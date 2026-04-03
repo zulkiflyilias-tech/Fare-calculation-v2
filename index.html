@@ -1,268 +1,607 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare Pro | West Malaysia</title>
-    
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        :root { 
-            --primary: #059669; 
-            --bg: #f1f5f9; 
-            --whatsapp: #128C7E; 
-            --card-bg: rgba(255, 255, 255, 0.95);
-        }
-        
-        body { 
-            font-family: 'Inter', system-ui, -apple-system, sans-serif; 
-            margin: 0; display: flex; height: 100dvh;
-            background: var(--bg); color: #0f172a; overflow: hidden;
-        }
-        
-        #sidebar { 
-            width: 400px; background: var(--card-bg); padding: 32px; 
-            box-shadow: 10px 0 30px rgba(0,0,0,0.05); z-index: 1000; 
-            display: flex; flex-direction: column; backdrop-filter: blur(10px);
-        }
-        
-        #map { flex-grow: 1; z-index: 1; }
 
-        .header { margin-bottom: 28px; }
-        h2 { margin: 0; font-size: 1.6rem; letter-spacing: -0.025em; }
-        .status-badge { 
-            display: inline-block; padding: 4px 12px; border-radius: 20px; 
-            background: #e2e8f0; color: #475569; font-size: 0.7rem; font-weight: 700; margin-top: 8px;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-        .input-group { margin-bottom: 20px; position: relative; }
-        label { display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 8px; font-size: 0.75rem; color: #64748b; }
-        
-        .locate-btn { color: #6366f1; cursor: pointer; font-size: 0.75rem; border: 1px solid #e2e8f0; padding: 2px 8px; border-radius: 6px; }
+<title>Rideshare MY | Peninsular Malaysia</title>
 
-        input { 
-            width: 100%; padding: 14px; border: 1px solid #e2e8f0; 
-            border-radius: 12px; font-size: 15px; box-sizing: border-box; transition: all 0.2s;
-            background: white;
-        }
-        input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.1); }
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
-        .autocomplete-results {
-            position: absolute; width: 100%; background: white; border-radius: 12px;
-            max-height: 240px; overflow-y: auto; z-index: 2000; display: none;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; margin-top: 5px;
-        }
-        .autocomplete-item { padding: 14px; cursor: pointer; font-size: 0.9em; border-bottom: 1px solid #f1f5f9; }
-        .autocomplete-item:hover { background: #f8fafc; }
+<style>
 
-        #results { 
-            margin-top: auto; padding: 24px; background: white; 
-            border-radius: 20px; display: none; border: 1px solid #e2e8f0;
-            animation: slideUp 0.3s ease-out;
-        }
+:root{
+--primary:#059669;
+--bg:#f1f5f9;
+--card:rgba(255,255,255,0.95);
+--whatsapp:#128C7E
+}
 
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+body{
+margin:0;
+display:flex;
+height:100vh;
+font-family:system-ui;
+background:var(--bg)
+}
 
-        .btn-whatsapp {
-            display: block; width: 100%; padding: 16px; background: var(--whatsapp); color: white;
-            text-align: center; text-decoration: none; border-radius: 12px; font-weight: 700;
-            transition: transform 0.2s;
-        }
-        .btn-whatsapp:active { transform: scale(0.98); }
+#map{flex:1}
 
-        @media (max-width: 768px) {
-            body { flex-direction: column; }
-            #sidebar { width: 100%; height: auto; max-height: 50%; padding: 20px; order: 2; }
-            #map { height: 50%; order: 1; }
-        }
-    </style>
+#sidebar{
+width:380px;
+padding:22px;
+background:var(--card);
+box-shadow:10px 0 30px rgba(0,0,0,0.05);
+display:flex;
+flex-direction:column;
+z-index:999
+}
+
+h2{margin:0;font-size:1.5rem}
+
+.input-group{
+margin:16px 0;
+position:relative
+}
+
+label{
+font-size:.75rem;
+font-weight:700;
+color:#64748b;
+display:flex;
+justify-content:space-between
+}
+
+input{
+width:100%;
+padding:14px;
+border-radius:10px;
+border:1px solid #e2e8f0;
+font-size:15px
+}
+
+input:focus{
+outline:none;
+border-color:var(--primary)
+}
+
+.locate-btn{
+cursor:pointer;
+font-size:.7rem;
+color:#6366f1
+}
+
+.swap-btn{
+margin:6px auto;
+padding:6px 12px;
+border:none;
+border-radius:8px;
+background:#e2e8f0;
+cursor:pointer;
+font-weight:600
+}
+
+.autocomplete-results{
+position:absolute;
+background:white;
+border-radius:10px;
+width:100%;
+max-height:220px;
+overflow:auto;
+display:none;
+border:1px solid #e2e8f0;
+z-index:2000
+}
+
+.autocomplete-item{
+padding:12px;
+cursor:pointer;
+border-bottom:1px solid #f1f5f9
+}
+
+.place-name{
+font-weight:700;
+font-size:.9rem
+}
+
+.place-address{
+font-size:.75rem;
+color:#64748b
+}
+
+.autocomplete-item:hover{
+background:#f8fafc
+}
+
+#results{
+margin-top:auto;
+padding:18px;
+border-radius:14px;
+border:1px solid #e2e8f0;
+background:white;
+display:none
+}
+
+.status{
+font-size:.8rem;
+color:#64748b;
+margin-bottom:8px
+}
+
+.route-option{
+padding:6px;
+border-radius:6px;
+cursor:pointer;
+margin-bottom:4px;
+font-size:.8rem;
+border:1px solid #e2e8f0
+}
+
+.route-option:hover{
+background:#f1f5f9
+}
+
+.btn{
+display:block;
+text-align:center;
+padding:14px;
+border-radius:10px;
+background:var(--whatsapp);
+color:white;
+text-decoration:none;
+font-weight:700
+}
+
+@media(max-width:768px){
+
+body{
+flex-direction:column;
+height:100vh;
+overflow:hidden
+}
+
+#sidebar{
+width:100%;
+padding:18px
+}
+
+#map{
+flex:1
+}
+
+}
+
+</style>
+
 </head>
+
 <body>
 
 <div id="sidebar">
-    <div class="header">
-        <h2>Rideshare MY</h2>
-        <div id="traffic-status" class="status-badge">Peninsular Malaysia Only</div>
-    </div>
 
-    <div class="input-group">
-        <label>Pickup Location <span class="locate-btn" onclick="getLocation()">📍 Use GPS</span></label>
-        <input type="text" id="pickup" placeholder="Enter pickup point" autocomplete="off">
-        <div id="pickup-results" class="autocomplete-results"></div>
-    </div>
+<h2>Rideshare MY</h2>
 
-    <div class="input-group">
-        <label>Dropoff Destination</label>
-        <input type="text" id="dropoff" placeholder="Where to?" autocomplete="off">
-        <div id="dropoff-results" class="autocomplete-results"></div>
-    </div>
+<div class="input-group">
 
-    <div id="results">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <div>
-                <div id="res-fare" style="font-size: 2rem; font-weight: 800; color: #0f172a;">RM 0</div>
-                <div id="res-distance" style="color: #64748b; font-size: 0.9rem;">0 km total</div>
-            </div>
-            <div style="text-align: right;">
-                <div id="res-eta" style="font-size: 1.2rem; font-weight: 700; color: var(--primary);">--</div>
-                <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Est. Travel Time</div>
-            </div>
-        </div>
-        <a href="#" id="whatsapp-link" class="btn-whatsapp" target="_blank">Book Ride via WhatsApp</a>
-    </div>
+<label>
+Pickup
+<span class="locate-btn" onclick="getLocation()">Use GPS</span>
+</label>
+
+<input id="pickup" placeholder="Enter pickup">
+<div id="pickup-results" class="autocomplete-results"></div>
+
+</div>
+
+<button class="swap-btn" onclick="swapLocations()">Swap</button>
+
+<div class="input-group">
+
+<label>Dropoff</label>
+
+<input id="dropoff" placeholder="Where to?">
+<div id="dropoff-results" class="autocomplete-results"></div>
+
+</div>
+
+<div id="results">
+
+<div id="status" class="status"></div>
+
+<div id="routes"></div>
+
+<div style="display:flex;justify-content:space-between;margin:12px 0">
+
+<div>
+<div id="fare" style="font-size:1.9rem;font-weight:800">RM 0</div>
+<div id="distance" style="color:#64748b">0 km</div>
+</div>
+
+<div style="text-align:right">
+<div id="eta" style="font-weight:700;color:var(--primary)">--</div>
+<div style="font-size:.7rem;color:#94a3b8">Travel Time</div>
+</div>
+
+</div>
+
+<a id="wa" class="btn" target="_blank">
+Book via WhatsApp
+</a>
+
+</div>
+
 </div>
 
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <script>
-    const CONFIG = { 
-        WHATSAPP_NUM: "60108988182", 
-        CENTER: [3.139, 101.686],
-        // Strictly West Malaysia (Peninsular) Bounding Box: [minLon, minLat, maxLon, maxLat]
-        BBOX: "99.6,1.2,103.5,6.7" 
-    };
 
-    let map = L.map('map', { zoomControl: false }).setView(CONFIG.CENTER, 13);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+const CONFIG={
+WHATSAPP:"60108988182",
+ORS_KEY:"YOUR_ORS_KEY",
+CENTER:[3.139,101.686],
+BBOX:"99.6,1.15,104.4,6.95",
+TRAFFIC_MULTIPLIER:1.25
+}
 
-    let pickupCoord, dropoffCoord, pickupMarker, dropoffMarker, routeLine;
-    let searchTimeout;
+const FARE={
+BASE:3,
+KM:1.25,
+MIN:8,
+MINUTE:0.40,
+TOLL_CITY:0.06,
+TOLL_HIGHWAY:0.18
+}
 
-    function getTrafficContext() {
-        const hour = new Date().getHours();
-        const day = new Date().getDay(); 
-        const isWeekend = (day === 0 || day === 6);
+const $=id=>document.getElementById(id)
 
-        if (hour >= 7 && hour <= 9 && !isWeekend) return { buffer: 1.5 }; 
-        if (hour >= 17 && hour <= 20 && !isWeekend) return { buffer: 1.6 }; 
-        return { buffer: 1.15 }; 
-    }
+let pickupCoord,dropoffCoord
+let pickupMarker,dropoffMarker
+let routes=[]
+let routeLayers=[]
+let selectedRoute=0
+let timer
 
-    map.on('click', async (e) => {
-        const name = await reverseGeocode(e.latlng.lat, e.latlng.lng);
-        if (!pickupCoord) setPickup([e.latlng.lat, e.latlng.lng], name);
-        else setDropoff([e.latlng.lat, e.latlng.lng], name);
-    });
+const map=L.map("map",{zoomControl:false}).setView(CONFIG.CENTER,13)
 
-    async function reverseGeocode(lat, lng) {
-        try {
-            const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
-            const d = await r.json();
-            return d.name || d.address.road || "Selected Location";
-        } catch (e) { return "Selected Location"; }
-    }
+L.tileLayer(
+"https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+{attribution:"© OpenStreetMap contributors"}
+).addTo(map)
 
-    function setPickup(coords, name) {
-        pickupCoord = coords;
-        document.getElementById('pickup').value = name;
-        if (pickupMarker) map.removeLayer(pickupMarker);
-        pickupMarker = L.circleMarker(coords, {radius: 8, color: '#059669', fillOpacity: 1}).addTo(map);
-        checkAndRoute();
-    }
+const fetchJSON=url=>fetch(url).then(r=>r.json())
 
-    function setDropoff(coords, name) {
-        dropoffCoord = coords;
-        document.getElementById('dropoff').value = name;
-        if (dropoffMarker) map.removeLayer(dropoffMarker);
-        dropoffMarker = L.circleMarker(coords, {radius: 8, color: '#ef4444', fillOpacity: 1}).addTo(map);
-        checkAndRoute();
-    }
+function formatETA(mins){
+const h=Math.floor(mins/60)
+const m=Math.round(mins%60)
+return h>0?`${h}h ${m}m`:`${m}m`
+}
 
-    async function checkAndRoute() {
-        if (!pickupCoord || !dropoffCoord) return;
-        
-        const url = `https://router.project-osrm.org/route/v1/driving/${pickupCoord[1]},${pickupCoord[0]};${dropoffCoord[1]},${dropoffCoord[0]}?overview=full&geometries=geojson`;
-        const r = await fetch(url);
-        const d = await r.json();
-        
-        if (d.routes && d.routes.length > 0) {
-            const route = d.routes[0];
-            if (routeLine) map.removeLayer(routeLine);
-            routeLine = L.geoJSON(route.geometry, {style: {color: '#059669', weight: 4, opacity: 0.8}}).addTo(map);
-            map.fitBounds(routeLine.getBounds(), {padding: [50, 50]});
-            
-            calculateFare(route.distance / 1000, route.duration / 60);
-        }
-    }
+function buildAddress(p){
+return [
+[p.housenumber,p.street].filter(Boolean).join(" "),
+p.city||p.district,
+p.state,
+p.country
+].filter(Boolean).join(", ")
+}
 
-    function calculateFare(km, baseMins) {
-        const traffic = getTrafficContext();
-        
-        const SETTINGS = {
-            BASE_START: 5.00,
-            PER_KM: 1.25,
-            PER_MINUTE: 0.30,
-            MINIMUM_FARE: 8.00
-        };
+function setPoint(type,coord,name){
 
-        const lightDelay = km < 4 ? 2 : 4; 
-        const totalMinutes = Math.round((baseMins * traffic.buffer) + lightDelay);
-        
-        const hours = Math.floor(totalMinutes / 60);
-        const mins = totalMinutes % 60;
-        const timeDisplay = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-        
-        let finalFare = SETTINGS.BASE_START + (km * SETTINGS.PER_KM) + (totalMinutes * SETTINGS.PER_MINUTE);
+if(type==="pickup") pickupCoord=coord
+else dropoffCoord=coord
 
-        if (finalFare < SETTINGS.MINIMUM_FARE) {
-            finalFare = SETTINGS.MINIMUM_FARE;
-        }
+$(type).value=name
 
-        finalFare = Math.ceil(finalFare);
+let marker=(type==="pickup")?pickupMarker:dropoffMarker
+if(marker) map.removeLayer(marker)
 
-        document.getElementById('results').style.display = 'block';
-        document.getElementById('res-fare').innerText = `RM ${finalFare}`;
-        document.getElementById('res-distance').innerText = `${km.toFixed(1)} km trip`;
-        document.getElementById('res-eta').innerText = timeDisplay;
+marker=L.circleMarker(coord,{
+radius:7,
+color:type==="pickup"?"#059669":"#ef4444",
+fillOpacity:1
+}).addTo(map)
 
-        // --- UPDATED WHATSAPP MESSAGE (Includes Distance) ---
-        const msg = `*Rideshare Booking Request*\n\n` +
-                    `*From:* ${document.getElementById('pickup').value}\n` +
-                    `*To:* ${document.getElementById('dropoff').value}\n\n` +
-                    `*Distance:* ${km.toFixed(2)} km\n` +
-                    `*⏱ Est. Time:* ${timeDisplay}\n` +
-                    `*Fare:* RM ${finalFare}`;
+if(type==="pickup") pickupMarker=marker
+else dropoffMarker=marker
 
-        document.getElementById('whatsapp-link').href = `https://wa.me/${CONFIG.WHATSAPP_NUM}?text=${encodeURIComponent(msg)}`;
-    }
+if(pickupCoord && dropoffCoord) routeTrip()
 
-    const search = (val, resId, type) => {
-        clearTimeout(searchTimeout);
-        if (val.length < 3) return;
-        searchTimeout = setTimeout(async () => {
-            // Apply West Malaysia bounding box to the search API
-            const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(val)}&limit=5&bbox=${CONFIG.BBOX}`;
-            const r = await fetch(url);
-            const d = await r.json();
-            const el = document.getElementById(resId);
-            el.innerHTML = d.features.map(f => {
-                const name = f.properties.name || "Unknown";
-                const city = f.properties.city ? `, ${f.properties.city}` : "";
-                return `<div class="autocomplete-item" onclick="select('${type}', [${f.geometry.coordinates[1]},${f.geometry.coordinates[0]}], '${name.replace(/'/g, "\\'")}')"><strong>${name}</strong><br><small>${city}</small></div>`;
-            }).join('');
-            el.style.display = 'block';
-        }, 400);
-    };
+}
 
-    window.select = (type, coords, name) => {
-        if (type === 'pickup') { setPickup(coords, name); }
-        else { setDropoff(coords, name); }
-        document.querySelectorAll('.autocomplete-results').forEach(i => i.style.display = 'none');
-    };
+async function routeTrip(){
 
-    document.getElementById('pickup').oninput = (e) => search(e.target.value, 'pickup-results', 'pickup');
-    document.getElementById('dropoff').oninput = (e) => search(e.target.value, 'dropoff-results', 'dropoff');
+$("status").innerText="Calculating routes..."
+$("results").style.display="block"
 
-    function getLocation() {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(async (pos) => {
-                const name = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
-                setPickup([pos.coords.latitude, pos.coords.longitude], name);
-                map.setView([pos.coords.latitude, pos.coords.longitude], 15);
-            });
-        }
-    }
+const res=await fetch(
+"https://api.openrouteservice.org/v2/directions/driving-car",
+{
+method:"POST",
+headers:{
+Authorization:CONFIG.ORS_KEY,
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+coordinates:[
+[pickupCoord[1],pickupCoord[0]],
+[dropoffCoord[1],dropoffCoord[0]]
+],
+alternative_routes:{
+share_factor:0.6,
+target_count:3
+},
+extra_info:["tollways"]
+})
+}
+)
+
+const data=await res.json()
+
+routes=data.routes||[]
+
+drawRoutes()
+
+$("status").innerText=""
+
+}
+
+function decodePolyline(str){
+
+let index=0,lat=0,lng=0,coordinates=[]
+
+while(index<str.length){
+
+let b,shift=0,result=0
+
+do{
+b=str.charCodeAt(index++)-63
+result|=(b&0x1f)<<shift
+shift+=5
+}while(b>=0x20)
+
+let dlat=((result&1)?~(result>>1):(result>>1))
+lat+=dlat
+
+shift=0
+result=0
+
+do{
+b=str.charCodeAt(index++)-63
+result|=(b&0x1f)<<shift
+shift+=5
+}while(b>=0x20)
+
+let dlng=((result&1)?~(result>>1):(result>>1))
+lng+=dlng
+
+coordinates.push([lat/1e5,lng/1e5])
+
+}
+
+return coordinates
+}
+
+function drawRoutes(){
+
+routeLayers.forEach(r=>map.removeLayer(r))
+routeLayers=[]
+
+$("routes").innerHTML=""
+
+routes.forEach((r,i)=>{
+
+const coords=decodePolyline(r.geometry)
+
+const line=L.polyline(coords,{
+color:i===0?"#059669":"#94a3b8",
+weight:i===0?5:3
+}).addTo(map)
+
+routeLayers.push(line)
+
+const km=r.summary.distance/1000
+const mins=(r.summary.duration/60)*CONFIG.TRAFFIC_MULTIPLIER
+
+const div=document.createElement("div")
+div.className="route-option"
+div.innerText=`Route ${i+1} • ${km.toFixed(1)} km • ${formatETA(mins)}`
+
+div.onclick=()=>{
+selectedRoute=i
+selectRoute()
+}
+
+$("routes").appendChild(div)
+
+})
+
+map.fitBounds(routeLayers[0].getBounds(),{padding:[40,40]})
+
+selectRoute()
+
+}
+
+function selectRoute(){
+
+const r=routes[selectedRoute]
+
+const km=r.summary.distance/1000
+const mins=(r.summary.duration/60)*CONFIG.TRAFFIC_MULTIPLIER
+
+let tollDetected=false
+
+if(r.extras && r.extras.tollways){
+tollDetected=true
+}
+
+calcFare(km,mins,tollDetected)
+
+}
+
+function calcFare(km,mins,tollDetected){
+
+let toll=0
+
+if(tollDetected){
+
+if(km<=12)
+toll=km*FARE.TOLL_CITY
+else
+toll=(12*FARE.TOLL_CITY)+((km-12)*FARE.TOLL_HIGHWAY)
+
+}
+
+let fare=
+FARE.BASE+
+(km*FARE.KM)+
+(mins*FARE.MINUTE)+
+toll
+
+if(fare<FARE.MIN) fare=FARE.MIN
+
+fare=Math.ceil(fare)
+
+$("fare").innerText=`RM ${fare}`
+$("distance").innerText=`${km.toFixed(1)} km`
+$("eta").innerText=formatETA(mins)
+
+const msg=
+`Ride Booking
+
+From: ${$("pickup").value}
+To: ${$("dropoff").value}
+
+Distance: ${km.toFixed(2)} km
+ETA: ${formatETA(mins)}
+Fare: RM ${fare}`
+
+$("wa").href=
+`https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(msg)}`
+
+}
+
+async function getLocation(){
+
+navigator.geolocation.getCurrentPosition(async p=>{
+
+const lat=p.coords.latitude
+const lng=p.coords.longitude
+
+const res=await fetchJSON(
+`https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`
+)
+
+let name="Current Location"
+
+if(res.features.length)
+name=buildAddress(res.features[0].properties)
+
+setPoint("pickup",[lat,lng],name)
+
+map.setView([lat,lng],15)
+
+})
+
+}
+
+function swapLocations(){
+
+if(!pickupCoord || !dropoffCoord) return
+
+const p=$("pickup").value
+const d=$("dropoff").value
+
+$("pickup").value=d
+$("dropoff").value=p
+
+const temp=pickupCoord
+pickupCoord=dropoffCoord
+dropoffCoord=temp
+
+routeTrip()
+
+}
+
+function renderResults(list,id,type){
+
+const el=$(id)
+
+el.innerHTML=""
+
+list.forEach(i=>{
+
+const p=i.properties
+const name=p.name||p.street||"Location"
+const address=buildAddress(p)
+
+const lat=i.geometry.coordinates[1]
+const lng=i.geometry.coordinates[0]
+
+const div=document.createElement("div")
+div.className="autocomplete-item"
+
+div.innerHTML=`
+<div class="place-name">${name}</div>
+<div class="place-address">${address}</div>
+`
+
+div.onclick=()=>{
+setPoint(type,[lat,lng],name)
+el.style.display="none"
+}
+
+el.appendChild(div)
+
+})
+
+el.style.display="block"
+
+}
+
+function search(val,id,type){
+
+clearTimeout(timer)
+
+if(val.length<3) return
+
+$("status").innerText="Searching location..."
+
+timer=setTimeout(async()=>{
+
+const p=await fetchJSON(
+`https://photon.komoot.io/api/?q=${val}&limit=6&bbox=${CONFIG.BBOX}`
+)
+
+renderResults(p.features||[],id,type)
+
+$("status").innerText=""
+
+},350)
+
+}
+
+$("pickup").oninput=e=>search(e.target.value,"pickup-results","pickup")
+$("dropoff").oninput=e=>search(e.target.value,"dropoff-results","dropoff")
+
+map.on("click",e=>{
+
+const lat=e.latlng.lat
+const lng=e.latlng.lng
+
+const label=`${lat.toFixed(5)}, ${lng.toFixed(5)}`
+
+if(!pickupCoord)
+setPoint("pickup",[lat,lng],label)
+else
+setPoint("dropoff",[lat,lng],label)
+
+})
+
 </script>
+
 </body>
 </html>
