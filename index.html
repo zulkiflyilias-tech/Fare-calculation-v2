@@ -334,7 +334,7 @@
         $("pickup").value = "Locating...";
         navigator.geolocation.getCurrentPosition(async p => {
             const lat = p.coords.latitude;
-  Qqqqqqqqqqqqqqqq          const lng = p.coords.longitude;
+  Qqq          const lng = p.coords.longitude;
             const address = await reverseGeocode(lat, lng);
             setPoint("pickup", [lat, lng], address);
             map.setView([lat, lng], 15);
