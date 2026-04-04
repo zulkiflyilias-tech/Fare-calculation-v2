@@ -168,9 +168,9 @@
             { upTo: 10, rate: 0.70 },
             { upTo: 25, rate: 1.00 },
             { upTo: 50, rate: 1.25 },
-            { upTo: 75, rate: 1.50 },
-            { upTo: 100, rate: 1.75 },
-            { upTo: Infinity, rate: 2.00 }
+            { upTo: 75, rate: 1.75 },
+            { upTo: 100, rate: 2.50 },
+            { upTo: Infinity, rate: 3.00 }
         ]
     };
 
@@ -210,7 +210,20 @@
     }
 
     function buildAddress(p) {
-        return [[p.housenumber, p.street].filter(Boolean).join(" "), p.city || p.district, p.state, p.country].filter(Boolean).join(", ");
+        if (!p) return "Unknown Location";
+        return [[p.name, p.housenumber, p.street].filter(Boolean).join(" "), p.city || p.district || p.town, p.state].filter(Boolean).join(", ");
+    }
+
+    async function reverseGeocode(lat, lng) {
+        try {
+            const res = await fetchJSON(`https://photon.komoot.io/reverse?lon=${lng}&lat=${lat}`);
+            if (res.features && res.features.length > 0) {
+                const p = res.features[0].properties;
+                // Try to get a specific name, otherwise fallback to a formatted address
+                return p.name || buildAddress(p);
+            }
+        } catch (e) { console.error("Geocoding error", e); }
+        return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     }
 
     function setPoint(type, coord, name) {
@@ -283,8 +296,10 @@
             const p = i.properties;
             const div = document.createElement("div");
             div.className = "autocomplete-item";
-            div.innerHTML = `<div class="place-name">${p.name || p.street || "Location"}</div><div class="place-address">${buildAddress(p)}</div>`;
-            div.onclick = () => { setPoint(type, [i.geometry.coordinates[1], i.geometry.coordinates[0]], p.name || p.street); el.style.display = "none"; };
+            const displayName = p.name || p.street || "Location";
+            const displayAddr = buildAddress(p);
+            div.innerHTML = `<div class="place-name">${displayName}</div><div class="place-address">${displayAddr}</div>`;
+            div.onclick = () => { setPoint(type, [i.geometry.coordinates[1], i.geometry.coordinates[0]], displayName); el.style.display = "none"; };
             el.appendChild(div);
         });
         el.style.display = "block";
@@ -304,19 +319,31 @@
     $("pickup").oninput = e => search(e.target.value, "pickup-results", "pickup");
     $("dropoff").oninput = e => search(e.target.value, "dropoff-results", "dropoff");
 
-    map.on("click", e => {
-        const name = `${e.latlng.lat.toFixed(5)},${e.latlng.lng.toFixed(5)}`;
-        if (!pickupCoord) setPoint("pickup", [e.latlng.lat, e.latlng.lng], name);
-        else setPoint("dropoff", [e.latlng.lat, e.latlng.lng], name);
+    map.on("click", async e => {
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+        // Show "Loading..." while fetching address
+        const targetId = !pickupCoord ? "pickup" : "dropoff";
+        $(targetId).value = "Locating...";
+        
+        const address = await reverseGeocode(lat, lng);
+        setPoint(targetId, [lat, lng], address);
     });
 
     function getLocation() {
-        navigator.geolocation.getCurrentPosition(p => {
-            setPoint("pickup", [p.coords.latitude, p.coords.longitude], "Current Location");
-            map.setView([p.coords.latitude, p.coords.longitude], 15);
+        $("pickup").value = "Locating...";
+        navigator.geolocation.getCurrentPosition(async p => {
+            const lat = p.coords.latitude;
+  Qqqqqqqqqqqqqqqq          const lng = p.coords.longitude;
+            const address = await reverseGeocode(lat, lng);
+            setPoint("pickup", [lat, lng], address);
+            map.setView([lat, lng], 15);
+        }, () => {
+            $("pickup").value = "";
+            alert("Could not access GPS.");
         });
     }
-</script>
+</script>qq
 
 </body>
 </html>
