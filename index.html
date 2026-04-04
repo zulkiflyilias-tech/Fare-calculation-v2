@@ -166,11 +166,11 @@
         MINUTE: 0.30,
         TIERS: [
             { upTo: 10, rate: 0.70 },
-            { upTo: 25, rate: 1.00 },
-            { upTo: 50, rate: 1.25 },
+            { upTo: 25, rate: 1.10 },
+            { upTo: 50, rate: 1.45 },
             { upTo: 75, rate: 1.75 },
-            { upTo: 100, rate: 2.50 },
-            { upTo: Infinity, rate: 3.00 }
+            { upTo: 100, rate: 2.00 },
+            { upTo: Infinity, rate: 2.50 }
         ]
     };
 
@@ -209,9 +209,20 @@
         return coordinates;
     }
 
+    // Improved logic to build a full address string
     function buildAddress(p) {
         if (!p) return "Unknown Location";
-        return [[p.name, p.housenumber, p.street].filter(Boolean).join(" "), p.city || p.district || p.town, p.state].filter(Boolean).join(", ");
+        const parts = [
+            p.name,
+            p.housenumber,
+            p.street,
+            p.district,
+            p.city || p.town || p.village,
+            p.state
+        ];
+        // Remove empty values and duplicates
+        const cleanParts = [...new Set(parts.filter(Boolean))];
+        return cleanParts.join(", ");
     }
 
     async function reverseGeocode(lat, lng) {
@@ -219,8 +230,7 @@
             const res = await fetchJSON(`https://photon.komoot.io/reverse?lon=${lng}&lat=${lat}`);
             if (res.features && res.features.length > 0) {
                 const p = res.features[0].properties;
-                // Try to get a specific name, otherwise fallback to a formatted address
-                return p.name || buildAddress(p);
+                return buildAddress(p);
             }
         } catch (e) { console.error("Geocoding error", e); }
         return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
@@ -322,7 +332,6 @@
     map.on("click", async e => {
         const lat = e.latlng.lat;
         const lng = e.latlng.lng;
-        // Show "Loading..." while fetching address
         const targetId = !pickupCoord ? "pickup" : "dropoff";
         $(targetId).value = "Locating...";
         
@@ -331,19 +340,23 @@
     });
 
     function getLocation() {
+        if (!navigator.geolocation) {
+            alert("Geolocation is not supported by your browser.");
+            return;
+        }
         $("pickup").value = "Locating...";
         navigator.geolocation.getCurrentPosition(async p => {
             const lat = p.coords.latitude;
-  Qqq          const lng = p.coords.longitude;
+            const lng = p.coords.longitude;
             const address = await reverseGeocode(lat, lng);
             setPoint("pickup", [lat, lng], address);
             map.setView([lat, lng], 15);
         }, () => {
             $("pickup").value = "";
-            alert("Could not access GPS.");
+            alert("Could not access GPS. Please ensure location permissions are enabled.");
         });
     }
-</script>qq
+</script>
 
 </body>
 </html>
