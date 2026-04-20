@@ -110,7 +110,7 @@
     <div id="results">
         <div class="fare-row">
             <div id="fare">RM 0</div>
-            <div id="eta" style="color: #4ade80; font-weight: 700;">-- mins</div>
+            <div id="eta" style="color: #4ade80; font-weight: 700;">--</div>
         </div>
         <div class="stats">
             <span id="distance">0 km</span>
@@ -248,13 +248,19 @@
 
         const finalTotal = Math.ceil(baseTotal * multiplier);
 
+        // Format duration into Hour and Minutes
+        const roundedMins = Math.round(mins);
+        const h = Math.floor(roundedMins / 60);
+        const m = roundedMins % 60;
+        const timeStr = h > 0 ? `${h} hr ${m} min` : `${m} min`;
+
         $("results").style.display = 'block';
         $("fare").innerText = `RM ${finalTotal}`;
         $("distance").innerText = `${km.toFixed(1)} km`;
-        $("eta").innerText = `${Math.round(mins)} mins`;
+        $("eta").innerText = timeStr;
         $("surge-label").innerText = label;
 
-        const msg = `*Fare Estimate (Novelty Resources)*\n\n*Departure:* ${depTime.toLocaleString()}\n*From:* ${$("pickup").value}\n*To:* ${$("dropoff").value}\n\n*Distance:* ${km.toFixed(1)}km\n*Estimate:* RM ${finalTotal}\n*Note:* ${label}`;
+        const msg = `*Fare Estimate (Novelty Resources)*\n\n*Departure:* ${depTime.toLocaleString()}\n*From:* ${$("pickup").value}\n*To:* ${$("dropoff").value}\n\n*Distance:* ${km.toFixed(1)}km\n*Travel Time:* ${timeStr}\n*Estimate:* RM ${finalTotal}\n*Note:* ${label}`;
         $("wa").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(msg)}`;
     }
 
@@ -285,7 +291,6 @@
             const lon = pos.coords.longitude;
             
             try {
-                // Reverse Geocode to get full address
                 const res = await fetch(`https://photon.komoot.io/reverse?lon=${lon}&lat=${lat}`);
                 const data = await res.json();
                 const p = data.features[0].properties;
