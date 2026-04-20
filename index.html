@@ -35,12 +35,11 @@
         }
         input:focus { outline: none; border-color: var(--primary); background: #fff; }
 
-        #departure-time { cursor: pointer; color: var(--text-main); font-weight: 600; }
-
         .gps-btn {
             position: absolute; right: 8px; background: none; border: none; cursor: pointer;
             color: var(--primary); padding: 8px; display: flex; align-items: center;
         }
+        .gps-btn.loading { opacity: 0.5; pointer-events: none; }
 
         .autocomplete-results {
             position: absolute; width: 100%; background: white; border-radius: 12px;
@@ -93,7 +92,7 @@
         <label>2. Pickup Location</label>
         <div class="search-wrapper">
             <input id="pickup" placeholder="Search pickup..." autocomplete="off">
-            <button id="gps-trigger" class="gps-btn">
+            <button id="gps-trigger" class="gps-btn" title="Use current location">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
             </button>
         </div>
@@ -172,11 +171,13 @@
         const list = $(resultId);
         list.innerHTML = features.map(f => {
             const p = f.properties;
-            const name = p.name || p.street || 'Selected Location';
-            const address = [p.city, p.state].filter(Boolean).join(', ');
+            const name = p.name || p.street || '';
+            const address = [p.street, p.district, p.city, p.state].filter(Boolean).join(', ');
+            const fullLabel = [name, address].filter(Boolean).join(', ');
+            
             return `
-                <div class="autocomplete-item" onclick="selectLocation('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${name.replace(/'/g, "\\'")}')">
-                    <span class="place-name">${name}</span>
+                <div class="autocomplete-item" onclick="selectLocation('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${fullLabel.replace(/'/g, "\\'")}')">
+                    <span class="place-name">${name || p.city || 'Location'}</span>
                     <span class="place-address">${address}</span>
                 </div>
             `;
@@ -207,6 +208,7 @@
                 body: JSON.stringify({ coordinates: [[pickupCoord[1], pickupCoord[0]], [dropoffCoord[1], dropoffCoord[0]]] })
             });
             const data = await res.json();
+            if (!data.routes) throw new Error();
             const route = data.routes[0];
             
             if (routeLayer) map.removeLayer(routeLayer);
@@ -223,23 +225,16 @@
         let lastLimit = 0;
         let activeMinuteRate = 0.45;
 
-        // Apply Tiered Distance Rates & Determine Time Rate
         for (const tier of FARE_ENGINE.TIERS) {
             if (remaining <= 0) break;
             let currentSegment = Math.min(remaining, tier.upTo - lastLimit);
             distCost += currentSegment * tier.rate;
-            
-            if (km > lastLimit) {
-                activeMinuteRate = tier.timeRate;
-            }
-            
+            if (km > lastLimit) activeMinuteRate = tier.timeRate;
             remaining -= currentSegment;
             lastLimit = tier.upTo;
         }
 
         let baseTotal = FARE_ENGINE.BASE + distCost + (mins * activeMinuteRate);
-
-        // Time-Based Surge Logic
         const depTime = new Date($("departure-time").value);
         const hour = depTime.getHours() + (depTime.getMinutes() / 60);
         let multiplier = 1.0;
@@ -282,9 +277,32 @@
     $("departure-time").onchange = () => { if (pickupCoord && dropoffCoord) calculateRoute(); };
     
     $("gps-trigger").onclick = () => {
-        navigator.geolocation.getCurrentPosition(pos => {
-            selectLocation('pickup', [pos.coords.latitude, pos.coords.longitude], "Current Location");
-            map.setView([pos.coords.latitude, pos.coords.longitude], 15);
+        const btn = $("gps-trigger");
+        btn.classList.add('loading');
+        
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            
+            try {
+                // Reverse Geocode to get full address
+                const res = await fetch(`https://photon.komoot.io/reverse?lon=${lon}&lat=${lat}`);
+                const data = await res.json();
+                const p = data.features[0].properties;
+                
+                const name = p.name || p.street || '';
+                const address = [p.street, p.district, p.city, p.postcode, p.state].filter(Boolean).join(', ');
+                const fullAddress = [name, address].filter(Boolean).join(', ');
+                
+                selectLocation('pickup', [lat, lon], fullAddress);
+                map.setView([lat, lon], 16);
+            } catch (e) {
+                selectLocation('pickup', [lat, lon], `GPS: ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+            }
+            btn.classList.remove('loading');
+        }, () => {
+            alert("Unable to retrieve location.");
+            btn.classList.remove('loading');
         });
     };
 
