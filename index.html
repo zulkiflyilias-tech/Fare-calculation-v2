@@ -12,6 +12,7 @@
             --card: #ffffff;
             --whatsapp: #25D366;
             --text-main: #1e293b;
+            --slate-400: #94a3b8;
         }
 
         body { margin: 0; display: flex; height: 100vh; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text-main); }
@@ -19,6 +20,7 @@
         #sidebar {
             width: 400px; padding: 24px; background: var(--card);
             box-shadow: 4px 0 15px rgba(0,0,0,0.08); display: flex; flex-direction: column; z-index: 1000;
+            overflow-y: auto;
         }
 
         .header { margin-bottom: 20px; }
@@ -26,8 +28,15 @@
         .header p { margin: 4px 0 0; font-size: 0.85rem; color: #64748b; font-weight: 500; }
 
         .input-group { margin-bottom: 16px; position: relative; }
-        label { display: block; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; margin-bottom: 6px; color: #94a3b8; letter-spacing: 0.5px; }
+        .label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        label { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: var(--slate-400); letter-spacing: 0.5px; }
         
+        .util-btn {
+            background: #f1f5f9; border: none; padding: 4px 10px; border-radius: 6px;
+            font-size: 0.7rem; font-weight: 700; cursor: pointer; color: #475569; transition: 0.2s;
+        }
+        .util-btn:hover { background: #e2e8f0; color: var(--primary); }
+
         .search-wrapper { position: relative; display: flex; align-items: center; }
         input {
             width: 100%; box-sizing: border-box; padding: 12px 16px; border: 2px solid #f1f5f9;
@@ -39,37 +48,45 @@
             position: absolute; right: 8px; background: none; border: none; cursor: pointer;
             color: var(--primary); padding: 8px; display: flex; align-items: center;
         }
-        .gps-btn.loading { opacity: 0.5; pointer-events: none; }
 
         .autocomplete-results {
             position: absolute; width: 100%; background: white; border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: none; z-index: 2000; margin-top: 4px; border: 1px solid #e2e8f0;
-            max-height: 250px; overflow-y: auto;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: none; z-index: 2000; margin-top: 4px; 
+            border: 1px solid #e2e8f0; max-height: 250px; overflow-y: auto;
         }
-        .autocomplete-item { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f1f5f9; }
+        .autocomplete-item { padding: 14px 16px; cursor: pointer; border-bottom: 1px solid #f1f5f9; min-height: 50px; }
         .autocomplete-item:hover { background: #f8fafc; }
         .place-name { font-weight: 700; font-size: 0.9rem; display: block; color: var(--text-main); }
         .place-address { font-size: 0.75rem; color: #64748b; display: block; }
 
         #results {
             margin-top: auto; padding: 20px; border-radius: 16px; background: #1e293b;
-            color: white; display: none;
+            color: white; display: none; min-height: 120px;
         }
+
+        /* Loading Spinner */
+        #loading-state { display: none; text-align: center; padding: 10px 0; }
+        .spinner {
+            width: 28px; height: 28px; border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: var(--primary); border-radius: 50%;
+            animation: spin 0.8s linear infinite; margin: 0 auto 10px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
         .fare-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
         #fare { font-size: 2rem; font-weight: 800; color: #fff; }
-        .stats { display: flex; gap: 8px; font-size: 0.8rem; color: #94a3b8; }
+        .stats { display: flex; gap: 8px; font-size: 0.8rem; color: var(--slate-400); }
         #surge-label { color: #fbbf24; font-weight: 600; text-transform: uppercase; font-size: 0.7rem; }
 
         .btn {
             display: block; width: 100%; text-align: center; padding: 14px; border-radius: 12px;
-            background: var(--whatsapp); color: white; text-decoration: none; font-weight: 800;
-            margin-top: 15px;
+            background: var(--whatsapp); color: white; text-decoration: none; font-weight: 800; margin-top: 15px;
         }
 
         @media(max-width: 768px) {
             body { flex-direction: column; }
             #sidebar { width: 100%; height: auto; padding: 15px; }
-            #map { height: 30vh; }
+            #map { height: 35vh; }
         }
     </style>
 </head>
@@ -83,13 +100,19 @@
 
     <div class="input-group">
         <label>1. Scheduled Departure</label>
-        <div class="search-wrapper">
+        <div class="search-wrapper" style="margin-top:6px;">
             <input type="datetime-local" id="departure-time">
         </div>
     </div>
 
     <div class="input-group">
-        <label>2. Pickup Location</label>
+        <div class="label-row">
+            <label>2. Pickup Location</label>
+            <div style="display: flex; gap: 6px;">
+                <button id="swap-btn" class="util-btn">⇅ Swap</button>
+                <button id="clear-btn" class="util-btn">✕ Clear</button>
+            </div>
+        </div>
         <div class="search-wrapper">
             <input id="pickup" placeholder="Search pickup..." autocomplete="off">
             <button id="gps-trigger" class="gps-btn" title="Use current location">
@@ -101,23 +124,30 @@
 
     <div class="input-group">
         <label>3. Dropoff Location</label>
-        <div class="search-wrapper">
+        <div class="search-wrapper" style="margin-top:6px;">
             <input id="dropoff" placeholder="Search destination..." autocomplete="off">
         </div>
         <div id="dropoff-results" class="autocomplete-results"></div>
     </div>
 
     <div id="results">
-        <div class="fare-row">
-            <div id="fare">RM 0</div>
-            <div id="eta" style="color: #4ade80; font-weight: 700;">--</div>
+        <div id="loading-state">
+            <div class="spinner"></div>
+            <p style="font-size: 0.75rem; color: var(--slate-400);">Calculating Fare...</p>
         </div>
-        <div class="stats">
-            <span id="distance">0 km</span>
-            <span>•</span>
-            <span id="surge-label">Standard Rate</span>
+        
+        <div id="fare-content">
+            <div class="fare-row">
+                <div id="fare">RM 0</div>
+                <div id="eta" style="color: #4ade80; font-weight: 700;">--</div>
+            </div>
+            <div class="stats">
+                <span id="distance">0 km</span>
+                <span>•</span>
+                <span id="surge-label">Standard Rate</span>
+            </div>
+            <a id="wa" class="btn" target="_blank">Send Estimate to WhatsApp</a>
         </div>
-        <a id="wa" class="btn" target="_blank">Send Estimate to WhatsApp</a>
     </div>
 </div>
 
@@ -131,6 +161,17 @@
         CENTER: [3.139, 101.686],
         BBOX: "99.5,1.2,103.6,6.8",
         TRAFFIC_MULTIPLIER: 1.25 
+    };
+
+    const icons = {
+        pickup: L.divIcon({
+            html: `<svg width="32" height="32" viewBox="0 0 24 24" fill="#059669" stroke="white" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5" fill="white"/></svg>`,
+            className: '', iconSize: [32, 32], iconAnchor: [16, 32]
+        }),
+        dropoff: L.divIcon({
+            html: `<svg width="32" height="32" viewBox="0 0 24 24" fill="#1e293b" stroke="white" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><rect x="10" y="7" width="4" height="4" fill="white"/></svg>`,
+            className: '', iconSize: [32, 32], iconAnchor: [16, 32]
+        })
     };
 
     const FARE_ENGINE = {
@@ -173,13 +214,11 @@
             const name = p.name || p.street || '';
             const address = [p.street, p.district, p.city, p.state].filter(Boolean).join(', ');
             const fullLabel = [name, address].filter(Boolean).join(', ');
-            
             return `
                 <div class="autocomplete-item" onclick="selectLocation('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${fullLabel.replace(/'/g, "\\'")}')">
                     <span class="place-name">${name || p.city || 'Location'}</span>
                     <span class="place-address">${address}</span>
-                </div>
-            `;
+                </div>`;
         }).join('');
         list.style.display = features.length ? 'block' : 'none';
     }
@@ -190,16 +229,20 @@
         if (type === 'pickup') {
             pickupCoord = coord;
             if (pickupMarker) map.removeLayer(pickupMarker);
-            pickupMarker = L.circleMarker(coord, { radius: 8, fillColor: '#059669', color: '#fff', fillOpacity: 1 }).addTo(map);
+            pickupMarker = L.marker(coord, { icon: icons.pickup }).addTo(map);
         } else {
             dropoffCoord = coord;
             if (dropoffMarker) map.removeLayer(dropoffMarker);
-            dropoffMarker = L.circleMarker(coord, { radius: 8, fillColor: '#1e293b', color: '#fff', fillOpacity: 1 }).addTo(map);
+            dropoffMarker = L.marker(coord, { icon: icons.dropoff }).addTo(map);
         }
         if (pickupCoord && dropoffCoord) calculateRoute();
     }
 
     async function calculateRoute() {
+        $("results").style.display = 'block';
+        $("fare-content").style.display = 'none';
+        $("loading-state").style.display = 'block';
+
         try {
             const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car", {
                 method: "POST",
@@ -215,15 +258,17 @@
             map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
 
             processFare(route.summary.distance / 1000, (route.summary.duration / 60) * CONFIG.TRAFFIC_MULTIPLIER);
-        } catch (e) { alert("Route calculation failed."); }
+            
+            $("loading-state").style.display = 'none';
+            $("fare-content").style.display = 'block';
+        } catch (e) { 
+            $("results").style.display = 'none';
+            alert("Route calculation failed."); 
+        }
     }
 
     function processFare(km, mins) {
-        let distCost = 0;
-        let remaining = km;
-        let lastLimit = 0;
-        let activeMinuteRate = 0.45;
-
+        let distCost = 0, remaining = km, lastLimit = 0, activeMinuteRate = 0.45;
         for (const tier of FARE_ENGINE.TIERS) {
             if (remaining <= 0) break;
             let currentSegment = Math.min(remaining, tier.upTo - lastLimit);
@@ -236,23 +281,16 @@
         let baseTotal = FARE_ENGINE.BASE + distCost + (mins * activeMinuteRate);
         const depTime = new Date($("departure-time").value);
         const hour = depTime.getHours() + (depTime.getMinutes() / 60);
-        let multiplier = 1.0;
-        let label = "Standard Rate";
+        let multiplier = 1.0, label = "Standard Rate";
 
-        if (hour >= 0 && hour < 6) {
-            multiplier = 1.5; label = "Midnight Surcharge (+50%)";
-        } else if ((hour >= 7 && hour <= 9.5) || (hour >= 17 && hour <= 20)) {
-            multiplier = 1.2; label = "Peak Hour Surge (+20%)";
-        }
+        if (hour >= 0 && hour < 6) { multiplier = 1.5; label = "Midnight Surcharge (+50%)"; }
+        else if ((hour >= 7 && hour <= 9.5) || (hour >= 17 && hour <= 20)) { multiplier = 1.2; label = "Peak Hour Surge (+20%)"; }
 
         const finalTotal = Math.ceil(baseTotal * multiplier);
-
         const roundedMins = Math.round(mins);
-        const h = Math.floor(roundedMins / 60);
-        const m = roundedMins % 60;
+        const h = Math.floor(roundedMins / 60), m = roundedMins % 60;
         const timeStr = h > 0 ? `${h} hr ${m} min` : `${m} min`;
 
-        $("results").style.display = 'block';
         $("fare").innerText = `RM ${finalTotal}`;
         $("distance").innerText = `${km.toFixed(1)} km`;
         $("eta").innerText = timeStr;
@@ -276,43 +314,48 @@
         return coordinates;
     }
 
+    $("swap-btn").onclick = () => {
+        const pV = $("pickup").value, dV = $("dropoff").value, pC = pickupCoord, dC = dropoffCoord;
+        if (!pC && !dC) return;
+        $("pickup").value = dV; $("dropoff").value = pV;
+        pickupCoord = dC; dropoffCoord = pC;
+        if (pickupMarker) map.removeLayer(pickupMarker);
+        if (dropoffMarker) map.removeLayer(dropoffMarker);
+        if (pickupCoord) pickupMarker = L.marker(pickupCoord, { icon: icons.pickup }).addTo(map);
+        if (dropoffCoord) dropoffMarker = L.marker(dropoffCoord, { icon: icons.dropoff }).addTo(map);
+        if (pickupCoord && dropoffCoord) calculateRoute();
+    };
+
+    $("clear-btn").onclick = () => {
+        pickupCoord = dropoffCoord = null;
+        $("pickup").value = ""; $("dropoff").value = "";
+        if (routeLayer) map.removeLayer(routeLayer);
+        if (pickupMarker) map.removeLayer(pickupMarker);
+        if (dropoffMarker) map.removeLayer(dropoffMarker);
+        $("results").style.display = 'none';
+        map.setView(CONFIG.CENTER, 13);
+    };
+
     $("pickup").oninput = e => search(e.target.value, "pickup-results", "pickup");
     $("dropoff").oninput = e => search(e.target.value, "dropoff-results", "dropoff");
     $("departure-time").onchange = () => { if (pickupCoord && dropoffCoord) calculateRoute(); };
     
     $("gps-trigger").onclick = () => {
-        const btn = $("gps-trigger");
-        btn.classList.add('loading');
-        
         navigator.geolocation.getCurrentPosition(async (pos) => {
-            const lat = pos.coords.latitude;
-            const lon = pos.coords.longitude;
-            
+            const lat = pos.coords.latitude, lon = pos.coords.longitude;
             try {
                 const res = await fetch(`https://photon.komoot.io/reverse?lon=${lon}&lat=${lat}`);
                 const data = await res.json();
                 const p = data.features[0].properties;
-                
-                const name = p.name || p.street || '';
-                const address = [p.street, p.district, p.city, p.postcode, p.state].filter(Boolean).join(', ');
-                const fullAddress = [name, address].filter(Boolean).join(', ');
-                
-                selectLocation('pickup', [lat, lon], fullAddress);
+                const full = [p.name, p.street, p.city].filter(Boolean).join(', ');
+                selectLocation('pickup', [lat, lon], full || "Current Location");
                 map.setView([lat, lon], 16);
-            } catch (e) {
-                selectLocation('pickup', [lat, lon], `GPS: ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
-            }
-            btn.classList.remove('loading');
-        }, () => {
-            alert("Unable to retrieve location.");
-            btn.classList.remove('loading');
-        });
+            } catch (e) { selectLocation('pickup', [lat, lon], "My Location"); }
+        }, () => alert("Location access denied."));
     };
 
     document.addEventListener('click', e => {
-        if (!e.target.closest('.input-group')) {
-            document.querySelectorAll('.autocomplete-results').forEach(el => el.style.display = 'none');
-        }
+        if (!e.target.closest('.input-group')) document.querySelectorAll('.autocomplete-results').forEach(el => el.style.display = 'none');
     });
 </script>
 </body>
