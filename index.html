@@ -136,10 +136,9 @@
     const FARE_ENGINE = {
         BASE: 5.00,
         TIERS: [
-            { upTo: 25,  rate: 1.25, timeRate: 0.45 }, 
-            { upTo: 50,  rate: 1.50, timeRate: 0.45 }, 
-            { upTo: 100, rate: 1.85, timeRate: 0.45 }, 
-            { upTo: Infinity, rate: 2.30, timeRate: 0.60 } 
+            { upTo: 50,  rate: 1.25, timeRate: 0.45 }, 
+            { upTo: 100, rate: 1.50, timeRate: 0.45 }, 
+            { upTo: Infinity, rate: 2.00, timeRate: 0.60 } 
         ]
     };
 
@@ -248,7 +247,6 @@
 
         const finalTotal = Math.ceil(baseTotal * multiplier);
 
-        // Format duration into Hour and Minutes
         const roundedMins = Math.round(mins);
         const h = Math.floor(roundedMins / 60);
         const m = roundedMins % 60;
