@@ -59,7 +59,7 @@
         .fare-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
         #fare { font-size: 2rem; font-weight: 800; color: #fff; }
         .stats { display: flex; gap: 8px; font-size: 0.8rem; color: #94a3b8; }
-        #surge-label { color: #fbbf24; font-weight: 600; }
+        #surge-label { color: #fbbf24; font-weight: 600; text-transform: uppercase; font-size: 0.7rem; }
 
         .btn {
             display: block; width: 100%; text-align: center; padding: 14px; border-radius: 12px;
@@ -116,7 +116,7 @@
         <div class="stats">
             <span id="distance">0 km</span>
             <span>•</span>
-            <span id="surge-label">Standard</span>
+            <span id="surge-label">Standard Rate</span>
         </div>
         <a id="wa" class="btn" target="_blank">Send Estimate to WhatsApp</a>
     </div>
@@ -137,29 +137,25 @@
     const FARE_ENGINE = {
         BASE: 5.00,
         TIERS: [
-            { upTo: 5,   rate: 1.00 }, 
-            { upTo: 15,  rate: 1.25 }, 
-            { upTo: 50,  rate: 1.50 }, 
-            { upTo: 100, rate: 1.85 }, 
-            { upTo: Infinity, rate: 2.30 } 
+            { upTo: 25,  rate: 1.25, timeRate: 0.45 }, 
+            { upTo: 50,  rate: 1.50, timeRate: 0.45 }, 
+            { upTo: 100, rate: 1.85, timeRate: 0.45 }, 
+            { upTo: Infinity, rate: 2.30, timeRate: 0.60 } 
         ]
     };
 
     const $ = id => document.getElementById(id);
     let pickupCoord, dropoffCoord, routeLayer, pickupMarker, dropoffMarker, timer;
 
-    // Initialize Map
     const map = L.map("map", { zoomControl: false }).setView(CONFIG.CENTER, 13);
     L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png").addTo(map);
 
-    // 1. Setup Departure Time Default
     window.onload = () => {
         const now = new Date();
         now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
         $("departure-time").value = now.toISOString().slice(0, 16);
     };
 
-    // 2. Search Logic
     async function search(val, resultId, type) {
         clearTimeout(timer);
         if (val.length < 3) { $(resultId).style.display = 'none'; return; }
@@ -179,7 +175,7 @@
             const name = p.name || p.street || 'Selected Location';
             const address = [p.city, p.state].filter(Boolean).join(', ');
             return `
-                <div class="autocomplete-item" onclick="selectLocation('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${name}')">
+                <div class="autocomplete-item" onclick="selectLocation('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${name.replace(/'/g, "\\'")}')">
                     <span class="place-name">${name}</span>
                     <span class="place-address">${address}</span>
                 </div>
@@ -203,7 +199,6 @@
         if (pickupCoord && dropoffCoord) calculateRoute();
     }
 
-    // 3. Route & Fare Logic
     async function calculateRoute() {
         try {
             const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car", {
@@ -219,25 +214,32 @@
             map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
 
             processFare(route.summary.distance / 1000, (route.summary.duration / 60) * CONFIG.TRAFFIC_MULTIPLIER);
-        } catch (e) { alert("Route calculation failed. Try again."); }
+        } catch (e) { alert("Route calculation failed."); }
     }
 
     function processFare(km, mins) {
-        // Distance Calculation
-        let distCost = 0, remaining = km, lastLimit = 0;
+        let distCost = 0;
+        let remaining = km;
+        let lastLimit = 0;
+        let activeMinuteRate = 0.45;
+
+        // Apply Tiered Distance Rates & Determine Time Rate
         for (const tier of FARE_ENGINE.TIERS) {
             if (remaining <= 0) break;
             let currentSegment = Math.min(remaining, tier.upTo - lastLimit);
             distCost += currentSegment * tier.rate;
+            
+            if (km > lastLimit) {
+                activeMinuteRate = tier.timeRate;
+            }
+            
             remaining -= currentSegment;
             lastLimit = tier.upTo;
         }
 
-        // Time Calculation
-        const activeMinuteRate = (km < 50) ? 0.45 : 0.65;
-        let total = FARE_ENGINE.BASE + distCost + (mins * activeMinuteRate);
+        let baseTotal = FARE_ENGINE.BASE + distCost + (mins * activeMinuteRate);
 
-        // Surge Multipliers
+        // Time-Based Surge Logic
         const depTime = new Date($("departure-time").value);
         const hour = depTime.getHours() + (depTime.getMinutes() / 60);
         let multiplier = 1.0;
@@ -249,21 +251,18 @@
             multiplier = 1.2; label = "Peak Hour Surge (+20%)";
         }
 
-        const finalTotal = Math.ceil(total * multiplier);
+        const finalTotal = Math.ceil(baseTotal * multiplier);
 
-        // Update UI
         $("results").style.display = 'block';
         $("fare").innerText = `RM ${finalTotal}`;
         $("distance").innerText = `${km.toFixed(1)} km`;
         $("eta").innerText = `${Math.round(mins)} mins`;
         $("surge-label").innerText = label;
 
-        // WhatsApp Link
-        const msg = `*Fare Estimate (Novelty Resources)*\n\n*Time:* ${depTime.toLocaleString()}\n*From:* ${$("pickup").value}\n*To:* ${$("dropoff").value}\n\n*Distance:* ${km.toFixed(1)}km\n*Total Fare:* RM ${finalTotal}\n*Note:* ${label}`;
+        const msg = `*Fare Estimate (Novelty Resources)*\n\n*Departure:* ${depTime.toLocaleString()}\n*From:* ${$("pickup").value}\n*To:* ${$("dropoff").value}\n\n*Distance:* ${km.toFixed(1)}km\n*Estimate:* RM ${finalTotal}\n*Note:* ${label}`;
         $("wa").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(msg)}`;
     }
 
-    // Helpers
     function decodePoly(str) {
         let index = 0, lat = 0, lng = 0, coordinates = [];
         while (index < str.length) {
@@ -278,14 +277,13 @@
         return coordinates;
     }
 
-    // Events
     $("pickup").oninput = e => search(e.target.value, "pickup-results", "pickup");
     $("dropoff").oninput = e => search(e.target.value, "dropoff-results", "dropoff");
     $("departure-time").onchange = () => { if (pickupCoord && dropoffCoord) calculateRoute(); };
     
     $("gps-trigger").onclick = () => {
         navigator.geolocation.getCurrentPosition(pos => {
-            selectLocation('pickup', [pos.coords.latitude, pos.coords.longitude], "My Current Location");
+            selectLocation('pickup', [pos.coords.latitude, pos.coords.longitude], "Current Location");
             map.setView([pos.coords.latitude, pos.coords.longitude], 15);
         });
     };
