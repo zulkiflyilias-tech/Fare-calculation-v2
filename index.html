@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare Fare Estimator</title>
+    <title>Rideshare MY - Fare Estimator</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -207,7 +207,12 @@
         };
 
         const FARE = {
-            TAXI: { FLAG: 3.00, INCLUDED_KM: 1.0, PER_KM: 1.25, PER_MIN: 0.42 },
+            TAXI: { 
+                FLAG: 3.00, 
+                INCLUDED_KM: 1.0, 
+                RATE_PER_KM: 1.25, 
+                RATE_PER_MIN: 0.42 
+            },
             OUTSIDE_RATE: 2.20 
         };
 
@@ -329,9 +334,9 @@
                 mode = "Taxi Meter";
                 totalFare = FARE.TAXI.FLAG;
                 if (km > FARE.TAXI.INCLUDED_KM) {
-                    totalFare += Math.ceil((km - FARE.TAXI.INCLUDED_KM) * 1000 / 200) * FARE.TAXI.PER_200M;
+                    totalFare += (km - FARE.TAXI.INCLUDED_KM) * FARE.TAXI.RATE_PER_KM;
                 }
-                totalFare += Math.floor((mins * 60) / 36) * FARE.TAXI.PER_36SEC;
+                totalFare += mins * FARE.TAXI.RATE_PER_MIN;
             } else {
                 mode = "Outstation Rate";
                 totalFare = km * FARE.OUTSIDE_RATE;
@@ -350,7 +355,6 @@
             $("eta").innerText = `${Math.round(mins)} min`;
             $("mode-badge").innerText = mode;
 
-            // FIXED: Added missing ${} for pickupCoord access
             const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${pickupCoord[0]},${pickupCoord[1]}&destination=${dropoffCoord[0]},${dropoffCoord[1]}&travelmode=driving`;
             $("nav-btn").href = mapsUrl;
 
