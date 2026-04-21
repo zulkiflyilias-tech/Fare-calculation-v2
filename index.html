@@ -1,4 +1,158 @@
-ló</head>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Rideshare MY - Fare Estimator</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        :root {
+            --primary: #059669;
+            --primary-hover: #047857;
+            --whatsapp: #25D366;
+            --bg: #f3f4f6;
+            --text: #1f2937;
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            margin: 0; 
+            background: var(--bg); 
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .search-panel {
+            background: white;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1001;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 12px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 4px;
+            color: #6b7280;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+
+        .gps-btn {
+            position: absolute;
+            right: 10px;
+            top: 28px;
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        .autocomplete-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #d1d5db;
+            z-index: 2000;
+            max-height: 250px;
+            overflow-y: auto;
+            display: none;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .autocomplete-item {
+            padding: 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .autocomplete-item:hover { background: #f9fafb; }
+        .place-name { display: block; font-weight: 600; font-size: 14px; }
+        .place-address { font-size: 12px; color: #6b7280; }
+
+        #map { flex-grow: 1; width: 100%; z-index: 1; }
+
+        .results-card {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+            z-index: 1002;
+            display: none;
+        }
+
+        .fare-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        #fare { font-size: 28px; font-weight: 800; color: var(--primary); margin: 0; }
+        #mode-badge { 
+            background: #ecfdf5; 
+            color: var(--primary); 
+            padding: 4px 8px; 
+            border-radius: 6px; 
+            font-size: 12px; 
+            font-weight: bold;
+        }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            font-size: 14px;
+            color: #4b5563;
+            margin-bottom: 15px;
+        }
+
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 14px;
+            border-radius: 10px;
+            text-align: center;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .btn-wa { background: var(--whatsapp); color: white; }
+        .btn-nav { background: #3b82f6; color: white; }
+
+        #loading-state { text-align: center; padding: 20px; font-weight: bold; }
+    </style>
+</head>
 <body>
 
     <div class="search-panel">
@@ -15,20 +169,9 @@ ló</head>
             <div id="dropoff-results" class="autocomplete-list"></div>
         </div>
 
-        <div style="display: flex; gap: 10px;">
-            <div class="input-group" style="flex: 2;">
-                <label>DEPARTURE TIME</label>
-                <input type="datetime-local" id="departure-time">
-            </div>
-            <div class="input-group" style="flex: 1;">
-                <label>PRESETS</label>
-                <select onchange="loadPreset(this.value)">
-                    <option value="">Select...</option>
-                    <option value="klia">KLIA</option>
-                    <option value="genting">Genting</option>
-                    <option value="jb">JB</option>
-                </select>
-            </div>
+        <div class="input-group">
+            <label>DEPARTURE TIME</label>
+            <input type="datetime-local" id="departure-time">
         </div>
     </div>
 
@@ -69,12 +212,6 @@ ló</head>
             SWITCH_KM: 30
         };
 
-        const PRESETS = {
-            klia: { name: "KLIA T1", coord: [2.7456, 101.7072] },
-            genting: { name: "Genting Highlands", coord: [3.4230, 101.7930] },
-            jb: { name: "Johor Bahru", coord: [1.4927, 103.7414] }
-        };
-
         const $ = id => document.getElementById(id);
         let pickupCoord, dropoffCoord, routeLayer, pickupMarker, dropoffMarker, searchTimer;
 
@@ -87,6 +224,12 @@ ló</head>
             now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
             $("departure-time").value = now.toISOString().slice(0, 16);
         };
+
+        function formatFullAddress(p) {
+            const parts = [p.name, p.street, p.housenumber, p.district, p.city, p.state, p.postcode]
+                .filter(part => part && part !== undefined);
+            return [...new Set(parts)].join(", ");
+        }
 
         async function searchPlaces(query, resultId, type) {
             clearTimeout(searchTimer);
@@ -105,11 +248,11 @@ ló</head>
             const list = $(resultId);
             list.innerHTML = features.map(f => {
                 const p = f.properties;
-                const label = `${p.name || ''}, ${p.city || ''}`.replace(/, $/, "");
+                const fullAddress = formatFullAddress(p);
                 return `
-                    <div class="autocomplete-item" onclick="selectLocation('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${label.replace(/'/g, "\\'")}')">
+                    <div class="autocomplete-item" onclick="selectLocation('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${fullAddress.replace(/'/g, "\\'")}')">
                         <span class="place-name">${p.name || 'Unknown'}</span>
-                        <span class="place-address">${p.city || ''} ${p.state || ''}</span>
+                        <span class="place-address">${fullAddress}</span>
                     </div>`;
             }).join('');
             list.style.display = features.length ? 'block' : 'none';
@@ -164,28 +307,40 @@ ló</head>
                 $("loading-state").style.display = 'none';
                 $("fare-content").style.display = 'block';
             } catch (e) {
-                alert("Routing failed. Please check your connection.");
+                alert("Routing failed. Please check connection.");
                 $("results").style.display = 'none';
             }
         }
 
         function processFare(km, mins, hour) {
-            let fare = 0;
-            let mode = (km <= FARE.SWITCH_KM) ? "Taxi Meter" : "Private Hire";
+            let totalFare = 0;
+            const threshold = FARE.SWITCH_KM;
 
-            if (mode === "Taxi Meter") {
-                fare = FARE.TAXI.FLAG;
-                if (km > FARE.TAXI.INCLUDED_KM) {
-                    fare += Math.ceil((km - FARE.TAXI.INCLUDED_KM) * 1000 / 200) * FARE.TAXI.PER_200M;
-                }
-                fare += Math.floor((mins * 60) / 36) * FARE.TAXI.PER_36SEC;
-            } else {
-                fare = FARE.PRIVATE.BASE + (km * FARE.PRIVATE.PER_KM);
+            // Tier 1: First 30km (Taxi Meter)
+            let tier1Dist = Math.min(km, threshold);
+            let tier1Fare = FARE.TAXI.FLAG;
+            if (tier1Dist > FARE.TAXI.INCLUDED_KM) {
+                tier1Fare += Math.ceil((tier1Dist - FARE.TAXI.INCLUDED_KM) * 1000 / 200) * FARE.TAXI.PER_200M;
+            }
+            // Pro-rate the time charge for Tier 1
+            const timeWeight = tier1Dist / km;
+            tier1Fare += Math.floor(((mins * 60) * timeWeight) / 36) * FARE.TAXI.PER_36SEC;
+            
+            totalFare = tier1Fare;
+
+            // Tier 2: Distance > 30km (Private Rate)
+            if (km > threshold) {
+                let tier2Dist = km - threshold;
+                totalFare += (tier2Dist * FARE.PRIVATE.PER_KM);
             }
 
-            if (hour >= 0 && hour < 6) fare *= 1.5;
+            // Apply Night Surcharge
+            if (hour >= 0 && hour < 6) totalFare *= 1.5;
+
+            // Add estimated toll for long trips
             const toll = km > 20 ? Math.ceil(km * 0.15) : 0;
-            const finalFare = Math.ceil(fare + toll);
+            const finalFare = Math.ceil(totalFare + toll);
+            const mode = km > threshold ? "Hybrid Rate" : "Taxi Meter";
 
             updateUI(finalFare, km, mins, mode);
         }
@@ -217,16 +372,25 @@ ló</head>
             return coordinates;
         }
 
-        function loadPreset(val) {
-            if (PRESETS[val]) selectLocation('dropoff', PRESETS[val].coord, PRESETS[val].name);
-        }
-
         $("pickup").oninput = e => searchPlaces(e.target.value, "pickup-results", "pickup");
         $("dropoff").oninput = e => searchPlaces(e.target.value, "dropoff-results", "dropoff");
+        
         $("gps-trigger").onclick = () => {
-            navigator.geolocation.getCurrentPosition(p => {
-                selectLocation('pickup', [p.coords.latitude, p.coords.longitude], "My Location");
-                map.setView([p.coords.latitude, p.coords.longitude], 15);
+            navigator.geolocation.getCurrentPosition(async p => {
+                const lat = p.coords.latitude;
+                const lon = p.coords.longitude;
+                try {
+                    const res = await fetch(`https://photon.komoot.io/reverse?lon=${lon}&lat=${lat}`);
+                    const data = await res.json();
+                    let address = "My Location";
+                    if(data.features && data.features.length > 0) {
+                        address = formatFullAddress(data.features[0].properties);
+                    }
+                    selectLocation('pickup', [lat, lon], address);
+                    map.setView([lat, lon], 15);
+                } catch (e) {
+                    selectLocation('pickup', [lat, lon], "Current Location");
+                }
             }, () => alert("GPS access denied."));
         };
     </script>
