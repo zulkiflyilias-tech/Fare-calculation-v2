@@ -208,12 +208,12 @@
 
         const FARE = {
             TAXI: { FLAG: 3.00, INCLUDED_KM: 1.0, PER_200M: 0.25, PER_36SEC: 0.25 },
-            PRIVATE: { BASE: 10, PER_KM: 2.2 },
-            SWITCH_KM: 30
+            OUTSIDE_RATE: 2.20 // Fixed rate per KM for outside Selangor/KL
         };
 
         const $ = id => document.getElementById(id);
         let pickupCoord, dropoffCoord, routeLayer, pickupMarker, dropoffMarker, searchTimer;
+        let pickupState = "", dropoffState = "";
 
         const map = L.map("map", { zoomControl: false }).setView(CONFIG.CENTER, 13);
         L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png").addTo(map);
@@ -249,8 +249,9 @@
             list.innerHTML = features.map(f => {
                 const p = f.properties;
                 const fullAddress = formatFullAddress(p);
+                const state = p.state || "";
                 return `
-                    <div class="autocomplete-item" onclick="selectLocation('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${fullAddress.replace(/'/g, "\\'")}')">
+                    <div class="autocomplete-item" onclick="selectLocation('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${fullAddress.replace(/'/g, "\\'")}', '${state.replace(/'/g, "\\'")}')">
                         <span class="place-name">${p.name || 'Unknown'}</span>
                         <span class="place-address">${fullAddress}</span>
                     </div>`;
@@ -258,16 +259,22 @@
             list.style.display = features.length ? 'block' : 'none';
         }
 
-        function selectLocation(type, coord, label) {
+        function selectLocation(type, coord, label, state) {
             $(type).value = label;
             $(`${type}-results`).style.display = 'none';
 
             if (type === 'pickup') {
                 pickupCoord = coord;
+                pickupState = state;
+            } else {
+                dropoffCoord = coord;
+                dropoffState = state;
+            }
+
+            if (type === 'pickup') {
                 if (pickupMarker) map.removeLayer(pickupMarker);
                 pickupMarker = L.marker(coord).addTo(map);
             } else {
-                dropoffCoord = coord;
                 if (dropoffMarker) map.removeLayer(dropoffMarker);
                 dropoffMarker = L.marker(coord).addTo(map);
             }
@@ -299,48 +306,46 @@
                 
                 const depDate = new Date($("departure-time").value);
                 const hour = depDate.getHours();
-                const multiplier = (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19) ? 1.5 : 1.2;
-                const totalMins = baseMins * multiplier;
 
-                processFare(km, totalMins, hour);
+                processFare(km, baseMins, hour);
 
                 $("loading-state").style.display = 'none';
                 $("fare-content").style.display = 'block';
             } catch (e) {
-                alert("Routing failed. Please check connection.");
+                alert("Routing failed.");
                 $("results").style.display = 'none';
             }
         }
 
         function processFare(km, mins, hour) {
             let totalFare = 0;
-            const threshold = FARE.SWITCH_KM;
+            let mode = "";
 
-            // Tier 1: First 30km (Taxi Meter)
-            let tier1Dist = Math.min(km, threshold);
-            let tier1Fare = FARE.TAXI.FLAG;
-            if (tier1Dist > FARE.TAXI.INCLUDED_KM) {
-                tier1Fare += Math.ceil((tier1Dist - FARE.TAXI.INCLUDED_KM) * 1000 / 200) * FARE.TAXI.PER_200M;
-            }
-            // Pro-rate the time charge for Tier 1
-            const timeWeight = tier1Dist / km;
-            tier1Fare += Math.floor(((mins * 60) * timeWeight) / 36) * FARE.TAXI.PER_36SEC;
-            
-            totalFare = tier1Fare;
+            // Check if both points are in Selangor or KL
+            const validZones = ["Selangor", "Kuala Lumpur", "WP Kuala Lumpur", "Wilayah Persekutuan Kuala Lumpur"];
+            const isWithinKV = validZones.some(z => pickupState.includes(z)) && 
+                               validZones.some(z => dropoffState.includes(z));
 
-            // Tier 2: Distance > 30km (Private Rate)
-            if (km > threshold) {
-                let tier2Dist = km - threshold;
-                totalFare += (tier2Dist * FARE.PRIVATE.PER_KM);
+            if (isWithinKV) {
+                // TAXI METER CALCULATION
+                mode = "Taxi Meter";
+                totalFare = FARE.TAXI.FLAG;
+                if (km > FARE.TAXI.INCLUDED_KM) {
+                    totalFare += Math.ceil((km - FARE.TAXI.INCLUDED_KM) * 1000 / 200) * FARE.TAXI.PER_200M;
+                }
+                totalFare += Math.floor((mins * 60) / 36) * FARE.TAXI.PER_36SEC;
+            } else {
+                // OUTSIDE RATE CALCULATION (2.2/km)
+                mode = "Outstation Rate";
+                totalFare = km * FARE.OUTSIDE_RATE;
             }
 
             // Apply Night Surcharge
             if (hour >= 0 && hour < 6) totalFare *= 1.5;
 
-            // Add estimated toll for long trips
+            // Toll estimate for longer trips
             const toll = km > 20 ? Math.ceil(km * 0.15) : 0;
             const finalFare = Math.ceil(totalFare + toll);
-            const mode = km > threshold ? "Hybrid Rate" : "Taxi Meter";
 
             updateUI(finalFare, km, mins, mode);
         }
@@ -383,13 +388,16 @@
                     const res = await fetch(`https://photon.komoot.io/reverse?lon=${lon}&lat=${lat}`);
                     const data = await res.json();
                     let address = "My Location";
+                    let state = "";
                     if(data.features && data.features.length > 0) {
-                        address = formatFullAddress(data.features[0].properties);
+                        const props = data.features[0].properties;
+                        address = formatFullAddress(props);
+                        state = props.state || "";
                     }
-                    selectLocation('pickup', [lat, lon], address);
+                    selectLocation('pickup', [lat, lon], address, state);
                     map.setView([lat, lon], 15);
                 } catch (e) {
-                    selectLocation('pickup', [lat, lon], "Current Location");
+                    selectLocation('pickup', [lat, lon], "Current Location", "");
                 }
             }, () => alert("GPS access denied."));
         };
