@@ -1,239 +1,366 @@
-<script>
-const CONFIG = {
-    WHATSAPP: "60108988182",
-    ORS_KEY: "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImVlYzI5ZTA0OTM2YTRlZDNhNjk1NTcyNGQ1OTJmYmNjIiwiaCI6Im11cm11cjY0In0=",
-    CENTER: [3.139, 101.686],
-    BBOX: "99.5,1.2,103.6,6.8"
-};
-
-const TARIFF = {
-    BASE_FARE: 3.00, // Added base fare
-    BASE_KM: 1.25,
-    BASE_MIN: 0.43,
-    LONG_KM: 1.80,
-    THRESHOLD: 50,
-    PEAK_SURCHARGE: 0.45
-};
-
-const $ = id => document.getElementById(id);
-
-// STATE
-let pickupCoord = null;
-let dropoffCoord = null;
-let markers = { pickup: null, dropoff: null };
-let routeLayer = null;
-let searchTimer = null;
-
-// MAP
-const map = L.map("map", { zoomControl: false }).setView(CONFIG.CENTER, 13);
-
-L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png")
-.addTo(map);
-
-L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-// INIT
-window.onload = () => {
-    const now = new Date();
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    $("departure-time").value = now.toISOString().slice(0, 16);
-};
-
-// UI STATE
-function setLoading(state) {
-    $("results").style.display = 'block';
-    $("loading-state").style.display = state ? 'block' : 'none';
-    $("fare-content").style.display = state ? 'none' : 'block';
-}
-
-// SEARCH
-function searchPlaces(query, resultId, type) {
-    clearTimeout(searchTimer);
-
-    if (query.length < 3) {
-        $(resultId).style.display = 'none';
-        return;
-    }
-
-    searchTimer = setTimeout(async () => {
-        try {
-            const res = await fetch(
-                `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&bbox=${CONFIG.BBOX}&limit=5`
-            );
-            const data = await res.json();
-            renderResults(data.features, resultId, type);
-        } catch (err) {
-            console.error("Search error:", err);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Rideshare MY - Fare Estimator</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        :root {
+            --primary: #059669;
+            --whatsapp: #25D366;
+            --bg: #f3f4f6;
+            --text: #1f2937;
+            --error: #ef4444;
         }
-    }, 400);
-}
 
-function renderResults(features, resultId, type) {
-    const list = $(resultId);
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            margin: 0; 
+            background: var(--bg); 
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
 
-    list.innerHTML = features.map(f => {
-        const p = f.properties;
-        const parts = [p.name, p.city, p.state].filter(Boolean);
-        const fullAddress = parts.join(", ");
+        .search-panel {
+            background: white;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1001;
+        }
 
-        return `
-        <div class="autocomplete-item"
-            onclick="selectLocation('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${fullAddress.replace(/'/g, "\\'")}')">
-            <span class="place-name">${p.name || 'Unknown'}</span>
-            <span class="place-address">${p.city || ''}${p.city && p.state ? ', ' : ''}${p.state || ''}</span>
-        </div>`;
-    }).join('');
+        .input-group {
+            position: relative;
+            margin-bottom: 12px;
+        }
 
-    list.style.display = features.length ? 'block' : 'none';
-}
+        .input-group label {
+            display: block;
+            font-size: 11px;
+            font-weight: 800;
+            margin-bottom: 4px;
+            color: #6b7280;
+            letter-spacing: 0.5px;
+        }
 
-// LOCATION
-function setMarker(type, coord) {
-    if (markers[type]) map.removeLayer(markers[type]);
-    markers[type] = L.marker(coord).addTo(map);
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border 0.2s;
+        }
 
-    if (type === 'pickup') pickupCoord = coord;
-    else dropoffCoord = coord;
-}
+        input:focus { outline: none; border-color: var(--primary); }
 
-function selectLocation(type, coord, label) {
-    $(type).value = label;
-    $(`${type}-results`).style.display = 'none';
+        .gps-btn {
+            position: absolute;
+            right: 8px;
+            top: 24px;
+            background: none; border: none;
+            font-size: 20px; padding: 8px;
+            cursor: pointer;
+        }
 
-    setMarker(type, coord);
+        .autocomplete-list {
+            position: absolute;
+            top: 100%; left: 0; right: 0;
+            background: white; border: 1px solid #d1d5db;
+            z-index: 2000; max-height: 200px;
+            overflow-y: auto; display: none;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
 
-    if (pickupCoord && dropoffCoord) calculateRoute();
-}
+        .autocomplete-item {
+            padding: 12px; cursor: pointer;
+            border-bottom: 1px solid #f3f4f6;
+        }
 
-// ROUTING
-async function calculateRoute() {
-    setLoading(true);
+        .autocomplete-item:hover { background: #f9fafb; }
+        .place-name { display: block; font-weight: 600; font-size: 14px; }
+        .place-address { font-size: 12px; color: #6b7280; }
 
-    try {
-        const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": CONFIG.ORS_KEY
-            },
-            body: JSON.stringify({
-                coordinates: [
-                    [pickupCoord[1], pickupCoord[0]],
-                    [dropoffCoord[1], dropoffCoord[0]]
-                ]
-            })
-        });
+        #map { flex-grow: 1; width: 100%; z-index: 1; }
 
-        const data = await res.json();
-        if (!data.routes?.length) throw new Error("No route");
+        .results-card {
+            position: fixed;
+            bottom: 20px; left: 15px; right: 15px;
+            background: white; padding: 18px;
+            border-radius: 16px;
+            box-shadow: 0 -4px 25px rgba(0,0,0,0.2);
+            z-index: 1002; display: none;
+        }
 
-        const route = data.routes[0];
-        drawRoute(route);
+        .fare-header {
+            display: flex; justify-content: space-between;
+            align-items: center; margin-bottom: 12px;
+        }
 
-        const km = route.summary.distance / 1000;
-        const mins = route.summary.duration / 60;
-        const hour = new Date($("departure-time").value).getHours();
+        #fare { font-size: 32px; font-weight: 800; color: var(--primary); margin: 0; }
+        
+        .badge { 
+            background: #ecfdf5; color: var(--primary); 
+            padding: 4px 10px; border-radius: 6px; 
+            font-size: 12px; font-weight: bold;
+        }
 
-        const result = calculateFare(km, mins, hour);
-        updateUI(result.fare, km, mins, result.mode, result.isPeak);
+        .stats-row {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 10px; font-size: 14px; margin-bottom: 15px;
+        }
 
-        setLoading(false);
-    } catch (err) {
-        console.error(err);
-        alert("Route calculation failed.");
-        $("results").style.display = 'none';
-    }
-}
+        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
-function drawRoute(route) {
-    if (routeLayer) map.removeLayer(routeLayer);
-    routeLayer = L.polyline(decodePoly(route.geometry), {
-        color: '#059669',
-        weight: 5
-    }).addTo(map);
-    map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
-}
+        .btn {
+            padding: 14px; border-radius: 12px;
+            text-align: center; text-decoration: none;
+            font-weight: bold; font-size: 14px; color: white;
+        }
 
-// FARE ENGINE
-function isPeakHour(hour) {
-    return (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19);
-}
+        .btn-wa { background: var(--whatsapp); }
+        .btn-nav { background: #3b82f6; }
 
-function calculateFare(km, mins, hour) {
-    let fare = TARIFF.BASE_FARE; // Start with base fare
+        .disclaimer {
+            text-align: center; font-size: 10px;
+            color: #9ca3af; margin-top: 8px;
+        }
 
-    if (km <= TARIFF.THRESHOLD) {
-        fare += (km * TARIFF.BASE_KM) + (mins * TARIFF.BASE_MIN);
-    } else {
-        const ratio = TARIFF.THRESHOLD / km;
-        const minsBase = mins * ratio;
-        const baseDistanceFare = (TARIFF.THRESHOLD * TARIFF.BASE_KM) + (minsBase * TARIFF.BASE_MIN);
-        fare += baseDistanceFare + ((km - TARIFF.THRESHOLD) * TARIFF.LONG_KM);
-    }
+        #loading-state { text-align: center; padding: 10px; font-weight: bold; color: var(--primary); }
+    </style>
+</head>
+<body>
 
-    const isPeak = isPeakHour(hour);
-    if (isPeak) fare += mins * TARIFF.PEAK_SURCHARGE;
-    if (hour >= 0 && hour < 6) fare *= 1.5;
+    <div class="search-panel">
+        <div class="input-group">
+            <label>PICKUP</label>
+            <input type="text" id="pickup" placeholder="Search pickup..." autocomplete="off">
+            <button class="gps-btn" id="gps-trigger">📍</button>
+            <div id="pickup-results" class="autocomplete-list"></div>
+        </div>
 
-    return {
-        fare: Math.ceil(fare),
-        isPeak,
-        mode: km > TARIFF.THRESHOLD ? "Long Haul" : isPeak ? "Peak Hour" : "Standard Rate"
-    };
-}
+        <div class="input-group">
+            <label>DROPOFF</label>
+            <input type="text" id="dropoff" placeholder="Search destination..." autocomplete="off">
+            <div id="dropoff-results" class="autocomplete-list"></div>
+        </div>
 
-// UI UPDATE
-function updateUI(fare, km, mins, mode, isPeak) {
-    $("fare").innerText = `RM ${fare}`;
-    $("fare").classList.toggle("is-peak", isPeak);
+        <div class="input-group" style="margin-bottom: 0;">
+            <label>DEPARTURE TIME</label>
+            <input type="datetime-local" id="departure-time">
+        </div>
+        <div class="disclaimer">Service limited to Peninsular Malaysia only.</div>
+    </div>
 
-    $("distance").innerText = `${km.toFixed(1)} km`;
-    $("eta").innerText = `${Math.round(mins)} min`;
-    $("mode-badge").innerText = mode;
+    <div id="map"></div>
 
-    // Fixed template literal syntax error
-    const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${pickupCoord[0]},${pickupCoord[1]}&destination=${dropoffCoord[0]},${dropoffCoord[1]}&travelmode=driving`;
-    $("nav-btn").href = mapsUrl;
+    <div id="results" class="results-card">
+        <div id="loading-state">Calculating...</div>
+        <div id="fare-content" style="display:none;">
+            <div class="fare-header">
+                <h2 id="fare">RM 0</h2>
+                <span id="mode-badge" class="badge">Standard</span>
+            </div>
+            
+            <div class="stats-row">
+                <div>📏 <b>Distance:</b> <span id="distance">0 km</span></div>
+                <div>⏱️ <b>Est. Time:</b> <span id="eta">0 min</span></div>
+            </div>
 
-    const msg = `*New Ride Booking*
+            <div class="btn-group">
+                <a id="wa-btn" class="btn btn-wa" target="_blank">WhatsApp Book</a>
+                <a id="nav-btn" class="btn btn-nav" target="_blank">Open Maps</a>
+            </div>
+        </div>
+    </div>
 
-From: ${$("pickup").value}
-To: ${$("dropoff").value}
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const CONFIG = {
+            WHATSAPP: "60108988182",
+            ORS_KEY: "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImVlYzI5ZTA0OTM2YTRlZDNhNjk1NTcyNGQ1OTJmYmNjIiwiaCI6Im11cm11cjY0In0=",
+            CENTER: [3.139, 101.686],
+            LIMITS: { minLat: 1.2, maxLat: 6.8, minLng: 99.5, maxLng: 104.8 },
+            BBOX_SEARCH: "99.5,1.2,104.8,6.8"
+        };
 
-Dist: ${km.toFixed(1)} km
-Est Time: ${Math.round(mins)} min
-Fare: RM ${fare}
-Status: ${mode}
+        const FARE = {
+            BASE: 3.00,
+            TIER1_KM: 1.25,
+            TIER1_MIN: 0.43,
+            TIER2_KM: 1.80,
+            SWITCH_KM: 50
+        };
 
-Navigation: ${mapsUrl}`;
+        const $ = id => document.getElementById(id);
+        let pickupCoord, dropoffCoord, routeLayer, pickupMarker, dropoffMarker, searchTimer;
 
-    $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(msg)}`;
-}
+        const map = L.map("map", { zoomControl: false }).setView(CONFIG.CENTER, 13);
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png").addTo(map);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-// UTIL
-function decodePoly(str) {
-    let index = 0, lat = 0, lng = 0, coordinates = [];
-    while (index < str.length) {
-        let b, shift = 0, result = 0;
-        do { b = str.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
-        lat += (result & 1) ? ~(result >> 1) : (result >> 1);
-        shift = 0; result = 0;
-        do { b = str.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
-        lng += (result & 1) ? ~(result >> 1) : (result >> 1);
-        coordinates.push([lat / 1e5, lng / 1e5]);
-    }
-    return coordinates;
-}
+        window.onload = () => {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            $("departure-time").value = now.toISOString().slice(0, 16);
+        };
 
-// EVENTS
-$("pickup").oninput = e => searchPlaces(e.target.value, "pickup-results", "pickup");
-$("dropoff").oninput = e => searchPlaces(e.target.value, "dropoff-results", "dropoff");
+        function isWithinWestMalaysia(coord) {
+            const [lat, lng] = coord;
+            return lat >= CONFIG.LIMITS.minLat && lat <= CONFIG.LIMITS.maxLat && 
+                   lng >= CONFIG.LIMITS.minLng && lng <= CONFIG.LIMITS.maxLng;
+        }
 
-$("gps-trigger").onclick = () => {
-    navigator.geolocation.getCurrentPosition(pos => {
-        const coord = [pos.coords.latitude, pos.coords.longitude];
-        selectLocation('pickup', coord, "My Location");
-        map.setView(coord, 15);
-    }, () => alert("GPS denied"));
-};
-</script>
+        async function searchPlaces(query, resultId, type) {
+            clearTimeout(searchTimer);
+            if (query.length < 3) return $(resultId).style.display = 'none';
+
+            searchTimer = setTimeout(async () => {
+                try {
+                    const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&bbox=${CONFIG.BBOX_SEARCH}&limit=5`);
+                    const data = await res.json();
+                    const list = $(resultId);
+                    
+                    list.innerHTML = data.features.map(f => {
+                        const p = f.properties;
+                        const label = `${p.name || ''}, ${p.city || ''}`.replace(/, $/, "");
+                        return `
+                            <div class="autocomplete-item" onclick="selectLocation('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${label.replace(/'/g, "\\'")}')">
+                                <span class="place-name">${p.name || 'Unknown'}</span>
+                                <span class="place-address">${p.city || ''} ${p.state || ''}</span>
+                            </div>`;
+                    }).join('');
+                    list.style.display = data.features.length ? 'block' : 'none';
+                } catch (e) { console.error("Search error", e); }
+            }, 400);
+        }
+
+        function selectLocation(type, coord, label) {
+            if (!isWithinWestMalaysia(coord)) {
+                alert("Location is outside Peninsular Malaysia boundaries.");
+                return;
+            }
+
+            $(type).value = label;
+            $(`${type}-results`).style.display = 'none';
+
+            if (type === 'pickup') {
+                pickupCoord = coord;
+                if (pickupMarker) map.removeLayer(pickupMarker);
+                pickupMarker = L.marker(coord).addTo(map);
+            } else {
+                dropoffCoord = coord;
+                if (dropoffMarker) map.removeLayer(dropoffMarker);
+                dropoffMarker = L.marker(coord).addTo(map);
+            }
+
+            if (pickupCoord && dropoffCoord) calculateRoute();
+        }
+
+        async function calculateRoute() {
+            $("results").style.display = 'block';
+            $("fare-content").style.display = 'none';
+            $("loading-state").style.display = 'block';
+
+            try {
+                const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Authorization": CONFIG.ORS_KEY },
+                    body: JSON.stringify({ coordinates: [[pickupCoord[1], pickupCoord[0]], [dropoffCoord[1], dropoffCoord[0]]] })
+                });
+
+                const data = await res.json();
+                const route = data.routes[0];
+
+                if (routeLayer) map.removeLayer(routeLayer);
+                routeLayer = L.polyline(decodePoly(route.geometry), { color: '#059669', weight: 5 }).addTo(map);
+                map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
+
+                const km = route.summary.distance / 1000;
+                const baseMins = route.summary.duration / 60;
+                
+                const depDate = new Date($("departure-time").value);
+                const hour = depDate.getHours();
+                // Systematic Traffic Multiplier
+                const multiplier = (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 20) ? 1.4 : 1.1;
+                const totalMins = baseMins * multiplier;
+
+                processFare(km, totalMins, hour);
+
+                $("loading-state").style.display = 'none';
+                $("fare-content").style.display = 'block';
+            } catch (e) {
+                alert("Routing failed. Ensure both points are within Peninsular Malaysia.");
+                $("results").style.display = 'none';
+            }
+        }
+
+        function processFare(km, mins, hour) {
+            let fare = FARE.BASE;
+            let mode = km > FARE.SWITCH_KM ? "Outstation" : "Standard Rate";
+
+            if (km <= FARE.SWITCH_KM) {
+                fare += (km * FARE.TIER1_KM) + (mins * FARE.TIER1_MIN);
+            } else {
+                const firstTierDist = FARE.SWITCH_KM;
+                const secondTierDist = km - FARE.SWITCH_KM;
+                
+                // Proportionate time charge for first 50km only
+                const minsPerKm = mins / km;
+                const timeForFirst50 = firstTierDist * minsPerKm;
+                
+                fare += (firstTierDist * FARE.TIER1_KM) + (timeForFirst50 * FARE.TIER1_MIN);
+                fare += (secondTierDist * FARE.TIER2_KM);
+            }
+
+            // Midnight Surcharge (+50%)
+            if (hour >= 0 && hour < 6) fare *= 1.5;
+
+            const finalFare = Math.ceil(fare);
+            updateUI(finalFare, km, mins, mode);
+        }
+
+        function updateUI(fare, km, mins, mode) {
+            $("fare").innerText = `RM ${fare}`;
+            $("distance").innerText = `${km.toFixed(1)} km`;
+            $("eta").innerText = `${Math.round(mins)} min`;
+            $("mode-badge").innerText = mode;
+
+            const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${pickupCoord[0]},${pickupCoord[1]}&destination=${dropoffCoord[0]},${dropoffCoord[1]}&travelmode=driving`;
+            $("nav-btn").href = mapsUrl;
+
+            const msg = `*New Ride Booking*\n\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\n\nDist: ${km.toFixed(1)}km\nEst Time: ${Math.round(mins)}min\nFare: RM ${fare}\nMode: ${mode}\n\nNavigation: ${mapsUrl}`;
+            $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(msg)}`;
+        }
+
+        function decodePoly(str) {
+            let index = 0, lat = 0, lng = 0, coordinates = [];
+            while (index < str.length) {
+                let b, shift = 0, result = 0;
+                do { b = str.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+                lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+                shift = 0; result = 0;
+                do { b = str.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+                lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+                coordinates.push([lat / 1e5, lng / 1e5]);
+            }
+            return coordinates;
+        }
+
+        $("pickup").oninput = e => searchPlaces(e.target.value, "pickup-results", "pickup");
+        $("dropoff").oninput = e => searchPlaces(e.target.value, "dropoff-results", "dropoff");
+        $("gps-trigger").onclick = () => {
+            navigator.geolocation.getCurrentPosition(p => {
+                selectLocation('pickup', [p.coords.latitude, p.coords.longitude], "Current Location");
+                map.setView([p.coords.latitude, p.coords.longitude], 15);
+            }, () => alert("GPS access denied."));
+        };
+    </script>
+</body>
+</html>
