@@ -30,19 +30,35 @@
                     const data = await res.json();
                     $(resId).innerHTML = data.features.map(f => {
                         const p = f.properties;
-                        const header = p.name || p.street || "Unknown Location";
-                        // Build a cleaner full address string
-                        const addressParts = [p.street, p.district, p.city, p.state].filter(Boolean);
-                        const sub = addressParts.join(", ");
-                        const full = p.name && !sub.includes(p.name) ? `${p.name}, ${sub}` : sub;
                         
+                        // 1. Primary Header (The Venue/Name)
+                        const header = p.name || p.street || "Location";
+                        
+                        // 2. Build detailed address components
+                        const addressParts = [
+                            p.street, 
+                            p.district, 
+                            p.city || p.town, 
+                            p.state
+                        ].filter(Boolean);
+
+                        const sub = addressParts.join(", ");
+
+                        // 3. Construct Final Full Address for the input field
+                        let full;
+                        if (p.name && !sub.startsWith(p.name)) {
+                            full = sub ? `${p.name}, ${sub}` : p.name;
+                        } else {
+                            full = sub || p.name;
+                        }
+
                         return `<div class="autocomplete-item" onclick="selectLoc('${type}',[${f.geometry.coordinates[1]},${f.geometry.coordinates[0]}],'${full.replace(/'/g,"\\'")}')">
                             <strong style="display:block;font-size:14px;">${header}</strong>
                             <small style="color:#6b7280;">${sub}</small>
                         </div>`;
                     }).join('');
                     $(resId).style.display = data.features.length ? 'block' : 'none';
-                } catch (e) { console.error(e); }
+                } catch (e) { console.error("Search Error:", e); }
             }, 400);
         }
 
@@ -87,7 +103,7 @@
                 processFare(km, mins);
                 toggleRes(true, false);
             } catch (e) { 
-                alert("Route calculation failed. Please try a different location."); 
+                alert("Route calculation failed."); 
                 toggleRes(false); 
             }
         }
@@ -110,7 +126,7 @@
             
             const nav = `https://www.google.com/maps/dir/?api=1&origin=${pCoord[0]},${pCoord[1]}&destination=${dCoord[0]},${dCoord[1]}&travelmode=driving`;
             $("nav-btn").href = nav;
-            $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(`*New Booking Request*\n\n📍 From: ${$("pickup").value}\n🏁 To: ${$("dropoff").value}\n\n💰 Fare: RM ${final}\n📏 Dist: ${km.toFixed(1)}km\n⏱️ Est: ${Math.round(mins)}min\n\n🗺️ Route: ${nav}`)}`;
+            $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(`*Booking*\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\nFare: RM ${final}\nDist: ${km.toFixed(1)}km\nNav: ${nav}`)}`;
         }
 
         function toggleRes(show, loading = false) {
@@ -142,9 +158,11 @@
                     const res = await fetch(`https://photon.komoot.io/reverse?lon=${lon}&lat=${lat}`);
                     const data = await res.json();
                     const feat = data.features[0].properties;
+                    
                     const header = feat.name || feat.street || "My Location";
-                    const city = feat.city || feat.town || "";
-                    const full = [header, city].filter(Boolean).join(", ");
+                    const addressParts = [feat.district, feat.city || feat.town, feat.state].filter(Boolean);
+                    const full = addressParts.length ? `${header}, ${addressParts.join(", ")}` : header;
+                    
                     selectLoc('pickup', [lat, lon], full);
                 } catch (e) {
                     selectLoc('pickup', [lat, lon], "Current Location");
