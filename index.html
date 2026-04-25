@@ -7,6 +7,7 @@ const CONFIG = {
 };
 
 const TARIFF = {
+    BASE_FARE: 3.00, // Added base fare
     BASE_KM: 1.25,
     BASE_MIN: 0.43,
     LONG_KM: 1.80,
@@ -72,7 +73,6 @@ function renderResults(features, resultId, type) {
 
     list.innerHTML = features.map(f => {
         const p = f.properties;
-        // Construct detailed address string
         const parts = [p.name, p.city, p.state].filter(Boolean);
         const fullAddress = parts.join(", ");
 
@@ -160,14 +160,15 @@ function isPeakHour(hour) {
 }
 
 function calculateFare(km, mins, hour) {
-    let fare;
+    let fare = TARIFF.BASE_FARE; // Start with base fare
+
     if (km <= TARIFF.THRESHOLD) {
-        fare = (km * TARIFF.BASE_KM) + (mins * TARIFF.BASE_MIN);
+        fare += (km * TARIFF.BASE_KM) + (mins * TARIFF.BASE_MIN);
     } else {
         const ratio = TARIFF.THRESHOLD / km;
         const minsBase = mins * ratio;
-        const baseFare = (TARIFF.THRESHOLD * TARIFF.BASE_KM) + (minsBase * TARIFF.BASE_MIN);
-        fare = baseFare + ((km - TARIFF.THRESHOLD) * TARIFF.LONG_KM);
+        const baseDistanceFare = (TARIFF.THRESHOLD * TARIFF.BASE_KM) + (minsBase * TARIFF.BASE_MIN);
+        fare += baseDistanceFare + ((km - TARIFF.THRESHOLD) * TARIFF.LONG_KM);
     }
 
     const isPeak = isPeakHour(hour);
@@ -190,6 +191,7 @@ function updateUI(fare, km, mins, mode, isPeak) {
     $("eta").innerText = `${Math.round(mins)} min`;
     $("mode-badge").innerText = mode;
 
+    // Fixed template literal syntax error
     const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${pickupCoord[0]},${pickupCoord[1]}&destination=${dropoffCoord[0]},${dropoffCoord[1]}&travelmode=driving`;
     $("nav-btn").href = mapsUrl;
 
