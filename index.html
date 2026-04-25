@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Fare Estimator</title>
-    
+    <title>Rideshare MY - Expert Fare Estimator</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
     <style>
         :root {
             --primary: #059669;
@@ -16,149 +14,28 @@
             --text: #1f2937;
             --peak: #dc2626;
         }
-
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            margin: 0; 
-            background: var(--bg); 
-            color: var(--text);
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-        }
-
-        .search-panel {
-            background: white;
-            padding: 15px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            z-index: 1001;
-        }
-
-        .input-group {
-            position: relative;
-            margin-bottom: 12px;
-        }
-
-        .input-group label {
-            display: block;
-            font-size: 12px;
-            font-weight: bold;
-            margin-bottom: 4px;
-            color: #6b7280;
-        }
-
-        input, select {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #d1d5db;
-            border-radius: 8px;
-            box-sizing: border-box;
-            font-size: 16px;
-        }
-
-        .gps-btn {
-            position: absolute;
-            right: 10px;
-            top: 28px;
-            background: none;
-            border: none;
-            font-size: 20px;
-            cursor: pointer;
-        }
-
-        .autocomplete-list {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: white;
-            border: 1px solid #d1d5db;
-            z-index: 2000;
-            max-height: 250px;
-            overflow-y: auto;
-            display: none;
-            border-radius: 0 0 8px 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-
-        .autocomplete-item {
-            padding: 12px;
-            cursor: pointer;
-            border-bottom: 1px solid #f3f4f6;
-        }
-
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: var(--bg); color: var(--text); display: flex; flex-direction: column; height: 100vh; }
+        .search-panel { background: white; padding: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 1001; }
+        .input-group { position: relative; margin-bottom: 12px; }
+        .input-group label { display: block; font-size: 11px; font-weight: bold; margin-bottom: 4px; color: #6b7280; letter-spacing: 0.5px; }
+        input { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        .gps-btn { position: absolute; right: 10px; top: 24px; background: none; border: none; font-size: 20px; cursor: pointer; padding: 5px; }
+        .autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #d1d5db; z-index: 2000; max-height: 250px; overflow-y: auto; display: none; border-radius: 0 0 8px 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .autocomplete-item { padding: 12px; cursor: pointer; border-bottom: 1px solid #f3f4f6; }
         .autocomplete-item:hover { background: #f9fafb; }
         .place-name { display: block; font-weight: 600; font-size: 14px; }
         .place-address { font-size: 12px; color: #6b7280; }
-
         #map { flex-grow: 1; width: 100%; z-index: 1; }
-
-        .results-card {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            right: 20px;
-            background: white;
-            padding: 20px;
-            border-radius: 16px;
-            box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
-            z-index: 1002;
-            display: none;
-        }
-
-        .fare-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-
+        .results-card { position: fixed; bottom: 20px; left: 20px; right: 20px; background: white; padding: 20px; border-radius: 16px; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); z-index: 1002; display: none; }
+        .fare-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         #fare { font-size: 28px; font-weight: 800; color: var(--primary); margin: 0; }
-        #fare.is-peak { color: var(--peak); }
-
-        #mode-badge { 
-            background: #ecfdf5; 
-            color: var(--primary); 
-            padding: 4px 8px; 
-            border-radius: 6px; 
-            font-size: 12px; 
-            font-weight: bold;
-        }
-
-        .stats-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            font-size: 14px;
-            color: #4b5563;
-            margin-bottom: 5px;
-        }
-
-        .disclaimer {
-            font-size: 11px;
-            color: #9ca3af;
-            margin-bottom: 15px;
-            font-style: italic;
-        }
-
-        .btn-group {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-
-        .btn {
-            padding: 14px;
-            border-radius: 10px;
-            text-align: center;
-            text-decoration: none;
-            font-weight: bold;
-            font-size: 14px;
-        }
-
+        #mode-badge { background: #ecfdf5; color: var(--primary); padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; }
+        .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px; color: #4b5563; margin-bottom: 5px; }
+        .disclaimer { font-size: 11px; color: #9ca3af; margin-bottom: 15px; font-style: italic; }
+        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .btn { padding: 14px; border-radius: 10px; text-align: center; text-decoration: none; font-weight: bold; font-size: 14px; }
         .btn-wa { background: var(--whatsapp); color: white; }
         .btn-nav { background: #3b82f6; color: white; }
-
         #loading-state { text-align: center; padding: 20px; font-weight: bold; }
     </style>
 </head>
@@ -178,42 +55,29 @@
             <div id="dropoff-results" class="autocomplete-list"></div>
         </div>
 
-        <div style="display: flex; gap: 10px;">
-            <div class="input-group" style="flex: 2;">
-                <label>DEPARTURE TIME</label>
-                <input type="datetime-local" id="departure-time">
-            </div>
-            <div class="input-group" style="flex: 1;">
-                <label>PRESETS</label>
-                <select onchange="loadPreset(this.value)">
-                    <option value="">Select...</option>
-                    <option value="klia">KLIA</option>
-                    <option value="genting">Genting</option>
-                    <option value="jb">JB</option>
-                </select>
-            </div>
+        <div class="input-group">
+            <label>DEPARTURE TIME</label>
+            <input type="datetime-local" id="departure-time">
         </div>
     </div>
 
     <div id="map"></div>
 
     <div id="results" class="results-card">
-        <div id="loading-state">Calculating...</div>
+        <div id="loading-state">Calculating Expert Fare...</div>
         <div id="fare-content" style="display:none;">
             <div class="fare-header">
                 <h2 id="fare">RM 0</h2>
                 <span id="mode-badge">Standard Rate</span>
             </div>
-            
             <div class="stats-row">
-                <div>📏 Distance: <span id="distance">0 km</span></div>
-                <div>⏱️ Est. Time: <span id="eta">0 min</span></div>
+                <div>📏 <span id="distance">0 km</span></div>
+                <div>⏱️ <span id="eta">0 min</span></div>
             </div>
-            <div class="disclaimer">*Excludes tolls and parking fees. High traffic buffer applied if applicable.</div>
-
+            <div class="disclaimer">*Excludes tolls. Final fare rounded up.</div>
             <div class="btn-group">
-                <a id="wa-btn" class="btn btn-wa" target="_blank">WhatsApp Book</a>
-                <a id="nav-btn" class="btn btn-nav" target="_blank">Open Maps</a>
+                <a id="wa-btn" class="btn btn-wa" target="_blank">Confirm Booking</a>
+                <a id="nav-btn" class="btn btn-nav" target="_blank">Maps View</a>
             </div>
         </div>
     </div>
@@ -223,30 +87,24 @@
         const CONFIG = {
             WHATSAPP: "60108988182",
             ORS_KEY: "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImVlYzI5ZTA0OTM2YTRlZDNhNjk1NTcyNGQ1OTJmYmNjIiwiaCI6Im11cm11cjY0In0=",
-            CENTER: [3.139, 101.686],
             BBOX: "99.5,1.2,103.6,6.8"
         };
 
         const TARIFF = {
+            BASE_FARE: 5.00,
             BASE_KM: 1.25,        
-            LONG_KM: 1.80,        
-            THRESHOLD: 80,        
-            PEAK_SURCHARGE: 0.45,  
-            TRAFFIC_ADJUSTMENT: 1.15 // 15% time buffer for peak hours
-        };
-
-        const PRESETS = {
-            klia: { name: "KLIA T1", coord: [2.7456, 101.7072] },
-            genting: { name: "Genting Highlands", coord: [3.4230, 101.7930] },
-            jb: { name: "Johor Bahru", coord: [1.4927, 103.7414] }
+            BASE_MIN: 0.43,      
+            LONG_KM: 1.80,       
+            THRESHOLD: 50,       
+            MIDNIGHT_SURCHARGE: 1.5,
+            TRAFFIC_BUFFER: 1.15
         };
 
         const $ = id => document.getElementById(id);
         let pickupCoord, dropoffCoord, routeLayer, pickupMarker, dropoffMarker, searchTimer;
 
-        const map = L.map("map", { zoomControl: false }).setView(CONFIG.CENTER, 13);
+        const map = L.map("map", { zoomControl: false }).setView([3.139, 101.686], 13);
         L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png").addTo(map);
-        L.control.zoom({ position: 'bottomright' }).addTo(map);
 
         window.onload = () => {
             const now = new Date();
@@ -257,13 +115,12 @@
         async function searchPlaces(query, resultId, type) {
             clearTimeout(searchTimer);
             if (query.length < 3) return $(resultId).style.display = 'none';
-
             searchTimer = setTimeout(async () => {
                 try {
                     const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&bbox=${CONFIG.BBOX}&limit=5`);
                     const data = await res.json();
                     renderResults(data.features, resultId, type);
-                } catch (e) { console.error("Search error", e); }
+                } catch (e) { console.error(e); }
             }, 400);
         }
 
@@ -282,7 +139,9 @@
         }
 
         function selectLocation(type, coord, label) {
-            $(type).value = label;
+            const displayLabel = label.length > 30 ? label.substring(0, 27) + "..." : label;
+            $(type).value = displayLabel;
+            $(type).dataset.fullAddress = label;
             $(`${type}-results`).style.display = 'none';
 
             if (type === 'pickup') {
@@ -294,7 +153,6 @@
                 if (dropoffMarker) map.removeLayer(dropoffMarker);
                 dropoffMarker = L.marker(coord).addTo(map);
             }
-
             if (pickupCoord && dropoffCoord) calculateRoute();
         }
 
@@ -322,65 +180,52 @@
                 
                 const depDate = new Date($("departure-time").value);
                 const hour = depDate.getHours();
-
-                // Apply traffic buffer during peak hours before processing fare
                 const isPeak = (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19);
-                if (isPeak) {
-                    mins *= TARIFF.TRAFFIC_ADJUSTMENT;
-                }
-                
-                processFare(km, mins, hour, isPeak);
+                if (isPeak) mins *= TARIFF.TRAFFIC_BUFFER;
 
+                processFare(km, mins, hour, isPeak);
                 $("loading-state").style.display = 'none';
                 $("fare-content").style.display = 'block';
-            } catch (e) {
-                alert("Routing failed. Please check your connection.");
-                $("results").style.display = 'none';
-            }
+            } catch (e) { alert("Route error"); }
         }
 
         function processFare(km, mins, hour, isPeak) {
-            let fare = 0;
-            
-            // 1. Distance Calculation (Tiered)
+            let fare = TARIFF.BASE_FARE;
+            let modeLabel = "Standard Rate";
+
             if (km <= TARIFF.THRESHOLD) {
-                fare = km * TARIFF.BASE_KM;
+                fare += (km * TARIFF.BASE_KM) + (mins * TARIFF.BASE_MIN);
             } else {
-                const baseCharge = TARIFF.THRESHOLD * TARIFF.BASE_KM;
-                const extraCharge = (km - TARIFF.THRESHOLD) * TARIFF.LONG_KM;
-                fare = baseCharge + extraCharge;
+                const baseTier = (TARIFF.THRESHOLD * TARIFF.BASE_KM) + (mins * TARIFF.BASE_MIN);
+                const longHaul = (km - TARIFF.THRESHOLD) * TARIFF.LONG_KM;
+                fare += baseTier + longHaul;
+                modeLabel = "Long Haul";
             }
 
-            // 2. Peak Hour Surcharge
-            if (isPeak) {
-                fare += (mins * TARIFF.PEAK_SURCHARGE);
-            }
-
-            // 3. Midnight Surcharge (50% extra for 12 AM - 6 AM)
             if (hour >= 0 && hour < 6) {
-                fare *= 1.5;
+                fare *= TARIFF.MIDNIGHT_SURCHARGE;
+                modeLabel = "Midnight Rate";
+            } else if (isPeak && km <= TARIFF.THRESHOLD) {
+                modeLabel = "Peak Hour";
             }
 
-            const finalFare = Math.ceil(fare);
-            const modeLabel = km > TARIFF.THRESHOLD ? "Long Haul" : (isPeak ? "Peak Hour" : (hour >= 0 && hour < 6 ? "Midnight Rate" : "Standard Rate"));
-
-            updateUI(finalFare, km, mins, modeLabel, isPeak);
+            updateUI(Math.ceil(fare), km, mins, modeLabel);
         }
 
-        function updateUI(fare, km, mins, mode, isPeak) {
-            const fareEl = $("fare");
-            fareEl.innerText = `RM ${fare}`;
-            if (isPeak) fareEl.classList.add('is-peak');
-            else fareEl.classList.remove('is-peak');
-
+        function updateUI(fare, km, mins, mode) {
+            $("fare").innerText = `RM ${fare}`;
             $("distance").innerText = `${km.toFixed(1)} km`;
             $("eta").innerText = `${Math.round(mins)} min`;
             $("mode-badge").innerText = mode;
 
+            const pAddr = $("pickup").dataset.fullAddress || $("pickup").value;
+            const dAddr = $("dropoff").dataset.fullAddress || $("dropoff").value;
+
+            // Fixed Maps URL template literal
             const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${pickupCoord[0]},${pickupCoord[1]}&destination=${dropoffCoord[0]},${dropoffCoord[1]}&travelmode=driving`;
             $("nav-btn").href = mapsUrl;
 
-            const msg = `*New Ride Booking*\n\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\n\nDist: ${km.toFixed(1)}km\nEst Time: ${Math.round(mins)}min\nFare: RM ${fare}\nStatus: ${mode}\n\nNavigation: ${mapsUrl}`;
+            const msg = `*Booking Request*\n\nFrom: ${pAddr}\nTo: ${dAddr}\n\nDist: ${km.toFixed(1)}km\nFare: RM ${fare}\nRate: ${mode}\n\nMap: ${mapsUrl}`;
             $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(msg)}`;
         }
 
@@ -398,16 +243,18 @@
             return coordinates;
         }
 
-        function loadPreset(val) {
-            if (PRESETS[val]) selectLocation('dropoff', PRESETS[val].coord, PRESETS[val].name);
-        }
-
         $("pickup").oninput = e => searchPlaces(e.target.value, "pickup-results", "pickup");
         $("dropoff").oninput = e => searchPlaces(e.target.value, "dropoff-results", "dropoff");
         $("gps-trigger").onclick = () => {
-            navigator.geolocation.getCurrentPosition(p => {
-                selectLocation('pickup', [p.coords.latitude, p.coords.longitude], "My Location");
-                map.setView([p.coords.latitude, p.coords.longitude], 15);
+            navigator.geolocation.getCurrentPosition(async p => {
+                const lat = p.coords.latitude, lon = p.coords.longitude;
+                try {
+                    const res = await fetch(`https://photon.komoot.io/reverse?lon=${lon}&lat=${lat}`);
+                    const data = await res.json();
+                    const addr = data.features[0]?.properties.name || "My Location";
+                    selectLocation('pickup', [lat, lon], addr);
+                    map.setView([lat, lon], 15);
+                } catch (e) { selectLocation('pickup', [lat, lon], "My Location"); }
             }, () => alert("GPS access denied."));
         };
     </script>
