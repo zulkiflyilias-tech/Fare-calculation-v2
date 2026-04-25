@@ -72,13 +72,15 @@ function renderResults(features, resultId, type) {
 
     list.innerHTML = features.map(f => {
         const p = f.properties;
-        const label = `${p.name || ''}, ${p.city || ''}`.replace(/, $/, "");
+        // Construct detailed address string
+        const parts = [p.name, p.city, p.state].filter(Boolean);
+        const fullAddress = parts.join(", ");
 
         return `
         <div class="autocomplete-item"
-            onclick="selectLocation('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${label.replace(/'/g, "\\'")}')">
+            onclick="selectLocation('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${fullAddress.replace(/'/g, "\\'")}')">
             <span class="place-name">${p.name || 'Unknown'}</span>
-            <span class="place-address">${p.city || ''} ${p.state || ''}</span>
+            <span class="place-address">${p.city || ''}${p.city && p.state ? ', ' : ''}${p.state || ''}</span>
         </div>`;
     }).join('');
 
@@ -126,7 +128,6 @@ async function calculateRoute() {
         if (!data.routes?.length) throw new Error("No route");
 
         const route = data.routes[0];
-
         drawRoute(route);
 
         const km = route.summary.distance / 1000;
@@ -134,11 +135,9 @@ async function calculateRoute() {
         const hour = new Date($("departure-time").value).getHours();
 
         const result = calculateFare(km, mins, hour);
-
         updateUI(result.fare, km, mins, result.mode, result.isPeak);
 
         setLoading(false);
-
     } catch (err) {
         console.error(err);
         alert("Route calculation failed.");
@@ -148,65 +147,38 @@ async function calculateRoute() {
 
 function drawRoute(route) {
     if (routeLayer) map.removeLayer(routeLayer);
-
     routeLayer = L.polyline(decodePoly(route.geometry), {
         color: '#059669',
         weight: 5
     }).addTo(map);
-
     map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
 }
 
-// FARE ENGINE (DISTANCE-WEIGHTED)
+// FARE ENGINE
 function isPeakHour(hour) {
     return (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19);
 }
 
 function calculateFare(km, mins, hour) {
     let fare;
-
     if (km <= TARIFF.THRESHOLD) {
         fare = (km * TARIFF.BASE_KM) + (mins * TARIFF.BASE_MIN);
     } else {
         const ratio = TARIFF.THRESHOLD / km;
         const minsBase = mins * ratio;
-
-        const baseFare =
-            (TARIFF.THRESHOLD * TARIFF.BASE_KM) +
-            (minsBase * TARIFF.BASE_MIN);
-
-        const extraKm = km - TARIFF.THRESHOLD;
-        const longFare = extraKm * TARIFF.LONG_KM;
-
-        fare = baseFare + longFare;
+        const baseFare = (TARIFF.THRESHOLD * TARIFF.BASE_KM) + (minsBase * TARIFF.BASE_MIN);
+        fare = baseFare + ((km - TARIFF.THRESHOLD) * TARIFF.LONG_KM);
     }
 
     const isPeak = isPeakHour(hour);
-
-    if (isPeak) {
-        fare += mins * TARIFF.PEAK_SURCHARGE;
-    }
-
-    if (hour >= 0 && hour < 6) {
-        fare *= 1.5;
-    }
+    if (isPeak) fare += mins * TARIFF.PEAK_SURCHARGE;
+    if (hour >= 0 && hour < 6) fare *= 1.5;
 
     return {
         fare: Math.ceil(fare),
         isPeak,
-        mode: km > TARIFF.THRESHOLD
-            ? "Long Haul"
-            : isPeak ? "Peak Hour" : "Standard Rate"
+        mode: km > TARIFF.THRESHOLD ? "Long Haul" : isPeak ? "Peak Hour" : "Standard Rate"
     };
-}
-
-// PROFIT ENGINE
-function calculateProfit(fare, km) {
-    const fuelPerKm = parseFloat($("fuel-cost")?.value) || 0;
-    const fuelTotal = km * fuelPerKm;
-    const profit = fare - fuelTotal;
-
-    return { fuelTotal, profit };
 }
 
 // UI UPDATE
@@ -218,27 +190,10 @@ function updateUI(fare, km, mins, mode, isPeak) {
     $("eta").innerText = `${Math.round(mins)} min`;
     $("mode-badge").innerText = mode;
 
-    // PROFIT
-    const { fuelTotal, profit } = calculateProfit(fare, km);
-
-    if ($("fuel-total")) $("fuel-total").innerText = `RM ${fuelTotal.toFixed(2)}`;
-
-    const profitEl = $("profit");
-    if (profitEl) {
-        profitEl.innerText = `RM ${profit.toFixed(2)}`;
-        profitEl.style.color =
-            profit > 0 ? "#059669" :
-            profit < 0 ? "#dc2626" : "#6b7280";
-    }
-
-    // LINKS
-    const mapsUrl =
-        `https://www.google.com/maps/dir/?api=1&origin=${pickupCoord[0]},${pickupCoord[1]}&destination=${dropoffCoord[0]},${dropoffCoord[1]}&travelmode=driving`;
-
+    const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${pickupCoord[0]},${pickupCoord[1]}&destination=${dropoffCoord[0]},${dropoffCoord[1]}&travelmode=driving`;
     $("nav-btn").href = mapsUrl;
 
-    const msg =
-`*New Ride Booking*
+    const msg = `*New Ride Booking*
 
 From: ${$("pickup").value}
 To: ${$("dropoff").value}
@@ -246,54 +201,31 @@ To: ${$("dropoff").value}
 Dist: ${km.toFixed(1)} km
 Est Time: ${Math.round(mins)} min
 Fare: RM ${fare}
-Fuel: RM ${fuelTotal.toFixed(2)}
-Profit: RM ${profit.toFixed(2)}
 Status: ${mode}
 
 Navigation: ${mapsUrl}`;
 
-    $("wa-btn").href =
-        `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(msg)}`;
+    $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(msg)}`;
 }
 
 // UTIL
 function decodePoly(str) {
     let index = 0, lat = 0, lng = 0, coordinates = [];
-
     while (index < str.length) {
         let b, shift = 0, result = 0;
-
-        do {
-            b = str.charCodeAt(index++) - 63;
-            result |= (b & 0x1f) << shift;
-            shift += 5;
-        } while (b >= 0x20);
-
+        do { b = str.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
         lat += (result & 1) ? ~(result >> 1) : (result >> 1);
-
-        shift = 0;
-        result = 0;
-
-        do {
-            b = str.charCodeAt(index++) - 63;
-            result |= (b & 0x1f) << shift;
-            shift += 5;
-        } while (b >= 0x20);
-
+        shift = 0; result = 0;
+        do { b = str.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
         lng += (result & 1) ? ~(result >> 1) : (result >> 1);
-
         coordinates.push([lat / 1e5, lng / 1e5]);
     }
-
     return coordinates;
 }
 
 // EVENTS
-$("pickup").oninput = e =>
-    searchPlaces(e.target.value, "pickup-results", "pickup");
-
-$("dropoff").oninput = e =>
-    searchPlaces(e.target.value, "dropoff-results", "dropoff");
+$("pickup").oninput = e => searchPlaces(e.target.value, "pickup-results", "pickup");
+$("dropoff").oninput = e => searchPlaces(e.target.value, "dropoff-results", "dropoff");
 
 $("gps-trigger").onclick = () => {
     navigator.geolocation.getCurrentPosition(pos => {
@@ -302,10 +234,4 @@ $("gps-trigger").onclick = () => {
         map.setView(coord, 15);
     }, () => alert("GPS denied"));
 };
-
-if ($("fuel-cost")) {
-    $("fuel-cost").oninput = () => {
-        if (pickupCoord && dropoffCoord) calculateRoute();
-    };
-}
 </script>
