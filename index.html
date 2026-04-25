@@ -3,45 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Hybrid Fare Estimator</title>
+    <title>Rideshare MY - Expert Fare Estimator</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        :root { --primary: #059669; --whatsapp: #25D366; --bg: #f3f4f6; }
-        body { font-family: -apple-system, sans-serif; margin: 0; background: var(--bg); display: flex; flex-direction: column; height: 100vh; }
+        :root { --primary: #059669; --whatsapp: #25D366; --bg: #f3f4f6; --text: #1f2937; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: var(--bg); display: flex; flex-direction: column; height: 100vh; color: var(--text); }
+        
         .search-panel { background: white; padding: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 1001; }
         .input-group { position: relative; margin-bottom: 12px; }
-        .input-group label { display: block; font-size: 11px; font-weight: bold; color: #6b7280; margin-bottom: 4px; }
-        input { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
-        .gps-btn { position: absolute; right: 10px; top: 24px; background: none; border: none; font-size: 20px; cursor: pointer; }
-        .autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #d1d5db; z-index: 2000; max-height: 200px; overflow-y: auto; display: none; border-radius: 0 0 8px 8px; }
+        .input-group label { display: block; font-size: 11px; font-weight: bold; color: #6b7280; margin-bottom: 4px; text-transform: uppercase; }
+        input { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; box-sizing: border-box; font-size: 16px; outline: none; }
+        input:focus { border-color: var(--primary); }
+        
+        .gps-btn { position: absolute; right: 10px; top: 24px; background: none; border: none; font-size: 20px; cursor: pointer; padding: 5px; }
+        
+        .autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #d1d5db; z-index: 2000; max-height: 200px; overflow-y: auto; display: none; border-radius: 0 0 8px 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .autocomplete-item { padding: 12px; border-bottom: 1px solid #f3f4f6; cursor: pointer; }
+        .autocomplete-item:hover { background: #f9fafb; }
+
         #map { flex-grow: 1; z-index: 1; }
+
         .results-card { position: fixed; bottom: 20px; left: 20px; right: 20px; background: white; padding: 20px; border-radius: 16px; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); z-index: 1002; display: none; }
-        .fare-header { display: flex; justify-content: space-between; align-items: center; }
+        .fare-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
         #fare { font-size: 32px; font-weight: 800; color: var(--primary); margin: 0; }
-        #mode-badge { background: #ecfdf5; color: var(--primary); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; }
-        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
-        .btn { padding: 14px; border-radius: 10px; text-align: center; text-decoration: none; font-weight: bold; font-size: 14px; color: white; }
+        #mode-badge { background: #ecfdf5; color: var(--primary); padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: bold; border: 1px solid #d1fae5; }
+        
+        .stats-row { display: flex; gap: 15px; font-size: 14px; color: #4b5563; margin-bottom: 15px; padding: 8px 0; border-top: 1px solid #f3f4f6; }
+        
+        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .btn { padding: 14px; border-radius: 10px; text-align: center; text-decoration: none; font-weight: bold; font-size: 14px; color: white; transition: opacity 0.2s; }
+        .btn:active { opacity: 0.8; }
         .btn-wa { background: var(--whatsapp); }
         .btn-nav { background: #3b82f6; }
+        
+        #loading-state { text-align: center; font-weight: bold; color: var(--primary); padding: 10px; }
     </style>
 </head>
 <body>
 
 <div class="search-panel">
     <div class="input-group">
-        <label>PICKUP</label>
+        <label>Pickup Location</label>
         <input type="text" id="pickup" placeholder="Search pickup..." autocomplete="off">
         <button class="gps-btn" id="gps-trigger">📍</button>
         <div id="pickup-results" class="autocomplete-list"></div>
     </div>
     <div class="input-group">
-        <label>DROPOFF</label>
+        <label>Dropoff Location</label>
         <input type="text" id="dropoff" placeholder="Search destination..." autocomplete="off">
         <div id="dropoff-results" class="autocomplete-list"></div>
     </div>
     <div class="input-group">
-        <label>DEPARTURE TIME</label>
+        <label>Departure Time</label>
         <input type="datetime-local" id="departure-time">
     </div>
 </div>
@@ -49,18 +62,19 @@
 <div id="map"></div>
 
 <div id="results" class="results-card">
-    <div id="loading-state" style="text-align:center; font-weight:bold;">Calculating Fare...</div>
+    <div id="loading-state">Analyzing Route...</div>
     <div id="fare-content" style="display:none;">
         <div class="fare-header">
             <h2 id="fare">RM 0</h2>
             <span id="mode-badge">Standard</span>
         </div>
-        <div style="font-size:14px; color:#4b5563; margin: 10px 0;">
-            📏 <span id="distance">0 km</span> | ⏱️ <span id="eta">0 min</span>
+        <div class="stats-row">
+            <span>📏 <b id="distance">0 km</b></span>
+            <span>⏱️ <b id="eta">0 min</b></span>
         </div>
         <div class="btn-group">
-            <a id="wa-btn" class="btn btn-wa" target="_blank">WhatsApp Book</a>
-            <a id="nav-btn" class="btn btn-nav" target="_blank">Open Maps</a>
+            <a id="wa-btn" class="btn btn-wa" target="_blank">Book WhatsApp</a>
+            <a id="nav-btn" class="btn btn-nav" target="_blank">Open Navigation</a>
         </div>
     </div>
 </div>
@@ -94,7 +108,7 @@
             const list = $(resultId);
             list.innerHTML = data.features.map(f => `
                 <div class="autocomplete-item" onclick="selectLoc('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${(f.properties.name || f.properties.street || 'Point').replace(/'/g, "")}')">
-                    <strong>${f.properties.name || 'Unknown'}</strong><br><small>${f.properties.city || ''}</small>
+                    <strong>${f.properties.name || 'Unknown'}</strong><br><small>${f.properties.city || ''} ${f.properties.state || ''}</small>
                 </div>`).join('');
             list.style.display = 'block';
         } catch (e) { console.error(e); }
@@ -116,6 +130,7 @@
     }
 
     $("gps-trigger").onclick = () => {
+        const btn = $("gps-trigger");
         $("pickup").value = "Locating...";
         navigator.geolocation.getCurrentPosition(async p => {
             const lat = p.coords.latitude, lon = p.coords.longitude;
@@ -126,7 +141,7 @@
                 selectLoc('pickup', [lat, lon], header);
                 map.setView([lat, lon], 15);
             } catch (e) { selectLoc('pickup', [lat, lon], "My Location"); }
-        });
+        }, () => { $("pickup").value = ""; alert("GPS Access Denied"); });
     };
 
     async function calculate() {
@@ -148,14 +163,15 @@
             map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
 
             const km = route.summary.distance / 1000;
-            const mins = (route.summary.duration / 60) * 1.25; // 25% traffic buffer
+            const mins = (route.summary.duration / 60) * 1.25; // Traffic Buffer
             const depDate = new Date($("departure-time").value);
             const hour = depDate.getHours();
 
-            let fare = 3.00; // BASE FARE
+            let fare = 3.00; // MANDATORY BASE FARE
             let mode = "Standard";
 
             if (km <= 50) {
+                // --- SHORT DISTANCE ---
                 fare += (km * 1.25);
                 const isPeak = (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 20);
                 if (isPeak) {
@@ -163,13 +179,18 @@
                     mode = "Peak Hour";
                 }
             } else {
-                // HYBRID CALCULATION: First 50km standard, then RM1.80/km
-                fare += (50 * 1.25);
-                fare += ((km - 50) * 1.80);
-                mode = "Long Distance (Hybrid)";
+                // --- LONG DISTANCE HYBRID ---
+                fare += (50 * 1.25); // First 50km
+                fare += ((km - 50) * 1.80); // Balance km
+                
+                // Duration Charge: RM 18/Hour (RM 0.30/Min)
+                const hourlyCharge = mins * 0.30;
+                fare += hourlyCharge;
+                
+                mode = "Long Distance (Hybrid + Time)";
             }
 
-            // Midnight Surcharge (50% on entire fare)
+            // Midnight Surcharge (50% on total fare)
             if (hour >= 0 && hour < 6) {
                 fare *= 1.5;
                 mode += " + Midnight";
@@ -184,12 +205,15 @@
             const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${pickupCoord[0]},${pickupCoord[1]}&destination=${dropoffCoord[0]},${dropoffCoord[1]}&travelmode=driving`;
             $("nav-btn").href = mapsUrl;
             
-            const msg = `*NEW BOOKING*\nPickup: ${$("pickup").value}\nDropoff: ${$("dropoff").value}\nDist: ${km.toFixed(1)}km\nEst. Time: ${Math.round(mins)}min\nFare: RM ${finalFare}\nRate: ${mode}`;
+            const msg = `*NEW BOOKING REQUEST*\n\n📍 Pickup: ${$("pickup").value}\n🏁 Dropoff: ${$("dropoff").value}\n\n📏 Dist: ${km.toFixed(1)}km\n⏱️ Est: ${Math.round(mins)}min\n💰 Fare: *RM ${finalFare}*\n🏷️ Rate: ${mode}`;
             $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(msg)}`;
 
             $("loading-state").style.display = 'none';
             $("fare-content").style.display = 'block';
-        } catch (e) { alert("Error calculating route."); }
+        } catch (e) { 
+            alert("Routing error. Please check your locations."); 
+            $("results").style.display = 'none';
+        }
     }
 
     function decodePoly(str) {
@@ -211,3 +235,4 @@
 </script>
 </body>
 </html>
+
