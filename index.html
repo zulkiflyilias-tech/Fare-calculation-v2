@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Professional Estimator v3.0</title>
+    <title>Rideshare MY - Professional Estimator v3.1</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -322,7 +322,6 @@
                 let distanceCost = 0;
                 let mode = "Standard";
 
-                // Tier 1: First 80km @ 1.25, Tier 2: Excess @ 1.90
                 if (km <= 80) {
                     distanceCost = km * 1.25;
                 } else {
@@ -336,15 +335,12 @@
                 let totalRunning = 0;
 
                 if (hr >= 0 && hr < 6) {
-                    // Midnight: (Dist + 50%) + Time Charge
                     totalRunning = (distanceCost * 1.5) + (mins * 0.43);
                     mode += " (Midnight)";
                 } else if ((hr >= 6 && hr < 9) || (hr >= 17 && hr < 20)) {
-                    // Peak: Dist + Time Charge
                     totalRunning = distanceCost + (mins * 0.43);
                     mode += " (Peak)";
                 } else {
-                    // Off-Peak: Dist only
                     totalRunning = distanceCost;
                     mode += " (Off-Peak)";
                 }
@@ -356,9 +352,12 @@
                 $("eta").innerText = `${Math.round(mins)} min`;
                 $("mode-badge").innerText = mode;
                 
+                // UPDATED WHATSAPP MESSAGE
                 const msg = encodeURIComponent(`Booking Request:\nType: ${mode}\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\nEst Fare: RM ${finalFare}`);
                 $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${msg}`;
-                $("nav-btn").href = `https://www.google.com/maps/dir/?api=1&origin=${pickupCoord}&destination=${dropoffCoord}`;
+                
+                // UPDATED GOOGLE MAPS NAVIGATION URL (FIXED)
+                $("nav-btn").href = `https://www.google.com/maps/dir/?api=1&origin=${pickupCoord[0]},${pickupCoord[1]}&destination=${dropoffCoord[0]},${dropoffCoord[1]}&travelmode=driving`;
 
                 $("loading-state").style.display = 'none';
                 $("fare-content").style.display = 'block';
