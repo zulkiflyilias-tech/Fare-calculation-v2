@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Expert Fare Estimator</title>
+    <title>Rideshare MY - Professional Estimator v3.0</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -13,6 +13,7 @@
             --whatsapp: #25D366;
             --bg: #f3f4f6;
             --text: #1f2937;
+            --gray-text: #6b7280;
         }
 
         body { 
@@ -29,82 +30,76 @@
         .search-panel {
             background: white;
             padding: 15px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 15px rgba(0,0,0,0.1);
             z-index: 1001;
             position: relative;
         }
 
         .input-group {
             position: relative;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
 
         .input-group label {
             display: block;
-            font-size: 11px;
-            font-weight: bold;
+            font-size: 10px;
+            font-weight: 800;
             margin-bottom: 4px;
-            color: #6b7280;
+            color: var(--gray-text);
             text-transform: uppercase;
         }
 
         input {
             width: 100%;
-            padding: 12px 70px 12px 12px; /* Extra right padding for buttons */
-            border: 1px solid #d1d5db;
-            border-radius: 8px;
+            padding: 12px 85px 12px 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
             box-sizing: border-box;
             font-size: 16px;
             outline: none;
+            background: #f9fafb;
         }
 
-        input:focus { border-color: var(--primary); }
+        input:focus { border-color: var(--primary); background: white; }
 
         .btn-container {
             position: absolute;
             right: 8px;
             top: 22px;
             display: flex;
-            gap: 5px;
-            align-items: center;
+            gap: 4px;
         }
 
         .icon-btn {
-            background: #f3f4f6;
+            background: transparent;
             border: none;
-            font-size: 16px;
+            font-size: 18px;
             cursor: pointer;
-            padding: 6px;
-            border-radius: 6px;
+            padding: 8px;
             color: #4b5563;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.2s;
         }
 
-        .icon-btn:hover { background: #e5e7eb; }
-        .clear-btn { display: none; font-weight: bold; }
+        .clear-btn { display: none; font-size: 14px; color: #9ca3af; }
 
         .swap-container {
             position: absolute;
-            right: 25px;
-            top: 72px; /* Positioned between pickup and dropoff */
+            right: 20px;
+            top: 72px;
             z-index: 1005;
         }
 
         .swap-btn {
             background: white;
-            border: 1px solid #d1d5db;
+            border: 1px solid #e5e7eb;
             border-radius: 50%;
             width: 32px;
             height: 32px;
             cursor: pointer;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
+            color: var(--primary);
         }
 
         .autocomplete-list {
@@ -113,42 +108,59 @@
             left: 0;
             right: 0;
             background: white;
-            border: 1px solid #d1d5db;
             z-index: 2000;
             max-height: 280px;
             overflow-y: auto;
             display: none;
-            border-radius: 0 0 8px 8px;
-            box-shadow: 0 10px 15px rgba(0,0,0,0.1);
+            border-radius: 0 0 12px 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
         }
 
         .autocomplete-item {
-            padding: 12px 16px;
+            padding: 14px 16px;
             cursor: pointer;
             border-bottom: 1px solid #f3f4f6;
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
+
+        .loc-details { display: flex; flex-direction: column; }
+        .loc-name { font-weight: 600; font-size: 15px; color: #111; }
+        .loc-addr { font-size: 12px; color: var(--gray-text); }
 
         #map { flex-grow: 1; width: 100%; z-index: 1; }
 
         .results-card {
             position: fixed;
             bottom: 20px;
-            left: 20px;
-            right: 20px;
+            left: 15px;
+            right: 15px;
             background: white;
             padding: 20px;
-            border-radius: 16px;
-            box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+            border-radius: 20px;
+            box-shadow: 0 -4px 25px rgba(0,0,0,0.15);
             z-index: 1002;
             display: none;
         }
 
         #fare { font-size: 32px; font-weight: 800; color: var(--primary); margin: 0; }
-        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .mode-badge {
+            background:#ecfdf5; 
+            color:var(--primary); 
+            padding:4px 10px; 
+            border-radius:20px; 
+            font-size:11px; 
+            font-weight:bold;
+            text-transform: uppercase;
+        }
+
+        .disclaimer { font-size: 10px; color: #9ca3af; margin-top: 8px; font-style: italic; }
+        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
         .btn { padding: 14px; border-radius: 10px; text-align: center; text-decoration: none; font-weight: bold; color: white; }
         .btn-wa { background: var(--whatsapp); }
         .btn-nav { background: #3b82f6; }
-        #loading-state { text-align: center; padding: 20px; font-weight: bold; color: var(--primary); }
+        #loading-state { text-align: center; padding: 10px; font-weight: bold; color: var(--primary); }
     </style>
 </head>
 <body>
@@ -165,7 +177,7 @@
         </div>
 
         <div class="swap-container">
-            <button class="swap-btn" id="swap-btn" title="Swap Locations">⇅</button>
+            <button class="swap-btn" id="swap-btn">⇅</button>
         </div>
 
         <div class="input-group">
@@ -186,19 +198,20 @@
     <div id="map"></div>
 
     <div id="results" class="results-card">
-        <div id="loading-state">Analyzing Route...</div>
+        <div id="loading-state">Calculating Tiered Fare...</div>
         <div id="fare-content" style="display:none;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                 <h2 id="fare">RM 0</h2>
-                <span id="mode-badge" style="background:#ecfdf5; color:var(--primary); padding:4px 10px; border-radius:20px; font-size:11px; font-weight:bold;">Standard</span>
+                <span id="mode-badge" class="mode-badge">Standard</span>
             </div>
-            <div style="display:flex; gap:15px; font-size:14px; margin-bottom:15px;">
-                <span>📏 <b id="distance">0 km</b></span>
-                <span>⏱️ <b id="eta">0 min</b></span>
+            <div style="display:flex; gap:15px; font-size:14px; color: #6b7280;">
+                <span>📏 <b id="distance" style="color:#1f2937">0 km</b></span>
+                <span>⏱️ <b id="eta" style="color:#1f2937">0 min</b></span>
             </div>
+            <div class="disclaimer">* Fare includes Tiered Distance + Time Surcharge. Tolls excluded.</div>
             <div class="btn-group">
-                <a id="wa-btn" class="btn btn-wa" target="_blank">Confirm WhatsApp</a>
-                <a id="nav-btn" class="btn btn-nav" target="_blank">Maps</a>
+                <a id="wa-btn" class="btn btn-wa" target="_blank">Book Now</a>
+                <a id="nav-btn" class="btn btn-nav" target="_blank">Google Maps</a>
             </div>
         </div>
     </div>
@@ -218,56 +231,10 @@
         const map = L.map("map", { zoomControl: false }).setView(CONFIG.CENTER, 13);
         L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png").addTo(map);
 
-        // --- Helper: Toggle Clear Button ---
         const toggleClear = (input, btnId) => {
             $(btnId).style.display = input.value.length > 0 ? 'flex' : 'none';
         };
 
-        // --- Swap Logic ---
-        $("swap-btn").onclick = () => {
-            const pVal = $("pickup").value;
-            const dVal = $("dropoff").value;
-            const pCoord = pickupCoord;
-            const dCoord = dropoffCoord;
-
-            if (!pVal && !dVal) return;
-
-            $("pickup").value = dVal;
-            $("dropoff").value = pVal;
-            pickupCoord = dCoord;
-            dropoffCoord = pCoord;
-
-            // Swap Markers
-            if (pickupMarker) map.removeLayer(pickupMarker);
-            if (dropoffMarker) map.removeLayer(dropoffMarker);
-            
-            if (pickupCoord) pickupMarker = L.marker(pickupCoord).addTo(map);
-            if (dropoffCoord) dropoffMarker = L.marker(dropoffCoord).addTo(map);
-
-            toggleClear($("pickup"), "clear-pickup");
-            toggleClear($("dropoff"), "clear-dropoff");
-
-            if (pickupCoord && dropoffCoord) calculate();
-        };
-
-        // --- Clear Buttons ---
-        $("clear-pickup").onclick = () => {
-            $("pickup").value = "";
-            pickupCoord = null;
-            if (pickupMarker) map.removeLayer(pickupMarker);
-            toggleClear($("pickup"), "clear-pickup");
-            $("results").style.display = 'none';
-        };
-
-        $("clear-dropoff").onclick = () => {
-            $("dropoff").value = "";
-            dropoffCoord = null;
-            if (dropoffMarker) map.removeLayer(dropoffMarker);
-            toggleClear($("dropoff"), "clear-dropoff");
-            $("results").style.display = 'none';
-        };
-
-        // --- Original Search & Logic ---
         async function searchPlaces(query, resultId, type) {
             toggleClear($(type), `clear-${type}`);
             clearTimeout(searchTimer);
@@ -286,9 +253,15 @@
             const list = $(resultId);
             list.innerHTML = features.map(f => {
                 const p = f.properties;
-                const label = [p.name, p.city].filter(Boolean).join(', ');
-                return `<div class="autocomplete-item" onclick="selectLoc('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${label.replace(/'/g, "\\'")}')">
-                    <b>${p.name || 'Unknown'}</b><br><small>${p.city || ''} ${p.state || ''}</small>
+                const mainName = p.name || 'Unknown';
+                const subAddr = [p.street, p.district || p.city, p.postcode].filter(Boolean).join(', ');
+                const fullLabel = `${mainName}, ${subAddr}`;
+
+                return `<div class="autocomplete-item" onclick="selectLoc('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${fullLabel.replace(/'/g, "\\'")}')">
+                    <div class="loc-details">
+                        <span class="loc-name">${mainName}</span>
+                        <span class="loc-addr">${subAddr || 'Malaysia'}</span>
+                    </div>
                 </div>`;
             }).join('');
             list.style.display = features.length ? 'block' : 'none';
@@ -299,21 +272,26 @@
             $(`${type}-results`).style.display = 'none';
             toggleClear($(type), `clear-${type}`);
             if (type === 'pickup') {
-                pickupCoord = coord;
                 if (pickupMarker) map.removeLayer(pickupMarker);
-                pickupMarker = L.marker(coord).addTo(map);
+                pickupCoord = coord; pickupMarker = L.marker(coord).addTo(map);
             } else {
-                dropoffCoord = coord;
                 if (dropoffMarker) map.removeLayer(dropoffMarker);
-                dropoffMarker = L.marker(coord).addTo(map);
+                dropoffCoord = coord; dropoffMarker = L.marker(coord).addTo(map);
             }
             if (pickupCoord && dropoffCoord) calculate();
         }
 
         $("gps-trigger").onclick = () => {
-            navigator.geolocation.getCurrentPosition(p => {
+            $("pickup").value = "Locating...";
+            navigator.geolocation.getCurrentPosition(async p => {
                 const lat = p.coords.latitude, lon = p.coords.longitude;
-                selectLoc('pickup', [lat, lon], "Current Location");
+                try {
+                    const res = await fetch(`https://photon.komoot.io/reverse?lon=${lon}&lat=${lat}`);
+                    const data = await res.json();
+                    const feat = data.features[0].properties;
+                    const addr = [feat.name, feat.street, feat.district || feat.city, feat.postcode].filter(Boolean).join(', ');
+                    selectLoc('pickup', [lat, lon], addr);
+                } catch (e) { selectLoc('pickup', [lat, lon], "Current Location"); }
                 map.setView([lat, lon], 15);
             });
         };
@@ -337,15 +315,54 @@
                 map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
 
                 const km = route.summary.distance / 1000;
-                const fare = Math.ceil(3 + (km * 1.5)); // Simplified fare logic for demo
-
-                $("fare").innerText = `RM ${fare}`;
-                $("distance").innerText = `${km.toFixed(1)} km`;
-                $("eta").innerText = `${Math.round(route.summary.duration / 60)} min`;
+                const mins = route.summary.duration / 60;
                 
+                // --- TIERED CALCULATION LOGIC ---
+                const baseFare = 3.00;
+                let distanceCost = 0;
+                let mode = "Standard";
+
+                // Tier 1: First 80km @ 1.25, Tier 2: Excess @ 1.90
+                if (km <= 80) {
+                    distanceCost = km * 1.25;
+                } else {
+                    distanceCost = (80 * 1.25) + ((km - 80) * 1.90);
+                    mode = "Long Distance";
+                }
+
+                const depVal = $("departure-time").value;
+                const date = depVal ? new Date(depVal) : new Date();
+                const hr = date.getHours();
+                let totalRunning = 0;
+
+                if (hr >= 0 && hr < 6) {
+                    // Midnight: (Dist + 50%) + Time Charge
+                    totalRunning = (distanceCost * 1.5) + (mins * 0.43);
+                    mode += " (Midnight)";
+                } else if ((hr >= 6 && hr < 9) || (hr >= 17 && hr < 20)) {
+                    // Peak: Dist + Time Charge
+                    totalRunning = distanceCost + (mins * 0.43);
+                    mode += " (Peak)";
+                } else {
+                    // Off-Peak: Dist only
+                    totalRunning = distanceCost;
+                    mode += " (Off-Peak)";
+                }
+
+                const finalFare = Math.ceil(baseFare + totalRunning);
+
+                $("fare").innerText = `RM ${finalFare}`;
+                $("distance").innerText = `${km.toFixed(1)} km`;
+                $("eta").innerText = `${Math.round(mins)} min`;
+                $("mode-badge").innerText = mode;
+                
+                const msg = encodeURIComponent(`Booking Request:\nType: ${mode}\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\nEst Fare: RM ${finalFare}`);
+                $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${msg}`;
+                $("nav-btn").href = `https://www.google.com/maps/dir/?api=1&origin=${pickupCoord}&destination=${dropoffCoord}`;
+
                 $("loading-state").style.display = 'none';
                 $("fare-content").style.display = 'block';
-            } catch (e) { alert("Error calculating route"); }
+            } catch (e) { alert("Error calculating fare."); }
         }
 
         function decodePoly(str) {
@@ -364,6 +381,15 @@
 
         $("pickup").oninput = e => searchPlaces(e.target.value, "pickup-results", "pickup");
         $("dropoff").oninput = e => searchPlaces(e.target.value, "dropoff-results", "dropoff");
+        $("clear-pickup").onclick = () => { $("pickup").value = ""; pickupCoord = null; toggleClear($("pickup"), "clear-pickup"); };
+        $("clear-dropoff").onclick = () => { $("dropoff").value = ""; dropoffCoord = null; toggleClear($("dropoff"), "clear-dropoff"); };
+        $("swap-btn").onclick = () => {
+            const v1 = $("pickup").value, v2 = $("dropoff").value;
+            const c1 = pickupCoord, c2 = dropoffCoord;
+            $("pickup").value = v2; $("dropoff").value = v1;
+            pickupCoord = c2; dropoffCoord = c1;
+            if (pickupCoord && dropoffCoord) calculate();
+        };
     </script>
 </body>
 </html>
