@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Professional v3.5</title>
+    <title>Rideshare MY - Professional v3.6</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -62,9 +62,6 @@
             outline: none;
             background: #f9fafb;
             transition: all 0.2s ease;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
 
         input:focus { 
@@ -99,7 +96,7 @@
             right: 0;
             background: white;
             z-index: 2000;
-            max-height: 300px;
+            max-height: 280px;
             overflow-y: auto;
             display: none;
             border-radius: 0 0 12px 12px;
@@ -111,16 +108,10 @@
             padding: 14px 16px;
             cursor: pointer;
             border-bottom: 1px solid #f3f4f6;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
         }
 
-        .autocomplete-item:last-child { border-bottom: none; }
-        .autocomplete-item:hover { background: #f9fafb; }
-
-        .loc-name { font-weight: 700; font-size: 14px; color: #111; }
-        .loc-addr { font-size: 12px; color: var(--gray-text); line-height: 1.4; }
+        .loc-name { font-weight: 700; font-size: 14px; display: block; color: #111; }
+        .loc-addr { font-size: 11px; color: var(--gray-text); }
 
         #map { flex-grow: 1; width: 100%; z-index: 1; }
 
@@ -142,7 +133,7 @@
             align-items: center;
             justify-content: center;
             color: var(--primary);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         }
 
         .results-card {
@@ -178,7 +169,7 @@
             color: white; 
         }
         .btn-wa { background: var(--whatsapp); }
-        .btn-nav { background: #3b82f6; }
+        .btn-nav { background: #3b82f6; cursor: pointer; }
         
         #loading-state { text-align: center; padding: 20px; color: var(--primary); }
     </style>
@@ -218,18 +209,18 @@
     <div id="map"></div>
 
     <div id="results" class="results-card">
-        <div id="loading-state">Calculating...</div>
+        <div id="loading-state">Calculating route...</div>
         <div id="fare-content" style="display:none;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <h2 id="fare">RM 0</h2>
                 <span id="mode-badge" class="mode-badge">Standard</span>
             </div>
-            <div style="margin: 10px 0; font-size:14px;">
+            <div style="margin: 10px 0; font-size:14px; color:#4b5563;">
                 📏 <b id="distance">0 km</b> | ⏱️ <b id="eta">0 min</b>
             </div>
             <div class="btn-group">
                 <a id="wa-btn" class="btn btn-wa" target="_blank">WhatsApp</a>
-                <a id="nav-btn" class="btn btn-nav">View Route</a>
+                <div id="nav-btn" class="btn btn-nav">View Route</div>
             </div>
         </div>
     </div>
@@ -268,15 +259,12 @@
             const list = $(resultId);
             list.innerHTML = features.map(f => {
                 const p = f.properties;
-                const name = p.name || 'Unknown Location';
-                // Build Detailed Address String (Grab style)
-                const addrParts = [p.street, p.district, p.postcode, p.city, p.state].filter(Boolean);
-                const fullAddr = addrParts.join(', ');
-                const displayString = `${name}, ${fullAddr}`.replace(/'/g, "\\'");
-
-                return `<div class="autocomplete-item" onclick="selectLoc('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${displayString}')">
+                const name = p.name || 'Unknown';
+                const addr = [p.street, p.district, p.postcode, p.city, p.state].filter(Boolean).join(', ');
+                const fullStr = `${name}, ${addr}`.replace(/'/g, "\\'");
+                return `<div class="autocomplete-item" onclick="selectLoc('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${fullStr}')">
                     <span class="loc-name">${name}</span>
-                    <span class="loc-addr">${fullAddr || 'Malaysia'}</span>
+                    <span class="loc-addr">${addr || 'Malaysia'}</span>
                 </div>`;
             }).join('');
             list.style.display = features.length ? 'block' : 'none';
@@ -342,15 +330,14 @@
                     runningTotal += (km * 1.25);
                 }
 
-                let finalFare = Math.round(runningTotal);
-                if (finalFare < 8) finalFare = 8;
+                let finalFare = Math.max(8, Math.round(runningTotal));
 
                 $("fare").innerText = `RM ${finalFare}`;
                 $("distance").innerText = `${km.toFixed(1)} km`;
                 $("eta").innerText = `${Math.round(mins)} min`;
                 $("mode-badge").innerText = mode;
                 
-                const msg = encodeURIComponent(`*Booking Request*\n---\n*From:* ${$("pickup").value}\n*To:* ${$("dropoff").value}\n---\n*Fare:* RM ${finalFare}\n*Dist:* ${km.toFixed(1)}km`);
+                const msg = encodeURIComponent(`*Booking*\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\nFare: RM ${finalFare}`);
                 $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${msg}`;
                 
                 $("nav-btn").onclick = () => {
@@ -359,7 +346,7 @@
 
                 $("loading-state").style.display = 'none';
                 $("fare-content").style.display = 'block';
-            } catch (e) { $("loading-state").innerText = "Route error."; }
+            } catch (e) { $("loading-state").innerText = "Calculation error."; }
         }
 
         function decodePoly(str) {
@@ -378,11 +365,21 @@
 
         $("pickup").oninput = e => searchPlaces(e.target.value, "pickup-results", "pickup");
         $("dropoff").oninput = e => searchPlaces(e.target.value, "dropoff-results", "dropoff");
-        $("clear-pickup").onclick = () => { $("pickup").value = ""; pickupCoord = null; $("clear-pickup").style.display='none'; };
-        $("clear-dropoff").onclick = () => { $("dropoff").value = ""; dropoffCoord = null; $("clear-dropoff").style.display='none'; };
+        $("departure-time").onchange = () => { if(pickupCoord && dropoffCoord) calculate(); };
+
         $("gps-trigger").onclick = () => {
-            navigator.geolocation.getCurrentPosition(p => selectLoc('pickup', [p.coords.latitude, p.coords.longitude], "Current Location"));
+            navigator.geolocation.getCurrentPosition(async p => {
+                const lat = p.coords.latitude, lon = p.coords.longitude;
+                try {
+                    const res = await fetch(`https://photon.komoot.io/reverse?lon=${lon}&lat=${lat}`);
+                    const data = await res.json();
+                    const feat = data.features[0].properties;
+                    const addr = [feat.name, feat.street, feat.district, feat.city].filter(Boolean).join(', ');
+                    selectLoc('pickup', [lat, lon], addr || "Current Location");
+                } catch (e) { selectLoc('pickup', [lat, lon], "Current Location"); }
+            });
         };
+
         $("swap-btn").onclick = () => {
             const v1 = $("pickup").value, v2 = $("dropoff").value;
             const c1 = pickupCoord, c2 = dropoffCoord;
