@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Professional v3.3</title>
+    <title>Rideshare MY - Professional v3.4</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -29,7 +29,6 @@
             overflow: hidden;
         }
 
-        /* Input Panel */
         .search-panel {
             background: var(--card-bg);
             padding: 16px;
@@ -90,9 +89,6 @@
             border-radius: 8px;
         }
 
-        .icon-btn:hover { background: #f3f4f6; }
-
-        /* Autocomplete */
         .autocomplete-list {
             position: absolute;
             top: 100%;
@@ -112,14 +108,11 @@
             padding: 12px 16px;
             cursor: pointer;
             border-bottom: 1px solid #f3f4f6;
-            display: flex;
-            align-items: center;
         }
 
         .loc-name { font-weight: 600; font-size: 14px; display: block; color: #111; }
         .loc-addr { font-size: 11px; color: var(--gray-text); }
 
-        /* Map & Elements */
         #map { flex-grow: 1; width: 100%; z-index: 1; }
 
         .swap-container {
@@ -136,17 +129,12 @@
             width: 36px;
             height: 36px;
             cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             display: flex;
             align-items: center;
             justify-content: center;
             color: var(--primary);
-            transition: transform 0.2s;
         }
 
-        .swap-btn:active { transform: scale(0.9); }
-
-        /* Results Card */
         .results-card {
             position: fixed;
             bottom: 24px;
@@ -158,15 +146,9 @@
             box-shadow: 0 -10px 30px rgba(0,0,0,0.15);
             z-index: 1002;
             display: none;
-            animation: slideUp 0.3s ease-out;
         }
 
-        @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
-        }
-
-        #fare { font-size: 34px; font-weight: 800; color: var(--primary); margin: 0; letter-spacing: -0.02em; }
+        #fare { font-size: 34px; font-weight: 800; color: var(--primary); margin: 0; }
         .mode-badge {
             background:#ecfdf5; 
             color:var(--primary); 
@@ -174,11 +156,8 @@
             border-radius:30px; 
             font-size:11px; 
             font-weight:700;
-            text-transform: uppercase;
         }
 
-        .disclaimer { font-size: 10px; color: #9ca3af; margin-top: 12px; line-height: 1.4; }
-        
         .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
         .btn { 
             padding: 14px; 
@@ -186,30 +165,12 @@
             text-align: center; 
             text-decoration: none; 
             font-weight: 700; 
-            font-size: 15px;
             color: white; 
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
         }
-        .btn-wa { background: var(--whatsapp); box-shadow: 0 4px 14px rgba(37, 211, 102, 0.3); }
-        .btn-nav { background: #3b82f6; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3); }
+        .btn-wa { background: var(--whatsapp); }
+        .btn-nav { background: #3b82f6; }
         
-        #loading-state { text-align: center; padding: 20px; font-weight: 600; color: var(--primary); }
-
-        .loader {
-            width: 20px;
-            height: 20px;
-            border: 3px solid #ecfdf5;
-            border-bottom-color: var(--primary);
-            border-radius: 50%;
-            display: inline-block;
-            animation: rotation 1s linear infinite;
-            margin-bottom: 10px;
-        }
-
-        @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #loading-state { text-align: center; padding: 20px; color: var(--primary); }
     </style>
 </head>
 <body>
@@ -247,25 +208,18 @@
     <div id="map"></div>
 
     <div id="results" class="results-card">
-        <div id="loading-state">
-            <span class="loader"></span><br>
-            Analyzing routes and traffic...
-        </div>
+        <div id="loading-state">Calculating...</div>
         <div id="fare-content" style="display:none;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
                 <h2 id="fare">RM 0</h2>
                 <span id="mode-badge" class="mode-badge">Standard</span>
             </div>
-            <div style="display:flex; gap:20px; font-size:14px; color: #4b5563; background: #f9fafb; padding: 10px; border-radius: 10px;">
-                <span>📏 Distance: <b id="distance" style="color:var(--text)">0 km</b></span>
-                <span>⏱️ Est. Time: <b id="eta" style="color:var(--text)">0 min</b></span>
-            </div>
-            <div class="disclaimer">
-                Prices rounded to nearest RM. Tolls and parking fees are not included.
+            <div style="margin: 10px 0; font-size:14px;">
+                📏 <b id="distance">0 km</b> | ⏱️ <b id="eta">0 min</b>
             </div>
             <div class="btn-group">
-                <a id="wa-btn" class="btn btn-wa" target="_blank">Book via WhatsApp</a>
-                <a id="nav-btn" class="btn btn-nav" target="_blank">Navigate App</a>
+                <a id="wa-btn" class="btn btn-wa" target="_blank">WhatsApp</a>
+                <a id="nav-btn" class="btn btn-nav">View Route</a>
             </div>
         </div>
     </div>
@@ -292,16 +246,11 @@
         async function searchPlaces(query, resultId, type) {
             $(`clear-${type}`).style.display = query.length > 0 ? 'flex' : 'none';
             clearTimeout(searchTimer);
-            if (query.length < 3) {
-                $(resultId).style.display = 'none';
-                return;
-            }
+            if (query.length < 3) { $(resultId).style.display = 'none'; return; }
             searchTimer = setTimeout(async () => {
-                try {
-                    const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&bbox=${CONFIG.BBOX}&limit=5`);
-                    const data = await res.json();
-                    renderResults(data.features, resultId, type);
-                } catch (e) { console.error(e); }
+                const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&bbox=${CONFIG.BBOX}&limit=5`);
+                const data = await res.json();
+                renderResults(data.features, resultId, type);
             }, 400);
         }
 
@@ -311,10 +260,8 @@
                 const p = f.properties;
                 const label = `${p.name || 'Location'}, ${p.city || ''}`.replace(/'/g, "\\'");
                 return `<div class="autocomplete-item" onclick="selectLoc('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${label}')">
-                    <div style="flex-grow:1">
-                        <span class="loc-name">${p.name || 'Location'}</span>
-                        <span class="loc-addr">${p.street || ''} ${p.city || 'Malaysia'}</span>
-                    </div>
+                    <span class="loc-name">${p.name}</span>
+                    <span class="loc-addr">${p.city || 'Malaysia'}</span>
                 </div>`;
             }).join('');
             list.style.display = features.length ? 'block' : 'none';
@@ -326,11 +273,11 @@
             if (type === 'pickup') {
                 if (pickupMarker) map.removeLayer(pickupMarker);
                 pickupCoord = coord;
-                pickupMarker = L.circleMarker(coord, {color: '#3b82f6', fillOpacity: 1, radius: 8}).addTo(map);
+                pickupMarker = L.circleMarker(coord, {color: '#3b82f6', radius: 8}).addTo(map);
             } else {
                 if (dropoffMarker) map.removeLayer(dropoffMarker);
                 dropoffCoord = coord;
-                dropoffMarker = L.circleMarker(coord, {color: '#ef4444', fillOpacity: 1, radius: 8}).addTo(map);
+                dropoffMarker = L.circleMarker(coord, {color: '#ef4444', radius: 8}).addTo(map);
             }
             if (pickupCoord && dropoffCoord) calculate();
         }
@@ -355,18 +302,18 @@
                 const km = route.summary.distance / 1000;
                 const mins = route.summary.duration / 60;
                 
-                // --- NEW FARE LOGIC ---
+                // --- REVISED FARE LOGIC ---
                 const baseFare = 5.00;
                 let runningTotal = baseFare;
                 let mode = "Standard";
 
                 const sched = new Date($("departure-time").value);
-                const hrs = sched.getHours();
-                const minsTotal = (hrs * 60) + sched.getMinutes();
+                const h = sched.getHours();
+                const m = sched.getMinutes();
+                const timeInMins = (h * 60) + m;
 
-                // Define Time Windows in minutes from midnight
-                const isPeak = (minsTotal >= 360 && minsTotal < 540) || (minsTotal >= 1020 && minsTotal < 1200);
-                const isMidnight = (minsTotal > 0 && minsTotal < 360);
+                const isPeak = (timeInMins >= 360 && timeInMins < 540) || (timeInMins >= 1020 && timeInMins < 1200);
+                const isMidnight = (h >= 0 && timeInMins < 360);
 
                 if (km >= 80) {
                     runningTotal += (km * 1.90) + (mins * 0.20);
@@ -381,23 +328,26 @@
                     runningTotal += (km * 1.25);
                 }
 
-                // Minimum Fare Check & Remove Cents
-                let finalFare = Math.max(8, Math.round(runningTotal));
+                // Minimum Fare Check: Strict RM 8.00
+                let finalFare = Math.round(runningTotal);
+                if (finalFare < 8) finalFare = 8;
 
                 $("fare").innerText = `RM ${finalFare}`;
                 $("distance").innerText = `${km.toFixed(1)} km`;
                 $("eta").innerText = `${Math.round(mins)} min`;
                 $("mode-badge").innerText = mode;
                 
-                const msg = encodeURIComponent(`*New Booking*\n---\n*Pickup:* ${$("pickup").value}\n*Dropoff:* ${$("dropoff").value}\n---\n*Est. Fare:* RM ${finalFare}\n*Dist:* ${km.toFixed(1)}km\n*Mode:* ${mode}`);
+                const msg = encodeURIComponent(`*Booking*\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\nFare: RM ${finalFare}\nDist: ${km.toFixed(1)}km`);
                 $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${msg}`;
                 
-                // Deep Link to Google Maps App
-                $("nav-btn").href = `google.navigation:q=${dropoffCoord[0]},${dropoffCoord[1]}`;
+                // Direct Navigation App Link
+                $("nav-btn").onclick = () => {
+                    window.location.href = `google.navigation:q=${dropoffCoord[0]},${dropoffCoord[1]}`;
+                };
 
                 $("loading-state").style.display = 'none';
                 $("fare-content").style.display = 'block';
-            } catch (e) { $("loading-state").innerText = "Error calculating route."; }
+            } catch (e) { $("loading-state").innerText = "Route error."; }
         }
 
         function decodePoly(str) {
@@ -416,9 +366,6 @@
 
         $("pickup").oninput = e => searchPlaces(e.target.value, "pickup-results", "pickup");
         $("dropoff").oninput = e => searchPlaces(e.target.value, "dropoff-results", "dropoff");
-        $("gps-trigger").onclick = () => {
-            navigator.geolocation.getCurrentPosition(p => selectLoc('pickup', [p.coords.latitude, p.coords.longitude], "Current Location"));
-        };
         $("swap-btn").onclick = () => {
             const v1 = $("pickup").value, v2 = $("dropoff").value;
             const c1 = pickupCoord, c2 = dropoffCoord;
