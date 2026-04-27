@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Pro v3.9.7</title>
+    <title>Rideshare MY - Pro v3.9.8</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --primary: #059669; --whatsapp: #25D366; --bg: #f3f4f6; --text: #1f2937; --gray: #6b7280; }
@@ -11,26 +11,20 @@
         .app-header { background: #fff; padding: 12px 16px; display: flex; align-items: center; border-bottom: 1px solid #e5e7eb; z-index: 110; }
         .app-header h1 { margin: 0; font-size: 18px; font-weight: 800; color: var(--primary); letter-spacing: -0.5px; }
         .version-pill { margin-left: 8px; font-size: 10px; background: #ecfdf5; padding: 2px 8px; border-radius: 10px; color: var(--primary); font-weight: 700; }
-        
         .search-panel { background: #fff; padding: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); z-index: 100; }
         .input-group { position: relative; margin-bottom: 12px; }
         .input-group label { display: block; font-size: 10px; font-weight: 800; margin-bottom: 4px; color: var(--gray); text-transform: uppercase; }
-        
         input { width: 100%; padding: 14px 95px 14px 14px; border: 1.5px solid #e5e7eb; border-radius: 12px; box-sizing: border-box; font-size: 15px; outline: none; background: #f9fafb; }
-        input:focus { border-color: var(--primary); background: #fff; box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.1); }
-        
+        input:focus { border-color: var(--primary); background: #fff; }
         .btn-container { position: absolute; right: 8px; top: 22px; display: flex; align-items: center; height: 48px; }
         .icon-btn { background: transparent; border: none; cursor: pointer; padding: 8px; color: var(--gray); font-size: 18px; }
-        
         .autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; background: #fff; z-index: 200; max-height: 280px; overflow-y: auto; display: none; border-radius: 0 0 12px 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); border: 1px solid #e5e7eb; }
         .autocomplete-item { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f3f4f6; }
         .loc-name { font-weight: 700; font-size: 14px; color: var(--text); display: block; }
-        .loc-addr { font-size: 11px; color: var(--gray); line-height: 1.4; display: block; margin-top: 2px; }
-
+        .loc-addr { font-size: 11px; color: var(--gray); display: block; margin-top: 2px; }
         #map { flex-grow: 1; z-index: 1; }
         .swap-container { position: absolute; right: 24px; top: 92px; z-index: 105; }
         .swap-btn { background: #fff; border: 1px solid #e5e7eb; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; color: var(--primary); }
-
         .results-card { position: fixed; bottom: 24px; left: 16px; right: 16px; background: #fff; padding: 20px; border-radius: 20px; box-shadow: 0 -10px 30px rgba(0,0,0,0.15); z-index: 300; display: none; }
         #fare { font-size: 32px; font-weight: 800; color: var(--primary); margin: 0; }
         .mode-badge { background:#ecfdf5; color:var(--primary); padding:4px 12px; border-radius:20px; font-size: 10px; font-weight:700; }
@@ -38,8 +32,6 @@
         .btn { padding: 14px; border-radius: 12px; text-align: center; text-decoration: none; font-weight: 700; font-size: 14px; color: #fff; display: flex; align-items: center; justify-content: center; }
         .btn-wa { background: var(--whatsapp); }
         .btn-nav { background: #3b82f6; }
-        
-        .loader-box { text-align: center; padding: 10px; }
         .loader { width: 24px; height: 24px; border: 3px solid #ecfdf5; border-bottom-color: var(--primary); border-radius: 50%; display: inline-block; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
@@ -48,13 +40,13 @@
 
     <header class="app-header">
         <h1>RIDESHARE MY</h1>
-        <span class="version-pill">PRO v3.9.7</span>
+        <span class="version-pill">PRO v3.9.8</span>
     </header>
 
     <div class="search-panel">
         <div class="input-group">
             <label>Pickup Point</label>
-            <input type="text" id="pickup" placeholder="Search address or building..." autocomplete="off">
+            <input type="text" id="pickup" placeholder="Search building or street..." autocomplete="off">
             <div class="btn-container">
                 <button class="icon-btn" onclick="clearInput('pickup')">✕</button>
                 <button class="icon-btn" id="gps-trigger">📍</button>
@@ -72,7 +64,7 @@
         </div>
 
         <div class="input-group" style="margin:0">
-            <label>Departure Time</label>
+            <label>Travel Date/Time</label>
             <input type="datetime-local" id="departure-time">
         </div>
     </div>
@@ -80,9 +72,9 @@
     <div id="map"></div>
 
     <div id="results" class="results-card">
-        <div id="loading-state" class="loader-box">
+        <div id="loading-state" style="text-align:center">
             <span class="loader"></span>
-            <p style="margin:8px 0 0; font-size:13px; color:var(--gray)">Searching navigable road...</p>
+            <p style="margin:8px 0 0; font-size:13px; color:var(--gray)">Snapping to road network...</p>
         </div>
         <div id="fare-content" style="display:none">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -132,35 +124,24 @@
         }
 
         async function search(query, type) {
-            if (query.length < 3) return $(`${type}-results`).style.display = 'none';
+            if (query.length < 3) return;
             clearTimeout(searchTimer);
             searchTimer = setTimeout(async () => {
                 try {
                     const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query + " Malaysia")}&limit=6`);
                     const data = await res.json();
-                    renderResults(data.features, type);
+                    const list = $(`${type}-results`);
+                    list.innerHTML = data.features.map(f => {
+                        const p = f.properties;
+                        const label = `${p.name || ''}, ${p.street || ''} ${p.district || ''}, ${p.postcode || ''} ${p.city || ''}`.replace(/ ,/g, '').replace(/,,/g, ',').trim();
+                        return `<div class="autocomplete-item" onclick="select('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${label.replace(/'/g, "\\'")}')">
+                            <span class="loc-name">${p.name || 'Point'}</span>
+                            <span class="loc-addr">${p.street || ''} ${p.district || ''}<br>${p.postcode || ''} ${p.city || ''}</span>
+                        </div>`;
+                    }).join('');
+                    list.style.display = 'block';
                 } catch (e) { console.error("API Error"); }
             }, 350);
-        }
-
-        function renderResults(features, type) {
-            const list = $(`${type}-results`);
-            list.innerHTML = features.map(f => {
-                const p = f.properties;
-                const name = p.name || p.street || 'Point';
-                const street = p.street || '';
-                const district = p.district || p.suburb || '';
-                const city = p.city || '';
-                const post = p.postcode || '';
-                
-                const fullLabel = `${name}, ${street} ${district}, ${post} ${city}`.replace(/ ,/g, '').replace(/,,/g, ',').trim();
-
-                return `<div class="autocomplete-item" onclick="select('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${fullLabel.replace(/'/g, "\\'")}')">
-                    <span class="loc-name">${name}</span>
-                    <span class="loc-addr">${street} ${district}<br>${post} ${city}</span>
-                </div>`;
-            }).join('');
-            list.style.display = features.length ? 'block' : 'none';
         }
 
         function select(type, latlng, label) {
@@ -180,7 +161,7 @@
                         const res = await fetch(`https://photon.komoot.io/reverse?lat=${pos[0]}&lon=${pos[1]}`);
                         const data = await res.json();
                         const p = data.features[0].properties;
-                        const full = `${p.name || ''}, ${p.street || ''}, ${p.postcode || ''} ${p.city || ''}`.trim().replace(/^,/, '');
+                        const full = `${p.name || ''}, ${p.street || ''}, ${p.postcode || ''} ${p.city || ''}`.trim();
                         select('pickup', pos, full);
                     } catch (e) { select('pickup', pos, "Current Location"); }
                 });
@@ -198,13 +179,13 @@
                     headers: { "Content-Type": "application/json", "Authorization": CONFIG.ORS_KEY },
                     body: JSON.stringify({ 
                         coordinates: [[coords.pickup[1], coords.pickup[0]], [coords.dropoff[1], coords.dropoff[0]]],
-                        radiuses: [350, 350], // Snap to road within 350m
+                        radiuses: [500, 500], // Increased to 500m to catch roads near large buildings
                         preference: 'recommended'
                     })
                 });
                 
                 const data = await res.json();
-                if (!data.routes) throw new Error();
+                if (!data.routes || data.routes.length === 0) throw new Error();
                 
                 const route = data.routes[0];
                 const km = route.summary.distance / 1000;
@@ -234,13 +215,15 @@
                 $("eta").innerText = `${mins} min`;
                 $("mode-badge").innerText = mode;
 
-                $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=` + encodeURIComponent(`*NEW BOOKING*\nMode: ${mode}\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\nFare: RM ${final}\nDist: ${km.toFixed(1)}km`);
+                const waMsg = encodeURIComponent(`*NEW RIDE*\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\nFare: RM ${final}`);
+                $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${waMsg}`;
+                // Fixed Google Maps URL syntax
                 $("nav-btn").href = `https://www.google.com/maps/dir/?api=1&origin=${coords.pickup[0]},${coords.pickup[1]}&destination=${coords.dropoff[0]},${coords.dropoff[1]}&travelmode=driving`;
 
                 $("loading-state").style.display = 'none';
                 $("fare-content").style.display = 'block';
             } catch (e) { 
-                $("loading-state").innerHTML = "<p style='color:#ef4444'>Road access not found. Try moving the pin.</p>"; 
+                $("loading-state").innerHTML = "<p style='color:#ef4444; font-size:12px; line-height:1.4'><b>Road network out of reach.</b><br>Please try picking a location closer to a main entrance or public road.</p>"; 
             }
         }
 
