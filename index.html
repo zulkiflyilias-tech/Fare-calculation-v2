@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Pro v3.3</title>
+    <title>Rideshare MY - Pro v3.4</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -30,12 +30,11 @@
             overflow: hidden;
         }
 
-        /* Improved Z-Index Hierarchy */
         .search-panel {
             background: var(--card-bg);
             padding: 16px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-            z-index: 100; /* Above map */
+            z-index: 100;
             border-bottom: 1px solid #e5e7eb;
         }
 
@@ -56,11 +55,11 @@
 
         input {
             width: 100%;
-            padding: 14px 90px 14px 14px; /* Larger padding for mobile */
+            padding: 14px 90px 14px 14px;
             border: 1.5px solid #e5e7eb;
             border-radius: 12px;
             box-sizing: border-box;
-            font-size: 16px; /* 16px prevents iOS zoom on focus */
+            font-size: 16px;
             outline: none;
             background: #f9fafb;
             transition: all 0.2s ease;
@@ -84,7 +83,7 @@
             background: transparent;
             border: none;
             cursor: pointer;
-            padding: 10px; /* Better touch target */
+            padding: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -92,16 +91,13 @@
             color: var(--gray-text);
         }
 
-        .icon-btn:hover { background: #f3f4f6; }
-
-        /* Autocomplete */
         .autocomplete-list {
             position: absolute;
             top: 100%;
             left: 0;
             right: 0;
             background: white;
-            z-index: 200; /* Above panel */
+            z-index: 200;
             max-height: 250px;
             overflow-y: auto;
             display: none;
@@ -121,7 +117,6 @@
         .loc-name { font-weight: 600; font-size: 14px; display: block; color: #111; }
         .loc-addr { font-size: 11px; color: var(--gray-text); }
 
-        /* Map */
         #map { flex-grow: 1; width: 100%; z-index: 1; }
 
         .swap-container {
@@ -145,7 +140,6 @@
             color: var(--primary);
         }
 
-        /* Results Card */
         .results-card {
             position: fixed;
             bottom: 24px;
@@ -212,7 +206,7 @@
     <div class="search-panel">
         <div class="input-group">
             <label>Pickup Location</label>
-            <input type="text" id="pickup" placeholder="Search for pickup..." autocomplete="off" enterkeyhint="search">
+            <input type="text" id="pickup" placeholder="Search for pickup..." autocomplete="off">
             <div class="btn-container">
                 <button class="icon-btn" id="clear-pickup" style="display:none">✕</button>
                 <button class="icon-btn" id="gps-trigger">📍</button>
@@ -226,7 +220,7 @@
 
         <div class="input-group">
             <label>Destination</label>
-            <input type="text" id="dropoff" placeholder="Search for destination..." autocomplete="off" enterkeyhint="search">
+            <input type="text" id="dropoff" placeholder="Search for destination..." autocomplete="off">
             <div class="btn-container">
                 <button class="icon-btn" id="clear-dropoff" style="display:none">✕</button>
             </div>
@@ -257,7 +251,7 @@
             </div>
             <div class="btn-group">
                 <a id="wa-btn" class="btn btn-wa" target="_blank">WhatsApp Book</a>
-                <a id="nav-btn" class="btn btn-nav" target="_blank">Google Maps</a>
+                <a id="nav-btn" class="btn btn-nav" target="_blank">Navigate</a>
             </div>
         </div>
     </div>
@@ -282,12 +276,10 @@
         $("departure-time").value = now.toISOString().slice(0,16);
 
         async function searchPlaces(query, resultId, type) {
-            $( `clear-${type}`).style.display = query.length > 0 ? 'flex' : 'none';
-            if (query.length === 0) { $(resultId).style.display = 'none'; return; }
+            $(`clear-${type}`).style.display = query.length > 0 ? 'flex' : 'none';
+            if (query.length < 3) { $(resultId).style.display = 'none'; return; }
             
             clearTimeout(searchTimer);
-            if (query.length < 3) return;
-
             searchTimer = setTimeout(async () => {
                 try {
                     const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&bbox=${CONFIG.BBOX}&limit=5`);
@@ -371,25 +363,30 @@
                 const km = route.summary.distance / 1000;
                 const mins = route.summary.duration / 60;
                 
-                // Fare Logic
                 const baseFare = 4.00;
-                let distCost = (km <= 80) ? (km * 1.30) : (80 * 1.30) + ((km - 80) * 1.95);
-                
                 const sched = new Date($("departure-time").value);
                 const hr = sched.getHours();
-                let multiplier = 1.0;
+                
+                let rawFare = 0;
                 let mode = km > 80 ? "Long Trip" : "Standard";
 
+                // --- LOGIC REVISION 3.4 ---
+                // 1. Midnight (00:00 - 05:59): 1.5x dist + 0.40/min
                 if (hr >= 0 && hr < 6) {
-                    multiplier = 1.5; 
+                    rawFare = baseFare + (km * 1.30 * 1.5) + (mins * 0.40);
                     mode += " (Midnight)";
-                } else if ((hr >= 7 && hr < 10) || (hr >= 17 && hr < 20)) {
-                    distCost += (mins * 0.40); 
+                } 
+                // 2. Peak Hours (06:00-09:00 or 17:00-20:00): 1.2x dist + 0.40/min
+                else if ((hr >= 6 && hr < 9) || (hr >= 17 && hr < 20)) {
+                    rawFare = baseFare + (km * 1.30 * 1.2) + (mins * 0.40);
                     mode += " (Peak Hour)";
                 }
+                // 3. Off-Peak Standard
+                else {
+                    const distCost = (km <= 80) ? (km * 1.30) : (80 * 1.30) + ((km - 80) * 1.95);
+                    rawFare = baseFare + distCost;
+                }
 
-                // Smart Rounding to nearest 0.50
-                const rawFare = baseFare + (distCost * multiplier);
                 const finalFare = (Math.ceil(rawFare * 2) / 2).toFixed(2);
 
                 $("fare").innerText = `RM ${finalFare}`;
@@ -399,14 +396,12 @@
                 
                 const msg = encodeURIComponent(`*Booking Request*\n---\n*From:* ${$("pickup").value}\n*To:* ${$("dropoff").value}\n---\n*Est. Fare:* RM ${finalFare}\n*Dist:* ${km.toFixed(1)}km\n*Mode:* ${mode}`);
                 $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${msg}`;
-                
-                // Fixed Google Maps Directions URL
                 $("nav-btn").href = `https://www.google.com/maps/dir/?api=1&origin=${pickupCoord[0]},${pickupCoord[1]}&destination=${dropoffCoord[0]},${dropoffCoord[1]}&travelmode=driving`;
 
                 $("loading-state").style.display = 'none';
                 $("fare-content").style.display = 'block';
             } catch (e) { 
-                $("loading-state").innerHTML = '<p style="color:#ef4444">Route calculation failed. Try different locations.</p>';
+                $("loading-state").innerHTML = '<p style="color:#ef4444">Route calculation failed.</p>';
             }
         }
 
