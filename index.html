@@ -3,25 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Pro v3.9.2</title>
+    <title>Rideshare MY - Pro v3.9.3</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --primary: #059669; --whatsapp: #25D366; --bg: #f3f4f6; --text: #1f2937; --gray: #6b7280; }
         body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: var(--bg); color: var(--text); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         
-        /* New Header Styling */
-        .app-header { background: #fff; padding: 12px 16px; display: flex; align-items: center; border-bottom: 1px solid #e5e7eb; }
+        .app-header { background: #fff; padding: 12px 16px; display: flex; align-items: center; border-bottom: 1px solid #e5e7eb; z-index: 110; }
         .app-header h1 { margin: 0; font-size: 18px; font-weight: 800; color: var(--primary); letter-spacing: -0.5px; }
-        .version-pill { margin-left: 8px; font-size: 10px; background: #ecfdf5; padding: 2px 8px; border-radius: 10px; color: var(--primary); }
+        .version-pill { margin-left: 8px; font-size: 10px; background: #ecfdf5; padding: 2px 8px; border-radius: 10px; color: var(--primary); font-weight: 700; }
 
         .search-panel { background: #fff; padding: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); z-index: 100; }
         .input-group { position: relative; margin-bottom: 12px; }
         .input-group label { display: block; font-size: 10px; font-weight: 800; margin-bottom: 4px; color: var(--gray); text-transform: uppercase; }
         
-        input { width: 100%; padding: 14px 90px 14px 14px; border: 1.5px solid #e5e7eb; border-radius: 12px; box-sizing: border-box; font-size: 16px; outline: none; background: #f9fafb; }
-        input:focus { border-color: var(--primary); background: #fff; }
+        input { width: 100%; padding: 14px 90px 14px 14px; border: 1.5px solid #e5e7eb; border-radius: 12px; box-sizing: border-box; font-size: 16px; outline: none; background: #f9fafb; transition: all 0.2s; }
+        input:focus { border-color: var(--primary); background: #fff; box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.1); }
         
-        .btn-container { position: absolute; right: 8px; top: 24px; display: flex; }
+        .btn-container { position: absolute; right: 8px; top: 22px; display: flex; }
         .icon-btn { background: transparent; border: none; cursor: pointer; padding: 10px; color: var(--gray); font-size: 18px; }
         
         .autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; background: #fff; z-index: 200; max-height: 250px; overflow-y: auto; display: none; border-radius: 0 0 12px 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
@@ -33,12 +32,14 @@
         .swap-container { position: absolute; right: 24px; top: 92px; z-index: 105; }
         .swap-btn { background: #fff; border: 1px solid #e5e7eb; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; color: var(--primary); font-weight: bold; }
 
-        .results-card { position: fixed; bottom: 24px; left: 16px; right: 16px; background: #fff; padding: 20px; border-radius: 20px; box-shadow: 0 -10px 30px rgba(0,0,0,0.15); z-index: 300; display: none; }
+        .results-card { position: fixed; bottom: 24px; left: 16px; right: 16px; background: #fff; padding: 20px; border-radius: 20px; box-shadow: 0 -10px 30px rgba(0,0,0,0.15); z-index: 300; display: none; animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        @keyframes slideUp { from { transform: translateY(110%); } to { transform: translateY(0); } }
 
         #fare { font-size: 32px; font-weight: 800; color: var(--primary); margin: 0; }
-        .mode-badge { background:#ecfdf5; color:var(--primary); padding:4px 12px; border-radius:20px; font-size:10px; font-weight:700; }
+        .mode-badge { background:#ecfdf5; color:var(--primary); padding:4px 12px; border-radius:20px; font-size: 10px; font-weight:700; }
         .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
-        .btn { padding: 14px; border-radius: 12px; text-align: center; text-decoration: none; font-weight: 700; font-size: 14px; color: #fff; display: flex; align-items: center; justify-content: center; }
+        .btn { padding: 14px; border-radius: 12px; text-align: center; text-decoration: none; font-weight: 700; font-size: 14px; color: #fff; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s; }
+        .btn:active { opacity: 0.8; }
         .btn-wa { background: var(--whatsapp); }
         .btn-nav { background: #3b82f6; }
 
@@ -50,7 +51,7 @@
 
     <header class="app-header">
         <h1>RIDESHARE MY</h1>
-        <span class="version-pill">PRO v3.9.2</span>
+        <span class="version-pill">PRO v3.9.3</span>
     </header>
 
     <div class="search-panel">
@@ -59,7 +60,7 @@
             <input type="text" id="pickup" placeholder="Search pickup..." autocomplete="off">
             <div class="btn-container">
                 <button class="icon-btn" onclick="clearInput('pickup')">✕</button>
-                <button class="icon-btn" id="gps-trigger">📍</button>
+                <button class="icon-btn" id="gps-trigger" title="Use Current Location">📍</button>
             </div>
             <div id="pickup-results" class="autocomplete-list"></div>
         </div>
@@ -73,13 +74,19 @@
             <div id="dropoff-results" class="autocomplete-list"></div>
         </div>
 
-        <div class="input-group" style="margin:0"><label>Schedule</label><input type="datetime-local" id="departure-time"></div>
+        <div class="input-group" style="margin:0">
+            <label>Schedule</label>
+            <input type="datetime-local" id="departure-time">
+        </div>
     </div>
 
     <div id="map"></div>
 
     <div id="results" class="results-card">
-        <div id="loading-state" style="text-align:center"><span class="loader"></span><p>Calculating route...</p></div>
+        <div id="loading-state" style="text-align:center">
+            <span class="loader"></span>
+            <p style="margin:8px 0 0; font-size:14px; color:var(--gray)">Calculating best fare...</p>
+        </div>
         <div id="fare-content" style="display:none">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                 <h2 id="fare">RM 8</h2>
@@ -90,8 +97,8 @@
                 <span>⏱️ <b><span id="eta">0 min</span></b></span>
             </div>
             <div class="btn-group">
-                <a id="wa-btn" class="btn btn-wa" target="_blank">WhatsApp</a>
-                <a id="nav-btn" class="btn btn-nav" target="_blank">Navigate</a>
+                <a id="wa-btn" class="btn btn-wa" target="_blank">WhatsApp Booking</a>
+                <a id="nav-btn" class="btn btn-nav" target="_blank">Start Navigation</a>
             </div>
         </div>
     </div>
@@ -101,6 +108,7 @@
         const CONFIG = {
             WHATSAPP: "60108988182",
             ORS_KEY: "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImVlYzI5ZTA0OTM2YTRlZDNhNjk1NTcyNGQ1OTJmYmNjIiwiaCI6Im11cm11cjY0In0=",
+            BASE_FARE: 4.00,
             MIN_FARE: 8,
             CENTER: [3.139, 101.686]
         };
@@ -113,7 +121,7 @@
         const map = L.map("map", { zoomControl: false, attributionControl: false }).setView(CONFIG.CENTER, 13);
         L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png").addTo(map);
 
-        // Set default time
+        // Auto-set current time
         const now = new Date();
         now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
         $("departure-time").value = now.toISOString().slice(0,16);
@@ -136,7 +144,7 @@
                     const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query + " Malaysia")}&lat=${c.lat}&lon=${c.lng}&limit=5`);
                     const data = await res.json();
                     renderResults(data.features, type);
-                } catch (e) { console.error("Search failed"); }
+                } catch (e) { console.error("Search API Error"); }
             }, 400);
         }
 
@@ -169,6 +177,24 @@
             else map.setView(latlng, 15);
         }
 
+        // GPS with Reverse Geocoding for Address Name
+        $("gps-trigger").onclick = () => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(async p => {
+                    const pos = [p.coords.latitude, p.coords.longitude];
+                    try {
+                        const res = await fetch(`https://photon.komoot.io/reverse?lat=${pos[0]}&lon=${pos[1]}`);
+                        const data = await res.json();
+                        const feat = data.features[0].properties;
+                        const address = `${feat.name || ''} ${feat.street || ''}, ${feat.city || ''}`.trim().replace(/^,|,$/g, '');
+                        select('pickup', pos, address || "Current Location");
+                    } catch (e) {
+                        select('pickup', pos, "Current Location");
+                    }
+                }, () => alert("Location access denied."));
+            }
+        };
+
         async function calculate() {
             $("results").style.display = 'block';
             $("fare-content").style.display = 'none';
@@ -191,14 +217,21 @@
                 const km = route.summary.distance / 1000;
                 const hr = new Date($("departure-time").value).getHours();
                 
-                // Fare logic with strictly RM 8 minimum
+                // MULTIPLIER LOGIC
                 let rate = 1.30;
                 let mode = "Standard";
-                if (hr < 6 || hr > 22) { rate = 1.95; mode = "Night"; }
-                else if ((hr >= 7 && hr <= 9) || (hr >= 17 && hr <= 20)) { rate = 1.60; mode = "Peak"; }
+                if (hr >= 22 || hr < 6) { 
+                    rate = 1.95; 
+                    mode = "Night (1.5x)"; 
+                } else if ((hr >= 7 && hr <= 9) || (hr >= 17 && hr <= 20)) { 
+                    rate = 1.60; 
+                    mode = "Peak (1.2x)"; 
+                }
 
-                const calculatedTotal = 5 + (km * rate); // Base 5 + distance
-                const finalFare = Math.max(CONFIG.MIN_FARE, Math.ceil(calculatedTotal));
+                // CALCULATION: Base RM 4 + (KM * Rate)
+                const distanceCharge = km * rate;
+                const totalCalculated = CONFIG.BASE_FARE + distanceCharge;
+                const finalFare = Math.max(CONFIG.MIN_FARE, Math.ceil(totalCalculated));
 
                 $("fare").innerText = `RM ${finalFare}`;
                 $("distance").innerText = `${km.toFixed(1)} km`;
@@ -212,7 +245,7 @@
                 $("loading-state").style.display = 'none';
                 $("fare-content").style.display = 'block';
             } catch (e) { 
-                $("loading-state").innerHTML = "Error calculating route. Please try again."; 
+                $("loading-state").innerHTML = "<p style='color:#ef4444'>Calculation Error. Please try different locations.</p>"; 
             }
         }
 
@@ -220,30 +253,21 @@
         $("dropoff").oninput = e => search(e.target.value, 'dropoff');
         
         $("swap-btn").onclick = () => {
-            if (!coords.pickup && !coords.dropoff) return;
+            if (!coords.pickup || !coords.dropoff) return;
             const tempVal = $("pickup").value, tempCoord = coords.pickup;
             $("pickup").value = $("dropoff").value; coords.pickup = coords.dropoff;
             $("dropoff").value = tempVal; coords.dropoff = tempCoord;
             
-            // Re-render markers
             if (markers.pickup) map.removeLayer(markers.pickup);
             if (markers.dropoff) map.removeLayer(markers.dropoff);
             
-            if (coords.pickup) markers.pickup = L.circleMarker(coords.pickup, {color: '#3b82f6', fillOpacity:1, radius:6}).addTo(map);
-            if (coords.dropoff) markers.dropoff = L.circleMarker(coords.dropoff, {color: '#ef4444', fillOpacity:1, radius:6}).addTo(map);
+            markers.pickup = L.circleMarker(coords.pickup, {color:'#3b82f6', fillOpacity:1, radius:6}).addTo(map);
+            markers.dropoff = L.circleMarker(coords.dropoff, {color:'#ef4444', fillOpacity:1, radius:6}).addTo(map);
             
-            if (coords.pickup && coords.dropoff) calculate();
+            calculate();
         };
 
-        $("gps-trigger").onclick = () => {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(p => {
-                    const pos = [p.coords.latitude, p.coords.longitude];
-                    select('pickup', pos, "Current Location");
-                }, () => alert("Unable to retrieve location"));
-            }
-        };
-
+        // UI: Close lists on click away
         document.addEventListener('click', e => { 
             if (!e.target.closest('.input-group')) {
                 document.querySelectorAll('.autocomplete-list').forEach(l => l.style.display = 'none');
