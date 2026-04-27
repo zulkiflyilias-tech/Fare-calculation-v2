@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Pro v3.5</title>
-    
+    <title>Rideshare MY - Pro v3.7</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
     <style>
         :root {
             --primary: #059669;
@@ -21,182 +19,83 @@
 
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            margin: 0; 
-            background: var(--bg); 
-            color: var(--text);
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
+            margin: 0; background: var(--bg); color: var(--text);
+            display: flex; flex-direction: column; height: 100vh; overflow: hidden;
         }
 
         .search-panel {
-            background: var(--card-bg);
-            padding: 16px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-            z-index: 100;
+            background: var(--card-bg); padding: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08); z-index: 100;
             border-bottom: 1px solid #e5e7eb;
         }
 
-        .input-group {
-            position: relative;
-            margin-bottom: 12px;
-        }
-
+        .input-group { position: relative; margin-bottom: 12px; }
         .input-group label {
-            display: block;
-            font-size: 10px;
-            font-weight: 800;
-            margin-bottom: 4px;
-            color: var(--gray-text);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
+            display: block; font-size: 10px; font-weight: 800;
+            margin-bottom: 4px; color: var(--gray-text);
+            text-transform: uppercase; letter-spacing: 0.05em;
         }
 
         input {
-            width: 100%;
-            padding: 14px 90px 14px 14px;
-            border: 1.5px solid #e5e7eb;
-            border-radius: 12px;
-            box-sizing: border-box;
-            font-size: 16px;
-            outline: none;
-            background: #f9fafb;
-            transition: all 0.2s ease;
+            width: 100%; padding: 14px 90px 14px 14px;
+            border: 1.5px solid #e5e7eb; border-radius: 12px;
+            box-sizing: border-box; font-size: 16px; outline: none;
+            background: #f9fafb; transition: all 0.2s ease;
         }
 
-        input:focus { 
-            border-color: var(--primary); 
-            background: white; 
-            box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.1);
-        }
+        input:focus { border-color: var(--primary); background: white; box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.1); }
 
-        .btn-container {
-            position: absolute;
-            right: 8px;
-            top: 24px;
-            display: flex;
-            gap: 2px;
-        }
-
-        .icon-btn {
-            background: transparent;
-            border: none;
-            cursor: pointer;
-            padding: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 8px;
-            color: var(--gray-text);
-        }
+        .btn-container { position: absolute; right: 8px; top: 24px; display: flex; gap: 2px; }
+        .icon-btn { background: transparent; border: none; cursor: pointer; padding: 10px; color: var(--gray-text); }
 
         .autocomplete-list {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: white;
-            z-index: 200;
-            max-height: 250px;
-            overflow-y: auto;
-            display: none;
-            border-radius: 0 0 12px 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-            margin-top: 2px;
+            position: absolute; top: 100%; left: 0; right: 0;
+            background: white; z-index: 200; max-height: 250px;
+            overflow-y: auto; display: none; border-radius: 0 0 12px 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15); margin-top: 2px;
         }
 
-        .autocomplete-item {
-            padding: 14px 16px;
-            cursor: pointer;
-            border-bottom: 1px solid #f3f4f6;
-            display: flex;
-            align-items: center;
-        }
-
+        .autocomplete-item { padding: 14px 16px; cursor: pointer; border-bottom: 1px solid #f3f4f6; }
         .loc-name { font-weight: 600; font-size: 14px; display: block; color: #111; }
         .loc-addr { font-size: 11px; color: var(--gray-text); }
 
         #map { flex-grow: 1; width: 100%; z-index: 1; }
 
-        .swap-container {
-            position: absolute;
-            right: 24px;
-            top: 76px;
-            z-index: 105;
-        }
-
+        .swap-container { position: absolute; right: 24px; top: 76px; z-index: 105; }
         .swap-btn {
-            background: white;
-            border: 1px solid #e5e7eb;
-            border-radius: 50%;
-            width: 36px;
-            height: 36px;
-            cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--primary);
+            background: white; border: 1px solid #e5e7eb; border-radius: 50%;
+            width: 36px; height: 36px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            display: flex; align-items: center; justify-content: center; color: var(--primary);
         }
 
         .results-card {
-            position: fixed;
-            bottom: 24px;
-            left: 16px;
-            right: 16px;
-            background: white;
-            padding: 20px;
-            border-radius: 20px;
-            box-shadow: 0 -10px 30px rgba(0,0,0,0.15);
-            z-index: 300;
-            display: none;
-            animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: fixed; bottom: 24px; left: 16px; right: 16px;
+            background: white; padding: 20px; border-radius: 20px;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.15); z-index: 300;
+            display: none; animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        @keyframes slideUp {
-            from { transform: translateY(100%); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
+        @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
         #fare { font-size: 32px; font-weight: 800; color: var(--primary); margin: 0; }
         .mode-badge {
-            background:#ecfdf5; 
-            color:var(--primary); 
-            padding:6px 12px; 
-            border-radius:30px; 
-            font-size:10px; 
-            font-weight:700;
-            text-transform: uppercase;
+            background:#ecfdf5; color:var(--primary); padding:6px 12px; 
+            border-radius:30px; font-size:10px; font-weight:700; text-transform: uppercase;
         }
 
         .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
         .btn { 
-            padding: 14px; 
-            border-radius: 12px; 
-            text-align: center; 
-            text-decoration: none; 
-            font-weight: 700; 
-            font-size: 14px;
-            color: white; 
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
+            padding: 14px; border-radius: 12px; text-align: center; 
+            text-decoration: none; font-weight: 700; font-size: 14px;
+            color: white; display: flex; align-items: center; justify-content: center; gap: 6px;
         }
         .btn-wa { background: var(--whatsapp); }
         .btn-nav { background: #3b82f6; }
         
-        #loading-state { text-align: center; padding: 20px; font-weight: 600; color: var(--primary); }
-
         .loader {
-            width: 24px;
-            height: 24px;
-            border: 3px solid #ecfdf5;
-            border-bottom-color: var(--primary);
-            border-radius: 50%;
-            display: inline-block;
-            animation: rotation 1s linear infinite;
+            width: 24px; height: 24px; border: 3px solid #ecfdf5;
+            border-bottom-color: var(--primary); border-radius: 50%;
+            display: inline-block; animation: rotation 1s linear infinite;
         }
         @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
@@ -236,9 +135,8 @@
     <div id="map"></div>
 
     <div id="results" class="results-card">
-        <div id="loading-state">
-            <span class="loader"></span><br>
-            <p>Analyzing routes...</p>
+        <div id="loading-state" style="text-align: center; padding: 20px;">
+            <span class="loader"></span><p>Analyzing routes...</p>
         </div>
         <div id="fare-content" style="display:none;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -261,8 +159,7 @@
         const CONFIG = {
             WHATSAPP: "60108988182",
             ORS_KEY: "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImVlYzI5ZTA0OTM2YTRlZDNhNjk1NTcyNGQ1OTJmYmNjIiwiaCI6Im11cm11cjY0In0=",
-            CENTER: [3.139, 101.686], // Default center (Klang Valley)
-            BBOX: "99.5,1.2,103.6,6.8" 
+            CENTER: [3.139, 101.686]
         };
 
         const $ = id => document.getElementById(id);
@@ -282,8 +179,8 @@
             clearTimeout(searchTimer);
             searchTimer = setTimeout(async () => {
                 try {
-                    // FIX: Added lat/lon bias and prioritized Malaysia in the query
-                    const bias = `&lat=${CONFIG.CENTER[0]}&lon=${CONFIG.CENTER[1]}`;
+                    const center = map.getCenter();
+                    const bias = `&lat=${center.lat}&lon=${center.lng}`;
                     const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query + " Malaysia")}${bias}&limit=5`);
                     const data = await res.json();
                     renderResults(data.features, resultId, type);
@@ -298,15 +195,9 @@
                 const name = p.name || 'Location';
                 const sub = [p.street, p.district || p.city, p.state].filter(Boolean).join(', ');
                 const label = `${name}, ${sub}`.replace(/'/g, "\\'");
-
-                // Logic to highlight NSK or Mydin results visually
-                const isPriority = name.toLowerCase().includes('nsk') || name.toLowerCase().includes('mydin');
-
                 return `<div class="autocomplete-item" onclick="selectLoc('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${label}')">
-                    <div style="flex-grow:1">
-                        <span class="loc-name">${isPriority ? '📍 ' : ''}${name}</span>
-                        <span class="loc-addr">${sub || 'Malaysia'}</span>
-                    </div>
+                    <span class="loc-name">${name}</span>
+                    <span class="loc-addr">${sub || 'Malaysia'}</span>
                 </div>`;
             }).join('');
             list.style.display = features.length ? 'block' : 'none';
@@ -328,24 +219,6 @@
             else map.setView(coord, 15);
         }
 
-        $("gps-trigger").onclick = () => {
-            if (!navigator.geolocation) return alert("Geolocation not supported");
-            $("pickup").value = "Locating...";
-            navigator.geolocation.getCurrentPosition(async p => {
-                const lat = p.coords.latitude, lon = p.coords.longitude;
-                try {
-                    const res = await fetch(`https://photon.komoot.io/reverse?lon=${lon}&lat=${lat}`);
-                    const data = await res.json();
-                    const feat = data.features[0].properties;
-                    const addr = [feat.name, feat.city].filter(Boolean).join(', ');
-                    selectLoc('pickup', [lat, lon], addr || "Current Location");
-                } catch (e) { selectLoc('pickup', [lat, lon], "Current Location"); }
-            }, () => { 
-                $("pickup").value = "";
-                alert("Position access denied"); 
-            });
-        };
-
         async function calculate() {
             $("results").style.display = 'block';
             $("fare-content").style.display = 'none';
@@ -358,37 +231,35 @@
                     body: JSON.stringify({ coordinates: [[pickupCoord[1], pickupCoord[0]], [dropoffCoord[1], dropoffCoord[0]]] })
                 });
                 const data = await res.json();
-                if (!data.routes) throw new Error("No route found");
+                
+                if (!data.routes || data.routes.length === 0) throw new Error("No route");
                 
                 const route = data.routes[0];
+                const coords = route.geometry.type === 'LineString' 
+                    ? route.geometry.coordinates.map(c => [c[1], c[0]])
+                    : decodePoly(route.geometry);
+
                 if (routeLayer) map.removeLayer(routeLayer);
-                routeLayer = L.polyline(decodePoly(route.geometry), { color: '#059669', weight: 6, opacity: 0.8 }).addTo(map);
+                routeLayer = L.polyline(coords, { color: '#059669', weight: 6, opacity: 0.8 }).addTo(map);
                 map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
 
                 const km = route.summary.distance / 1000;
                 const mins = route.summary.duration / 60;
+                const hr = new Date($("departure-time").value).getHours();
                 
-                const baseFare = 4.00;
-                const sched = new Date($("departure-time").value);
-                const hr = sched.getHours();
-                
-                let rawFare = 0;
+                // FARE UPDATED: Min fare RM 8.00
+                let baseFare = 8.00; 
+                let ratePerKm = 1.30;
                 let mode = km > 80 ? "Long Trip" : "Standard";
 
-                if (hr >= 0 && hr < 6) {
-                    rawFare = baseFare + (km * 1.30 * 1.5) + (mins * 0.40);
-                    mode += " (Midnight)";
-                } 
-                else if ((hr >= 6 && hr < 9) || (hr >= 17 && hr < 20)) {
-                    rawFare = baseFare + (km * 1.30 * 1.2) + (mins * 0.40);
-                    mode += " (Peak Hour)";
-                }
-                else {
-                    const distCost = (km <= 80) ? (km * 1.30) : (80 * 1.30) + ((km - 80) * 1.95);
-                    rawFare = baseFare + distCost;
-                }
+                if (hr >= 0 && hr < 6) { ratePerKm *= 1.5; mode += " (Midnight)"; } 
+                else if ((hr >= 6 && hr < 9) || (hr >= 17 && hr < 20)) { ratePerKm *= 1.25; mode += " (Peak)"; }
 
-                const finalFare = (Math.ceil(rawFare * 2) / 2).toFixed(2);
+                let calculatedFare = baseFare + (km * ratePerKm);
+                if (km > 80) calculatedFare += (km - 80) * 0.50; 
+
+                // Ensure RM 8.00 minimum and round to whole Ringgit
+                const finalFare = Math.max(8, Math.ceil(calculatedFare));
 
                 $("fare").innerText = `RM ${finalFare}`;
                 $("distance").innerText = `${km.toFixed(1)} km`;
@@ -398,13 +269,12 @@
                 const msg = encodeURIComponent(`*Booking Request*\n---\n*From:* ${$("pickup").value}\n*To:* ${$("dropoff").value}\n---\n*Est. Fare:* RM ${finalFare}\n*Dist:* ${km.toFixed(1)}km\n*Mode:* ${mode}`);
                 $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${msg}`;
                 
-                // FIX: Corrected template literal for Navigation
                 $("nav-btn").href = `https://www.google.com/maps/dir/?api=1&origin=${pickupCoord[0]},${pickupCoord[1]}&destination=${dropoffCoord[0]},${dropoffCoord[1]}&travelmode=driving`;
 
                 $("loading-state").style.display = 'none';
                 $("fare-content").style.display = 'block';
             } catch (e) { 
-                $("loading-state").innerHTML = '<p style="color:#error">Route calculation failed.</p>';
+                $("loading-state").innerHTML = '<p style="color:red">Error: No route found or API limit reached.</p>';
             }
         }
 
@@ -424,11 +294,6 @@
 
         $("pickup").oninput = e => searchPlaces(e.target.value, "pickup-results", "pickup");
         $("dropoff").oninput = e => searchPlaces(e.target.value, "dropoff-results", "dropoff");
-        $("departure-time").onchange = () => { if(pickupCoord && dropoffCoord) calculate(); };
-        
-        $("clear-pickup").onclick = () => { $("pickup").value = ""; pickupCoord = null; $("clear-pickup").style.display='none'; $("pickup-results").style.display='none'; };
-        $("clear-dropoff").onclick = () => { $("dropoff").value = ""; dropoffCoord = null; $("clear-dropoff").style.display='none'; $("dropoff-results").style.display='none'; };
-        
         $("swap-btn").onclick = () => {
             const v1 = $("pickup").value, v2 = $("dropoff").value;
             const c1 = pickupCoord, c2 = dropoffCoord;
@@ -436,12 +301,10 @@
             pickupCoord = c2; dropoffCoord = c1;
             if (pickupCoord && dropoffCoord) calculate();
         };
-
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.input-group')) {
-                document.querySelectorAll('.autocomplete-list').forEach(l => l.style.display = 'none');
-            }
-        });
+        $("gps-trigger").onclick = () => {
+            navigator.geolocation.getCurrentPosition(p => selectLoc('pickup', [p.coords.latitude, p.coords.longitude], "My Location"));
+        };
+        document.addEventListener('click', e => { if (!e.target.closest('.input-group')) document.querySelectorAll('.autocomplete-list').forEach(l => l.style.display = 'none'); });
     </script>
 </body>
 </html>
