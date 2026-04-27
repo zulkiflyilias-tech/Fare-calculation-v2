@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Professional v3.4</title>
+    <title>Rideshare MY - Professional v3.5</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -58,10 +58,13 @@
             border: 1.5px solid #e5e7eb;
             border-radius: 12px;
             box-sizing: border-box;
-            font-size: 15px;
+            font-size: 14px;
             outline: none;
             background: #f9fafb;
             transition: all 0.2s ease;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         input:focus { 
@@ -96,7 +99,7 @@
             right: 0;
             background: white;
             z-index: 2000;
-            max-height: 250px;
+            max-height: 300px;
             overflow-y: auto;
             display: none;
             border-radius: 0 0 12px 12px;
@@ -105,13 +108,19 @@
         }
 
         .autocomplete-item {
-            padding: 12px 16px;
+            padding: 14px 16px;
             cursor: pointer;
             border-bottom: 1px solid #f3f4f6;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
         }
 
-        .loc-name { font-weight: 600; font-size: 14px; display: block; color: #111; }
-        .loc-addr { font-size: 11px; color: var(--gray-text); }
+        .autocomplete-item:last-child { border-bottom: none; }
+        .autocomplete-item:hover { background: #f9fafb; }
+
+        .loc-name { font-weight: 700; font-size: 14px; color: #111; }
+        .loc-addr { font-size: 12px; color: var(--gray-text); line-height: 1.4; }
 
         #map { flex-grow: 1; width: 100%; z-index: 1; }
 
@@ -133,6 +142,7 @@
             align-items: center;
             justify-content: center;
             color: var(--primary);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
         .results-card {
@@ -248,7 +258,7 @@
             clearTimeout(searchTimer);
             if (query.length < 3) { $(resultId).style.display = 'none'; return; }
             searchTimer = setTimeout(async () => {
-                const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&bbox=${CONFIG.BBOX}&limit=5`);
+                const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&bbox=${CONFIG.BBOX}&limit=6`);
                 const data = await res.json();
                 renderResults(data.features, resultId, type);
             }, 400);
@@ -258,10 +268,15 @@
             const list = $(resultId);
             list.innerHTML = features.map(f => {
                 const p = f.properties;
-                const label = `${p.name || 'Location'}, ${p.city || ''}`.replace(/'/g, "\\'");
-                return `<div class="autocomplete-item" onclick="selectLoc('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${label}')">
-                    <span class="loc-name">${p.name}</span>
-                    <span class="loc-addr">${p.city || 'Malaysia'}</span>
+                const name = p.name || 'Unknown Location';
+                // Build Detailed Address String (Grab style)
+                const addrParts = [p.street, p.district, p.postcode, p.city, p.state].filter(Boolean);
+                const fullAddr = addrParts.join(', ');
+                const displayString = `${name}, ${fullAddr}`.replace(/'/g, "\\'");
+
+                return `<div class="autocomplete-item" onclick="selectLoc('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${displayString}')">
+                    <span class="loc-name">${name}</span>
+                    <span class="loc-addr">${fullAddr || 'Malaysia'}</span>
                 </div>`;
             }).join('');
             list.style.display = features.length ? 'block' : 'none';
@@ -302,7 +317,6 @@
                 const km = route.summary.distance / 1000;
                 const mins = route.summary.duration / 60;
                 
-                // --- REVISED FARE LOGIC ---
                 const baseFare = 5.00;
                 let runningTotal = baseFare;
                 let mode = "Standard";
@@ -328,7 +342,6 @@
                     runningTotal += (km * 1.25);
                 }
 
-                // Minimum Fare Check: Strict RM 8.00
                 let finalFare = Math.round(runningTotal);
                 if (finalFare < 8) finalFare = 8;
 
@@ -337,10 +350,9 @@
                 $("eta").innerText = `${Math.round(mins)} min`;
                 $("mode-badge").innerText = mode;
                 
-                const msg = encodeURIComponent(`*Booking*\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\nFare: RM ${finalFare}\nDist: ${km.toFixed(1)}km`);
+                const msg = encodeURIComponent(`*Booking Request*\n---\n*From:* ${$("pickup").value}\n*To:* ${$("dropoff").value}\n---\n*Fare:* RM ${finalFare}\n*Dist:* ${km.toFixed(1)}km`);
                 $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${msg}`;
                 
-                // Direct Navigation App Link
                 $("nav-btn").onclick = () => {
                     window.location.href = `google.navigation:q=${dropoffCoord[0]},${dropoffCoord[1]}`;
                 };
@@ -366,6 +378,11 @@
 
         $("pickup").oninput = e => searchPlaces(e.target.value, "pickup-results", "pickup");
         $("dropoff").oninput = e => searchPlaces(e.target.value, "dropoff-results", "dropoff");
+        $("clear-pickup").onclick = () => { $("pickup").value = ""; pickupCoord = null; $("clear-pickup").style.display='none'; };
+        $("clear-dropoff").onclick = () => { $("dropoff").value = ""; dropoffCoord = null; $("clear-dropoff").style.display='none'; };
+        $("gps-trigger").onclick = () => {
+            navigator.geolocation.getCurrentPosition(p => selectLoc('pickup', [p.coords.latitude, p.coords.longitude], "Current Location"));
+        };
         $("swap-btn").onclick = () => {
             const v1 = $("pickup").value, v2 = $("dropoff").value;
             const c1 = pickupCoord, c2 = dropoffCoord;
