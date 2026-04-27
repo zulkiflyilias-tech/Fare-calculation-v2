@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Professional v3.2</title>
+    <title>Rideshare MY - Professional v3.3</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -261,11 +261,11 @@
                 <span>⏱️ Est. Time: <b id="eta" style="color:var(--text)">0 min</b></span>
             </div>
             <div class="disclaimer">
-                Prices are estimates based on distance and peak-hour surcharges. Tolls and parking fees are not included.
+                Prices rounded to nearest RM. Tolls and parking fees are not included.
             </div>
             <div class="btn-group">
                 <a id="wa-btn" class="btn btn-wa" target="_blank">Book via WhatsApp</a>
-                <a id="nav-btn" class="btn btn-nav" target="_blank">View Route</a>
+                <a id="nav-btn" class="btn btn-nav" target="_blank">Navigate App</a>
             </div>
         </div>
     </div>
@@ -276,35 +276,32 @@
             WHATSAPP: "60108988182",
             ORS_KEY: "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImVlYzI5ZTA0OTM2YTRlZDNhNjk1NTcyNGQ1OTJmYmNjIiwiaCI6Im11cm11cjY0In0=",
             CENTER: [3.139, 101.686],
-            BBOX: "99.5,1.2,103.6,6.8" // Malaysia bounds
+            BBOX: "99.5,1.2,103.6,6.8"
         };
 
         const $ = id => document.getElementById(id);
         let pickupCoord, dropoffCoord, routeLayer, pickupMarker, dropoffMarker, searchTimer;
 
-        // Initialize Map
         const map = L.map("map", { zoomControl: false, attributionControl: false }).setView(CONFIG.CENTER, 13);
         L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png").addTo(map);
 
-        // Set default time to now
         const now = new Date();
         now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
         $("departure-time").value = now.toISOString().slice(0,16);
 
         async function searchPlaces(query, resultId, type) {
-            $( `clear-${type}`).style.display = query.length > 0 ? 'flex' : 'none';
+            $(`clear-${type}`).style.display = query.length > 0 ? 'flex' : 'none';
             clearTimeout(searchTimer);
             if (query.length < 3) {
                 $(resultId).style.display = 'none';
                 return;
             }
-
             searchTimer = setTimeout(async () => {
                 try {
                     const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&bbox=${CONFIG.BBOX}&limit=5`);
                     const data = await res.json();
                     renderResults(data.features, resultId, type);
-                } catch (e) { console.error("Search error:", e); }
+                } catch (e) { console.error(e); }
             }, 400);
         }
 
@@ -312,14 +309,11 @@
             const list = $(resultId);
             list.innerHTML = features.map(f => {
                 const p = f.properties;
-                const name = p.name || 'Location';
-                const sub = [p.street, p.district || p.city].filter(Boolean).join(', ');
-                const label = `${name}, ${sub}`.replace(/'/g, "\\'");
-
+                const label = `${p.name || 'Location'}, ${p.city || ''}`.replace(/'/g, "\\'");
                 return `<div class="autocomplete-item" onclick="selectLoc('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${label}')">
                     <div style="flex-grow:1">
-                        <span class="loc-name">${name}</span>
-                        <span class="loc-addr">${sub || 'Malaysia'}</span>
+                        <span class="loc-name">${p.name || 'Location'}</span>
+                        <span class="loc-addr">${p.street || ''} ${p.city || 'Malaysia'}</span>
                     </div>
                 </div>`;
             }).join('');
@@ -339,23 +333,7 @@
                 dropoffMarker = L.circleMarker(coord, {color: '#ef4444', fillOpacity: 1, radius: 8}).addTo(map);
             }
             if (pickupCoord && dropoffCoord) calculate();
-            else map.setView(coord, 15);
         }
-
-        $("gps-trigger").onclick = () => {
-            if (!navigator.geolocation) return alert("Geolocation not supported");
-            $("pickup").value = "Locating...";
-            navigator.geolocation.getCurrentPosition(async p => {
-                const lat = p.coords.latitude, lon = p.coords.longitude;
-                try {
-                    const res = await fetch(`https://photon.komoot.io/reverse?lon=${lon}&lat=${lat}`);
-                    const data = await res.json();
-                    const feat = data.features[0].properties;
-                    const addr = [feat.name, feat.city].filter(Boolean).join(', ');
-                    selectLoc('pickup', [lat, lon], addr || "Current Location");
-                } catch (e) { selectLoc('pickup', [lat, lon], "Current Location"); }
-            }, () => alert("Position access denied"));
-        };
 
         async function calculate() {
             $("results").style.display = 'block';
@@ -369,52 +347,57 @@
                     body: JSON.stringify({ coordinates: [[pickupCoord[1], pickupCoord[0]], [dropoffCoord[1], dropoffCoord[0]]] })
                 });
                 const data = await res.json();
-                if (!data.routes) throw new Error("No route found");
-                
                 const route = data.routes[0];
                 if (routeLayer) map.removeLayer(routeLayer);
-                routeLayer = L.polyline(decodePoly(route.geometry), { color: CONFIG.primary, weight: 6, opacity: 0.8 }).addTo(map);
+                routeLayer = L.polyline(decodePoly(route.geometry), { color: '#059669', weight: 6 }).addTo(map);
                 map.fitBounds(routeLayer.getBounds(), { padding: [80, 80] });
 
                 const km = route.summary.distance / 1000;
                 const mins = route.summary.duration / 60;
                 
-                // --- CALCULATION LOGIC ---
-                const baseFare = 4.00;
-                let distCost = (km <= 80) ? (km * 1.30) : (80 * 1.30) + ((km - 80) * 1.95);
-                
-                const sched = new Date($("departure-time").value);
-                const hr = sched.getHours();
-                let multiplier = 1.0;
-                let mode = km > 80 ? "Long Trip" : "Standard";
+                // --- NEW FARE LOGIC ---
+                const baseFare = 5.00;
+                let runningTotal = baseFare;
+                let mode = "Standard";
 
-                if (hr >= 0 && hr < 6) {
-                    multiplier = 1.5; 
-                    mode += " (Midnight)";
-                } else if ((hr >= 7 && hr < 10) || (hr >= 17 && hr < 20)) {
-                    distCost += (mins * 0.40); 
-                    mode += " (Peak Hour)";
+                const sched = new Date($("departure-time").value);
+                const hrs = sched.getHours();
+                const minsTotal = (hrs * 60) + sched.getMinutes();
+
+                // Define Time Windows in minutes from midnight
+                const isPeak = (minsTotal >= 360 && minsTotal < 540) || (minsTotal >= 1020 && minsTotal < 1200);
+                const isMidnight = (minsTotal > 0 && minsTotal < 360);
+
+                if (km >= 80) {
+                    runningTotal += (km * 1.90) + (mins * 0.20);
+                    mode = "Long Distance";
+                } else if (isMidnight) {
+                    runningTotal += (km * 1.25 * 1.50) + (mins * 0.40);
+                    mode = "Midnight";
+                } else if (isPeak) {
+                    runningTotal += (km * 1.25 * 1.20) + (mins * 0.40);
+                    mode = "Peak Hour";
+                } else {
+                    runningTotal += (km * 1.25);
                 }
 
-                const finalFare = Math.ceil(baseFare + (distCost * multiplier));
+                // Minimum Fare Check & Remove Cents
+                let finalFare = Math.max(8, Math.round(runningTotal));
 
-                // Update UI
                 $("fare").innerText = `RM ${finalFare}`;
                 $("distance").innerText = `${km.toFixed(1)} km`;
                 $("eta").innerText = `${Math.round(mins)} min`;
                 $("mode-badge").innerText = mode;
                 
-                const msg = encodeURIComponent(`*Booking Request*\n---\n*From:* ${$("pickup").value}\n*To:* ${$("dropoff").value}\n---\n*Est. Fare:* RM ${finalFare}\n*Dist:* ${km.toFixed(1)}km\n*Mode:* ${mode}`);
+                const msg = encodeURIComponent(`*New Booking*\n---\n*Pickup:* ${$("pickup").value}\n*Dropoff:* ${$("dropoff").value}\n---\n*Est. Fare:* RM ${finalFare}\n*Dist:* ${km.toFixed(1)}km\n*Mode:* ${mode}`);
                 $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${msg}`;
                 
-                // Optimized Google Maps Directions URL
-                $("nav-btn").href = `https://www.google.com/maps/dir/?api=1&origin=${pickupCoord[0]},${pickupCoord[1]}&destination=${dropoffCoord[0]},${dropoffCoord[1]}&travelmode=driving`;
+                // Deep Link to Google Maps App
+                $("nav-btn").href = `google.navigation:q=${dropoffCoord[0]},${dropoffCoord[1]}`;
 
                 $("loading-state").style.display = 'none';
                 $("fare-content").style.display = 'block';
-            } catch (e) { 
-                $("loading-state").innerHTML = '<span style="color:#ef4444">Could not calculate route. Please check your locations.</span>';
-            }
+            } catch (e) { $("loading-state").innerText = "Error calculating route."; }
         }
 
         function decodePoly(str) {
@@ -431,14 +414,11 @@
             return coordinates;
         }
 
-        // Event Listeners
         $("pickup").oninput = e => searchPlaces(e.target.value, "pickup-results", "pickup");
         $("dropoff").oninput = e => searchPlaces(e.target.value, "dropoff-results", "dropoff");
-        $("departure-time").onchange = () => { if(pickupCoord && dropoffCoord) calculate(); };
-        
-        $("clear-pickup").onclick = () => { $("pickup").value = ""; pickupCoord = null; $("clear-pickup").style.display='none'; };
-        $("clear-dropoff").onclick = () => { $("dropoff").value = ""; dropoffCoord = null; $("clear-dropoff").style.display='none'; };
-        
+        $("gps-trigger").onclick = () => {
+            navigator.geolocation.getCurrentPosition(p => selectLoc('pickup', [p.coords.latitude, p.coords.longitude], "Current Location"));
+        };
         $("swap-btn").onclick = () => {
             const v1 = $("pickup").value, v2 = $("dropoff").value;
             const c1 = pickupCoord, c2 = dropoffCoord;
@@ -446,13 +426,6 @@
             pickupCoord = c2; dropoffCoord = c1;
             if (pickupCoord && dropoffCoord) calculate();
         };
-
-        // Close lists on outside click
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.input-group')) {
-                document.querySelectorAll('.autocomplete-list').forEach(l => l.style.display = 'none');
-            }
-        });
     </script>
 </body>
 </html>
