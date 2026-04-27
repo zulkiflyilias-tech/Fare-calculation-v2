@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Pro v3.9.6</title>
+    <title>Rideshare MY - Pro v3.9.7</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --primary: #059669; --whatsapp: #25D366; --bg: #f3f4f6; --text: #1f2937; --gray: #6b7280; }
@@ -16,8 +16,7 @@
         .input-group { position: relative; margin-bottom: 12px; }
         .input-group label { display: block; font-size: 10px; font-weight: 800; margin-bottom: 4px; color: var(--gray); text-transform: uppercase; }
         
-        /* Updated padding for icon room */
-        input { width: 100%; padding: 14px 95px 14px 14px; border: 1.5px solid #e5e7eb; border-radius: 12px; box-sizing: border-box; font-size: 15px; outline: none; background: #f9fafb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        input { width: 100%; padding: 14px 95px 14px 14px; border: 1.5px solid #e5e7eb; border-radius: 12px; box-sizing: border-box; font-size: 15px; outline: none; background: #f9fafb; }
         input:focus { border-color: var(--primary); background: #fff; box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.1); }
         
         .btn-container { position: absolute; right: 8px; top: 22px; display: flex; align-items: center; height: 48px; }
@@ -25,8 +24,8 @@
         
         .autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; background: #fff; z-index: 200; max-height: 280px; overflow-y: auto; display: none; border-radius: 0 0 12px 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); border: 1px solid #e5e7eb; }
         .autocomplete-item { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f3f4f6; }
-        .loc-name { font-weight: 700; font-size: 14px; color: var(--text); display: block; margin-bottom: 2px; }
-        .loc-addr { font-size: 11px; color: var(--gray); line-height: 1.4; display: block; }
+        .loc-name { font-weight: 700; font-size: 14px; color: var(--text); display: block; }
+        .loc-addr { font-size: 11px; color: var(--gray); line-height: 1.4; display: block; margin-top: 2px; }
 
         #map { flex-grow: 1; z-index: 1; }
         .swap-container { position: absolute; right: 24px; top: 92px; z-index: 105; }
@@ -49,16 +48,16 @@
 
     <header class="app-header">
         <h1>RIDESHARE MY</h1>
-        <span class="version-pill">PRO v3.9.6</span>
+        <span class="version-pill">PRO v3.9.7</span>
     </header>
 
     <div class="search-panel">
         <div class="input-group">
             <label>Pickup Point</label>
-            <input type="text" id="pickup" placeholder="Search address, building, or area..." autocomplete="off">
+            <input type="text" id="pickup" placeholder="Search address or building..." autocomplete="off">
             <div class="btn-container">
                 <button class="icon-btn" onclick="clearInput('pickup')">✕</button>
-                <button class="icon-btn" id="gps-trigger" title="Current Location">📍</button>
+                <button class="icon-btn" id="gps-trigger">📍</button>
             </div>
             <div id="pickup-results" class="autocomplete-list"></div>
         </div>
@@ -67,7 +66,7 @@
 
         <div class="input-group">
             <label>Drop-off Point</label>
-            <input type="text" id="dropoff" placeholder="Where to?" autocomplete="off">
+            <input type="text" id="dropoff" placeholder="Destination..." autocomplete="off">
             <div class="btn-container"><button class="icon-btn" onclick="clearInput('dropoff')">✕</button></div>
             <div id="dropoff-results" class="autocomplete-list"></div>
         </div>
@@ -83,7 +82,7 @@
     <div id="results" class="results-card">
         <div id="loading-state" class="loader-box">
             <span class="loader"></span>
-            <p style="margin:8px 0 0; font-size:13px; color:var(--gray)">Calculating road route...</p>
+            <p style="margin:8px 0 0; font-size:13px; color:var(--gray)">Searching navigable road...</p>
         </div>
         <div id="fare-content" style="display:none">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -119,7 +118,6 @@
         const map = L.map("map", { zoomControl: false, attributionControl: false }).setView(CONFIG.CENTER, 13);
         L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png").addTo(map);
 
-        // Set current local time
         const now = new Date();
         now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
         $("departure-time").value = now.toISOString().slice(0,16);
@@ -141,7 +139,7 @@
                     const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query + " Malaysia")}&limit=6`);
                     const data = await res.json();
                     renderResults(data.features, type);
-                } catch (e) { console.error("Search API Offline"); }
+                } catch (e) { console.error("API Error"); }
             }, 350);
         }
 
@@ -149,18 +147,17 @@
             const list = $(`${type}-results`);
             list.innerHTML = features.map(f => {
                 const p = f.properties;
-                // Construct detailed address components
-                const name = p.name || p.street || 'Point of Interest';
-                const addr1 = p.street ? p.street : '';
-                const addr2 = p.district || p.suburb || '';
+                const name = p.name || p.street || 'Point';
+                const street = p.street || '';
+                const district = p.district || p.suburb || '';
                 const city = p.city || '';
                 const post = p.postcode || '';
                 
-                const fullLabel = `${name}, ${addr1} ${addr2}, ${post} ${city}`.replace(/ ,/g, '').replace(/,,/g, ',').trim();
+                const fullLabel = `${name}, ${street} ${district}, ${post} ${city}`.replace(/ ,/g, '').replace(/,,/g, ',').trim();
 
                 return `<div class="autocomplete-item" onclick="select('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${fullLabel.replace(/'/g, "\\'")}')">
                     <span class="loc-name">${name}</span>
-                    <span class="loc-addr">${addr1} ${addr2}<br>${post} ${city} ${p.state || ''}</span>
+                    <span class="loc-addr">${street} ${district}<br>${post} ${city}</span>
                 </div>`;
             }).join('');
             list.style.display = features.length ? 'block' : 'none';
@@ -170,17 +167,9 @@
             $(type).value = label;
             $(`${type}-results`).style.display = 'none';
             coords[type] = latlng;
-            
             if (markers[type]) map.removeLayer(markers[type]);
-            markers[type] = L.circleMarker(latlng, { 
-                color: type === 'pickup' ? '#3b82f6' : '#ef4444', 
-                fillOpacity: 1, 
-                radius: 7,
-                pane: 'markerPane' 
-            }).addTo(map);
-            
-            if (coords.pickup && coords.dropoff) calculate(); 
-            else map.setView(latlng, 16);
+            markers[type] = L.circleMarker(latlng, { color: type === 'pickup' ? '#3b82f6' : '#ef4444', fillOpacity: 1, radius: 7 }).addTo(map);
+            if (coords.pickup && coords.dropoff) calculate(); else map.setView(latlng, 16);
         }
 
         $("gps-trigger").onclick = () => {
@@ -190,13 +179,11 @@
                     try {
                         const res = await fetch(`https://photon.komoot.io/reverse?lat=${pos[0]}&lon=${pos[1]}`);
                         const data = await res.json();
-                        if (data.features.length) {
-                            const p = data.features[0].properties;
-                            const full = `${p.name || ''}, ${p.street || ''}, ${p.postcode || ''} ${p.city || ''}`.trim().replace(/^,/, '');
-                            select('pickup', pos, full || "Current Location");
-                        } else { select('pickup', pos, "Current Location"); }
+                        const p = data.features[0].properties;
+                        const full = `${p.name || ''}, ${p.street || ''}, ${p.postcode || ''} ${p.city || ''}`.trim().replace(/^,/, '');
+                        select('pickup', pos, full);
                     } catch (e) { select('pickup', pos, "Current Location"); }
-                }, () => alert("GPS Access Denied"));
+                });
             }
         };
 
@@ -206,13 +193,12 @@
             $("loading-state").style.display = 'block';
 
             try {
-                // Request optimized for road-snapping (driving-car profile)
                 const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car", {
                     method: "POST",
                     headers: { "Content-Type": "application/json", "Authorization": CONFIG.ORS_KEY },
                     body: JSON.stringify({ 
                         coordinates: [[coords.pickup[1], coords.pickup[0]], [coords.dropoff[1], coords.dropoff[0]]],
-                        instructions: false,
+                        radiuses: [350, 350], // Snap to road within 350m
                         preference: 'recommended'
                     })
                 });
@@ -225,26 +211,21 @@
                 const mins = Math.max(1, Math.round(route.summary.duration / 60));
 
                 if (routeLayer) map.removeLayer(routeLayer);
-                routeLayer = L.polyline(route.geometry.coordinates.map(c => [c[1], c[0]]), { color: '#059669', weight: 6, opacity: 0.9 }).addTo(map);
+                routeLayer = L.polyline(route.geometry.coordinates.map(c => [c[1], c[0]]), { color: '#059669', weight: 6 }).addTo(map);
                 map.fitBounds(routeLayer.getBounds(), { padding: [60, 60] });
 
-                // FARE ENGINE v3.9.6
                 const time = new Date($("departure-time").value);
                 const hhmm = time.getHours() * 100 + time.getMinutes();
                 let fare = 0, mode = "Standard";
 
                 if (km >= 80) {
-                    fare = (km * 1.90) + (mins * 0.20);
-                    mode = "Long Journey";
+                    fare = (km * 1.90) + (mins * 0.20); mode = "Long Journey";
                 } else if (hhmm >= 0 && hhmm <= 559) {
-                    fare = (km * CONFIG.BASE_RATE * 1.5) + (mins * 0.40);
-                    mode = "Night Rate";
+                    fare = (km * CONFIG.BASE_RATE * 1.5) + (mins * 0.40); mode = "Night Rate";
                 } else if ((hhmm >= 600 && hhmm <= 859) || (hhmm >= 1700 && hhmm <= 1959)) {
-                    fare = (km * CONFIG.BASE_RATE * 1.2) + (mins * 0.40);
-                    mode = "Peak Hour";
+                    fare = (km * CONFIG.BASE_RATE * 1.2) + (mins * 0.40); mode = "Peak Hour";
                 } else {
-                    fare = km * CONFIG.BASE_RATE;
-                    mode = "Standard";
+                    fare = km * CONFIG.BASE_RATE; mode = "Standard";
                 }
 
                 const final = Math.max(CONFIG.MIN_FARE, Math.ceil(fare));
@@ -253,33 +234,25 @@
                 $("eta").innerText = `${mins} min`;
                 $("mode-badge").innerText = mode;
 
-                const waMsg = encodeURIComponent(`*NEW RIDE BOOKING*\n🚗 Mode: ${mode}\n📍 From: ${$("pickup").value}\n🏁 To: ${$("dropoff").value}\n💰 Fare: RM ${final}\n📏 Dist: ${km.toFixed(1)}km`);
-                $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${waMsg}`;
+                $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=` + encodeURIComponent(`*NEW BOOKING*\nMode: ${mode}\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\nFare: RM ${final}\nDist: ${km.toFixed(1)}km`);
                 $("nav-btn").href = `https://www.google.com/maps/dir/?api=1&origin=${coords.pickup[0]},${coords.pickup[1]}&destination=${coords.dropoff[0]},${coords.dropoff[1]}&travelmode=driving`;
 
                 $("loading-state").style.display = 'none';
                 $("fare-content").style.display = 'block';
             } catch (e) { 
-                $("loading-state").innerHTML = "<p style='color:#ef4444; font-weight:bold;'>No road access found between these points.</p>"; 
+                $("loading-state").innerHTML = "<p style='color:#ef4444'>Road access not found. Try moving the pin.</p>"; 
             }
         }
 
         $("pickup").oninput = e => search(e.target.value, 'pickup');
         $("dropoff").oninput = e => search(e.target.value, 'dropoff');
-        
         $("swap-btn").onclick = () => {
-            if (!coords.pickup || !coords.dropoff) return;
             const tV = $("pickup").value, tC = coords.pickup;
             $("pickup").value = $("dropoff").value; coords.pickup = coords.dropoff;
             $("dropoff").value = tV; coords.dropoff = tC;
-            calculate();
+            if (coords.pickup && coords.dropoff) calculate();
         };
-
-        document.addEventListener('click', e => {
-            if (!e.target.closest('.input-group')) {
-                document.querySelectorAll('.autocomplete-list').forEach(l => l.style.display = 'none');
-            }
-        });
+        document.addEventListener('click', e => { if (!e.target.closest('.input-group')) document.querySelectorAll('.autocomplete-list').forEach(l => l.style.display = 'none'); });
     </script>
 </body>
 </html>
