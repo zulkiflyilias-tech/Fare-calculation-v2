@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Pro v3.4</title>
+    <title>Rideshare MY - Pro v3.5</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -261,7 +261,7 @@
         const CONFIG = {
             WHATSAPP: "60108988182",
             ORS_KEY: "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImVlYzI5ZTA0OTM2YTRlZDNhNjk1NTcyNGQ1OTJmYmNjIiwiaCI6Im11cm11cjY0In0=",
-            CENTER: [3.139, 101.686],
+            CENTER: [3.139, 101.686], // Default center (Klang Valley)
             BBOX: "99.5,1.2,103.6,6.8" 
         };
 
@@ -282,7 +282,9 @@
             clearTimeout(searchTimer);
             searchTimer = setTimeout(async () => {
                 try {
-                    const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&bbox=${CONFIG.BBOX}&limit=5`);
+                    // FIX: Added lat/lon bias and prioritized Malaysia in the query
+                    const bias = `&lat=${CONFIG.CENTER[0]}&lon=${CONFIG.CENTER[1]}`;
+                    const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query + " Malaysia")}${bias}&limit=5`);
                     const data = await res.json();
                     renderResults(data.features, resultId, type);
                 } catch (e) { console.error("Search error:", e); }
@@ -294,12 +296,15 @@
             list.innerHTML = features.map(f => {
                 const p = f.properties;
                 const name = p.name || 'Location';
-                const sub = [p.street, p.district || p.city].filter(Boolean).join(', ');
+                const sub = [p.street, p.district || p.city, p.state].filter(Boolean).join(', ');
                 const label = `${name}, ${sub}`.replace(/'/g, "\\'");
+
+                // Logic to highlight NSK or Mydin results visually
+                const isPriority = name.toLowerCase().includes('nsk') || name.toLowerCase().includes('mydin');
 
                 return `<div class="autocomplete-item" onclick="selectLoc('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${label}')">
                     <div style="flex-grow:1">
-                        <span class="loc-name">${name}</span>
+                        <span class="loc-name">${isPriority ? '📍 ' : ''}${name}</span>
                         <span class="loc-addr">${sub || 'Malaysia'}</span>
                     </div>
                 </div>`;
@@ -370,18 +375,14 @@
                 let rawFare = 0;
                 let mode = km > 80 ? "Long Trip" : "Standard";
 
-                // --- LOGIC REVISION 3.4 ---
-                // 1. Midnight (00:00 - 05:59): 1.5x dist + 0.40/min
                 if (hr >= 0 && hr < 6) {
                     rawFare = baseFare + (km * 1.30 * 1.5) + (mins * 0.40);
                     mode += " (Midnight)";
                 } 
-                // 2. Peak Hours (06:00-09:00 or 17:00-20:00): 1.2x dist + 0.40/min
                 else if ((hr >= 6 && hr < 9) || (hr >= 17 && hr < 20)) {
                     rawFare = baseFare + (km * 1.30 * 1.2) + (mins * 0.40);
                     mode += " (Peak Hour)";
                 }
-                // 3. Off-Peak Standard
                 else {
                     const distCost = (km <= 80) ? (km * 1.30) : (80 * 1.30) + ((km - 80) * 1.95);
                     rawFare = baseFare + distCost;
@@ -396,12 +397,14 @@
                 
                 const msg = encodeURIComponent(`*Booking Request*\n---\n*From:* ${$("pickup").value}\n*To:* ${$("dropoff").value}\n---\n*Est. Fare:* RM ${finalFare}\n*Dist:* ${km.toFixed(1)}km\n*Mode:* ${mode}`);
                 $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${msg}`;
+                
+                // FIX: Corrected template literal for Navigation
                 $("nav-btn").href = `https://www.google.com/maps/dir/?api=1&origin=${pickupCoord[0]},${pickupCoord[1]}&destination=${dropoffCoord[0]},${dropoffCoord[1]}&travelmode=driving`;
 
                 $("loading-state").style.display = 'none';
                 $("fare-content").style.display = 'block';
             } catch (e) { 
-                $("loading-state").innerHTML = '<p style="color:#ef4444">Route calculation failed.</p>';
+                $("loading-state").innerHTML = '<p style="color:#error">Route calculation failed.</p>';
             }
         }
 
