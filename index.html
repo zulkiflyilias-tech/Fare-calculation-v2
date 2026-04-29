@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Expert v4.4</title>
+    <title>Rideshare MY - Expert v4.5</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -125,7 +125,7 @@
     <div id="map"></div>
 
     <div id="results" class="results-card">
-        <div id="loading-state">Updating Fare...</div>
+        <div id="loading-state">Updating...</div>
         <div id="fare-content">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <h2 id="fare">RM 0</h2>
@@ -158,7 +158,6 @@
         const map = L.map("map", { zoomControl: false, attributionControl: false }).setView(CONFIG.CENTER, CONFIG.ZOOM);
         L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png").addTo(map);
 
-        // Init time
         const now = new Date();
         now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
         $("departure-time").value = now.toISOString().slice(0,16);
@@ -166,10 +165,8 @@
         async function searchPlaces(query, resultId, type) {
             const list = $(resultId);
             $(`clear-${type}`).style.display = query.length > 0 ? 'flex' : 'none';
-            
             clearTimeout(searchTimer);
             if (query.length < 3) { list.style.display = 'none'; return; }
-
             searchTimer = setTimeout(async () => {
                 try {
                     const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&countrycode=MY&limit=6`);
@@ -199,7 +196,6 @@
             $(type).value = label;
             $(`${type}-results`).style.display = 'none';
             $(`clear-${type}`).style.display = 'flex';
-            
             if (type === 'pickup') {
                 if (pickupMarker) map.removeLayer(pickupMarker);
                 pickupCoord = coord;
@@ -224,7 +220,6 @@
 
         async function calculate() {
             if (!pickupCoord || !dropoffCoord) return;
-            
             $("results").style.display = 'block';
             $("fare").style.opacity = "0.4";
             $("loading-state").style.display = 'block';
@@ -237,7 +232,6 @@
                 });
                 const data = await res.json();
                 const route = data.routes[0];
-                
                 if (routeLayer) map.removeLayer(routeLayer);
                 routeLayer = L.polyline(decodePoly(route.geometry), { color: '#059669', weight: 6 }).addTo(map);
                 map.fitBounds(routeLayer.getBounds(), { padding: [80, 80] });
@@ -256,7 +250,6 @@
 
                 let subtotal = 3.00 + (km * rate);
                 if (subtotal < 6.00) subtotal = 6.00;
-                
                 const finalFare = (subtotal % 1 >= 0.50) ? Math.floor(subtotal) + 1 : Math.floor(subtotal);
                 const eta = Math.ceil(route.summary.duration / 60);
 
@@ -264,12 +257,9 @@
                 $("distance").innerText = `${km.toFixed(1)} km`;
                 $("eta").innerText = `${eta} min`;
                 $("mode-badge").innerText = mode;
-                
                 lastSummaryText = `*Taxi Booking Request*\nMode: ${mode}\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\nDistance: ${km.toFixed(1)} km\nEst. Time: ${eta} min\nTotal Fare: RM ${finalFare}`;
-                
                 $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(lastSummaryText)}`;
                 $("nav-btn").onclick = () => window.location.href = `google.navigation:q=${dropoffCoord[0]},${dropoffCoord[1]}`;
-
                 $("fare").style.opacity = "1";
                 $("loading-state").style.display = 'none';
             } catch (e) { $("loading-state").innerText = "Calculation error."; }
@@ -289,10 +279,15 @@
             return coordinates;
         }
 
-        // Listeners
+        // --- Optimized Listeners ---
         $("pickup").oninput = e => searchPlaces(e.target.value, "pickup-results", "pickup");
         $("dropoff").oninput = e => searchPlaces(e.target.value, "dropoff-results", "dropoff");
-        $("departure-time").onchange = () => calculate();
+        
+        // Ensure refresh triggers immediately on time selection
+        const refreshFare = () => { if (pickupCoord && dropoffCoord) calculate(); };
+        $("departure-time").oninput = refreshFare;
+        $("departure-time").onchange = refreshFare;
+
         $("clear-pickup").onclick = () => resetField('pickup');
         $("clear-dropoff").onclick = () => resetField('dropoff');
 
@@ -306,7 +301,7 @@
                     const addr = [feat.name, feat.street, feat.district, feat.city].filter(Boolean).join(', ');
                     selectLoc('pickup', [lat, lon], addr || "Current Location");
                 } catch (e) { selectLoc('pickup', [lat, lon], "Current Location"); }
-            });
+            }, (err) => alert("GPS Error: " + err.message));
         };
 
         $("swap-btn").onclick = () => {
@@ -316,9 +311,9 @@
             pickupCoord = c2; dropoffCoord = c1;
             if (pickupMarker) map.removeLayer(pickupMarker);
             if (dropoffMarker) map.removeLayer(dropoffMarker);
-            if (pickupCoord) pickupMarker = L.circleMarker(pickupCoord, {color: '#3b82f6', radius: 8}).addTo(map);
-            if (dropoffCoord) dropoffMarker = L.circleMarker(dropoffCoord, {color: '#ef4444', radius: 8}).addTo(map);
-            calculate();
+            if (pickupCoord) pickupMarker = L.circleMarker(pickupCoord, {color: '#3b82f6', radius: 8, fillOpacity: 0.8}).addTo(map);
+            if (dropoffCoord) dropoffMarker = L.circleMarker(dropoffCoord, {color: '#ef4444', radius: 8, fillOpacity: 0.8}).addTo(map);
+            refreshFare();
         };
 
         $("copy-btn").onclick = () => {
