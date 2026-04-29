@@ -244,7 +244,7 @@
                 const isPeak = (totalMins >= 420 && totalMins < 540) || (totalMins >= 900 && totalMins < 1200);
                 const isMidnight = (totalMins >= 0 && totalMins < 360);
                 
-                if (km >= 80) { rate = 1.80; mode = "Long Distance Rate"; }
+                if (km >= 80) { rate = 1.25 * 1.5; mode = "Long Distance Rate"; }
                 else if (isMidnight) { rate = 1.25 * 1.5; mode = "Midnight Rate"; }
                 else if (isPeak) { rate = 1.25 * 1.2; mode = "Peak Hour Rate"; }
 
