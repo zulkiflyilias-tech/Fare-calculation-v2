@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Expert v3.9</title>
+    <title>Rideshare MY - Expert v4.0</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -36,6 +36,8 @@
             box-shadow: 0 4px 20px rgba(0,0,0,0.08);
             z-index: 1001;
             border-bottom: 1px solid #e5e7eb;
+            position: relative;
+            overflow: visible; /* Allows autocomplete dropdown to show */
         }
 
         .input-group {
@@ -96,13 +98,14 @@
             left: 0;
             right: 0;
             background: white;
-            z-index: 2000;
+            z-index: 9999; /* Ensures it sits above map */
             max-height: 280px;
             overflow-y: auto;
             display: none;
             border-radius: 0 0 12px 12px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.15);
             margin-top: 2px;
+            border: 1px solid #e5e7eb;
         }
 
         .autocomplete-item {
@@ -111,6 +114,7 @@
             border-bottom: 1px solid #f3f4f6;
         }
 
+        .autocomplete-item:hover { background: #f9fafb; }
         .loc-name { font-weight: 700; font-size: 14px; display: block; color: #111; }
         .loc-addr { font-size: 11px; color: var(--gray-text); }
 
@@ -236,14 +240,15 @@
         const CONFIG = {
             WHATSAPP: "60108988182",
             ORS_KEY: "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImVlYzI5ZTA0OTM2YTRlZDNhNjk1NTcyNGQ1OTJmYmNjIiwiaCI6Im11cm11cjY0In0=",
-            CENTER: [4.2105, 101.9758] 
+            CENTER: [4.2105, 101.9758], // Centered on Peninsular Malaysia
+            ZOOM: 7
         };
 
         const $ = id => document.getElementById(id);
         let pickupCoord, dropoffCoord, routeLayer, pickupMarker, dropoffMarker, searchTimer;
         let lastSummaryText = "";
 
-        const map = L.map("map", { zoomControl: false, attributionControl: false }).setView(CONFIG.CENTER, 6);
+        const map = L.map("map", { zoomControl: false, attributionControl: false }).setView(CONFIG.CENTER, CONFIG.ZOOM);
         L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png").addTo(map);
 
         const now = new Date();
@@ -251,59 +256,44 @@
         $("departure-time").value = now.toISOString().slice(0,16);
 
         async function searchPlaces(query, resultId, type) {
+            const list = $(resultId);
             $(`clear-${type}`).style.display = query.length > 0 ? 'flex' : 'none';
+            
             clearTimeout(searchTimer);
             if (query.length < 3) { 
-                $(resultId).style.display = 'none'; 
+                list.style.display = 'none'; 
                 return; 
             }
 
             searchTimer = setTimeout(async () => {
-                let bias = "";
-                if (pickupCoord) {
-                    bias = `&lat=${pickupCoord[0]}&lon=${pickupCoord[1]}&location_bias_scale=0.4`;
-                }
-                
-                // Smart Tag Filtering to avoid incorrect school results for beaches/towns
-                let tags = "";
-                const q = query.toLowerCase();
-                if (q.includes("pantai") || q.includes("beach") || q.includes("desaru") || q.includes("penawar")) {
-                    tags = "&osm_tag=!amenity:school&osm_tag=natural:beach&osm_tag=tourism:attraction&osm_tag=leisure:resort&osm_tag=place:town";
-                }
-
-                const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&filter=countrycode:my${bias}${tags}&limit=8`;
-                
                 try {
-                    const res = await fetch(url);
+                    // Optimized for Malaysia
+                    const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&countrycode=MY&limit=6`);
                     const data = await res.json();
-                    
-                    // Fallback to general search if specific tags return nothing
-                    if (data.features.length === 0 && tags !== "") {
-                        const retryRes = await fetch(url.replace(tags, ""));
-                        const retryData = await retryRes.json();
-                        renderResults(retryData.features, resultId, type);
-                    } else {
-                        renderResults(data.features, resultId, type);
-                    }
+                    renderResults(data.features, resultId, type);
                 } catch (e) {
-                    console.error("Geocoding Error", e);
+                    console.error("Search API Error", e);
                 }
             }, 400);
         }
 
         function renderResults(features, resultId, type) {
             const list = $(resultId);
+            if (!features.length) {
+                list.style.display = 'none';
+                return;
+            }
             list.innerHTML = features.map(f => {
                 const p = f.properties;
-                const name = p.name || 'Unknown';
-                const addr = [p.street, p.district, p.postcode, p.city, p.state].filter(Boolean).join(', ');
+                const name = p.name || 'Unknown Location';
+                const addr = [p.street, p.district, p.city, p.state].filter(Boolean).join(', ');
                 const fullStr = `${name}, ${addr}`.replace(/'/g, "\\'");
                 return `<div class="autocomplete-item" onclick="selectLoc('${type}', [${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}], '${fullStr}')">
                     <span class="loc-name">${name}</span>
                     <span class="loc-addr">${addr || 'Malaysia'}</span>
                 </div>`;
             }).join('');
-            list.style.display = features.length ? 'block' : 'none';
+            list.style.display = 'block';
         }
 
         function selectLoc(type, coord, label) {
@@ -313,11 +303,11 @@
             if (type === 'pickup') {
                 if (pickupMarker) map.removeLayer(pickupMarker);
                 pickupCoord = coord;
-                pickupMarker = L.circleMarker(coord, {color: '#3b82f6', radius: 8}).addTo(map);
+                pickupMarker = L.circleMarker(coord, {color: '#3b82f6', radius: 8, fillOpacity: 0.8}).addTo(map);
             } else {
                 if (dropoffMarker) map.removeLayer(dropoffMarker);
                 dropoffCoord = coord;
-                dropoffMarker = L.circleMarker(coord, {color: '#ef4444', radius: 8}).addTo(map);
+                dropoffMarker = L.circleMarker(coord, {color: '#ef4444', radius: 8, fillOpacity: 0.8}).addTo(map);
             }
             if (pickupCoord && dropoffCoord) calculate();
         }
@@ -346,18 +336,13 @@
                     body: JSON.stringify({ coordinates: [[pickupCoord[1], pickupCoord[0]], [dropoffCoord[1], dropoffCoord[0]]] })
                 });
                 const data = await res.json();
-                
-                if (!data.routes || data.routes.length === 0) throw new Error("No route found");
-
                 const route = data.routes[0];
                 if (routeLayer) map.removeLayer(routeLayer);
                 routeLayer = L.polyline(decodePoly(route.geometry), { color: '#059669', weight: 6 }).addTo(map);
                 map.fitBounds(routeLayer.getBounds(), { padding: [80, 80] });
 
                 const km = route.summary.distance / 1000;
-                const estMins = Math.ceil(route.summary.duration / 60);
                 
-                // Fare Logic
                 const sched = new Date($("departure-time").value);
                 const h = sched.getHours();
                 const m = sched.getMinutes();
@@ -366,33 +351,30 @@
                 const isRushHour = (timeInMins >= 420 && timeInMins <= 570) || (timeInMins >= 1020 && timeInMins <= 1200);
                 const isMidnight = (h >= 0 && h < 6);
 
-                let ratePerKm = 1.25;
-                let mode = "Standard Rate";
+                let trafficFactor = isRushHour ? 1.6 : 1.3;
+                let mode = isRushHour ? "Rush Hour Rate" : "Standard Rate";
+                if (isMidnight) mode = "Midnight Rate";
 
-                if (km >= 80) {
-                    ratePerKm = 1.80;
-                    mode = "Long Distance Rate";
-                } else if (isMidnight) {
-                    ratePerKm = 1.25 * 1.5;
-                    mode = "Midnight Rate";
-                } else if (isRushHour) {
-                    ratePerKm = 1.25 * 1.2;
-                    mode = "Peak Hour Rate";
-                }
-
-                const baseFare = 3.00;
-                let rawFare = baseFare + (km * ratePerKm);
-                if (rawFare < 6.00) rawFare = 6.00;
+                const baseSeconds = route.summary.duration;
+                const trafficAdjustedSeconds = baseSeconds * trafficFactor;
+                const trafficAdjustedMins = Math.ceil(trafficAdjustedSeconds / 60);
                 
-                // Standard Rounding (e.g. 12.3 -> 12, 12.5 -> 13)
-                const finalFare = Math.round(rawFare);
+                const flagOff = 3.00;
+                const firstKm = 1.0;
+                let distFare = km > firstKm ? (km - firstKm) * 1.25 : 0;
+                let timeFare = (trafficAdjustedSeconds / 36) * 0.25;
+
+                let subtotal = flagOff + distFare + timeFare;
+                if (isMidnight) subtotal *= 1.5;
+
+                const finalFare = Math.round(subtotal * 1.20); 
 
                 $("fare").innerText = `RM ${finalFare}`;
                 $("distance").innerText = `${km.toFixed(1)} km`;
-                $("eta").innerText = `${estMins} min`;
+                $("eta").innerText = `${trafficAdjustedMins} min`;
                 $("mode-badge").innerText = mode;
                 
-                lastSummaryText = `*Taxi Booking Request*\nMode: ${mode}\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\nEst. Distance: ${km.toFixed(1)} km\nEst. Time: ${estMins} min\nEst. Fare: RM ${finalFare}`;
+                lastSummaryText = `*Taxi Booking Request*\nMode: ${mode}\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\nEst. Distance: ${km.toFixed(1)} km\nEst. Time: ${trafficAdjustedMins} min\nEst. Fare: RM ${finalFare}`;
                 
                 $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(lastSummaryText)}`;
                 $("nav-btn").onclick = () => window.location.href = `google.navigation:q=${dropoffCoord[0]},${dropoffCoord[1]}`;
@@ -400,7 +382,8 @@
                 $("loading-state").style.display = 'none';
                 $("fare-content").style.display = 'block';
             } catch (e) { 
-                $("loading-state").innerText = "Route unavailable or calculation error."; 
+                $("loading-state").innerText = "Calculation error."; 
+                console.error(e);
             }
         }
 
@@ -463,6 +446,12 @@
             $(`clear-dropoff`).style.display = $("dropoff").value ? 'flex' : 'none';
             if (pickupCoord && dropoffCoord) calculate();
         };
+
+        // Close results on map click
+        map.on('click', () => {
+            $("pickup-results").style.display = 'none';
+            $("dropoff-results").style.display = 'none';
+        });
     </script>
 </body>
 </html>
