@@ -259,7 +259,6 @@
                 return; 
             }
             searchTimer = setTimeout(async () => {
-                // Location bias based on pickup coordinate to sort by distance
                 let bias = "";
                 if (pickupCoord) {
                     bias = `&lat=${pickupCoord[0]}&lon=${pickupCoord[1]}&location_bias_scale=0.6`;
@@ -359,17 +358,20 @@
                 }
 
                 const baseFare = 3.00;
-                let finalFare = baseFare + (km * ratePerKm);
+                let rawFare = baseFare + (km * ratePerKm);
 
                 // Minimum fare RM 6.00
-                if (finalFare < 6.00) finalFare = 6.00;
+                if (rawFare < 6.00) rawFare = 6.00;
 
-                $("fare").innerText = `RM ${finalFare.toFixed(2)}`;
+                // Standard Rounding (12.35 -> 12, 12.55 -> 13)
+                const finalFare = Math.round(rawFare);
+
+                $("fare").innerText = `RM ${finalFare}`;
                 $("distance").innerText = `${km.toFixed(1)} km`;
                 $("eta").innerText = `${estMins} min`;
                 $("mode-badge").innerText = mode;
                 
-                lastSummaryText = `*Taxi Booking Request*\nMode: ${mode}\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\nEst. Distance: ${km.toFixed(1)} km\nEst. Time: ${estMins} min\nEst. Fare: RM ${finalFare.toFixed(2)}`;
+                lastSummaryText = `*Taxi Booking Request*\nMode: ${mode}\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\nEst. Distance: ${km.toFixed(1)} km\nEst. Time: ${estMins} min\nEst. Fare: RM ${finalFare}`;
                 
                 $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(lastSummaryText)}`;
                 $("nav-btn").onclick = () => window.location.href = `google.navigation:q=${dropoffCoord[0]},${dropoffCoord[1]}`;
