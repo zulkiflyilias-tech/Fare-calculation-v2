@@ -236,7 +236,7 @@
         const CONFIG = {
             WHATSAPP: "60108988182",
             ORS_KEY: "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImVlYzI5ZTA0OTM2YTRlZDNhNjk1NTcyNGQ1OTJmYmNjIiwiaCI6Im11cm11cjY0In0=",
-            CENTER: [4.2105, 101.9758] // Adjusted center to cover all Malaysia better
+            CENTER: [4.2105, 101.9758] 
         };
 
         const $ = id => document.getElementById(id);
@@ -257,19 +257,34 @@
                 $(resultId).style.display = 'none'; 
                 return; 
             }
+
             searchTimer = setTimeout(async () => {
-                // Remove BBOX and filter by countrycode:my for full Malaysia coverage (Peninsular + Borneo)
                 let bias = "";
                 if (pickupCoord) {
                     bias = `&lat=${pickupCoord[0]}&lon=${pickupCoord[1]}&location_bias_scale=0.4`;
                 }
                 
-                const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&filter=countrycode:my${bias}&limit=8`;
+                // Smart Tag Filtering to avoid incorrect school results for beaches/towns
+                let tags = "";
+                const q = query.toLowerCase();
+                if (q.includes("pantai") || q.includes("beach") || q.includes("desaru") || q.includes("penawar")) {
+                    tags = "&osm_tag=!amenity:school&osm_tag=natural:beach&osm_tag=tourism:attraction&osm_tag=leisure:resort&osm_tag=place:town";
+                }
+
+                const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&filter=countrycode:my${bias}${tags}&limit=8`;
                 
                 try {
                     const res = await fetch(url);
                     const data = await res.json();
-                    renderResults(data.features, resultId, type);
+                    
+                    // Fallback to general search if specific tags return nothing
+                    if (data.features.length === 0 && tags !== "") {
+                        const retryRes = await fetch(url.replace(tags, ""));
+                        const retryData = await retryRes.json();
+                        renderResults(retryData.features, resultId, type);
+                    } else {
+                        renderResults(data.features, resultId, type);
+                    }
                 } catch (e) {
                     console.error("Geocoding Error", e);
                 }
@@ -332,9 +347,7 @@
                 });
                 const data = await res.json();
                 
-                if (!data.routes || data.routes.length === 0) {
-                    throw new Error("No route found");
-                }
+                if (!data.routes || data.routes.length === 0) throw new Error("No route found");
 
                 const route = data.routes[0];
                 if (routeLayer) map.removeLayer(routeLayer);
@@ -344,6 +357,7 @@
                 const km = route.summary.distance / 1000;
                 const estMins = Math.ceil(route.summary.duration / 60);
                 
+                // Fare Logic
                 const sched = new Date($("departure-time").value);
                 const h = sched.getHours();
                 const m = sched.getMinutes();
@@ -369,6 +383,8 @@
                 const baseFare = 3.00;
                 let rawFare = baseFare + (km * ratePerKm);
                 if (rawFare < 6.00) rawFare = 6.00;
+                
+                // Standard Rounding (e.g. 12.3 -> 12, 12.5 -> 13)
                 const finalFare = Math.round(rawFare);
 
                 $("fare").innerText = `RM ${finalFare}`;
@@ -384,7 +400,7 @@
                 $("loading-state").style.display = 'none';
                 $("fare-content").style.display = 'block';
             } catch (e) { 
-                $("loading-state").innerText = e.message === "No route found" ? "No road route available (check if destinations cross sea)." : "Calculation error."; 
+                $("loading-state").innerText = "Route unavailable or calculation error."; 
             }
         }
 
