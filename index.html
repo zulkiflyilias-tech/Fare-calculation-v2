@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Expert v4.2</title>
+    <title>Rideshare MY - Expert v4.3</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -34,7 +34,7 @@
             background: var(--card-bg);
             padding: 16px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-            z-index: 1005; /* Higher than map */
+            z-index: 1005;
             border-bottom: 1px solid #e5e7eb;
             position: relative;
         }
@@ -66,11 +66,7 @@
             transition: all 0.2s ease;
         }
 
-        input:focus { 
-            border-color: var(--primary); 
-            background: white; 
-            box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.1);
-        }
+        input:focus { border-color: var(--primary); background: white; }
 
         .btn-container {
             position: absolute;
@@ -89,8 +85,11 @@
             align-items: center;
             justify-content: center;
             border-radius: 8px;
-            font-size: 18px;
+            font-size: 16px;
+            color: #9ca3af;
         }
+
+        .icon-btn:hover { color: var(--text); }
 
         .autocomplete-list {
             position: absolute;
@@ -99,23 +98,22 @@
             right: 0;
             background: white;
             z-index: 9999; 
-            max-height: 280px;
+            max-height: 250px;
             overflow-y: auto;
             display: none;
             border-radius: 0 0 12px 12px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-            margin-top: 2px;
             border: 1px solid #e5e7eb;
         }
 
         .autocomplete-item {
-            padding: 14px 16px;
+            padding: 12px 16px;
             cursor: pointer;
             border-bottom: 1px solid #f3f4f6;
         }
 
         .autocomplete-item:hover { background: #f9fafb; }
-        .loc-name { font-weight: 700; font-size: 14px; display: block; color: #111; }
+        .loc-name { font-weight: 700; font-size: 13px; display: block; color: #111; }
         .loc-addr { font-size: 11px; color: var(--gray-text); }
 
         #map { flex-grow: 1; width: 100%; z-index: 1; }
@@ -270,7 +268,7 @@
                     const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&countrycode=MY&limit=6`);
                     const data = await res.json();
                     renderResults(data.features, resultId, type);
-                } catch (e) { console.error("Search API Error", e); }
+                } catch (e) { console.error(e); }
             }, 400);
         }
 
@@ -307,6 +305,26 @@
             if (pickupCoord && dropoffCoord) calculate();
         }
 
+        // New Logic to clear specific input
+        function clearField(type) {
+            $(type).value = '';
+            $(`clear-${type}`).style.display = 'none';
+            $(`${type}-results`).style.display = 'none';
+            $("results").style.display = 'none';
+            
+            if (type === 'pickup') {
+                if (pickupMarker) map.removeLayer(pickupMarker);
+                pickupCoord = null;
+            } else {
+                if (dropoffMarker) map.removeLayer(dropoffMarker);
+                dropoffCoord = null;
+            }
+            if (routeLayer) {
+                map.removeLayer(routeLayer);
+                routeLayer = null;
+            }
+        }
+
         async function calculate() {
             if (!pickupCoord || !dropoffCoord) return;
             
@@ -341,14 +359,11 @@
                 const isLongDistance = km >= 80;
 
                 if (isLongDistance) {
-                    ratePerKm = 1.80;
-                    mode = "Long Distance Rate";
+                    ratePerKm = 1.80; mode = "Long Distance Rate";
                 } else if (isMidnight) {
-                    ratePerKm = 1.25 * 1.50;
-                    mode = "Midnight Rate";
+                    ratePerKm = 1.25 * 1.50; mode = "Midnight Rate";
                 } else if (isPeak) {
-                    ratePerKm = 1.25 * 1.20;
-                    mode = "Peak Hour Rate";
+                    ratePerKm = 1.25 * 1.20; mode = "Peak Hour Rate";
                 }
 
                 let calculatedFare = 3.00 + (km * ratePerKm);
@@ -372,9 +387,7 @@
 
                 $("loading-state").style.display = 'none';
                 $("fare-content").style.display = 'block';
-            } catch (e) { 
-                $("loading-state").innerText = "Route error."; 
-            }
+            } catch (e) { $("loading-state").innerText = "Route error."; }
         }
 
         function decodePoly(str) {
@@ -391,9 +404,12 @@
             return coordinates;
         }
 
+        // --- Event Listeners ---
         $("pickup").oninput = e => searchPlaces(e.target.value, "pickup-results", "pickup");
         $("dropoff").oninput = e => searchPlaces(e.target.value, "dropoff-results", "dropoff");
-        $("departure-time").onchange = () => { if(pickupCoord && dropoffCoord) calculate(); };
+        
+        $("clear-pickup").onclick = () => clearField('pickup');
+        $("clear-dropoff").onclick = () => clearField('dropoff');
 
         $("gps-trigger").onclick = () => {
             navigator.geolocation.getCurrentPosition(async p => {
@@ -401,24 +417,22 @@
                 try {
                     const res = await fetch(`https://photon.komoot.io/reverse?lon=${lon}&lat=${lat}`);
                     const data = await res.json();
-                    if (data.features && data.features.length > 0) {
-                        const feat = data.features[0].properties;
-                        const addr = [feat.name, feat.street, feat.district, feat.city].filter(Boolean).join(', ');
-                        selectLoc('pickup', [lat, lon], addr || "Current Location");
-                    } else {
-                        selectLoc('pickup', [lat, lon], "Current Location");
-                    }
-                } catch (e) { 
-                    selectLoc('pickup', [lat, lon], "Current Location"); 
-                }
-            }, (err) => alert("GPS Error: " + err.message));
+                    const feat = data.features[0].properties;
+                    const addr = [feat.name, feat.street, feat.district, feat.city].filter(Boolean).join(', ');
+                    selectLoc('pickup', [lat, lon], addr || "Current Location");
+                } catch (e) { selectLoc('pickup', [lat, lon], "Current Location"); }
+            });
         };
 
         $("swap-btn").onclick = () => {
             const v1 = $("pickup").value, v2 = $("dropoff").value;
             const c1 = pickupCoord, c2 = dropoffCoord;
+            const m1 = pickupMarker, m2 = dropoffMarker;
             $("pickup").value = v2; $("dropoff").value = v1;
             pickupCoord = c2; dropoffCoord = c1;
+            pickupMarker = m2; dropoffMarker = m1;
+            if(pickupMarker) pickupMarker.setStyle({color: '#3b82f6'});
+            if(dropoffMarker) dropoffMarker.setStyle({color: '#ef4444'});
             if (pickupCoord && dropoffCoord) calculate();
         };
 
@@ -429,8 +443,7 @@
                 setTimeout(() => { btn.innerText = "Copy Text"; }, 2000);
             });
         };
-        
-        // Hide autocomplete on map click
+
         map.on('click', () => {
             $("pickup-results").style.display = 'none';
             $("dropoff-results").style.display = 'none';
