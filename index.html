@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Expert v4.5</title>
+    <title>Rideshare MY - Expert v5.0</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -240,48 +240,57 @@
                 const sched = new Date($("departure-time").value);
                 const hour = sched.getHours();
                 
-                // 1. Calculate Tiered Distance Fare
+                // 1. ENHANCED TIERED DISTANCE FARE (Long Distance Buffer)
                 let distFare = 0;
-                if (km <= 1) {
-                    distFare = km * 3.00;
-                } else if (km <= 5) {
-                    distFare = (1 * 3.00) + ((km - 1) * 2.50);
-                } else if (km <= 20) {
-                    distFare = (1 * 3.00) + (4 * 2.50) + ((km - 5) * 1.50);
+                if (km <= 2) {
+                    distFare = km * 4.00; // Protection for short trips
+                } else if (km <= 10) {
+                    distFare = (2 * 4.00) + ((km - 2) * 2.50);
+                } else if (km <= 30) {
+                    distFare = (2 * 4.00) + (8 * 2.50) + ((km - 10) * 1.80);
                 } else {
-                    distFare = (1 * 3.00) + (4 * 2.50) + (15 * 1.50) + ((km - 20) * 1.20);
+                    // Maintenance floor for return fuel on long distance
+                    distFare = (2 * 4.00) + (8 * 2.50) + (20 * 1.80) + ((km - 30) * 1.50);
                 }
 
-                const baseFare = 0.00;
+                const baseFare = 2.00; // Base booking fee
                 let subtotal = 0;
                 let mode = "Standard Rate";
 
-                // 2. Identify Surcharge Windows
+                // 2. IDENTIFY SURCHARGE WINDOWS
                 const isPeak = (hour >= 6 && hour < 9) || (hour >= 17 && hour < 20);
                 const isMidnight = (hour >= 0 && hour < 6);
 
-                // 3. Apply logic based on request rules
+                // 3. ENHANCED SURCHARGE LOGIC
                 if (isPeak) {
-                    subtotal = baseFare + distFare + 8.00;
-                    mode = "Peak Hour Rate (+RM8)";
+                    const peakSurcharge = Math.max(8.00, distFare * 0.20);
+                    subtotal = baseFare + distFare + peakSurcharge;
+                    mode = `Peak Hour (+RM${peakSurcharge.toFixed(0)})`;
                 } else if (isMidnight) {
-                    // Midnight 50% for total fare non-peak hours + Base fare
-                    const standardTotal = baseFare + distFare;
-                    subtotal = standardTotal + (standardTotal * 0.50);
-                    mode = "Midnight Rate (+50%)";
+                    // SLIDING MIDNIGHT SCALE
+                    let midnightSurcharge = 0;
+                    if (km <= 10) {
+                        midnightSurcharge = distFare * 0.75; // Higher incentive for short night trips
+                    } else {
+                        midnightSurcharge = (10 * 2.50 * 0.75) + ((distFare - (10 * 2.50)) * 0.35); // Tapered for long distance
+                    }
+                    subtotal = baseFare + distFare + midnightSurcharge;
+                    mode = "Midnight Premium";
                 } else {
                     subtotal = baseFare + distFare;
                 }
 
-                // Final Rounding (.50 threshold)
-                const finalFare = (subtotal % 1 >= 0.50) ? Math.floor(subtotal) + 1 : Math.floor(subtotal);
+                // 4. FINAL ROUNDING (Nearest RM 1 for cash handling ease)
+                const finalFare = Math.round(subtotal);
                 const eta = Math.ceil(route.summary.duration / 60);
 
                 $("fare").innerText = `RM ${finalFare}`;
                 $("distance").innerText = `${km.toFixed(1)} km`;
                 $("eta").innerText = `${eta} min`;
                 $("mode-badge").innerText = mode;
+                
                 lastSummaryText = `*eHailing Booking Request*\nMode: ${mode}\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\nDistance: ${km.toFixed(1)} km\nEst. Time: ${eta} min\nTotal Fare: RM ${finalFare}`;
+                
                 $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(lastSummaryText)}`;
                 $("nav-btn").onclick = () => window.location.href = `google.navigation:q=${dropoffCoord[0]},${dropoffCoord[1]}`;
                 $("fare").style.opacity = "1";
