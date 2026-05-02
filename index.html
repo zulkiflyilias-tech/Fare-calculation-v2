@@ -238,18 +238,42 @@
 
                 const km = route.summary.distance / 1000;
                 const sched = new Date($("departure-time").value);
-                const totalMins = (sched.getHours() * 60) + sched.getMinutes();
-
-                let rate = 1.25, mode = "Standard Rate";
-                const isPeak = (totalMins >= 420 && totalMins < 540) || (totalMins >= 900 && totalMins < 1200);
-                const isMidnight = (totalMins >= 0 && totalMins < 360);
+                const hour = sched.getHours();
                 
-                if (km >= 80) { rate = 1.25 * 1.5; mode = "Long Distance Rate"; }
-                else if (isMidnight) { rate = 1.25 * 1.5; mode = "Midnight Rate"; }
-                else if (isPeak) { rate = 1.25 * 1.2; mode = "Peak Hour Rate"; }
+                // 1. Calculate Tiered Distance Fare
+                let distFare = 0;
+                if (km <= 1) {
+                    distFare = km * 3.00;
+                } else if (km <= 5) {
+                    distFare = (1 * 3.00) + ((km - 1) * 2.50);
+                } else if (km <= 20) {
+                    distFare = (1 * 3.00) + (4 * 2.50) + ((km - 5) * 1.50);
+                } else {
+                    distFare = (1 * 3.00) + (4 * 2.50) + (15 * 1.50) + ((km - 20) * 1.20);
+                }
 
-                let subtotal = 3.00 + (km * rate);
-                if (subtotal < 6.00) subtotal = 6.00;
+                const baseFare = 3.00;
+                let subtotal = 0;
+                let mode = "Standard Rate";
+
+                // 2. Identify Surcharge Windows
+                const isPeak = (hour >= 6 && hour < 9) || (hour >= 17 && hour < 20);
+                const isMidnight = (hour >= 0 && hour < 6);
+
+                // 3. Apply logic based on request rules
+                if (isPeak) {
+                    subtotal = baseFare + distFare + 8.00;
+                    mode = "Peak Hour Rate (+RM8)";
+                } else if (isMidnight) {
+                    // Midnight 50% for total fare non-peak hours + Base fare
+                    const standardTotal = baseFare + distFare;
+                    subtotal = standardTotal + (standardTotal * 0.50);
+                    mode = "Midnight Rate (+50%)";
+                } else {
+                    subtotal = baseFare + distFare;
+                }
+
+                // Final Rounding (.50 threshold)
                 const finalFare = (subtotal % 1 >= 0.50) ? Math.floor(subtotal) + 1 : Math.floor(subtotal);
                 const eta = Math.ceil(route.summary.duration / 60);
 
@@ -262,7 +286,10 @@
                 $("nav-btn").onclick = () => window.location.href = `google.navigation:q=${dropoffCoord[0]},${dropoffCoord[1]}`;
                 $("fare").style.opacity = "1";
                 $("loading-state").style.display = 'none';
-            } catch (e) { $("loading-state").innerText = "Calculation error."; }
+            } catch (e) { 
+                console.error(e);
+                $("loading-state").innerText = "Calculation error."; 
+            }
         }
 
         function decodePoly(str) {
@@ -279,11 +306,9 @@
             return coordinates;
         }
 
-        // --- Optimized Listeners ---
         $("pickup").oninput = e => searchPlaces(e.target.value, "pickup-results", "pickup");
         $("dropoff").oninput = e => searchPlaces(e.target.value, "dropoff-results", "dropoff");
         
-        // Ensure refresh triggers immediately on time selection
         const refreshFare = () => { if (pickupCoord && dropoffCoord) calculate(); };
         $("departure-time").oninput = refreshFare;
         $("departure-time").onchange = refreshFare;
