@@ -172,12 +172,11 @@
             ORS_KEY: "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImVlYzI5ZTA0OTM2YTRlZDNhNjk1NTcyNGQ1OTJmYmNjIiwiaCI6Im11cm11cjY0In0=",
             CENTER: [4.2105, 101.9758],
             ZOOM: 7,
-            // Categories for Max Rate Charges
             HIGH_DEMAND_KEYWORDS: [
                 "mall", "pavilion", "mid valley", "klcc", "sunway", "ioio", "paradigm", "plaza",
                 "airport", "klia", "klia2", "subang airport", "hotel", "resort", "tower",
                 "commercial", "industrial", "city centre", "central", "sentral", "station", 
-                "mrt", "lrt", "tourist", "batu caves", "genting", "bintang"
+                "mrt", "lrt", "tourist", "batu caves", "genting", "bintang", "mydin"
             ]
         };
 
@@ -285,50 +284,47 @@
                 map.fitBounds(routeLayer.getBounds(), { padding: [80, 80] });
 
                 const km = route.summary.distance / 1000;
+                const actualEta = Math.ceil(route.summary.duration / 60);
                 const dateObj = new Date($("departure-time").value);
                 const hour = dateObj.getHours();
                 const locText = ($("pickup").value + $("dropoff").value).toLowerCase();
 
-                // 1. Check for High-Demand Zones (Max Charges)
+                // 1. Check for High-Demand Zones
                 const isHighDemand = CONFIG.HIGH_DEMAND_KEYWORDS.some(key => locText.includes(key));
-
-                // 2. Determine Rate Type per KM
-                let ratePerKm = 0;
-                let mode = "";
-
                 const isPeak = (hour >= 6 && hour < 9) || (hour >= 12 && hour < 14) || (hour >= 17 && hour < 21);
 
-                if (km >= 90) {
-                    // Long Distance
-                    ratePerKm = isHighDemand ? 2.00 : 1.65;
-                    mode = "Long Distance Rate";
-                } else if (isPeak) {
-                    // Peak Hour
-                    ratePerKm = isHighDemand ? 1.97 : 1.54;
-                    mode = "Peak Hour Rate";
-                } else {
-                    // Non-Peak
-                    ratePerKm = isHighDemand ? 1.20 : 0.90;
-                    mode = "Non-Peak Rate";
+                // 2. Base Rate Calculation
+                let ratePerKm = 0;
+                if (km >= 90) ratePerKm = isHighDemand ? 2.00 : 1.65;
+                else if (isPeak) ratePerKm = isHighDemand ? 1.97 : 1.54;
+                else ratePerKm = isHighDemand ? 1.20 : 0.90;
+
+                // 3. Traffic Duration Surcharge
+                // Baseline speed 25 km/h -> 1km = 2.4 mins
+                const baselineMinutes = (km / 25) * 60;
+                let trafficSurcharge = 0;
+                if (actualEta > baselineMinutes) {
+                    const delayMinutes = actualEta - baselineMinutes;
+                    trafficSurcharge = delayMinutes * 0.20; // RM 0.20 per min of delay
                 }
 
-                if (isHighDemand) mode += " (Zone Max)";
+                // 4. Final Total
+                let finalFare = (km * ratePerKm) + trafficSurcharge;
+                const roundedFare = Math.max(Math.round(finalFare), 5);
 
-                // 3. Final Fare Calculation
-                let finalFare = km * ratePerKm;
-                const roundedFare = Math.max(Math.round(finalFare), 5); // Subject to RM 5 minimum
-                const eta = Math.ceil(route.summary.duration / 60);
+                const modeLabel = isHighDemand ? "Zone Max" : "Standard Rate";
+                const trafficLabel = trafficSurcharge > 0 ? `+ RM ${trafficSurcharge.toFixed(2)} Traffic` : modeLabel;
+
+                $("fare").innerText = `RM ${roundedFare}`;
+                $("distance").innerText = `${km.toFixed(1)} km`;
+                $("eta").innerText = `${actualEta} min`;
+                $("mode-badge").innerText = trafficLabel;
 
                 const formattedTime = dateObj.toLocaleString('en-MY', { 
                     weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' 
                 });
 
-                $("fare").innerText = `RM ${roundedFare}`;
-                $("distance").innerText = `${km.toFixed(1)} km`;
-                $("eta").innerText = `${eta} min`;
-                $("mode-badge").innerText = mode;
-
-                lastSummaryText = `🚖 *NEW RIDE BOOKING*\n--------------------------\n📍 *Pickup:* ${$("pickup").value}\n🏁 *Drop-off:* ${$("dropoff").value}\n⏰ *Time:* ${formattedTime}\n\n📊 *Details:*\n• Distance: ${km.toFixed(1)} km\n• Rate Applied: RM ${ratePerKm.toFixed(2)}/km\n• Category: ${mode}\n\n💰 *TOTAL FARE: RM ${roundedFare}*\n--------------------------\n_Please confirm my booking._`;
+                lastSummaryText = `🚖 *NEW RIDE BOOKING*\n--------------------------\n📍 *Pickup:* ${$("pickup").value}\n🏁 *Drop-off:* ${$("dropoff").value}\n⏰ *Time:* ${formattedTime}\n\n📊 *Details:*\n• Distance: ${km.toFixed(1)} km\n• Duration: ${actualEta} min\n• Traffic Adj: RM ${trafficSurcharge.toFixed(2)}\n\n💰 *TOTAL FARE: RM ${roundedFare}*\n--------------------------`;
                 
                 $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(lastSummaryText)}`;
                 $("nav-btn").onclick = () => window.location.href = `google.navigation:q=${dropoffCoord[0]},${dropoffCoord[1]}`;
@@ -356,10 +352,7 @@
 
         $("pickup").oninput = e => searchPlaces(e.target.value, "pickup-results", "pickup");
         $("dropoff").oninput = e => searchPlaces(e.target.value, "dropoff-results", "dropoff");
-        
-        const refreshFare = () => { if (pickupCoord && dropoffCoord) calculate(); };
-        $("departure-time").onchange = refreshFare;
-
+        $("departure-time").onchange = () => { if (pickupCoord && dropoffCoord) calculate(); };
         $("clear-pickup").onclick = () => resetField('pickup');
         $("clear-dropoff").onclick = () => resetField('dropoff');
 
@@ -386,7 +379,7 @@
             if (dropoffMarker) map.removeLayer(dropoffMarker);
             pickupMarker = L.marker(pickupCoord, {icon: iconA}).addTo(map);
             dropoffMarker = L.marker(dropoffCoord, {icon: iconB}).addTo(map);
-            refreshFare();
+            if (pickupCoord && dropoffCoord) calculate();
         };
 
         $("copy-btn").onclick = () => {
