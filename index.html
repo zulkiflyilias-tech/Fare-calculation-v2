@@ -105,7 +105,6 @@
         
         #loading-state { text-align: center; padding: 10px; color: var(--primary); font-weight: 600; display: none; }
 
-        /* Custom Marker Labels */
         .marker-label {
             background: white; border: 2px solid black; border-radius: 50%;
             width: 24px; height: 24px; display: flex; align-items: center;
@@ -175,7 +174,6 @@
             ZOOM: 7
         };
 
-        // Custom SVG Icons
         const iconA = L.divIcon({
             className: 'custom-div-icon',
             html: `<div class="marker-label" style="border-color:var(--pickup-blue); color:var(--pickup-blue);">A</div>`,
@@ -276,19 +274,27 @@
                 const data = await res.json();
                 const route = data.routes[0];
                 if (routeLayer) map.removeLayer(routeLayer);
-                routeLayer = L.polyline(decodePoly(route.geometry), { color: CONFIG.ORS_KEY ? '#059669' : '#94a3b8', weight: 6 }).addTo(map);
+                routeLayer = L.polyline(decodePoly(route.geometry), { color: '#059669', weight: 6 }).addTo(map);
                 map.fitBounds(routeLayer.getBounds(), { padding: [80, 80] });
 
                 const km = route.summary.distance / 1000;
                 const hour = new Date($("departure-time").value).getHours();
 
-                let baseFare = 0;
-                if (km <= 1) baseFare = 5.00;
-                else if (km <= 5) baseFare = 5.00 + ((km - 1) * 2.50);
-                else if (km <= 20) baseFare = 5.00 + (4 * 2.50) + ((km - 5) * 1.50);
-                else if (km <= 100) baseFare = 5.00 + (4 * 2.50) + (15 * 1.50) + ((km - 20) * 1.25);
-                else baseFare = 5.00 + (4 * 2.50) + (15 * 1.50) + (80 * 1.25) + ((km - 100) * 1.10);
+                // 1. Calculate distance-only portion (Base RM 5 is fixed)
+                let distanceOnlyFare = 0;
+                if (km <= 1) {
+                    distanceOnlyFare = 0;
+                } else if (km <= 5) {
+                    distanceOnlyFare = (km - 1) * 2.50;
+                } else if (km <= 20) {
+                    distanceOnlyFare = (4 * 2.50) + ((km - 5) * 1.50);
+                } else if (km <= 100) {
+                    distanceOnlyFare = (4 * 2.50) + (15 * 1.50) + ((km - 20) * 1.25);
+                } else {
+                    distanceOnlyFare = (4 * 2.50) + (15 * 1.50) + (80 * 1.25) + ((km - 100) * 1.10);
+                }
 
+                // 2. Multipliers
                 let multiplier = 1.0;
                 let mode = "Standard Rate";
                 const isPeak = (hour >= 6 && hour < 9) || (hour >= 12 && hour < 14) || (hour >= 17 && hour < 21);
@@ -297,11 +303,16 @@
                 if (isMidnight) { multiplier = 1.5; mode = "Midnight Rate"; }
                 else if (isPeak) { multiplier = 1.2; mode = "Peak Hour Rate"; }
 
-                let finalFare = km <= 100 ? baseFare * multiplier : baseFare + (km * 0.30);
-                if (km > 100) mode = "Long Distance Rate";
+                // 3. Final Fare: Base 5 + (Distance * Multiplier)
+                let finalFare;
+                if (km > 100) {
+                    finalFare = (5.00 + distanceOnlyFare) + (km * 0.30);
+                    mode = "Long Distance Rate";
+                } else {
+                    finalFare = 5.00 + (distanceOnlyFare * multiplier);
+                }
                 
-                // Cleaner Code: Simplified rounding
-                const roundedFare = Math.round(Math.max(finalFare, 5.00));
+                const roundedFare = Math.max(Math.round(finalFare), 5);
                 const eta = Math.ceil(route.summary.duration / 60);
 
                 const formattedTime = new Date($("departure-time").value).toLocaleString('en-MY', { 
@@ -364,12 +375,13 @@
         $("swap-btn").onclick = () => {
             const v1 = $("pickup").value, v2 = $("dropoff").value;
             const c1 = pickupCoord, c2 = dropoffCoord;
+            if(!c1 || !c2) return;
             $("pickup").value = v2; $("dropoff").value = v1;
             pickupCoord = c2; dropoffCoord = c1;
             if (pickupMarker) map.removeLayer(pickupMarker);
             if (dropoffMarker) map.removeLayer(dropoffMarker);
-            if (pickupCoord) pickupMarker = L.marker(pickupCoord, {icon: iconA}).addTo(map);
-            if (dropoffCoord) dropoffMarker = L.marker(dropoffCoord, {icon: iconB}).addTo(map);
+            pickupMarker = L.marker(pickupCoord, {icon: iconA}).addTo(map);
+            dropoffMarker = L.marker(dropoffCoord, {icon: iconB}).addTo(map);
             refreshFare();
         };
 
