@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Expert v5.3</title>
+    <title>Rideshare MY - Expert v4.5</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -148,8 +148,7 @@
             WHATSAPP: "60108988182",
             ORS_KEY: "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImVlYzI5ZTA0OTM2YTRlZDNhNjk1NTcyNGQ1OTJmYmNjIiwiaCI6Im11cm11cjY0In0=",
             CENTER: [4.2105, 101.9758],
-            ZOOM: 7,
-            MIN_FARE: 5.00
+            ZOOM: 7
         };
 
         const $ = id => document.getElementById(id);
@@ -239,59 +238,76 @@
 
                 const km = route.summary.distance / 1000;
                 const sched = new Date($("departure-time").value);
-                const hour = sched.getHours();
-                
-                // --- FARE CALCULATION V5.3 ---
-                
-                // 1. Tiered Base Rate
-                let standardRate = 0;
+                const hrs = sched.getHours();
+                const mins = (hrs * 60) + sched.getMinutes();
+
+                // 1. Calculate Base Tiered Fare
+                let baseFare = 0;
                 if (km <= 1) {
-                    standardRate = km * 5.00;
-                } else if (km <= 5) {
-                    standardRate = (1 * 5.00) + ((km - 1) * 2.50);
-                } else if (km <= 20) {
-                    standardRate = (1 * 5.00) + (4 * 2.50) + ((km - 5) * 1.50);
-                } else if (km <= 150) {
-                    standardRate = (1 * 5.00) + (4 * 2.50) + (15 * 1.50) + ((km - 20) * 1.25);
+                    baseFare = 5.00;
                 } else {
-                    standardRate = (1 * 5.00) + (4 * 2.50) + (15 * 1.50) + (130 * 1.25) + ((km - 150) * 1.10);
+                    baseFare += 5.00; // First 1km
+                    let remaining = km - 1;
+
+                    // 1.1 - 5 km (RM 2.50)
+                    let t2 = Math.min(remaining, 4);
+                    baseFare += t2 * 2.50;
+                    remaining -= t2;
+
+                    // 5.1 - 20 km (RM 1.50)
+                    if (remaining > 0) {
+                        let t3 = Math.min(remaining, 15);
+                        baseFare += t3 * 1.50;
+                        remaining -= t3;
+                    }
+
+                    // 20.1 - 100 km (RM 1.25)
+                    if (remaining > 0) {
+                        let t4 = Math.min(remaining, 80);
+                        baseFare += t4 * 1.25;
+                        remaining -= t4;
+                    }
+
+                    // Over 100 km (RM 1.10)
+                    if (remaining > 0) {
+                        baseFare += remaining * 1.10;
+                    }
                 }
 
-                // 2. Multipliers
+                // 2. Identify Timing and Multipliers
                 let multiplier = 1.0;
                 let mode = "Standard Rate";
 
-                const isPeak = (hour >= 6 && hour < 9) || (hour >= 13 && hour < 14) || (hour >= 19 && hour < 21);
-                const isMidnight = (hour >= 0 && hour < 6);
+                const isMidnight = (mins >= 0 && mins < 360); // 00:00 - 06:00
+                const isPeak = (mins >= 360 && mins < 540) || // 06:00 - 09:00
+                               (mins >= 720 && mins < 840) || // 12:00 - 14:00
+                               (mins >= 1020 && mins < 1260); // 17:00 - 21:00
 
-                if (isMidnight) {
-                    multiplier = 1.5;
-                    mode = "Midnight (1.5x)";
-                } else if (isPeak) {
-                    multiplier = 1.2;
-                    mode = "Peak Hour (1.2x)";
+                if (km < 50) {
+                    if (isMidnight) { multiplier = 1.5; mode = "Midnight Rate"; }
+                    else if (isPeak) { multiplier = 1.2; mode = "Peak Hour Rate"; }
                 }
 
-                let subtotal = standardRate * multiplier;
-
-                // 3. Long Distance Surcharge
-                let surcharge = 0;
+                // 3. Apply Multiplier & Minimum Fare
+                let totalFare = baseFare * multiplier;
+                
+                // 4. Long Distance Surcharge (RM 0.30/km for portions > 100km)
                 if (km >= 100) {
-                    surcharge = Math.floor(km / 100) * 20;
-                    subtotal += surcharge;
+                    totalFare += (km - 100) * 0.30;
+                    mode = "Long Distance Rate";
                 }
 
-                // 4. Minimum Fare Check (RM 5.00)
-                const finalFare = Math.max(CONFIG.MIN_FARE, Math.ceil(subtotal));
+                if (totalFare < 5.00) totalFare = 5.00;
+
+                // 5. Rounding logic (0.50 threshold)
+                const finalFare = (totalFare % 1 >= 0.50) ? Math.floor(totalFare) + 1 : Math.floor(totalFare);
                 const eta = Math.ceil(route.summary.duration / 60);
 
                 $("fare").innerText = `RM ${finalFare}`;
                 $("distance").innerText = `${km.toFixed(1)} km`;
                 $("eta").innerText = `${eta} min`;
                 $("mode-badge").innerText = mode;
-                
-                lastSummaryText = `*eHailing Booking Request*\nMode: ${mode}\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\nDistance: ${km.toFixed(1)} km\nTotal Fare: RM ${finalFare}`;
-                
+                lastSummaryText = `*Taxi Booking Request*\nMode: ${mode}\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\nDistance: ${km.toFixed(1)} km\nEst. Time: ${eta} min\nTotal Fare: RM ${finalFare}`;
                 $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(lastSummaryText)}`;
                 $("nav-btn").onclick = () => window.location.href = `google.navigation:q=${dropoffCoord[0]},${dropoffCoord[1]}`;
                 $("fare").style.opacity = "1";
