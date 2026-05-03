@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Expert v4.5</title>
+    <title>Rideshare MY - Expert v4.6</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -17,6 +17,8 @@
             --card-bg: #ffffff;
             --text: #1f2937;
             --gray-text: #6b7280;
+            --pickup-blue: #3b82f6;
+            --dropoff-red: #ef4444;
         }
 
         body { 
@@ -37,7 +39,6 @@
             color: var(--gray-text); text-transform: uppercase; letter-spacing: 0.05em;
         }
 
-        /* Search Spinner Animation */
         .input-group.loading::after {
             content: "";
             position: absolute;
@@ -93,7 +94,7 @@
             background: white; padding: 20px; border-radius: 20px;
             box-shadow: 0 -10px 30px rgba(0,0,0,0.15); z-index: 1002; display: none;
         }
-        #fare { font-size: 34px; font-weight: 800; color: var(--primary); margin: 0; transition: opacity 0.2s; }
+        #fare { font-size: 34px; font-weight: 800; color: var(--primary); margin: 0; }
         .mode-badge { background:#ecfdf5; color:var(--primary); padding:6px 12px; border-radius:30px; font-size:11px; font-weight:700; }
 
         .btn-group { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 20px; }
@@ -103,6 +104,14 @@
         .btn-copy { background: var(--copy); }
         
         #loading-state { text-align: center; padding: 10px; color: var(--primary); font-weight: 600; display: none; }
+
+        /* Custom Marker Labels */
+        .marker-label {
+            background: white; border: 2px solid black; border-radius: 50%;
+            width: 24px; height: 24px; display: flex; align-items: center;
+            justify-content: center; font-weight: 800; font-size: 12px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
     </style>
 </head>
 <body>
@@ -166,6 +175,19 @@
             ZOOM: 7
         };
 
+        // Custom SVG Icons
+        const iconA = L.divIcon({
+            className: 'custom-div-icon',
+            html: `<div class="marker-label" style="border-color:var(--pickup-blue); color:var(--pickup-blue);">A</div>`,
+            iconSize: [24, 24], iconAnchor: [12, 12]
+        });
+
+        const iconB = L.divIcon({
+            className: 'custom-div-icon',
+            html: `<div class="marker-label" style="border-color:var(--dropoff-red); color:var(--dropoff-red);">B</div>`,
+            iconSize: [24, 24], iconAnchor: [12, 12]
+        });
+
         const $ = id => document.getElementById(id);
         let pickupCoord, dropoffCoord, routeLayer, pickupMarker, dropoffMarker, searchTimer;
         let lastSummaryText = "";
@@ -183,24 +205,15 @@
             $(`clear-${type}`).style.display = query.length > 0 ? 'flex' : 'none';
             
             clearTimeout(searchTimer);
-            if (query.length < 3) { 
-                list.style.display = 'none'; 
-                group.classList.remove('loading');
-                return; 
-            }
+            if (query.length < 3) { list.style.display = 'none'; group.classList.remove('loading'); return; }
 
             group.classList.add('loading');
-
             searchTimer = setTimeout(async () => {
                 try {
                     const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&countrycode=MY&limit=6`);
                     const data = await res.json();
                     renderResults(data.features, resultId, type);
-                } catch (e) { 
-                    console.error(e); 
-                } finally {
-                    group.classList.remove('loading');
-                }
+                } catch (e) { console.error(e); } finally { group.classList.remove('loading'); }
             }, 400);
         }
 
@@ -224,15 +237,16 @@
             $(type).value = label;
             $(`${type}-results`).style.display = 'none';
             $(`clear-${type}`).style.display = 'flex';
+            
             if (type === 'pickup') {
                 if (pickupMarker) map.removeLayer(pickupMarker);
                 pickupCoord = coord;
-                pickupMarker = L.circleMarker(coord, {color: '#3b82f6', radius: 8, fillOpacity: 0.8}).addTo(map);
+                pickupMarker = L.marker(coord, {icon: iconA}).addTo(map);
                 if (!$("dropoff").value) $("dropoff").focus();
             } else {
                 if (dropoffMarker) map.removeLayer(dropoffMarker);
                 dropoffCoord = coord;
-                dropoffMarker = L.circleMarker(coord, {color: '#ef4444', radius: 8, fillOpacity: 0.8}).addTo(map);
+                dropoffMarker = L.marker(coord, {icon: iconB}).addTo(map);
             }
             if (pickupCoord && dropoffCoord) calculate();
         }
@@ -262,13 +276,11 @@
                 const data = await res.json();
                 const route = data.routes[0];
                 if (routeLayer) map.removeLayer(routeLayer);
-                routeLayer = L.polyline(decodePoly(route.geometry), { color: '#059669', weight: 6 }).addTo(map);
+                routeLayer = L.polyline(decodePoly(route.geometry), { color: CONFIG.ORS_KEY ? '#059669' : '#94a3b8', weight: 6 }).addTo(map);
                 map.fitBounds(routeLayer.getBounds(), { padding: [80, 80] });
 
                 const km = route.summary.distance / 1000;
-                const schedValue = $("departure-time").value;
-                const sched = new Date(schedValue);
-                const hour = sched.getHours();
+                const hour = new Date($("departure-time").value).getHours();
 
                 let baseFare = 0;
                 if (km <= 1) baseFare = 5.00;
@@ -287,12 +299,12 @@
 
                 let finalFare = km <= 100 ? baseFare * multiplier : baseFare + (km * 0.30);
                 if (km > 100) mode = "Long Distance Rate";
-                if (finalFare < 5.00) finalFare = 5.00;
-
-                const roundedFare = (finalFare % 1 >= 0.50) ? Math.floor(finalFare) + 1 : Math.floor(finalFare);
+                
+                // Cleaner Code: Simplified rounding
+                const roundedFare = Math.round(Math.max(finalFare, 5.00));
                 const eta = Math.ceil(route.summary.duration / 60);
 
-                const formattedTime = sched.toLocaleString('en-MY', { 
+                const formattedTime = new Date($("departure-time").value).toLocaleString('en-MY', { 
                     weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' 
                 });
 
@@ -301,7 +313,6 @@
                 $("eta").innerText = `${eta} min`;
                 $("mode-badge").innerText = mode;
 
-                // Enhanced WhatsApp Message
                 lastSummaryText = `🚖 *NEW RIDE BOOKING*\n--------------------------\n📍 *Pickup:* ${$("pickup").value}\n🏁 *Drop-off:* ${$("dropoff").value}\n⏰ *Time:* ${formattedTime}\n\n📊 *Details:*\n• Distance: ${km.toFixed(1)} km\n• Est. Time: ${eta} min\n• Rate: ${mode}\n\n💰 *TOTAL FARE: RM ${roundedFare}*\n--------------------------\n_Please confirm my booking._`;
                 
                 $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(lastSummaryText)}`;
@@ -332,7 +343,6 @@
         $("dropoff").oninput = e => searchPlaces(e.target.value, "dropoff-results", "dropoff");
         
         const refreshFare = () => { if (pickupCoord && dropoffCoord) calculate(); };
-        $("departure-time").oninput = refreshFare;
         $("departure-time").onchange = refreshFare;
 
         $("clear-pickup").onclick = () => resetField('pickup');
@@ -358,8 +368,8 @@
             pickupCoord = c2; dropoffCoord = c1;
             if (pickupMarker) map.removeLayer(pickupMarker);
             if (dropoffMarker) map.removeLayer(dropoffMarker);
-            if (pickupCoord) pickupMarker = L.circleMarker(pickupCoord, {color: '#3b82f6', radius: 8, fillOpacity: 0.8}).addTo(map);
-            if (dropoffCoord) dropoffMarker = L.circleMarker(dropoffCoord, {color: '#ef4444', radius: 8, fillOpacity: 0.8}).addTo(map);
+            if (pickupCoord) pickupMarker = L.marker(pickupCoord, {icon: iconA}).addTo(map);
+            if (dropoffCoord) dropoffMarker = L.marker(dropoffCoord, {icon: iconB}).addTo(map);
             refreshFare();
         };
 
