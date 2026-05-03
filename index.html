@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Expert v4.6</title>
+    <title>Rideshare MY - Expert v4.7</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -171,7 +171,9 @@
             WHATSAPP: "60108988182",
             ORS_KEY: "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImVlYzI5ZTA0OTM2YTRlZDNhNjk1NTcyNGQ1OTJmYmNjIiwiaCI6Im11cm11cjY0In0=",
             CENTER: [4.2105, 101.9758],
-            ZOOM: 7
+            ZOOM: 7,
+            ZONE_SURCHARGE: 2.00,
+            ZONE_KEYWORDS: ["top glove tower", "setia alam"]
         };
 
         const iconA = L.divIcon({
@@ -280,7 +282,7 @@
                 const km = route.summary.distance / 1000;
                 const hour = new Date($("departure-time").value).getHours();
 
-                // 1. Calculate distance-only portion (Base RM 5 is fixed)
+                // 1. Calculate distance-only portion
                 let distanceOnlyFare = 0;
                 if (km <= 1) {
                     distanceOnlyFare = 0;
@@ -303,13 +305,22 @@
                 if (isMidnight) { multiplier = 1.5; mode = "Midnight Rate"; }
                 else if (isPeak) { multiplier = 1.2; mode = "Peak Hour Rate"; }
 
-                // 3. Final Fare: Base 5 + (Distance * Multiplier)
+                // 3. Zone Surcharge Detection
+                let appliedSurcharge = 0;
+                const locText = ($("pickup").value + $("dropoff").value).toLowerCase();
+                const isHub = CONFIG.ZONE_KEYWORDS.some(key => locText.includes(key));
+                if (isHub) {
+                    appliedSurcharge = CONFIG.ZONE_SURCHARGE;
+                    mode += " + Zone Fee";
+                }
+
+                // 4. Final Fare Calculation
                 let finalFare;
                 if (km > 100) {
-                    finalFare = (5.00 + distanceOnlyFare) + (km * 0.30);
+                    finalFare = (5.00 + distanceOnlyFare) + (km * 0.30) + appliedSurcharge;
                     mode = "Long Distance Rate";
                 } else {
-                    finalFare = 5.00 + (distanceOnlyFare * multiplier);
+                    finalFare = 5.00 + (distanceOnlyFare * multiplier) + appliedSurcharge;
                 }
                 
                 const roundedFare = Math.max(Math.round(finalFare), 5);
