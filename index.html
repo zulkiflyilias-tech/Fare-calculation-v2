@@ -293,7 +293,7 @@
                 $("distance").innerText = `${km.toFixed(1)} km`;
                 $("eta").innerText = `${eta} min`;
                 $("mode-badge").innerText = mode;
-                lastSummaryText = `*Taxi Booking Request*\nMode: ${mode}\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\nDistance: ${km.toFixed(1)} km\nEst. Time: ${eta} min\nTotal Fare: RM ${roundedFare}`;
+                lastSummaryText = `*eHailing Booking Request*\nMode: ${mode}\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\nDistance: ${km.toFixed(1)} km\nEst. Time: ${eta} min\nTotal Fare: RM ${roundedFare}`;
                 $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(lastSummaryText)}`;
                 $("nav-btn").onclick = () => window.location.href = `google.navigation:q=${dropoffCoord[0]},${dropoffCoord[1]}`;
                 $("fare").style.opacity = "1";
