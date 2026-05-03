@@ -37,6 +37,21 @@
             color: var(--gray-text); text-transform: uppercase; letter-spacing: 0.05em;
         }
 
+        /* Search Spinner Animation */
+        .input-group.loading::after {
+            content: "";
+            position: absolute;
+            right: 95px;
+            top: 32px;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #e5e7eb;
+            border-top: 2px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
         input {
             width: 100%; padding: 12px 90px 12px 14px;
             border: 1.5px solid #e5e7eb; border-radius: 12px;
@@ -93,9 +108,9 @@
 <body>
 
     <div class="search-panel">
-        <div class="input-group">
+        <div class="input-group" id="pickup-group">
             <label>Pickup Location</label>
-            <input type="text" id="pickup" placeholder="Search for pickup..." autocomplete="off">
+            <input type="text" id="pickup" placeholder="Search for pickup..." autocomplete="off" enterkeyhint="search">
             <div class="btn-container">
                 <button class="icon-btn" id="clear-pickup" style="display:none">✕</button>
                 <button class="icon-btn" id="gps-trigger">📍</button>
@@ -107,9 +122,9 @@
             <button class="swap-btn" id="swap-btn">⇅</button>
         </div>
 
-        <div class="input-group">
+        <div class="input-group" id="dropoff-group">
             <label>Destination</label>
-            <input type="text" id="dropoff" placeholder="Search for destination..." autocomplete="off">
+            <input type="text" id="dropoff" placeholder="Search for destination..." autocomplete="off" enterkeyhint="search">
             <div class="btn-container">
                 <button class="icon-btn" id="clear-dropoff" style="display:none">✕</button>
             </div>
@@ -164,16 +179,29 @@
 
         async function searchPlaces(query, resultId, type) {
             const list = $(resultId);
+            const group = $(`${type}-group`);
             $(`clear-${type}`).style.display = query.length > 0 ? 'flex' : 'none';
+            
             clearTimeout(searchTimer);
-            if (query.length < 3) { list.style.display = 'none'; return; }
+            if (query.length < 3) { 
+                list.style.display = 'none'; 
+                group.classList.remove('loading');
+                return; 
+            }
+
+            group.classList.add('loading');
+
             searchTimer = setTimeout(async () => {
                 try {
                     const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&countrycode=MY&limit=6`);
                     const data = await res.json();
                     renderResults(data.features, resultId, type);
-                } catch (e) { console.error(e); }
-            }, 300);
+                } catch (e) { 
+                    console.error(e); 
+                } finally {
+                    group.classList.remove('loading');
+                }
+            }, 400);
         }
 
         function renderResults(features, resultId, type) {
@@ -200,6 +228,7 @@
                 if (pickupMarker) map.removeLayer(pickupMarker);
                 pickupCoord = coord;
                 pickupMarker = L.circleMarker(coord, {color: '#3b82f6', radius: 8, fillOpacity: 0.8}).addTo(map);
+                if (!$("dropoff").value) $("dropoff").focus();
             } else {
                 if (dropoffMarker) map.removeLayer(dropoffMarker);
                 dropoffCoord = coord;
@@ -237,63 +266,44 @@
                 map.fitBounds(routeLayer.getBounds(), { padding: [80, 80] });
 
                 const km = route.summary.distance / 1000;
-                const sched = new Date($("departure-time").value);
+                const schedValue = $("departure-time").value;
+                const sched = new Date(schedValue);
                 const hour = sched.getHours();
 
-                // 1. Calculate Base Tiered Fare
                 let baseFare = 0;
-                if (km <= 1) {
-                    baseFare = 5.00;
-                } else if (km <= 5) {
-                    baseFare = 5.00 + ((km - 1) * 2.50);
-                } else if (km <= 20) {
-                    baseFare = 5.00 + (4 * 2.50) + ((km - 5) * 1.50);
-                } else if (km <= 100) {
-                    baseFare = 5.00 + (4 * 2.50) + (15 * 1.50) + ((km - 20) * 1.25);
-                } else {
-                    // Over 100km
-                    baseFare = 5.00 + (4 * 2.50) + (15 * 1.50) + (80 * 1.25) + ((km - 100) * 1.10);
-                }
+                if (km <= 1) baseFare = 5.00;
+                else if (km <= 5) baseFare = 5.00 + ((km - 1) * 2.50);
+                else if (km <= 20) baseFare = 5.00 + (4 * 2.50) + ((km - 5) * 1.50);
+                else if (km <= 100) baseFare = 5.00 + (4 * 2.50) + (15 * 1.50) + ((km - 20) * 1.25);
+                else baseFare = 5.00 + (4 * 2.50) + (15 * 1.50) + (80 * 1.25) + ((km - 100) * 1.10);
 
-                // 2. Identify Multipliers
                 let multiplier = 1.0;
                 let mode = "Standard Rate";
-
                 const isPeak = (hour >= 6 && hour < 9) || (hour >= 12 && hour < 14) || (hour >= 17 && hour < 21);
                 const isMidnight = (hour >= 0 && hour < 6);
 
-                if (isMidnight) {
-                    multiplier = 1.5;
-                    mode = "Midnight Rate";
-                } else if (isPeak) {
-                    multiplier = 1.2;
-                    mode = "Peak Hour Rate";
-                }
+                if (isMidnight) { multiplier = 1.5; mode = "Midnight Rate"; }
+                else if (isPeak) { multiplier = 1.2; mode = "Peak Hour Rate"; }
 
-                // 3. Apply Logic
-                let finalFare = baseFare;
-                
-                if (km <= 100) {
-                    finalFare = baseFare * multiplier;
-                } else {
-                    // Long distance logic: Over 100km doesn't get peak/midnight multipliers
-                    // But adds RM 0.30/km for the entire distance
-                    finalFare = baseFare + (km * 0.30);
-                    mode = "Long Distance Rate";
-                }
-
-                // 4. Minimum Fare Enforcement
+                let finalFare = km <= 100 ? baseFare * multiplier : baseFare + (km * 0.30);
+                if (km > 100) mode = "Long Distance Rate";
                 if (finalFare < 5.00) finalFare = 5.00;
 
-                // Rounding
                 const roundedFare = (finalFare % 1 >= 0.50) ? Math.floor(finalFare) + 1 : Math.floor(finalFare);
                 const eta = Math.ceil(route.summary.duration / 60);
+
+                const formattedTime = sched.toLocaleString('en-MY', { 
+                    weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' 
+                });
 
                 $("fare").innerText = `RM ${roundedFare}`;
                 $("distance").innerText = `${km.toFixed(1)} km`;
                 $("eta").innerText = `${eta} min`;
                 $("mode-badge").innerText = mode;
-                lastSummaryText = `*eHailing Booking Request*\nMode: ${mode}\nFrom: ${$("pickup").value}\nTo: ${$("dropoff").value}\nDistance: ${km.toFixed(1)} km\nEst. Time: ${eta} min\nTotal Fare: RM ${roundedFare}`;
+
+                // Enhanced WhatsApp Message
+                lastSummaryText = `🚖 *NEW RIDE BOOKING*\n--------------------------\n📍 *Pickup:* ${$("pickup").value}\n🏁 *Drop-off:* ${$("dropoff").value}\n⏰ *Time:* ${formattedTime}\n\n📊 *Details:*\n• Distance: ${km.toFixed(1)} km\n• Est. Time: ${eta} min\n• Rate: ${mode}\n\n💰 *TOTAL FARE: RM ${roundedFare}*\n--------------------------\n_Please confirm my booking._`;
+                
                 $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(lastSummaryText)}`;
                 $("nav-btn").onclick = () => window.location.href = `google.navigation:q=${dropoffCoord[0]},${dropoffCoord[1]}`;
                 $("fare").style.opacity = "1";
