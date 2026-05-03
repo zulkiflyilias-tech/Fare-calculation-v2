@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Expert v4.7</title>
+    <title>Rideshare MY - Expert v4.8</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -172,8 +172,13 @@
             ORS_KEY: "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImVlYzI5ZTA0OTM2YTRlZDNhNjk1NTcyNGQ1OTJmYmNjIiwiaCI6Im11cm11cjY0In0=",
             CENTER: [4.2105, 101.9758],
             ZOOM: 7,
-            ZONE_SURCHARGE: 2.00,
-            ZONE_KEYWORDS: ["top glove tower", "setia alam"]
+            // Categories for Max Rate Charges
+            HIGH_DEMAND_KEYWORDS: [
+                "mall", "pavilion", "mid valley", "klcc", "sunway", "ioio", "paradigm", "plaza",
+                "airport", "klia", "klia2", "subang airport", "hotel", "resort", "tower",
+                "commercial", "industrial", "city centre", "central", "sentral", "station", 
+                "mrt", "lrt", "tourist", "batu caves", "genting", "bintang"
+            ]
         };
 
         const iconA = L.divIcon({
@@ -280,53 +285,41 @@
                 map.fitBounds(routeLayer.getBounds(), { padding: [80, 80] });
 
                 const km = route.summary.distance / 1000;
-                const hour = new Date($("departure-time").value).getHours();
-
-                // 1. Calculate distance-only portion
-                let distanceOnlyFare = 0;
-                if (km <= 1) {
-                    distanceOnlyFare = 0;
-                } else if (km <= 5) {
-                    distanceOnlyFare = (km - 1) * 2.50;
-                } else if (km <= 20) {
-                    distanceOnlyFare = (4 * 2.50) + ((km - 5) * 1.50);
-                } else if (km <= 100) {
-                    distanceOnlyFare = (4 * 2.50) + (15 * 1.50) + ((km - 20) * 1.25);
-                } else {
-                    distanceOnlyFare = (4 * 2.50) + (15 * 1.50) + (80 * 1.25) + ((km - 100) * 1.10);
-                }
-
-                // 2. Multipliers
-                let multiplier = 1.0;
-                let mode = "Standard Rate";
-                const isPeak = (hour >= 6 && hour < 9) || (hour >= 12 && hour < 14) || (hour >= 17 && hour < 21);
-                const isMidnight = (hour >= 0 && hour < 6);
-
-                if (isMidnight) { multiplier = 1.5; mode = "Midnight Rate"; }
-                else if (isPeak) { multiplier = 1.2; mode = "Peak Hour Rate"; }
-
-                // 3. Zone Surcharge Detection
-                let appliedSurcharge = 0;
+                const dateObj = new Date($("departure-time").value);
+                const hour = dateObj.getHours();
                 const locText = ($("pickup").value + $("dropoff").value).toLowerCase();
-                const isHub = CONFIG.ZONE_KEYWORDS.some(key => locText.includes(key));
-                if (isHub) {
-                    appliedSurcharge = CONFIG.ZONE_SURCHARGE;
-                    mode += " + Zone Fee";
+
+                // 1. Check for High-Demand Zones (Max Charges)
+                const isHighDemand = CONFIG.HIGH_DEMAND_KEYWORDS.some(key => locText.includes(key));
+
+                // 2. Determine Rate Type per KM
+                let ratePerKm = 0;
+                let mode = "";
+
+                const isPeak = (hour >= 6 && hour < 9) || (hour >= 12 && hour < 14) || (hour >= 17 && hour < 21);
+
+                if (km >= 90) {
+                    // Long Distance
+                    ratePerKm = isHighDemand ? 2.00 : 1.65;
+                    mode = "Long Distance Rate";
+                } else if (isPeak) {
+                    // Peak Hour
+                    ratePerKm = isHighDemand ? 1.97 : 1.54;
+                    mode = "Peak Hour Rate";
+                } else {
+                    // Non-Peak
+                    ratePerKm = isHighDemand ? 1.20 : 0.90;
+                    mode = "Non-Peak Rate";
                 }
 
-                // 4. Final Fare Calculation
-                let finalFare;
-                if (km > 100) {
-                    finalFare = (5.00 + distanceOnlyFare) + (km * 0.30) + appliedSurcharge;
-                    mode = "Long Distance Rate";
-                } else {
-                    finalFare = 5.00 + (distanceOnlyFare * multiplier) + appliedSurcharge;
-                }
-                
-                const roundedFare = Math.max(Math.round(finalFare), 5);
+                if (isHighDemand) mode += " (Zone Max)";
+
+                // 3. Final Fare Calculation
+                let finalFare = km * ratePerKm;
+                const roundedFare = Math.max(Math.round(finalFare), 5); // Subject to RM 5 minimum
                 const eta = Math.ceil(route.summary.duration / 60);
 
-                const formattedTime = new Date($("departure-time").value).toLocaleString('en-MY', { 
+                const formattedTime = dateObj.toLocaleString('en-MY', { 
                     weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' 
                 });
 
@@ -335,7 +328,7 @@
                 $("eta").innerText = `${eta} min`;
                 $("mode-badge").innerText = mode;
 
-                lastSummaryText = `🚖 *NEW RIDE BOOKING*\n--------------------------\n📍 *Pickup:* ${$("pickup").value}\n🏁 *Drop-off:* ${$("dropoff").value}\n⏰ *Time:* ${formattedTime}\n\n📊 *Details:*\n• Distance: ${km.toFixed(1)} km\n• Est. Time: ${eta} min\n• Rate: ${mode}\n\n💰 *TOTAL FARE: RM ${roundedFare}*\n--------------------------\n_Please confirm my booking._`;
+                lastSummaryText = `🚖 *NEW RIDE BOOKING*\n--------------------------\n📍 *Pickup:* ${$("pickup").value}\n🏁 *Drop-off:* ${$("dropoff").value}\n⏰ *Time:* ${formattedTime}\n\n📊 *Details:*\n• Distance: ${km.toFixed(1)} km\n• Rate Applied: RM ${ratePerKm.toFixed(2)}/km\n• Category: ${mode}\n\n💰 *TOTAL FARE: RM ${roundedFare}*\n--------------------------\n_Please confirm my booking._`;
                 
                 $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(lastSummaryText)}`;
                 $("nav-btn").onclick = () => window.location.href = `google.navigation:q=${dropoffCoord[0]},${dropoffCoord[1]}`;
