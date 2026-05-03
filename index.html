@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Expert v4.8.1</title>
+    <title>Rideshare MY - Expert v4.8.2</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -203,6 +203,15 @@
         now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
         $("departure-time").value = now.toISOString().slice(0,16);
 
+        function formatDuration(totalMinutes) {
+            const hrs = Math.floor(totalMinutes / 60);
+            const mins = totalMinutes % 60;
+            if (hrs > 0) {
+                return `${hrs}h ${mins}m (${totalMinutes} min)`;
+            }
+            return `${totalMinutes} min`;
+        }
+
         async function searchPlaces(query, resultId, type) {
             const list = $(resultId);
             const group = $(`${type}-group`);
@@ -265,13 +274,6 @@
             $("results").style.display = 'none';
         }
 
-        function formatDuration(totalMinutes) {
-            const hrs = Math.floor(totalMinutes / 60);
-            const mins = totalMinutes % 60;
-            if (hrs > 0) return `${hrs}h ${mins}m (${totalMinutes} min)`;
-            return `${totalMinutes} min`;
-        }
-
         async function calculate() {
             if (!pickupCoord || !dropoffCoord) return;
             $("results").style.display = 'block';
@@ -316,6 +318,8 @@
 
                 const modeLabel = isHighDemand ? "Zone Max" : "Standard Rate";
                 const trafficLabel = trafficSurcharge > 0 ? `+ RM ${trafficSurcharge.toFixed(2)} Traffic` : modeLabel;
+                
+                // CRITICAL UPDATE: Applying the formatting
                 const durationString = formatDuration(actualEtaTotal);
 
                 $("fare").innerText = `RM ${roundedFare}`;
