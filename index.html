@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Expert v4.8</title>
+    <title>Rideshare MY - Expert v4.8.1</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -265,6 +265,13 @@
             $("results").style.display = 'none';
         }
 
+        function formatDuration(totalMinutes) {
+            const hrs = Math.floor(totalMinutes / 60);
+            const mins = totalMinutes % 60;
+            if (hrs > 0) return `${hrs}h ${mins}m (${totalMinutes} min)`;
+            return `${totalMinutes} min`;
+        }
+
         async function calculate() {
             if (!pickupCoord || !dropoffCoord) return;
             $("results").style.display = 'block';
@@ -284,47 +291,43 @@
                 map.fitBounds(routeLayer.getBounds(), { padding: [80, 80] });
 
                 const km = route.summary.distance / 1000;
-                const actualEta = Math.ceil(route.summary.duration / 60);
+                const actualEtaTotal = Math.ceil(route.summary.duration / 60);
                 const dateObj = new Date($("departure-time").value);
                 const hour = dateObj.getHours();
                 const locText = ($("pickup").value + $("dropoff").value).toLowerCase();
 
-                // 1. Check for High-Demand Zones
                 const isHighDemand = CONFIG.HIGH_DEMAND_KEYWORDS.some(key => locText.includes(key));
                 const isPeak = (hour >= 6 && hour < 9) || (hour >= 12 && hour < 14) || (hour >= 17 && hour < 21);
 
-                // 2. Base Rate Calculation
                 let ratePerKm = 0;
                 if (km >= 90) ratePerKm = isHighDemand ? 2.20 : 1.75;
                 else if (isPeak) ratePerKm = isHighDemand ? 1.97 : 1.54;
                 else ratePerKm = isHighDemand ? 1.30 : 1.00;
 
-                // 3. Traffic Duration Surcharge
-                // Baseline speed 25 km/h -> 1km = 2.4 mins
                 const baselineMinutes = (km / 25) * 60;
                 let trafficSurcharge = 0;
-                if (actualEta > baselineMinutes) {
-                    const delayMinutes = actualEta - baselineMinutes;
-                    trafficSurcharge = delayMinutes * 0.20; // RM 0.20 per min of delay
+                if (actualEtaTotal > baselineMinutes) {
+                    const delayMinutes = actualEtaTotal - baselineMinutes;
+                    trafficSurcharge = delayMinutes * 0.20;
                 }
 
-                // 4. Final Total
                 let finalFare = (km * ratePerKm) + trafficSurcharge;
                 const roundedFare = Math.max(Math.round(finalFare), 5);
 
                 const modeLabel = isHighDemand ? "Zone Max" : "Standard Rate";
                 const trafficLabel = trafficSurcharge > 0 ? `+ RM ${trafficSurcharge.toFixed(2)} Traffic` : modeLabel;
+                const durationString = formatDuration(actualEtaTotal);
 
                 $("fare").innerText = `RM ${roundedFare}`;
                 $("distance").innerText = `${km.toFixed(1)} km`;
-                $("eta").innerText = `${actualEta} min`;
+                $("eta").innerText = durationString;
                 $("mode-badge").innerText = trafficLabel;
 
                 const formattedTime = dateObj.toLocaleString('en-MY', { 
                     weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' 
                 });
 
-                lastSummaryText = `🚖 *NEW RIDE BOOKING*\n--------------------------\n📍 *Pickup:* ${$("pickup").value}\n🏁 *Drop-off:* ${$("dropoff").value}\n⏰ *Time:* ${formattedTime}\n\n📊 *Details:*\n• Distance: ${km.toFixed(1)} km\n• Duration: ${actualEta} min\n• Traffic Adj: RM ${trafficSurcharge.toFixed(2)}\n\n💰 *TOTAL FARE: RM ${roundedFare}*\n--------------------------`;
+                lastSummaryText = `🚖 *NEW RIDE BOOKING*\n--------------------------\n📍 *Pickup:* ${$("pickup").value}\n🏁 *Drop-off:* ${$("dropoff").value}\n⏰ *Time:* ${formattedTime}\n\n📊 *Details:*\n• Distance: ${km.toFixed(1)} km\n• Duration: ${durationString}\n• Traffic Adj: RM ${trafficSurcharge.toFixed(2)}\n\n💰 *TOTAL FARE: RM ${roundedFare}*\n--------------------------`;
                 
                 $("wa-btn").href = `https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(lastSummaryText)}`;
                 $("nav-btn").onclick = () => window.location.href = `google.navigation:q=${dropoffCoord[0]},${dropoffCoord[1]}`;
