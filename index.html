@@ -99,12 +99,10 @@
             { name: "Mont Kiara", lat: 3.1651, lon: 101.6524 }
         ];
 
-        // NEW: Get real address from Lat/Lon
         async function getAddress(lat, lon) {
             try {
                 const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`);
                 const data = await res.json();
-                // Return a concise address (Street name + City/Area)
                 const parts = data.display_name.split(',');
                 return parts.slice(0, 3).join(',');
             } catch (e) {
@@ -129,7 +127,6 @@
 
         async function searchLocation(query) {
             if (query.length < 3) return;
-            // Bias results towards Malaysia
             const res = await fetch(`https://photon.komoot.io/api/?q=${query}&lat=3.139&lon=101.686`);
             const data = await res.json();
             let html = '';
@@ -149,82 +146,74 @@
             destCoords = [lat, lon];
             document.getElementById('destination').value = name;
             document.getElementById('search-results').innerHTML = '';
-            
-            // Marker logic
             markers.clearLayers();
             if(userCoords) L.marker(userCoords).addTo(markers);
             L.marker(destCoords).addTo(markers).bindPopup(name).openPopup();
-            
             if(userCoords) {
                 const group = new L.featureGroup([L.marker(userCoords), L.marker(destCoords)]);
                 map.fitBounds(group.getBounds().pad(0.3));
-            } else {
-                map.setView(destCoords, 14);
-            }
+            } else { map.setView(destCoords, 14); }
         }
 
         async function calculateFinalFare() {
             if (!userCoords || !destCoords) return alert("Please set pickup and destination first");
 
-            // Fetch Route from OSRM
             const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${userCoords[1]},${userCoords[0]};${destCoords[1]},${destCoords[0]}?overview=false`);
             const data = await res.json();
-            
-            if (data.code !== "Ok") return alert("Route calculation failed. Try another destination.");
+            if (data.code !== "Ok") return alert("Route calculation failed.");
 
             const distanceKm = data.routes[0].distance / 1000;
             const durationMin = data.routes[0].duration / 60;
 
-            // Logic Components
-            let base = 10.00;
-            let distCharge = distanceKm * 1.60;
+            // Updated Distance Rate: RM 1.25
+            let base = 8.00; 
+            let distCharge = distanceKm * 1.25;
             
-            // Traffic Multiplier based on speed
             let avgSpeed = distanceKm / (durationMin / 60);
             let trafficMult = 1.0;
             if (avgSpeed < 15) trafficMult = 1.35;
             else if (avgSpeed < 25) trafficMult = 1.20;
 
-            // Peak Hour Multiplier
+            // Revised Peak & Friday Logic
             let now = new Date();
             let hour = now.getHours();
-            let isPeak = ( (hour >= 7 && hour <= 10) || (hour >= 17 && hour <= 20) );
-            let peakMult = isPeak ? 1.15 : 1.0;
+            let day = now.getDay(); // 5 = Friday
+            let peakMult = 1.0;
 
-            // Zone Premium
+            // Standard Peak
+            if ((hour >= 7 && hour <= 10) || (hour >= 17 && hour <= 20)) {
+                peakMult = 1.15;
+            }
+            // Friday 12pm onwards
+            if (day === 5 && hour >= 12) {
+                peakMult = 1.25; // Friday specific multiplier
+            }
+
             let zonePrem = 0;
             PREM_ZONES.forEach(z => {
                 let distToZone = L.latLng(destCoords).distanceTo([z.lat, z.lon]);
-                if (distToZone < 1200) zonePrem = 5.00; // 1.2km radius
+                if (distToZone < 1200) zonePrem = 5.00;
             });
 
-            // Deadhead Recovery
             let deadheadMult = document.getElementById('deadhead-toggle').checked ? 1.35 : 1.0;
             let tolls = parseFloat(document.getElementById('tolls').value) || 0;
 
-            // Total Calculation
             let subtotal = (base + distCharge) * trafficMult * peakMult * deadheadMult;
             let finalTotal = subtotal + zonePrem + tolls;
 
-            // Update UI
             document.getElementById('result-card').classList.remove('hidden');
             document.getElementById('final-price').innerText = `RM ${finalTotal.toFixed(2)}`;
-            
-            // Updated Stats Breakdown
             document.getElementById('dist-label').innerHTML = `<span class="text-blue-400 font-black">${distanceKm.toFixed(1)}km</span> / ${Math.round(durationMin)}m`;
-            
             document.getElementById('peak-label').innerText = `x${(trafficMult * peakMult).toFixed(2)} (${Math.round(avgSpeed)}km/h)`;
             
             let premiumLabel = `+RM ${zonePrem.toFixed(2)}`;
             if (deadheadMult > 1) premiumLabel += " (+35% DH)";
             document.getElementById('premium-label').innerText = premiumLabel;
-            
             document.getElementById('toll-label').innerText = `RM ${tolls.toFixed(2)}`;
             
             window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
         }
 
-        // Auto-run on load
         getCurrentLocation();
     </script>
 </body>
