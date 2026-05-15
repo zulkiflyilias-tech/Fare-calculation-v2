@@ -90,7 +90,7 @@
     </div>
 
     <script>
-        let map = L.map('map', {zoomControl: false}).setView([3.13, 101.68], 11);
+        let map = L.map('map', {zoomControl: false}).setView([3.1390, 101.6869], 11);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
         let uLat, uLon, dLat, dLon, markers = L.layerGroup().addTo(map);
 
@@ -100,15 +100,17 @@
 
         async function searchLoc(q, type) {
             if (q.length < 3) return;
-            const res = await fetch(`https://photon.komoot.io/api/?q=${q}&lat=3.13&lon=101.6&limit=6`);
+            // Added URL encoding and country filter parameter for strict Malaysia results
+            const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=3.1390&lon=101.6869&limit=6&filter=countrycode:my`);
             const data = await res.json();
             const resDiv = document.getElementById(type + '-results');
             resDiv.classList.remove('hidden');
             resDiv.innerHTML = data.features.map(f => {
                 const p = f.properties;
                 const main = p.name || "Place";
-                const sub = [p.street, p.city, p.state].filter(x => x).join(', ');
-                return `<div class="p-3 border-b border-slate-800 text-xs cursor-pointer" onclick="select('${type}', ${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}, '${main}')">
+                const sub = [p.street, p.quarter, p.city, p.state].filter(x => x).join(', ');
+                // Escaped string values to prevent breakdown bugs when address elements possess apostrophes
+                return `<div class="p-3 border-b border-slate-800 text-xs cursor-pointer" onclick="select('${type}', ${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}, '${main.replace(/'/g, "\\'")}')">
                     <div class="font-bold text-yellow-500">${main}</div><div class="text-[10px] text-slate-500">${sub}</div>
                 </div>`;
             }).join('');
@@ -133,10 +135,21 @@
         async function getGPS() {
             navigator.geolocation.getCurrentPosition(async pos => {
                 uLat = pos.coords.latitude; uLon = pos.coords.longitude;
-                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${uLat}&lon=${uLon}`);
-                const data = await res.json();
-                document.getElementById('pickup').value = data.display_name.split(',').slice(0,3).join(',');
+                try {
+                    // Added country restriction parameter to backup reverse geocoder system
+                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${uLat}&lon=${uLon}&countrycodes=my`);
+                    const data = await res.json();
+                    if(data.display_name) {
+                        document.getElementById('pickup').value = data.display_name.split(',').slice(0,3).join(',');
+                    } else {
+                        document.getElementById('pickup').value = `${uLat.toFixed(4)}, ${uLon.toFixed(4)}`;
+                    }
+                } catch(e) {
+                    document.getElementById('pickup').value = `${uLat.toFixed(4)}, ${uLon.toFixed(4)}`;
+                }
                 calculate();
+            }, err => {
+                console.log("GPS access denied or unavailable.");
             });
         }
 
