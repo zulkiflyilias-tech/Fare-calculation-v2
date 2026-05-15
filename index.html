@@ -124,16 +124,17 @@
             { name: "Iskandar Malaysia Zone (JB)", code: "Johor", premium: 6, risk: "low", bounds: [[1.40, 103.55], [1.65, 103.85]] }
         ];
 
+        // Adjusted default fallbacks to low risk unless explicitly deep rural
         const MALAYSIA_STATES_FALLBACK = {
-            "selangor": { code: "Selangor", name: "Selangor", premium: 3, risk: "medium" },
+            "selangor": { code: "Selangor", name: "Selangor", premium: 3, risk: "low" },
             "kuala lumpur": { code: "KL", name: "Kuala Lumpur", premium: 5, risk: "low" },
-            "johor": { code: "Johor", name: "Johor", premium: 2, risk: "medium" },
-            "penang": { code: "Penang", name: "Penang", premium: 2, risk: "medium" },
-            "pulau pinang": { code: "Penang", name: "Penang", premium: 2, risk: "medium" },
-            "pahang": { code: "Pahang", name: "Pahang", premium: 0, risk: "high" },
-            "negeri sembilan": { code: "Negeri Sembilan", name: "Negeri Sembilan", premium: 0, risk: "high" },
-            "melaka": { code: "Melaka", name: "Melaka", premium: 0, risk: "medium" },
-            "perak": { code: "Perak", name: "Perak", premium: 0, risk: "high" },
+            "johor": { code: "Johor", name: "Johor", premium: 2, risk: "low" },
+            "penang": { code: "Penang", name: "Penang", premium: 2, risk: "low" },
+            "pulau pinang": { code: "Penang", name: "Penang", premium: 2, risk: "low" },
+            "pahang": { code: "Pahang", name: "Pahang", premium: 0, risk: "high" }, // Considered remote/mountainous areas
+            "negeri sembilan": { code: "Negeri Sembilan", name: "Negeri Sembilan", premium: 0, risk: "medium" },
+            "melaka": { code: "Melaka", name: "Melaka", premium: 0, risk: "low" },
+            "perak": { code: "Perak", name: "Perak", premium: 0, risk: "medium" },
             "kedah": { code: "Kedah", name: "Kedah", premium: 0, risk: "high" }
         };
 
@@ -148,7 +149,6 @@
         let routeMarkers = L.layerGroup().addTo(map);
         let typingTimeout;
 
-        // Automated Initialization Sequence
         window.onload = function() {
             setCurrentTimestamp();
             document.getElementById('pickup').placeholder = "Type pickup location...";
@@ -170,7 +170,6 @@
             document.getElementById('clock').innerText = new Date().toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' }) + ' (MYT)'; 
         }, 1000);
 
-        // Geofencing matrix match logic
         function automaticGeomatch(lat, lon, rawStateString) {
             for (const zone of GEOFENCES) {
                 const b = zone.bounds;
@@ -186,7 +185,7 @@
                     return { state: fallback.code, name: fallback.name, premium: fallback.premium, risk: fallback.risk };
                 }
             }
-            return { state: "MY_ZONE", name: "Standard Territory", premium: 0, risk: "medium" };
+            return { state: "MY_ZONE", name: "Standard Territory", premium: 0, risk: "low" };
         }
 
         function handleTyping(mode, value) {
@@ -309,7 +308,7 @@
 
         function getGPS(isInitialLoad = false) {
             if (!navigator.geolocation) {
-                if (isInitialLoad) document.getElementById('pickup').placeholder = "Type pickup location... ";
+                if (isInitialLoad) document.getElementById('pickup').placeholder = "Type pickup location...";
                 return;
             }
             navigator.geolocation.getCurrentPosition(async pos => {
@@ -408,7 +407,6 @@
 
             let scheduleMultiplier = 1.00, scheduleLabel = "Standard Flat-Rate (0%)";
             
-            // Constrained Friday Rush window logic: strictly 12:00 PM to 3:00 PM
             if (bookingDay === 5 && decimalTime >= 12.0 && decimalTime <= 15.0) {
                 scheduleMultiplier = 1.25; scheduleLabel = "Friday Rush Premium (+25%)";
             } else if ((decimalTime >= 6.5 && decimalTime <= 9.5) || (decimalTime >= 17.0 && decimalTime <= 20.5)) {
@@ -425,14 +423,20 @@
             const primarySubtotal = baseFareCost + distanceFareTotal + calculatedTimeFare;
             const computedPeakSurcharge = primarySubtotal * (scheduleMultiplier - 1);
 
-            const riskMapping = { "low": 0, "medium": 1, "high": 2, "very_high": 3 };
-            const inverseRiskLevels = ["low", "medium", "high", "very_high"];
-            const maxRiskIndex = Math.max(riskMapping[pickupRisk] || 0, riskMapping[dropoffRisk] || 0);
+            // DETECT RURAL / REMOTE AND INTERSTATE CONDITIONS
+            const isInterstate = pGeoData.state !== dGeoData.state;
+            const targetHasRuralRisk = (pickupRisk === "high" || pickupRisk === "very_high" || dropoffRisk === "high" || dropoffRisk === "very_high");
+            const isLongDistanceRemote = distance > 100 && targetHasRuralRisk;
+
+            let deadheadRate = 0.00;
             
-            let deadheadRate = DEADHEAD_MULTIPLIER[inverseRiskLevels[maxRiskIndex]] || 0.00;
-            let isLongDistanceTrip = distance > 80;
-            if (isLongDistanceTrip && deadheadRate < 0.35) deadheadRate = 0.35;
-            
+            // Only apply deadhead if explicitly rural/remote or an interstate rural route
+            if (targetHasRuralRisk || (isInterstate && isLongDistanceRemote)) {
+                const riskMapping = { "low": 0, "medium": 0.15, "high": 0.45, "very_high": 0.70 };
+                const maxRisk = riskMapping[pickupRisk] > riskMapping[dropoffRisk] ? pickupRisk : dropoffRisk;
+                deadheadRate = riskMapping[maxRisk] || 0.35; 
+            }
+
             const compiledDeadheadFee = distance * CONFIG.baseDistanceRate * deadheadRate;
             const automatedHighwayToll = distance > 20 ? (distance * 0.15) : 0;
             const compiledTollFees = automatedHighwayToll + manualTollInput;
@@ -457,7 +461,7 @@
             const finalRoundedFare = (Math.round(rawCombinedTotal * 10) / 10).toFixed(2);
 
             document.getElementById('result-card').classList.remove('hidden');
-            document.getElementById('trip-type').innerText = isLongDistanceTrip ? "Long Distance / Interstate Route" : "Urban / Local Territory Trip";
+            document.getElementById('trip-type').innerText = (distance > 80) ? "Long Distance / Interstate Route" : "Urban / Local Territory Trip";
             document.getElementById('final-price').innerText = `RM ${finalRoundedFare}`;
             
             const durationLabel = durationMinutes >= 60 ? `${Math.floor(durationMinutes / 60)} hr ${Math.round(durationMinutes % 60)} mins` : `${Math.round(durationMinutes)} mins`;
@@ -473,7 +477,12 @@
                 document.getElementById('premium-row').classList.add('hidden');
             }
 
-            document.getElementById('dh-label').innerText = compiledDeadheadFee > 0 ? `RM ${compiledDeadheadFee.toFixed(2)} (${Math.round(deadheadRate * 100)}%)` : "N/A (Urban Zone)";
+            if (compiledDeadheadFee > 0) {
+                document.getElementById('dh-label').innerText = `RM ${compiledDeadheadFee.toFixed(2)} (${Math.round(deadheadRate * 100)}%)`;
+            } else {
+                document.getElementById('dh-label').innerText = "N/A (Urban / Core Territory)";
+            }
+            
             document.getElementById('toll-label').innerText = `RM ${compiledTollFees.toFixed(2)} (Estimated)`;
         }
 
