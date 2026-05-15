@@ -151,7 +151,7 @@
         // Automated Initialization Sequence
         window.onload = function() {
             setCurrentTimestamp();
-            document.getElementById('pickup').placeholder = "Locating your position...";
+            document.getElementById('pickup').placeholder = "Type pickup location...";
             setTimeout(() => { 
                 map.invalidateSize(); 
                 getGPS(true); 
@@ -170,6 +170,7 @@
             document.getElementById('clock').innerText = new Date().toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' }) + ' (MYT)'; 
         }, 1000);
 
+        // Geofencing matrix match logic
         function automaticGeomatch(lat, lon, rawStateString) {
             for (const zone of GEOFENCES) {
                 const b = zone.bounds;
@@ -306,10 +307,9 @@
             }
         }
 
-        // Auto-detect GPS Handler
         function getGPS(isInitialLoad = false) {
             if (!navigator.geolocation) {
-                if (isInitialLoad) document.getElementById('pickup').placeholder = "Type pickup location...";
+                if (isInitialLoad) document.getElementById('pickup').placeholder = "Type pickup location... ";
                 return;
             }
             navigator.geolocation.getCurrentPosition(async pos => {
@@ -407,7 +407,9 @@
             const decimalTime = bookingHour + (checkedDate.getMinutes() / 60);
 
             let scheduleMultiplier = 1.00, scheduleLabel = "Standard Flat-Rate (0%)";
-            if (bookingDay === 5 && decimalTime >= 12.0) {
+            
+            // Constrained Friday Rush window logic: strictly 12:00 PM to 3:00 PM
+            if (bookingDay === 5 && decimalTime >= 12.0 && decimalTime <= 15.0) {
                 scheduleMultiplier = 1.25; scheduleLabel = "Friday Rush Premium (+25%)";
             } else if ((decimalTime >= 6.5 && decimalTime <= 9.5) || (decimalTime >= 17.0 && decimalTime <= 20.5)) {
                 scheduleMultiplier = 1.15; scheduleLabel = "Peak Hours Commute (+15%)";
