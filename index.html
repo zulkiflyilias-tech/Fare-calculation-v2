@@ -3,217 +3,144 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Private Driver Fare Engine</title>
+    <title>Smart Driver Fare Engine</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <style>
-        #map { height: 200px; border-radius: 12px; margin-bottom: 15px; }
-        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); }
-        ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
-    </style>
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans min-h-screen p-4">
 
     <div class="flex justify-between items-center mb-6">
         <div>
-            <h1 class="text-2xl font-black text-yellow-500 tracking-tight">FARE CALCULATOR</h1>
-            <p class="text-xs text-slate-400 uppercase tracking-widest">Premium Sedan Logic</p>
+            <h1 class="text-2xl font-black text-yellow-500">AUTO-FARE AI</h1>
+            <p class="text-[10px] text-slate-400 uppercase tracking-widest">Self-Adjusting Logic</p>
         </div>
-        <div id="status-dot" class="h-3 w-3 bg-green-500 rounded-full animate-pulse"></div>
+        <div class="text-right">
+            <p id="clock" class="text-xs font-mono text-yellow-500"></p>
+        </div>
     </div>
 
-    <div id="map" class="shadow-2xl border border-slate-800"></div>
+    <div id="map" class="h-40 rounded-xl mb-4 border border-slate-800 shadow-2xl"></div>
 
     <div class="space-y-4">
-        <div class="relative">
-            <label class="text-[10px] font-bold text-slate-500 uppercase ml-2">Pickup Location</label>
-            <div class="flex gap-2">
-                <input id="pickup" type="text" class="w-full bg-slate-900 border border-slate-800 p-3 rounded-lg text-sm" placeholder="Getting GPS address...">
-                <button onclick="getCurrentLocation()" class="bg-blue-600 px-4 rounded-lg active:bg-blue-700 transition-colors">📍</button>
-            </div>
+        <div class="flex gap-2">
+            <input id="pickup" type="text" class="flex-1 bg-slate-900 border border-slate-800 p-3 rounded-lg text-xs" placeholder="Pickup Address...">
+            <button onclick="getCurrentLocation()" class="bg-blue-600 px-4 rounded-lg">📍</button>
         </div>
+        <input id="destination" type="text" oninput="searchLocation(this.value)" class="w-full bg-slate-900 border border-slate-800 p-3 rounded-lg text-xs" placeholder="Search Destination...">
+        <div id="search-results" class="absolute z-[1000] w-[90%] bg-slate-800 rounded-lg max-h-40 overflow-y-auto"></div>
 
-        <div class="relative">
-            <label class="text-[10px] font-bold text-slate-500 uppercase ml-2">Destination</label>
-            <input id="destination" type="text" oninput="searchLocation(this.value)" class="w-full bg-slate-900 border border-slate-800 p-3 rounded-lg text-sm" placeholder="Search Place (e.g. KLCC, Mydin)">
-            <div id="search-results" class="absolute z-[1000] w-full bg-slate-800 rounded-b-lg shadow-xl max-h-48 overflow-y-auto mt-1"></div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-            <div class="bg-slate-900 p-3 rounded-lg border border-slate-800 flex items-center justify-between">
-                <span class="text-xs font-semibold">Deadhead/Rural</span>
-                <input type="checkbox" id="deadhead-toggle" class="w-5 h-5 accent-yellow-500">
-            </div>
-            <div class="bg-slate-900 p-3 rounded-lg border border-slate-800 flex items-center justify-between">
-                <span class="text-xs font-semibold">Tolls (Manual)</span>
-                <input type="number" id="tolls" class="w-16 bg-transparent text-right outline-none text-yellow-500 font-bold" value="0.00" step="0.10">
-            </div>
-        </div>
-
-        <button onclick="calculateFinalFare()" class="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-xl transition-transform active:scale-95 shadow-[0_0_20px_rgba(234,179,8,0.3)]">
-            GENERATE FINAL PRICE
+        <button onclick="calculateFinalFare()" class="w-full bg-yellow-500 text-black font-black py-4 rounded-xl shadow-lg active:scale-95 transition-transform">
+            GENERATE SMART QUOTE
         </button>
     </div>
 
-    <div id="result-card" class="hidden mt-6 p-6 rounded-2xl border-2 border-yellow-500/50 bg-gradient-to-b from-slate-900 to-slate-950 shadow-2xl">
-        <div class="text-center">
-            <span class="text-slate-400 text-xs font-bold uppercase tracking-widest">Final Price</span>
-            <h2 id="final-price" class="text-6xl font-black text-white mt-2">RM 0.00</h2>
+    <div id="result-card" class="hidden mt-6 p-5 rounded-2xl bg-slate-900 border border-yellow-500/30">
+        <div class="text-center mb-4">
+            <p id="trip-type" class="text-[10px] font-bold text-yellow-500 uppercase mb-1"></p>
+            <h2 id="final-price" class="text-5xl font-black text-white">RM 0.00</h2>
         </div>
         
-        <div class="mt-4 pt-4 border-t border-slate-800 space-y-3 text-sm">
-            <div class="flex justify-between items-center text-slate-300">
-                <span>Distance & Time</span>
-                <span id="dist-label" class="font-bold text-slate-100">---</span>
-            </div>
-            <div class="flex justify-between items-center text-slate-400">
-                <span>Traffic/Peak Adjustment</span>
-                <span id="peak-label" class="text-slate-200">---</span>
-            </div>
-            <div class="flex justify-between items-center text-yellow-500 font-bold">
-                <span>Zone/Deadhead Premium</span>
-                <span id="premium-label">---</span>
-            </div>
-            <div class="flex justify-between items-center text-slate-400">
-                <span>Tolls</span>
-                <span id="toll-label" class="text-slate-200">RM 0.00</span>
-            </div>
+        <div class="space-y-2 text-xs border-t border-slate-800 pt-4">
+            <div class="flex justify-between"><span>Dist/Time</span><span id="dist-label" class="text-slate-300"></span></div>
+            <div class="flex justify-between"><span>Base + Km (RM1.25)</span><span id="base-km-label"></span></div>
+            <div class="flex justify-between"><span>Traffic/Peak Adjustment</span><span id="peak-label"></span></div>
+            <div class="flex justify-between font-bold text-yellow-500"><span>Auto-Deadhead (Return)</span><span id="dh-label"></span></div>
+            <div class="flex justify-between"><span>Est. Tolls & Zone Fees</span><span id="toll-label"></span></div>
         </div>
     </div>
 
     <script>
-        let map = L.map('map', { zoomControl: false }).setView([3.139, 101.686], 12);
+        let map = L.map('map', {zoomControl: false}).setView([3.139, 101.686], 12);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
-
-        let userCoords = null;
-        let destCoords = null;
-        let markers = L.layerGroup().addTo(map);
+        let userCoords = null, destCoords = null, markers = L.layerGroup().addTo(map);
 
         const PREM_ZONES = [
-            { name: "KLCC", lat: 3.1579, lon: 101.7116 },
-            { name: "Pavilion/BB", lat: 3.1485, lon: 101.7131 },
-            { name: "TRX", lat: 3.1428, lon: 101.7194 },
-            { name: "Mid Valley", lat: 3.1186, lon: 101.6778 },
-            { name: "Mont Kiara", lat: 3.1651, lon: 101.6524 }
+            { name: "KLCC/BB", lat: 3.15, lon: 101.71 },
+            { name: "Mid Valley", lat: 3.11, lon: 101.67 },
+            { name: "JB Sentral/CIQ", lat: 1.46, lon: 103.76 },
+            { name: "Penang Core", lat: 5.41, lon: 100.32 }
         ];
 
-        async function getAddress(lat, lon) {
-            try {
-                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`);
-                const data = await res.json();
-                const parts = data.display_name.split(',');
-                return parts.slice(0, 3).join(',');
-            } catch (e) {
-                return "Location Found";
-            }
-        }
+        setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleTimeString(); }, 1000);
 
         async function getCurrentLocation() {
-            document.getElementById('pickup').value = "Locating...";
-            navigator.geolocation.getCurrentPosition(async (pos) => {
+            navigator.geolocation.getCurrentPosition(async pos => {
                 userCoords = [pos.coords.latitude, pos.coords.longitude];
                 map.setView(userCoords, 15);
                 markers.clearLayers();
-                L.marker(userCoords).addTo(markers).bindPopup("Pickup").openPopup();
-                
-                const addr = await getAddress(pos.coords.latitude, pos.coords.longitude);
-                document.getElementById('pickup').value = addr;
-            }, (err) => {
-                document.getElementById('pickup').value = "GPS Access Denied";
-            }, { enableHighAccuracy: true });
-        }
-
-        async function searchLocation(query) {
-            if (query.length < 3) return;
-            const res = await fetch(`https://photon.komoot.io/api/?q=${query}&lat=3.139&lon=101.686`);
-            const data = await res.json();
-            let html = '';
-            data.features.forEach(f => {
-                const name = f.properties.name || "Unknown Place";
-                const city = f.properties.city || f.properties.state || "";
-                html += `<div class="p-3 border-b border-slate-700 hover:bg-slate-700 cursor-pointer text-xs" 
-                         onclick="selectDestination(${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}, '${name}')">
-                         <div class="font-bold">${name}</div>
-                         <div class="text-slate-400">${city}</div>
-                         </div>`;
+                L.marker(userCoords).addTo(markers);
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${userCoords[0]}&lon=${userCoords[1]}`);
+                const data = await res.json();
+                document.getElementById('pickup').value = data.display_name.split(',').slice(0,2).join(',');
             });
-            document.getElementById('search-results').innerHTML = html;
         }
 
-        function selectDestination(lat, lon, name) {
+        async function searchLocation(q) {
+            if (q.length < 3) return;
+            const res = await fetch(`https://photon.komoot.io/api/?q=${q}&lat=3.13&lon=101.6`);
+            const data = await res.json();
+            document.getElementById('search-results').innerHTML = data.features.map(f => `
+                <div class="p-3 border-b border-slate-700 text-xs" onclick="selectDest(${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}, '${f.properties.name}')">
+                    ${f.properties.name}
+                </div>`).join('');
+        }
+
+        function selectDest(lat, lon, name) {
             destCoords = [lat, lon];
             document.getElementById('destination').value = name;
             document.getElementById('search-results').innerHTML = '';
-            markers.clearLayers();
-            if(userCoords) L.marker(userCoords).addTo(markers);
-            L.marker(destCoords).addTo(markers).bindPopup(name).openPopup();
-            if(userCoords) {
-                const group = new L.featureGroup([L.marker(userCoords), L.marker(destCoords)]);
-                map.fitBounds(group.getBounds().pad(0.3));
-            } else { map.setView(destCoords, 14); }
+            L.marker(destCoords).addTo(markers);
+            map.fitBounds(new L.featureGroup([L.marker(userCoords), L.marker(destCoords)]).getBounds().pad(0.3));
         }
 
         async function calculateFinalFare() {
-            if (!userCoords || !destCoords) return alert("Please set pickup and destination first");
-
-            const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${userCoords[1]},${userCoords[0]};${destCoords[1]},${destCoords[0]}?overview=false`);
+            if (!userCoords || !destCoords) return alert("Select locations");
+            const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${userCoords[1]},${userCoords[0]};${destCoords[1]},${destCoords[0]}`);
             const data = await res.json();
-            if (data.code !== "Ok") return alert("Route calculation failed.");
+            const dist = data.routes[0].distance / 1000;
+            const mins = data.routes[0].duration / 60;
 
-            const distanceKm = data.routes[0].distance / 1000;
-            const durationMin = data.routes[0].duration / 60;
+            // 1. FUNDAMENTALS
+            let base = 8.00;
+            let kmRate = 1.25;
+            let baseDistFare = base + (dist * kmRate);
 
-            // Updated Distance Rate: RM 1.25
-            let base = 8.00; 
-            let distCharge = distanceKm * 1.25;
+            // 2. AUTO-TRAFFIC & PEAK
+            let speed = dist / (mins / 60);
+            let trafficMult = speed < 20 ? 1.35 : (speed < 40 ? 1.15 : 1.0);
             
-            let avgSpeed = distanceKm / (durationMin / 60);
-            let trafficMult = 1.0;
-            if (avgSpeed < 15) trafficMult = 1.35;
-            else if (avgSpeed < 25) trafficMult = 1.20;
+            let now = new Date(), hr = now.getHours(), day = now.getDay();
+            let peakMult = ((hr >= 7 && hr <= 10) || (hr >= 17 && hr <= 20)) ? 1.15 : 1.0;
+            if (day === 5 && hr >= 12) peakMult = 1.25; // Friday Auto-Peak
 
-            // Revised Peak & Friday Logic
-            let now = new Date();
-            let hour = now.getHours();
-            let day = now.getDay(); // 5 = Friday
-            let peakMult = 1.0;
+            // 3. AUTO-DEADHEAD (Interstate Logic)
+            // Automatically triggered if trip > 80km or takes > 90 mins
+            let dhMult = (dist > 80 || mins > 90) ? 1.35 : 1.0;
 
-            // Standard Peak
-            if ((hour >= 7 && hour <= 10) || (hour >= 17 && hour <= 20)) {
-                peakMult = 1.15;
-            }
-            // Friday 12pm onwards
-            if (day === 5 && hour >= 12) {
-                peakMult = 1.25; // Friday specific multiplier
-            }
-
-            let zonePrem = 0;
+            // 4. AUTO-TOLLS & ZONES
+            let estToll = dist > 20 ? (dist * 0.14) : 0; // Average PLUS toll rate
+            let zoneFee = 0;
             PREM_ZONES.forEach(z => {
-                let distToZone = L.latLng(destCoords).distanceTo([z.lat, z.lon]);
-                if (distToZone < 1200) zonePrem = 5.00;
+                if (L.latLng(destCoords).distanceTo([z.lat, z.lon]) < 1500) zoneFee = 5.0;
             });
 
-            let deadheadMult = document.getElementById('deadhead-toggle').checked ? 1.35 : 1.0;
-            let tolls = parseFloat(document.getElementById('tolls').value) || 0;
+            // FINAL MATH
+            let subtotal = baseDistFare * trafficMult * peakMult * dhMult;
+            let final = subtotal + estToll + zoneFee;
 
-            let subtotal = (base + distCharge) * trafficMult * peakMult * deadheadMult;
-            let finalTotal = subtotal + zonePrem + tolls;
-
+            // UI
             document.getElementById('result-card').classList.remove('hidden');
-            document.getElementById('final-price').innerText = `RM ${finalTotal.toFixed(2)}`;
-            document.getElementById('dist-label').innerHTML = `<span class="text-blue-400 font-black">${distanceKm.toFixed(1)}km</span> / ${Math.round(durationMin)}m`;
-            document.getElementById('peak-label').innerText = `x${(trafficMult * peakMult).toFixed(2)} (${Math.round(avgSpeed)}km/h)`;
+            document.getElementById('trip-type').innerText = dhMult > 1 ? "Interstate / Long Distance" : "Urban / Local Trip";
+            document.getElementById('final-price').innerText = `RM ${final.toFixed(2)}`;
+            document.getElementById('dist-label').innerText = `${dist.toFixed(1)}km / ${Math.round(mins)}m`;
+            document.getElementById('base-km-label').innerText = `RM ${baseDistFare.toFixed(2)}`;
+            document.getElementById('peak-label').innerText = `x${(trafficMult * peakMult).toFixed(2)} (${Math.round(speed)}km/h)`;
+            document.getElementById('dh-label').innerText = dhMult > 1 ? "AUTO-APPLIED (+35%)" : "N/A";
+            document.getElementById('toll-label').innerText = `RM ${(estToll + zoneFee).toFixed(2)}`;
             
-            let premiumLabel = `+RM ${zonePrem.toFixed(2)}`;
-            if (deadheadMult > 1) premiumLabel += " (+35% DH)";
-            document.getElementById('premium-label').innerText = premiumLabel;
-            document.getElementById('toll-label').innerText = `RM ${tolls.toFixed(2)}`;
-            
-            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            window.scrollTo(0, document.body.scrollHeight);
         }
-
         getCurrentLocation();
     </script>
 </body>
