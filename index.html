@@ -1,456 +1,178 @@
-<!-- ========================= -->
-<!-- ENHANCED RIDESHARE LOGIC -->
-<!-- Malaysia Dynamic Pricing -->
-<!-- ========================= -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Private Driver Fare Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        #map { height: 200px; border-radius: 12px; margin-bottom: 15px; }
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen p-4">
 
-<script>
-const CONFIG = {
-    ORS_KEY: "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImVlYzI5ZTA0OTM2YTRlZDNhNjk1NTcyNGQ1OTJmYmNjIiwiaCI6Im11cm11cjY0In0=",
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h1 class="text-2xl font-black text-yellow-500 tracking-tight">FARE CALCULATOR</h1>
+            <p class="text-xs text-slate-400 uppercase tracking-widest">Premium Sedan Logic</p>
+        </div>
+        <div id="status-dot" class="h-3 w-3 bg-green-500 rounded-full animate-pulse"></div>
+    </div>
 
-    RATES: {
-        BASE: 5.00,
+    <!-- Map View -->
+    <div id="map" class="shadow-2xl border border-slate-800"></div>
 
-        // Urban Distance Tiers
-        KM_TIER_1: 1.40,
-        KM_TIER_2: 1.20,
-        KM_TIER_3: 1.00,
+    <!-- Input Section -->
+    <div class="space-y-4">
+        <div class="relative">
+            <label class="text-[10px] font-bold text-slate-500 uppercase ml-2">Pickup Location</label>
+            <div class="flex gap-2">
+                <input id="pickup" type="text" readonly class="w-full bg-slate-900 border border-slate-800 p-3 rounded-lg text-sm" placeholder="Getting GPS...">
+                <button onclick="getCurrentLocation()" class="bg-blue-600 px-4 rounded-lg">📍</button>
+            </div>
+        </div>
 
-        // Time Cost
-        TIME_RATE: 0.35,
+        <div class="relative">
+            <label class="text-[10px] font-bold text-slate-500 uppercase ml-2">Destination</label>
+            <input id="destination" type="text" oninput="searchLocation(this.value)" class="w-full bg-slate-900 border border-slate-800 p-3 rounded-lg text-sm" placeholder="Search Place (e.g. KLCC, Pavilion)">
+            <div id="search-results" class="absolute z-[1000] w-full bg-slate-800 rounded-b-lg shadow-xl max-h-40 overflow-y-auto mt-1"></div>
+        </div>
 
-        // Interstate
-        EMPTY_RETURN_KM: 0.65,
+        <!-- Premium Toggles -->
+        <div class="grid grid-cols-2 gap-3">
+            <div class="bg-slate-900 p-3 rounded-lg border border-slate-800 flex items-center justify-between">
+                <span class="text-xs">Deadhead/Rural</span>
+                <input type="checkbox" id="deadhead-toggle" class="w-5 h-5 accent-yellow-500">
+            </div>
+            <div class="bg-slate-900 p-3 rounded-lg border border-slate-800 flex items-center justify-between">
+                <span class="text-xs">Tolls (Manual)</span>
+                <input type="number" id="tolls" class="w-12 bg-transparent text-right outline-none text-yellow-500" value="0.00">
+            </div>
+        </div>
 
-        // Rural
-        RURAL_MIN: 12,
-        RURAL_PICKUP_PER_KM: 0.90,
+        <button onclick="calculateFinalFare()" class="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-xl transition-transform active:scale-95 shadow-[0_0_20px_rgba(234,179,8,0.3)]">
+            GENERATE FINAL PRICE
+        </button>
+    </div>
 
-        // Waiting
-        WAIT_PER_MIN: 0.50
-    },
+    <!-- Result Card -->
+    <div id="result-card" class="hidden mt-6 p-6 rounded-2xl border-2 border-yellow-500/50 bg-gradient-to-b from-slate-900 to-slate-950 shadow-2xl">
+        <div class="text-center">
+            <span class="text-slate-400 text-xs font-bold uppercase tracking-widest">Total Fare Estimate</span>
+            <h2 id="final-price" class="text-6xl font-black text-white mt-2">RM 0.00</h2>
+        </div>
+        
+        <div class="mt-4 pt-4 border-t border-slate-800 space-y-2 text-sm text-slate-400">
+            <div class="flex justify-between"><span>Base + Distance</span><span id="dist-label">RM 0.00</span></div>
+            <div class="flex justify-between"><span>Traffic/Peak Adjustment</span><span id="peak-label">RM 0.00</span></div>
+            <div class="flex justify-between text-yellow-500 font-bold"><span>Zone/Deadhead Premium</span><span id="premium-label">RM 0.00</span></div>
+            <div class="flex justify-between"><span>Tolls</span><span id="toll-label">RM 0.00</span></div>
+        </div>
+    </div>
 
-    // Peak Hours Malaysia
-    PEAK_WINDOWS: [
-        { start: 6, end: 10 },
-        { start: 17, end: 20 }
-    ],
+    <script>
+        let map = L.map('map').setView([3.139, 101.686], 12);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
-    // Highly Congested Zones
-    CONGESTED_ZONES: [
-        "Kuala Lumpur",
-        "Petaling Jaya",
-        "Subang Jaya",
-        "Shah Alam",
-        "George Town",
-        "Bayan Lepas",
-        "Johor Bahru",
-        "Mont Kiara",
-        "Bangsar",
-        "Bukit Bintang",
-        "KLCC",
-        "Mid Valley",
-        "Puchong",
-        "Cheras",
-        "Kajang"
-    ],
+        let userCoords = null;
+        let destCoords = null;
+        let markers = L.layerGroup().addTo(map);
 
-    // Rural Keywords
-    RURAL_ZONES: [
-        "Felda",
-        "Kampung",
-        "Estate",
-        "Ladang",
-        "Mukim",
-        "Rural"
-    ]
-};
+        const PREM_ZONES = [
+            { name: "KLCC", lat: 3.1579, lon: 101.7116 },
+            { name: "Pavilion/BB", lat: 3.1485, lon: 101.7131 },
+            { name: "TRX", lat: 3.1428, lon: 101.7194 },
+            { name: "Mid Valley", lat: 3.1186, lon: 101.6778 },
+            { name: "Mont Kiara", lat: 3.1651, lon: 101.6524 }
+        ];
 
-const $ = id => document.getElementById(id);
-
-let pickupCoord,
-    dropoffCoord,
-    pickupState,
-    dropoffState,
-    pickupLabel = "",
-    dropoffLabel = "",
-    routeLayer,
-    currentFare = 0;
-
-function isPeakHour() {
-    const now = new Date().getHours();
-
-    return CONFIG.PEAK_WINDOWS.some(p =>
-        now >= p.start && now < p.end
-    );
-}
-
-function isCongestedArea(text) {
-    return CONFIG.CONGESTED_ZONES.some(z =>
-        text.toLowerCase().includes(z.toLowerCase())
-    );
-}
-
-function isRuralArea(text) {
-    return CONFIG.RURAL_ZONES.some(z =>
-        text.toLowerCase().includes(z.toLowerCase())
-    );
-}
-
-function getTrafficMultiplier(durationMins, distanceKm, areaText) {
-
-    const avgSpeed = distanceKm / (durationMins / 60);
-
-    let multiplier = 1.0;
-
-    // Speed-based traffic model
-    if (avgSpeed < 10) multiplier = 2.0;
-    else if (avgSpeed < 20) multiplier = 1.6;
-    else if (avgSpeed < 35) multiplier = 1.3;
-    else if (avgSpeed < 50) multiplier = 1.1;
-
-    // Additional urban congestion weighting
-    if (isCongestedArea(areaText) && isPeakHour()) {
-        multiplier += 0.25;
-    }
-
-    return Math.min(multiplier, 2.5);
-}
-
-function getDemandMultiplier(areaText) {
-
-    let multiplier = 1.0;
-
-    if (isPeakHour()) multiplier += 0.20;
-
-    if (isCongestedArea(areaText)) multiplier += 0.20;
-
-    return Math.min(multiplier, 2.0);
-}
-
-function getZoneType(areaText) {
-
-    if (isRuralArea(areaText)) return "RURAL";
-
-    if (isCongestedArea(areaText)) return "URBAN_CONGESTED";
-
-    return "STANDARD";
-}
-
-async function calculate() {
-
-    try {
-
-        const res = await fetch(
-            "https://api.openrouteservice.org/v2/directions/driving-car",
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": CONFIG.ORS_KEY
-                },
-                body: JSON.stringify({
-                    coordinates: [
-                        [pickupCoord[1], pickupCoord[0]],
-                        [dropoffCoord[1], dropoffCoord[0]]
-                    ]
-                })
-            }
-        );
-
-        const data = await res.json();
-
-        const route = data.routes[0];
-
-        const km = route.summary.distance / 1000;
-
-        const mins = Math.ceil(route.summary.duration / 60);
-
-        const routeText =
-            `${pickupLabel} ${dropoffLabel}`;
-
-        const zoneType = getZoneType(routeText);
-
-        // =========================
-        // DISTANCE PRICING
-        // =========================
-
-        let distFare = 0;
-
-        if (km <= 50) {
-
-            distFare =
-                km * CONFIG.RATES.KM_TIER_1;
-
-        } else if (km <= 150) {
-
-            distFare =
-                (50 * CONFIG.RATES.KM_TIER_1) +
-                ((km - 50) * CONFIG.RATES.KM_TIER_2);
-
-        } else {
-
-            distFare =
-                (50 * CONFIG.RATES.KM_TIER_1) +
-                (100 * CONFIG.RATES.KM_TIER_2) +
-                ((km - 150) * CONFIG.RATES.KM_TIER_3);
+        function getCurrentLocation() {
+            navigator.geolocation.getCurrentPosition(pos => {
+                userCoords = [pos.coords.latitude, pos.coords.longitude];
+                map.setView(userCoords, 15);
+                markers.clearLayers();
+                L.marker(userCoords).addTo(markers).bindPopup("Pickup").openPopup();
+                document.getElementById('pickup').value = "Current Location Detected";
+            });
         }
 
-        // =========================
-        // TIME FARE
-        // =========================
-
-        const timeFare =
-            mins * CONFIG.RATES.TIME_RATE;
-
-        // =========================
-        // INTERSTATE
-        // =========================
-
-        const isInterstate =
-            pickupState &&
-            dropoffState &&
-            pickupState !== dropoffState;
-
-        const emptyReturn =
-            isInterstate
-                ? km * CONFIG.RATES.EMPTY_RETURN_KM
-                : 0;
-
-        // =========================
-        // TRAFFIC MULTIPLIER
-        // =========================
-
-        const trafficMultiplier =
-            getTrafficMultiplier(
-                mins,
-                km,
-                routeText
-            );
-
-        // =========================
-        // DEMAND MULTIPLIER
-        // =========================
-
-        const demandMultiplier =
-            getDemandMultiplier(routeText);
-
-        // =========================
-        // SURGE
-        // =========================
-
-        const surgeMultiplier =
-            trafficMultiplier *
-            demandMultiplier;
-
-        // =========================
-        // RURAL PICKUP COMPENSATION
-        // =========================
-
-        let ruralFee = 0;
-
-        if (zoneType === "RURAL") {
-
-            ruralFee =
-                Math.max(
-                    CONFIG.RATES.RURAL_MIN,
-                    km * CONFIG.RATES.RURAL_PICKUP_PER_KM
-                );
+        async function searchLocation(query) {
+            if (query.length < 3) return;
+            const res = await fetch(`https://photon.komoot.io/api/?q=${query}&lat=3.139&lon=101.686`);
+            const data = await res.json();
+            let html = '';
+            data.features.forEach(f => {
+                html += `<div class="p-3 border-b border-slate-700 hover:bg-slate-700 cursor-pointer text-xs" 
+                         onclick="selectDestination(${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}, '${f.properties.name}')">
+                         ${f.properties.name}, ${f.properties.city || ''}</div>`;
+            });
+            document.getElementById('search-results').innerHTML = html;
         }
 
-        // =========================
-        // SUBTOTAL
-        // =========================
+        function selectDestination(lat, lon, name) {
+            destCoords = [lat, lon];
+            document.getElementById('destination').value = name;
+            document.getElementById('search-results').innerHTML = '';
+            L.marker(destCoords).addTo(markers).bindPopup("Destination").openPopup();
+            const group = new L.featureGroup([L.marker(userCoords), L.marker(destCoords)]);
+            map.fitBounds(group.getBounds().pad(0.5));
+        }
 
-        const subtotal =
-            CONFIG.RATES.BASE +
-            distFare +
-            timeFare +
-            emptyReturn;
+        async function calculateFinalFare() {
+            if (!userCoords || !destCoords) return alert("Please set pickup and destination");
 
-        // =========================
-        // FINAL FARE
-        // =========================
+            // 1. Get Route Data (OSRM - Free)
+            const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${userCoords[1]},${userCoords[0]};${destCoords[1]},${destCoords[0]}?overview=false`);
+            const data = await res.json();
+            const distanceKm = data.routes[0].distance / 1000;
+            const durationMin = data.routes[0].duration / 60;
 
-        currentFare =
-            (
-                subtotal *
-                surgeMultiplier
-            ) + ruralFee;
+            // 2. Base Calculation (KL Rates)
+            let base = 10.00;
+            let distCharge = distanceKm * 1.60;
+            
+            // 3. Traffic Tier
+            let avgSpeed = distanceKm / (durationMin / 60);
+            let trafficMult = 1.0;
+            if (avgSpeed < 15) trafficMult = 1.35;
+            else if (avgSpeed < 25) trafficMult = 1.20;
 
-        currentFare =
-            Math.round(currentFare);
+            // 4. Peak Hour Check (7-10am, 5-8pm)
+            let now = new Date();
+            let hour = now.getHours();
+            let peakMult = ( (hour >= 7 && hour <= 10) || (hour >= 17 && hour <= 20) ) ? 1.15 : 1.0;
 
-        // =========================
-        // UI BADGES
-        // =========================
+            // 5. Zone Premium Check
+            let zonePrem = 0;
+            PREM_ZONES.forEach(z => {
+                let distToZone = L.latLng(destCoords).distanceTo([z.lat, z.lon]);
+                if (distToZone < 1000) zonePrem = 5.00;
+            });
 
-        let badge = "STANDARD";
+            // 6. Deadhead Recovery
+            let deadhead = document.getElementById('deadhead-toggle').checked ? 1.30 : 1.0;
+            let tolls = parseFloat(document.getElementById('tolls').value) || 0;
 
-        if (zoneType === "RURAL")
-            badge = "RURAL";
+            // FINAL MATH
+            let subtotal = (base + distCharge) * trafficMult * peakMult * deadhead;
+            let finalTotal = subtotal + zonePrem + tolls;
 
-        if (isCongestedArea(routeText))
-            badge = "PEAK";
+            // UI Update
+            document.getElementById('result-card').classList.remove('hidden');
+            document.getElementById('final-price').innerText = `RM ${finalTotal.toFixed(2)}`;
+            document.getElementById('dist-label').innerText = `RM ${(base + distCharge).toFixed(2)}`;
+            document.getElementById('peak-label').innerText = `x${(trafficMult * peakMult).toFixed(2)}`;
+            document.getElementById('premium-label').innerText = `+RM ${zonePrem + (subtotal * 0.3 - subtotal * 0)}`;
+            document.getElementById('toll-label').innerText = `RM ${tolls.toFixed(2)}`;
+            
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        }
 
-        if (isInterstate)
-            badge = "INTERSTATE";
-
-        // =========================
-        // UI OUTPUT
-        // =========================
-
-        $("fare").innerText =
-            `RM ${currentFare}`;
-
-        $("summary").innerHTML =
-            `
-            <b>${km.toFixed(1)} km</b>
-            •
-            <b>${mins} mins</b>
-            •
-            Surge ${surgeMultiplier.toFixed(2)}x
-        `;
-
-        $("badge").innerText = badge;
-
-        // =========================
-        // BREAKDOWN
-        // =========================
-
-        $("invoice-content").innerHTML = `
-            <table class="invoice-table">
-
-                <tr>
-                    <td>Base Fare</td>
-                    <td class="amount">
-                        RM ${CONFIG.RATES.BASE.toFixed(2)}
-                    </td>
-                </tr>
-
-                <tr>
-                    <td>Distance Fee</td>
-                    <td class="amount">
-                        RM ${distFare.toFixed(2)}
-                    </td>
-                </tr>
-
-                <tr>
-                    <td>Time Fee</td>
-                    <td class="amount">
-                        RM ${timeFare.toFixed(2)}
-                    </td>
-                </tr>
-
-                ${
-                    isInterstate
-                    ? `
-                    <tr>
-                        <td>Interstate Return Risk</td>
-                        <td class="amount">
-                            RM ${emptyReturn.toFixed(2)}
-                        </td>
-                    </tr>
-                    `
-                    : ""
-                }
-
-                ${
-                    ruralFee > 0
-                    ? `
-                    <tr>
-                        <td>Rural Compensation</td>
-                        <td class="amount">
-                            RM ${ruralFee.toFixed(2)}
-                        </td>
-                    </tr>
-                    `
-                    : ""
-                }
-
-                <tr>
-                    <td>Traffic Multiplier</td>
-                    <td class="amount">
-                        ${trafficMultiplier.toFixed(2)}x
-                    </td>
-                </tr>
-
-                <tr>
-                    <td>Demand Multiplier</td>
-                    <td class="amount">
-                        ${demandMultiplier.toFixed(2)}x
-                    </td>
-                </tr>
-
-                <tr style="
-                    font-size:16px;
-                    font-weight:800;
-                    color:var(--primary)
-                ">
-                    <td>Total</td>
-                    <td class="amount">
-                        RM ${currentFare.toFixed(2)}
-                    </td>
-                </tr>
-
-            </table>
-        `;
-
-        $("results").style.display = "block";
-
-        if (routeLayer)
-            map.removeLayer(routeLayer);
-
-        routeLayer = L.polyline(
-            decodePoly(route.geometry),
-            {
-                color: "#059669",
-                weight: 6
-            }
-        ).addTo(map);
-
-        map.fitBounds(
-            routeLayer.getBounds(),
-            {
-                padding: [40, 160]
-            }
-        );
-
-    } catch (e) {
-
-        console.error(e);
-
-    }
-}
-
-// =========================
-// IMPORTANT
-// MODIFY selectLoc()
-// =========================
-
-async function selectLoc(type, coord, label, state) {
-
-    if (type === 'pickup') {
-
-        pickupCoord = coord;
-        pickupState = state;
-        pickupLabel = label;
-
-        $("pickup").value = label;
-
-        $("p-results").style.display = 'none';
-
-    } else {
-
-        dropoffCoord = coord;
-        dropoffState = state;
-        dropoffLabel = label;
-
-        $("dropoff").value = label;
-
-        $("d-results").style.display = 'none';
-    }
-
-    if (pickupCoord && dropoffCoord)
-        calculate();
-}
-</script>
+        getCurrentLocation();
+    </script>
+</body>
+</html>
