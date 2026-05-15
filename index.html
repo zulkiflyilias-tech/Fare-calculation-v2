@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Premium Driver Engine</title>
+    <title>Premium Sedan Logic Engine</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        #map { height: 180px; border-radius: 12px; filter: grayscale(0.5) contrast(1.2); }
+        #map { height: 180px; border-radius: 12px; filter: grayscale(0.2) contrast(1.1); }
         .search-results { 
             position: absolute; z-index: 2000; width: 100%; 
             background: #0f172a; border: 1px solid #334155; 
@@ -53,7 +53,7 @@
             <input id="schedule" type="datetime-local" onchange="calculate()" class="bg-slate-900 border border-slate-800 p-2 rounded-lg text-xs text-yellow-500 font-bold">
             <div class="bg-slate-900 border border-slate-800 p-2 rounded-lg flex items-center px-3">
                 <span class="text-[10px] text-slate-500 font-bold mr-2">EXTRA TOLL</span>
-                <input id="tolls" type="number" oninput="calculate()" class="w-full bg-transparent text-right text-sm outline-none" value="0.00">
+                <input id="tolls" type="number" oninput="calculate()" class="w-full bg-transparent text-right text-sm outline-none" value="0.00" step="0.10">
             </div>
         </div>
     </div>
@@ -68,14 +68,18 @@
         <div class="space-y-3 text-[11px] border-t border-slate-800 pt-5">
             <div class="flex justify-between">
                 <span class="text-slate-500 uppercase font-bold">Distance & Time</span>
-                <span id="dist-label" class="text-slate-100 font-mono"></span>
+                <span id="dist-label" class="text-slate-100 font-mono font-bold"></span>
             </div>
             <div class="flex justify-between">
-                <span class="text-slate-500 uppercase font-bold">Fare (RM1.25/km)</span>
+                <span class="text-slate-500 uppercase font-bold">Base Fare + Distance</span>
                 <span id="base-km-label" class="text-slate-100 font-mono"></span>
             </div>
+            <div class="flex justify-between">
+                <span class="text-slate-500 uppercase font-bold">Traffic & Schedule Adj.</span>
+                <span id="peak-label" class="text-slate-100 font-mono"></span>
+            </div>
             <div class="flex justify-between text-yellow-500 font-bold italic">
-                <span>Auto-Deadhead Factor</span>
+                <span>Auto-Deadhead Surcharge</span>
                 <span id="dh-label"></span>
             </div>
             <div class="flex justify-between">
@@ -140,33 +144,52 @@
             if (!uLat || !dLat) return;
             const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${uLon},${uLat};${dLon},${dLat}`);
             const data = await res.json();
+            if (data.code !== 'Ok') return;
+
             const dist = data.routes[0].distance / 1000;
             const mins = data.routes[0].duration / 60;
             
-            // Logic
-            let baseFare = 8.00 + (dist * 1.25);
-            let speed = dist / (mins / 60);
-            let trafficMult = speed < 25 ? 1.25 : 1.0;
+            // Core Formula Fundamentals
+            let baseRate = 8.00;
+            let perKmCost = 1.25;
+            let baseFare = baseRate + (dist * perKmCost);
             
+            // Traffic Index Analysis (Speed-to-Delay Ratio)
+            let speed = dist / (mins / 60);
+            let trafficMult = 1.0;
+            if (speed < 20) {
+                trafficMult = 1.35; // Severe Gridlock
+            } else if (speed < 40) {
+                trafficMult = 1.15; // Moderate urban congestion
+            }
+            
+            // Scheduling Peak Modifier
             let Sched = new Date(document.getElementById('schedule').value);
-            let hr = Sched.getHours(), day = Sched.getDay();
-            let peakMult = (day === 5 && hr >= 12) ? 1.25 : (((hr >= 7 && hr <= 10) || (hr >= 17 && hr <= 20)) ? 1.15 : 1.0);
+            let hr = Sched.getHours();
+            let day = Sched.getDay();
+            let peakMult = 1.0;
+            
+            if (day === 5 && hr >= 12) {
+                peakMult = 1.25; // Friday Afternoon Surge Priority
+            } else if ((hr >= 7 && hr <= 10) || (hr >= 17 && hr <= 20)) {
+                peakMult = 1.15; // Standard Daily Peak Window
+            }
 
+            // Boundary Crossings & Deadhead Index
             let dhMult = (dist > 80) ? 1.35 : 1.0;
 
-            // --- AUTO TOLL LOGIC ---
-            // Estimate RM 0.15 per KM for highway usage if trip > 20km
+            // Highway Toll Structuring
             let autoToll = dist > 20 ? (dist * 0.15) : 0;
             let manualToll = parseFloat(document.getElementById('tolls').value) || 0;
 
+            // Mathematical Aggregation
             let subtotal = (baseFare * trafficMult * peakMult * dhMult);
-            let final = subtotal + autoToll + manualToll;
+            let finalUnrounded = subtotal + autoToll + manualToll;
 
-            // --- ROUNDING CENT LOGIC ---
-            // Rounds to the nearest 0.10 (e.g., 80.26 becomes 80.30)
-            let roundedFinal = (Math.round(final * 10) / 10).toFixed(2);
+            // Currency Standardization Rounding Logic (10 Sen Precision)
+            let roundedFinal = (Math.round(finalUnrounded * 10) / 10).toFixed(2);
 
-            // UI
+            // Rendering Output to DOM
             markers.clearLayers();
             L.marker([uLat, uLon]).addTo(markers); L.marker([dLat, dLon]).addTo(markers);
             map.fitBounds(new L.featureGroup([L.marker([uLat, uLon]), L.marker([dLat, dLon])]).getBounds().pad(0.3));
@@ -174,10 +197,14 @@
             document.getElementById('result-card').classList.remove('hidden');
             document.getElementById('trip-type').innerText = dhMult > 1 ? "Long Distance / Interstate" : "Urban / Local Trip";
             document.getElementById('final-price').innerText = `RM ${roundedFinal}`;
-            document.getElementById('dist-label').innerText = `${dist.toFixed(1)}km / ${Math.round(mins)}m`;
-            document.getElementById('base-km-label').innerText = `RM ${baseFare.toFixed(2)}`;
-            document.getElementById('dh-label').innerText = dhMult > 1 ? "ACTIVE (+35%)" : "N/A";
-            document.getElementById('toll-label').innerText = `RM ${(autoToll + manualToll).toFixed(2)}`;
+            
+            // Formatted Sublabels Matching Verification Breakdown
+            let hoursText = mins >= 60 ? `${Math.floor(mins / 60)} hr ${Math.round(mins % 60)} mins` : `${Math.round(mins)} mins`;
+            document.getElementById('dist-label').innerText = `${dist.toFixed(1)} km / ${hoursText}`;
+            document.getElementById('base-km-label').innerText = `RM ${baseFare.toFixed(2)} (Base RM8 + RM1.25/km)`;
+            document.getElementById('peak-label').innerText = `x${(trafficMult * peakMult).toFixed(2)} (${Math.round(speed)} km/h avg)`;
+            document.getElementById('dh-label').innerText = dhMult > 1 ? "ACTIVE (+35% Interstate Recovery)" : "N/A (Local Zone)";
+            document.getElementById('toll-label').innerText = `RM ${(autoToll + manualToll).toFixed(2)} (Auto-estimated)`;
         }
 
         setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleString('en-MY'); }, 1000);
