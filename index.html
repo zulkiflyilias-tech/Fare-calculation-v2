@@ -10,11 +10,12 @@
     <style>
         #map { height: 200px; border-radius: 12px; margin-bottom: 15px; }
         .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans min-h-screen p-4">
 
-    <!-- Header -->
     <div class="flex justify-between items-center mb-6">
         <div>
             <h1 class="text-2xl font-black text-yellow-500 tracking-tight">FARE CALCULATOR</h1>
@@ -23,34 +24,31 @@
         <div id="status-dot" class="h-3 w-3 bg-green-500 rounded-full animate-pulse"></div>
     </div>
 
-    <!-- Map View -->
     <div id="map" class="shadow-2xl border border-slate-800"></div>
 
-    <!-- Input Section -->
     <div class="space-y-4">
         <div class="relative">
             <label class="text-[10px] font-bold text-slate-500 uppercase ml-2">Pickup Location</label>
             <div class="flex gap-2">
-                <input id="pickup" type="text" readonly class="w-full bg-slate-900 border border-slate-800 p-3 rounded-lg text-sm" placeholder="Getting GPS...">
-                <button onclick="getCurrentLocation()" class="bg-blue-600 px-4 rounded-lg">📍</button>
+                <input id="pickup" type="text" class="w-full bg-slate-900 border border-slate-800 p-3 rounded-lg text-sm" placeholder="Getting GPS address...">
+                <button onclick="getCurrentLocation()" class="bg-blue-600 px-4 rounded-lg active:bg-blue-700 transition-colors">📍</button>
             </div>
         </div>
 
         <div class="relative">
             <label class="text-[10px] font-bold text-slate-500 uppercase ml-2">Destination</label>
-            <input id="destination" type="text" oninput="searchLocation(this.value)" class="w-full bg-slate-900 border border-slate-800 p-3 rounded-lg text-sm" placeholder="Search Place (e.g. KLCC, Pavilion)">
-            <div id="search-results" class="absolute z-[1000] w-full bg-slate-800 rounded-b-lg shadow-xl max-h-40 overflow-y-auto mt-1"></div>
+            <input id="destination" type="text" oninput="searchLocation(this.value)" class="w-full bg-slate-900 border border-slate-800 p-3 rounded-lg text-sm" placeholder="Search Place (e.g. KLCC, Mydin)">
+            <div id="search-results" class="absolute z-[1000] w-full bg-slate-800 rounded-b-lg shadow-xl max-h-48 overflow-y-auto mt-1"></div>
         </div>
 
-        <!-- Premium Toggles -->
         <div class="grid grid-cols-2 gap-3">
             <div class="bg-slate-900 p-3 rounded-lg border border-slate-800 flex items-center justify-between">
-                <span class="text-xs">Deadhead/Rural</span>
+                <span class="text-xs font-semibold">Deadhead/Rural</span>
                 <input type="checkbox" id="deadhead-toggle" class="w-5 h-5 accent-yellow-500">
             </div>
             <div class="bg-slate-900 p-3 rounded-lg border border-slate-800 flex items-center justify-between">
-                <span class="text-xs">Tolls (Manual)</span>
-                <input type="number" id="tolls" class="w-12 bg-transparent text-right outline-none text-yellow-500" value="0.00">
+                <span class="text-xs font-semibold">Tolls (Manual)</span>
+                <input type="number" id="tolls" class="w-16 bg-transparent text-right outline-none text-yellow-500 font-bold" value="0.00" step="0.10">
             </div>
         </div>
 
@@ -59,23 +57,34 @@
         </button>
     </div>
 
-    <!-- Result Card -->
     <div id="result-card" class="hidden mt-6 p-6 rounded-2xl border-2 border-yellow-500/50 bg-gradient-to-b from-slate-900 to-slate-950 shadow-2xl">
         <div class="text-center">
-            <span class="text-slate-400 text-xs font-bold uppercase tracking-widest">Total Fare Estimate</span>
+            <span class="text-slate-400 text-xs font-bold uppercase tracking-widest">Final Price</span>
             <h2 id="final-price" class="text-6xl font-black text-white mt-2">RM 0.00</h2>
         </div>
         
-        <div class="mt-4 pt-4 border-t border-slate-800 space-y-2 text-sm text-slate-400">
-            <div class="flex justify-between"><span>Base + Distance</span><span id="dist-label">RM 0.00</span></div>
-            <div class="flex justify-between"><span>Traffic/Peak Adjustment</span><span id="peak-label">RM 0.00</span></div>
-            <div class="flex justify-between text-yellow-500 font-bold"><span>Zone/Deadhead Premium</span><span id="premium-label">RM 0.00</span></div>
-            <div class="flex justify-between"><span>Tolls</span><span id="toll-label">RM 0.00</span></div>
+        <div class="mt-4 pt-4 border-t border-slate-800 space-y-3 text-sm">
+            <div class="flex justify-between items-center text-slate-300">
+                <span>Distance & Time</span>
+                <span id="dist-label" class="font-bold text-slate-100">---</span>
+            </div>
+            <div class="flex justify-between items-center text-slate-400">
+                <span>Traffic/Peak Adjustment</span>
+                <span id="peak-label" class="text-slate-200">---</span>
+            </div>
+            <div class="flex justify-between items-center text-yellow-500 font-bold">
+                <span>Zone/Deadhead Premium</span>
+                <span id="premium-label">---</span>
+            </div>
+            <div class="flex justify-between items-center text-slate-400">
+                <span>Tolls</span>
+                <span id="toll-label" class="text-slate-200">RM 0.00</span>
+            </div>
         </div>
     </div>
 
     <script>
-        let map = L.map('map').setView([3.139, 101.686], 12);
+        let map = L.map('map', { zoomControl: false }).setView([3.139, 101.686], 12);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
         let userCoords = null;
@@ -90,25 +99,48 @@
             { name: "Mont Kiara", lat: 3.1651, lon: 101.6524 }
         ];
 
-        function getCurrentLocation() {
-            navigator.geolocation.getCurrentPosition(pos => {
+        // NEW: Get real address from Lat/Lon
+        async function getAddress(lat, lon) {
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`);
+                const data = await res.json();
+                // Return a concise address (Street name + City/Area)
+                const parts = data.display_name.split(',');
+                return parts.slice(0, 3).join(',');
+            } catch (e) {
+                return "Location Found";
+            }
+        }
+
+        async function getCurrentLocation() {
+            document.getElementById('pickup').value = "Locating...";
+            navigator.geolocation.getCurrentPosition(async (pos) => {
                 userCoords = [pos.coords.latitude, pos.coords.longitude];
                 map.setView(userCoords, 15);
                 markers.clearLayers();
                 L.marker(userCoords).addTo(markers).bindPopup("Pickup").openPopup();
-                document.getElementById('pickup').value = "Current Location Detected";
-            });
+                
+                const addr = await getAddress(pos.coords.latitude, pos.coords.longitude);
+                document.getElementById('pickup').value = addr;
+            }, (err) => {
+                document.getElementById('pickup').value = "GPS Access Denied";
+            }, { enableHighAccuracy: true });
         }
 
         async function searchLocation(query) {
             if (query.length < 3) return;
+            // Bias results towards Malaysia
             const res = await fetch(`https://photon.komoot.io/api/?q=${query}&lat=3.139&lon=101.686`);
             const data = await res.json();
             let html = '';
             data.features.forEach(f => {
+                const name = f.properties.name || "Unknown Place";
+                const city = f.properties.city || f.properties.state || "";
                 html += `<div class="p-3 border-b border-slate-700 hover:bg-slate-700 cursor-pointer text-xs" 
-                         onclick="selectDestination(${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}, '${f.properties.name}')">
-                         ${f.properties.name}, ${f.properties.city || ''}</div>`;
+                         onclick="selectDestination(${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}, '${name}')">
+                         <div class="font-bold">${name}</div>
+                         <div class="text-slate-400">${city}</div>
+                         </div>`;
             });
             document.getElementById('search-results').innerHTML = html;
         }
@@ -117,61 +149,82 @@
             destCoords = [lat, lon];
             document.getElementById('destination').value = name;
             document.getElementById('search-results').innerHTML = '';
-            L.marker(destCoords).addTo(markers).bindPopup("Destination").openPopup();
-            const group = new L.featureGroup([L.marker(userCoords), L.marker(destCoords)]);
-            map.fitBounds(group.getBounds().pad(0.5));
+            
+            // Marker logic
+            markers.clearLayers();
+            if(userCoords) L.marker(userCoords).addTo(markers);
+            L.marker(destCoords).addTo(markers).bindPopup(name).openPopup();
+            
+            if(userCoords) {
+                const group = new L.featureGroup([L.marker(userCoords), L.marker(destCoords)]);
+                map.fitBounds(group.getBounds().pad(0.3));
+            } else {
+                map.setView(destCoords, 14);
+            }
         }
 
         async function calculateFinalFare() {
-            if (!userCoords || !destCoords) return alert("Please set pickup and destination");
+            if (!userCoords || !destCoords) return alert("Please set pickup and destination first");
 
-            // 1. Get Route Data (OSRM - Free)
+            // Fetch Route from OSRM
             const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${userCoords[1]},${userCoords[0]};${destCoords[1]},${destCoords[0]}?overview=false`);
             const data = await res.json();
+            
+            if (data.code !== "Ok") return alert("Route calculation failed. Try another destination.");
+
             const distanceKm = data.routes[0].distance / 1000;
             const durationMin = data.routes[0].duration / 60;
 
-            // 2. Base Calculation (KL Rates)
+            // Logic Components
             let base = 10.00;
             let distCharge = distanceKm * 1.60;
             
-            // 3. Traffic Tier
+            // Traffic Multiplier based on speed
             let avgSpeed = distanceKm / (durationMin / 60);
             let trafficMult = 1.0;
             if (avgSpeed < 15) trafficMult = 1.35;
             else if (avgSpeed < 25) trafficMult = 1.20;
 
-            // 4. Peak Hour Check (7-10am, 5-8pm)
+            // Peak Hour Multiplier
             let now = new Date();
             let hour = now.getHours();
-            let peakMult = ( (hour >= 7 && hour <= 10) || (hour >= 17 && hour <= 20) ) ? 1.15 : 1.0;
+            let isPeak = ( (hour >= 7 && hour <= 10) || (hour >= 17 && hour <= 20) );
+            let peakMult = isPeak ? 1.15 : 1.0;
 
-            // 5. Zone Premium Check
+            // Zone Premium
             let zonePrem = 0;
             PREM_ZONES.forEach(z => {
                 let distToZone = L.latLng(destCoords).distanceTo([z.lat, z.lon]);
-                if (distToZone < 1000) zonePrem = 5.00;
+                if (distToZone < 1200) zonePrem = 5.00; // 1.2km radius
             });
 
-            // 6. Deadhead Recovery
-            let deadhead = document.getElementById('deadhead-toggle').checked ? 1.30 : 1.0;
+            // Deadhead Recovery
+            let deadheadMult = document.getElementById('deadhead-toggle').checked ? 1.35 : 1.0;
             let tolls = parseFloat(document.getElementById('tolls').value) || 0;
 
-            // FINAL MATH
-            let subtotal = (base + distCharge) * trafficMult * peakMult * deadhead;
+            // Total Calculation
+            let subtotal = (base + distCharge) * trafficMult * peakMult * deadheadMult;
             let finalTotal = subtotal + zonePrem + tolls;
 
-            // UI Update
+            // Update UI
             document.getElementById('result-card').classList.remove('hidden');
             document.getElementById('final-price').innerText = `RM ${finalTotal.toFixed(2)}`;
-            document.getElementById('dist-label').innerText = `RM ${(base + distCharge).toFixed(2)}`;
-            document.getElementById('peak-label').innerText = `x${(trafficMult * peakMult).toFixed(2)}`;
-            document.getElementById('premium-label').innerText = `+RM ${zonePrem + (subtotal * 0.3 - subtotal * 0)}`;
+            
+            // Updated Stats Breakdown
+            document.getElementById('dist-label').innerHTML = `<span class="text-blue-400 font-black">${distanceKm.toFixed(1)}km</span> / ${Math.round(durationMin)}m`;
+            
+            document.getElementById('peak-label').innerText = `x${(trafficMult * peakMult).toFixed(2)} (${Math.round(avgSpeed)}km/h)`;
+            
+            let premiumLabel = `+RM ${zonePrem.toFixed(2)}`;
+            if (deadheadMult > 1) premiumLabel += " (+35% DH)";
+            document.getElementById('premium-label').innerText = premiumLabel;
+            
             document.getElementById('toll-label').innerText = `RM ${tolls.toFixed(2)}`;
             
             window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
         }
 
+        // Auto-run on load
         getCurrentLocation();
     </script>
 </body>
