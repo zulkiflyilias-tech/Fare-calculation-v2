@@ -1,721 +1,329 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ms">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>Premium Sedan Engine - Fully Automated Core</title>
-  <!-- Tailwind & Leaflet (CDN) -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <style>
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    #map { aspect-ratio: 16 / 9; border-radius: 20px; filter: grayscale(0.1) contrast(1.05); }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Rideshare MY - Pengiraan Tambang Adil</title>
+    
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    /* Dropdown with proper z-index and scrolling */
-    .search-results {
-      position: absolute;
-      z-index: 999;
-      width: 100%;
-      background: #0f172a;
-      border: 1px solid #334155;
-      border-radius: 12px;
-      max-height: 220px;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.7);
-    }
-    .search-results::-webkit-scrollbar { width: 6px; }
-    .search-results::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-    .result-item {
-      padding: 0.75rem;
-      border-bottom: 1px solid #1e293b;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    .result-item:last-child { border-bottom: none; }
-    .result-item:hover,
-    .result-item.active { background: #1e293b; }
+    <style>
+        :root {
+            --primary: #0056b3;
+            --dark: #212529;
+            --light: #f8f9fa;
+            --success: #198754;
+        }
 
-    /* Toast notification */
-    #toast {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #1e293b;
-      color: #facc15;
-      padding: 0.75rem 1.5rem;
-      border-radius: 12px;
-      border: 1px solid #334155;
-      font-size: 0.9rem;
-      z-index: 9999;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.8);
-      transition: opacity 0.3s, transform 0.3s;
-      opacity: 0;
-      pointer-events: none;
-      max-width: 90%;
-    }
-    #toast.show {
-      opacity: 1;
-      pointer-events: auto;
-    }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--light);
+            color: var(--dark);
+        }
 
-    /* Loading spinner for map/route */
-    .spinner {
-      display: inline-block;
-      width: 16px;
-      height: 16px;
-      border: 2px solid #334155;
-      border-top-color: #10b981;
-      border-radius: 50%;
-      animation: spin 0.6s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #map {
+            flex: 1;
+            width: 100%;
+            min-height: 35vh;
+        }
+
+        .panel {
+            padding: 20px;
+            background: white;
+            box-shadow: 0 -3px 10px rgba(0,0,0,0.1);
+            border-radius: 16px 16px 0 0;
+            z-index: 1000;
+            max-height: 65vh;
+            overflow-y: auto;
+        }
+
+        h2 { margin-top: 0; font-size: 1.4rem; color: var(--primary); }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        /* Cadangan Autocomplete Dropdown */
+        .suggestions {
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            width: 100%;
+            z-index: 2000;
+            max-height: 200px;
+            overflow-y: auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 0 0 8px 8px;
+            display: none;
+        }
+
+        .suggestions div {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+
+        .suggestions div:hover { background-color: #f0f0f0; }
+
+        .btn {
+            width: 100%;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 14px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn:hover { background: #004085; }
+
+        .result-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e9ecef;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .fare-large {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--success);
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .details-table {
+            width: 100%;
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+
+        .details-table td { padding: 4px 0; }
+        .details-table td:last-child { text-align: right; font-weight: bold; }
+    </style>
 </head>
-<body class="bg-slate-950 text-slate-100 font-sans min-h-screen p-4 md:p-8 flex justify-center items-start">
+<body>
 
-  <!-- Toast container -->
-  <div id="toast"></div>
-
-  <div class="w-full max-w-xl space-y-4">
-
-    <!-- Header -->
-    <div class="flex justify-between items-center bg-slate-900/50 p-4 border border-slate-800 rounded-2xl">
-      <div>
-        <h1 class="text-xl font-black text-emerald-400 tracking-tighter">MALAYSIA PREMIUM SEDAN</h1>
-        <p class="text-[11px] text-slate-400">Zero Manual Selection • Automated Logic Core</p>
-      </div>
-      <div class="text-right">
-        <p id="clock" class="text-[10px] font-mono text-yellow-500 font-bold"></p>
-        <button onclick="app.reset()" class="text-[9px] text-slate-400 border border-slate-700 px-2 py-0.5 rounded uppercase mt-1 hover:bg-slate-800 transition">Reset</button>
-      </div>
-    </div>
-
-    <!-- Map -->
+<div class="container">
+    <!-- Paparan Peta -->
     <div id="map"></div>
 
-    <!-- Input card -->
-    <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-4 shadow-md relative z-30">
-
-      <!-- Pickup -->
-      <div class="relative space-y-1.5">
-        <label class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">📍 Pickup Location</label>
-        <div class="flex gap-2">
-          <input id="pickup" type="text"
-                 autocomplete="off"
-                 aria-autocomplete="list"
-                 role="combobox"
-                 aria-expanded="false"
-                 aria-controls="pickup-results"
-                 class="flex-1 bg-slate-950 border border-slate-800 p-3 rounded-xl text-sm outline-none focus:border-emerald-500 transition"
-                 placeholder="Type pickup location..." />
-          <button onclick="app.useGPS()" class="bg-emerald-600 hover:bg-emerald-500 px-4 rounded-xl active:scale-95 transition-all text-white font-bold text-xs shadow-lg">GPS</button>
+    <!-- Panel Kawalan / Input -->
+    <div class="panel">
+        <h2>Rideshare MY - Pengiraan Tambang Adil</h2>
+        
+        <!-- Lokasi Mula -->
+        <div class="input-group">
+            <label for="pickup">Lokasi Pengambilan (Pickup)</label>
+            <input type="text" id="pickup" placeholder="Cari lokasi mula..." autocomplete="off">
+            <div id="pickup-suggestions" class="suggestions"></div>
         </div>
-        <div id="pickup-results" class="search-results hidden" role="listbox"></div>
-        <div id="pickup-badge" class="text-[11px] text-slate-400 bg-slate-950/60 p-2 rounded-lg border border-slate-800/80 hidden flex justify-between"></div>
-      </div>
 
-      <!-- Swap -->
-      <div class="flex justify-center -my-2 relative z-40">
-        <button onclick="app.swap()" class="bg-slate-800 hover:bg-slate-700 p-2 rounded-full border border-slate-700 shadow-xl active:bg-emerald-500 active:text-black transition-all">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-            <path fill-rule="evenodd" d="M11.5 15a.5.5 0 0 0 .5-.5V2.707l3.146 3.147a.5.5 0 0 0 .708-.708l-4-4a.5.5 0 0 0-.708 0l-4 4a.5.5 0 1 0 .708.708L11 2.707V14.5a.5.5 0 0 0 .5-.5zm-7-14a.5.5 0 0 1 .5.5v11.793l3.146-3.147a.5.5 0 0 1 .708.708l-4 4a.5.5 0 0 1-.708 0l-4-4a.5.5 0 0 1 .708-.708L4 13.293V1.5a.5.5 0 0 1 .5-.5z"/>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Destination -->
-      <div class="relative space-y-1.5">
-        <label class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">🏁 Destination</label>
-        <input id="destination" type="text"
-               autocomplete="off"
-               aria-autocomplete="list"
-               role="combobox"
-               aria-expanded="false"
-               aria-controls="dest-results"
-               class="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl text-sm outline-none focus:border-emerald-500 transition"
-               placeholder="Type destination..." />
-        <div id="dest-results" class="search-results hidden" role="listbox"></div>
-        <div id="dest-badge" class="text-[11px] text-slate-400 bg-slate-950/60 p-2 rounded-lg border border-slate-800/80 hidden flex justify-between"></div>
-      </div>
-
-      <!-- Schedule & Tolls -->
-      <div class="grid grid-cols-2 gap-3 border-t border-slate-800/80 pt-3">
-        <div>
-          <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">📅 Booking Schedule</label>
-          <input id="schedule" type="datetime-local" class="w-full bg-slate-950 border border-slate-800 p-2 rounded-xl text-xs text-yellow-500 font-bold outline-none" />
+        <!-- Lokasi Tamat -->
+        <div class="input-group">
+            <label for="dropoff">Lokasi Destinasi (Dropoff)</label>
+            <input type="text" id="dropoff" placeholder="Cari destinasi..." autocomplete="off">
+            <div id="dropoff-suggestions" class="suggestions"></div>
         </div>
-        <div>
-          <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">🛣️ Manual Toll Adjustments</label>
-          <div class="bg-slate-950 border border-slate-800 p-2 rounded-xl flex items-center px-3">
-            <span class="text-[11px] text-slate-600 font-bold mr-1">RM</span>
-            <input id="tolls" type="number" min="0" step="0.50" class="w-full bg-transparent text-right text-xs font-mono font-bold text-slate-200 outline-none" value="0.00" />
-          </div>
+
+        <!-- Tetapan Faktor Trafik / Masa Realiti -->
+        <div class="input-group">
+            <label for="traffic">Keadaan Trafik Semasa (Multiplier)</label>
+            <select id="traffic">
+                <option value="1.0">Lancar (1.0x)</option>
+                <option value="1.2">Kesesakan Sederhana (1.2x)</option>
+                <option value="1.5">Kesesakan Tinggi / Waktu Puncak (1.5x)</option>
+                <option value="2.0">Kesesakan Melampau / Hujan Lebat (2.0x)</option>
+            </select>
         </div>
-      </div>
+
+        <button class="btn" onclick="kiraTambang()">Kira Estimasi Tambang</button>
+
+        <!-- Paparan Keputusan Matematik Sebenar -->
+        <div id="result" class="result-box">
+            <label>Estimasi Tambang Adil (Kos Sebenar):</label>
+            <div class="fare-large" id="total-fare">RM0.00</div>
+            
+            <table class="details-table">
+                <tr><td>Jarak Anggaran:</td><td id="res-distance">0.0 km</td></tr>
+                <tr><td>Masa Anggaran:</td><td id="res-time">0 minit</td></tr>
+                <tr style="border-top: 1px solid #ccc;"><td colspan="2"><b>Pecahan Kos Komponen:</b></td></tr>
+                <tr><td>Tambang Asas (Base):</td><td id="res-base">RM8.00</td></tr>
+                <tr><td>Kos Jarak (RM1.50/km):</td><td id="res-dist-cost">RM0.00</td></tr>
+                <tr><td>Kos Masa (RM0.40/min):</td><td id="res-time-cost">RM0.00</td></tr>
+                <tr><td>Faktor Lonjakan (Surge):</td><td id="res-surge">1.0x</td></tr>
+            </table>
+        </div>
     </div>
+</div>
 
-    <!-- Result card -->
-    <div id="result-card" class="hidden p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-black border border-slate-800 shadow-2xl space-y-4">
-      <div class="text-center pb-2 border-b border-slate-800/60">
-        <p id="trip-type" class="text-[10px] font-black text-sky-400 uppercase tracking-widest mb-0.5"></p>
-        <h2 id="final-price" class="text-6xl font-black text-white tracking-tighter">RM 0.00</h2>
-        <p class="text-[9px] text-slate-500 mt-0.5 uppercase tracking-wider">Regulated Fare (Rounded to nearest 10 sen)</p>
-      </div>
-      <div class="space-y-2.5 text-xs">
-        <div class="flex justify-between items-center"><span class="text-slate-500 font-medium">Distance & Duration Matrix</span><span id="dist-label" class="text-slate-200 font-mono font-bold"></span></div>
-        <div class="flex justify-between items-center"><span class="text-slate-500 font-medium">Base Fare Plan</span><span id="base-km-label" class="text-slate-200 font-mono"></span></div>
-        <div class="flex justify-between items-center"><span class="text-slate-500 font-medium">Schedule Multiplier Status</span><span id="peak-label" class="text-slate-200 font-mono"></span></div>
-        <div class="flex justify-between items-center text-emerald-400"><span class="font-medium">Operator Commission Fee (10%)</span><span id="operator-label" class="font-mono"></span></div>
-        <div class="flex justify-between items-center"><span class="text-slate-500 font-medium">Dynamic Highway Toll Infrastructure</span><span id="toll-label" class="text-teal-400 font-mono font-bold"></span></div>
-        <div id="guarantee-row" class="flex justify-between items-center text-amber-500 font-medium hidden"><span>⭐ Minimum Fare Floor Correction</span><span id="guarantee-label" class="font-mono font-bold"></span></div>
-      </div>
-    </div>
-  </div>
+<script>
+    // 1. Inisialisasi Peta - Fokus Semenanjung Malaysia (Kuala Lumpur)
+    const map = L.map('map').setView([3.1390, 101.6869], 8);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
 
-  <script>
-    // ============================================================
-    //  CONFIGURATION
-    // ============================================================
-    const CONFIG = {
-      baseDistanceRate: 1.25,          // RM per km
-      distanceBuffer: 5.0,             // fixed system offset (km)
-      shortTripLimit: 2.0,             // km
-      shortTripMinFare: 8.00,          // RM
-      operatorFeePercent: 0.10,        // 10% of base fare
-      peakWindows: [                   // {day: 0=Sun, 5=Fri, etc.}
-        { day: 5, start: 12.0, end: 15.0, multiplier: 1.20, label: "Friday Rush (+20%)" },
-        { day: 0, start: 6.5, end: 9.5, multiplier: 1.20, label: "Weekday Morning Peak (+20%)" },
-        { day: 0, start: 17.0, end: 20.5, multiplier: 1.20, label: "Weekday Evening Peak (+20%)" }
-      ],
-      geocodingDebounce: 300,          // ms
-      routingDebounce: 400,
-      cacheTTL: 5 * 60 * 1000,         // 5 minutes
-      defaultLat: 4.2105,
-      defaultLon: 101.9758,
-      defaultZoom: 6
-    };
+    let pickupMarker, dropoffMarker, routeLine;
+    let pickupCoords = null, dropoffCoords = null;
 
-    // ============================================================
-    //  STATE
-    // ============================================================
-    const state = {
-      pickup: { lat: null, lon: null, address: '', geoData: null },
-      destination: { lat: null, lon: null, address: '', geoData: null },
-      distance: null,      // km
-      duration: null,      // minutes
-      routeFetched: false,
-      map: null,
-      routeLayer: null,
-      markers: null,
-      geocodingCache: new Map(),
-      abortController: null,
-      routeAbortController: null,
-      isRouting: false
-    };
+    // Tetapan Struktur Kos Cadangan Sebenar
+    const KADAR_BASE = 8.00;
+    const KADAR_KM = 1.50;
+    const KADAR_MINIT = 0.40;
 
-    // ============================================================
-    //  SERVICES (Geocoder, Router, FareCalculator)
-    // ============================================================
-    const Geocoder = {
-      // Photon (search)
-      async search(query, lat = CONFIG.defaultLat, lon = CONFIG.defaultLon) {
-        const key = `search:${query}:${lat}:${lon}`;
-        const cached = state.geocodingCache.get(key);
-        if (cached && (Date.now() - cached.timestamp < CONFIG.cacheTTL)) {
-          return cached.data;
-        }
-        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=${lat}&lon=${lon}&limit=5`;
-        const resp = await fetch(url);
-        if (!resp.ok) throw new Error(`Geocoding HTTP ${resp.status}`);
-        const data = await resp.json();
-        state.geocodingCache.set(key, { data, timestamp: Date.now() });
-        return data;
-      },
+    // 2. Integrasi Geocoding Menggunakan Photon API (Percuma & Pantas)
+    setupAutocomplete('pickup', 'pickup-suggestions', (coords) => {
+        pickupCoords = coords;
+        if (pickupMarker) map.removeLayer(pickupMarker);
+        pickupMarker = L.marker([coords.lat, coords.lon], {draggable: false}).addTo(map).bindPopup("Pickup").openPopup();
+        kemaskiniPandanganPeta();
+    });
 
-      // Nominatim reverse
-      async reverse(lat, lon) {
-        const key = `reverse:${lat}:${lon}`;
-        const cached = state.geocodingCache.get(key);
-        if (cached && (Date.now() - cached.timestamp < CONFIG.cacheTTL)) {
-          return cached.data;
-        }
-        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
-        const resp = await fetch(url);
-        if (!resp.ok) throw new Error(`Reverse geocoding HTTP ${resp.status}`);
-        const data = await resp.json();
-        state.geocodingCache.set(key, { data, timestamp: Date.now() });
-        return data;
-      }
-    };
+    setupAutocomplete('dropoff', 'dropoff-suggestions', (coords) => {
+        dropoffCoords = coords;
+        if (dropoffMarker) map.removeLayer(dropoffMarker);
+        dropoffMarker = L.marker([coords.lat, coords.lon], {draggable: false}).addTo(map).bindPopup("Dropoff").openPopup();
+        kemaskiniPandanganPeta();
+    });
 
-    const Router = {
-      async route(lat1, lon1, lat2, lon2) {
-        // Cancel previous route request
-        if (state.routeAbortController) {
-          state.routeAbortController.abort();
-        }
-        state.routeAbortController = new AbortController();
-        const url = `https://router.project-osrm.org/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`;
-        const resp = await fetch(url, { signal: state.routeAbortController.signal });
-        if (!resp.ok) throw new Error(`Routing HTTP ${resp.status}`);
-        const data = await resp.json();
-        if (data.code !== 'Ok' || !data.routes || data.routes.length === 0) {
-          throw new Error('No route found');
-        }
-        return data.routes[0];
-      }
-    };
+    function setupAutocomplete(inputId, suggestionsId, onSelect) {
+        const input = document.getElementById(inputId);
+        const suggestionsBox = document.getElementById(suggestionsId);
 
-    const FareCalculator = {
-      // Return object with all components
-      compute({ distance, duration, tolls, schedule }) {
-        const baseDist = parseFloat(distance) || 0;
-        const dur = parseFloat(duration) || 0;
-        const toll = Math.max(0, parseFloat(tolls) || 0);
+        input.addEventListener('input', debounce(async function() {
+            const query = input.value;
+            if (query.length < 3) { suggestionsBox.style.display = 'none'; return; }
 
-        // 1. Payable distance (distance + buffer)
-        const payableDist = baseDist + CONFIG.distanceBuffer;
+            // Menghadkan carian geocoding sekitar Malaysia sahaja (Semenanjung fokus)
+            const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&bias={{101.68,3.13}}&limit=5`;
+            
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                suggestionsBox.innerHTML = '';
+                
+                // Tapis entiti yang berada dalam radius Malaysia sahaja
+                const myFeatures = data.features.filter(f => f.properties.countrycode === 'MY');
 
-        // 2. Base fare (distance rate)
-        const baseFare = payableDist * CONFIG.baseDistanceRate;
+                if(myFeatures.length === 0) { suggestionsBox.style.display = 'none'; return; }
 
-        // 3. Peak multiplier based on schedule
-        let multiplier = 1.0;
-        let peakLabel = "Standard Rate (0%)";
-        if (schedule) {
-          const dt = new Date(schedule);
-          const hour = dt.getHours() + dt.getMinutes() / 60;
-          const day = dt.getDay(); // 0=Sun, 1=Mon, ...
-          for (const win of CONFIG.peakWindows) {
-            if (win.day === day || (win.day === 0 && day >= 1 && day <= 5)) {
-              if (hour >= win.start && hour <= win.end) {
-                multiplier = win.multiplier;
-                peakLabel = win.label;
-                break;
-              }
+                myFeatures.forEach(feature => {
+                    const props = feature.properties;
+                    const name = `${props.name || ''} ${props.street || ''} ${props.city || ''}`.trim();
+                    const div = document.createElement('div');
+                    div.textContent = name;
+                    div.onclick = () => {
+                        input.value = name;
+                        suggestionsBox.style.display = 'none';
+                        onSelect({ lat: feature.geometry.coordinates[1], lon: feature.geometry.coordinates[0] });
+                    };
+                    suggestionsBox.appendChild(div);
+                });
+                suggestionsBox.style.display = 'block';
+            } catch (err) {
+                console.error("Ralat Geocoding:", err);
             }
-          }
-        }
-
-        // 4. Journey fare = baseFare * multiplier
-        const journeyFare = baseFare * multiplier;
-
-        // 5. Operator commission (on base fare before multiplier)
-        const operatorFee = baseFare * CONFIG.operatorFeePercent;
-
-        // 6. Subtotal before floor
-        let subtotal = journeyFare + toll;
-
-        // 7. Short trip floor
-        let floorCorrection = 0;
-        if (baseDist < CONFIG.shortTripLimit && subtotal < CONFIG.shortTripMinFare) {
-          floorCorrection = CONFIG.shortTripMinFare - subtotal;
-          subtotal = CONFIG.shortTripMinFare;
-        }
-
-        // 8. Round to nearest 10 sen (0.10)
-        const finalFare = Math.round(subtotal * 10) / 10;
-
-        return {
-          baseDist,
-          duration: dur,
-          payableDist,
-          baseFare,
-          multiplier,
-          peakLabel,
-          journeyFare,
-          operatorFee,
-          toll,
-          floorCorrection,
-          subtotal,
-          finalFare
-        };
-      }
-    };
-
-    // ============================================================
-    //  GEOMATCHING (Zone detection)
-    // ============================================================
-    const GEOFENCES = [
-      { name: "Kuala Lumpur (Dense Urban)", code: "KL", bounds: [[3.03, 101.60], [3.24, 101.76]] },
-      { name: "Putrajaya Core Zone", code: "Putrajaya", bounds: [[2.86, 101.65], [2.98, 101.73]] },
-      { name: "Genting Highlands (Premium Resort)", code: "Pahang", bounds: [[3.39, 101.75], [3.45, 101.81]] },
-      { name: "Selangor Premium Core (Zone 1)", code: "Selangor", bounds: [[2.92, 101.45], [3.31, 101.75]] },
-      { name: "Penang Island Hub", code: "Penang", bounds: [[5.20, 100.16], [5.50, 100.32]] },
-      { name: "Iskandar Malaysia Zone (JB)", code: "Johor", bounds: [[1.40, 103.55], [1.65, 103.85]] }
-    ];
-
-    const STATE_FALLBACK = {
-      "selangor": { code: "Selangor", name: "Selangor" },
-      "kuala lumpur": { code: "KL", name: "Kuala Lumpur" },
-      "johor": { code: "Johor", name: "Johor" },
-      "penang": { code: "Penang", name: "Penang" },
-      "pulau pinang": { code: "Penang", name: "Penang" },
-      "pahang": { code: "Pahang", name: "Pahang" },
-      "negeri sembilan": { code: "Negeri Sembilan", name: "Negeri Sembilan" },
-      "melaka": { code: "Melaka", name: "Melaka" },
-      "perak": { code: "Perak", name: "Perak" },
-      "kedah": { code: "Kedah", name: "Kedah" }
-    };
-
-    function geomatch(lat, lon, stateStr) {
-      for (const zone of GEOFENCES) {
-        const b = zone.bounds;
-        if (lat >= b[0][0] && lat <= b[1][0] && lon >= b[0][1] && lon <= b[1][1]) {
-          return { code: zone.code, name: zone.name };
-        }
-      }
-      const cleaned = (stateStr || "").toLowerCase().trim();
-      for (const key in STATE_FALLBACK) {
-        if (cleaned.includes(key)) {
-          return STATE_FALLBACK[key];
-        }
-      }
-      return { code: "MY_ZONE", name: "Standard Territory" };
+        }, 400));
     }
 
-    // ============================================================
-    //  APP CONTROLLER
-    // ============================================================
-    const app = {
-      // ---- Init ----
-      init() {
-        // Map
-        const map = L.map('map', { zoomControl: false })
-          .setView([CONFIG.defaultLat, CONFIG.defaultLon], CONFIG.defaultZoom);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
-        state.map = map;
-        state.markers = L.layerGroup().addTo(map);
-        state.routeLayer = L.layerGroup().addTo(map);
+    function debounce(func, delay) {
+        let timer;
+        return function() {
+            clearTimeout(timer);
+            timer = setTimeout(() => func.apply(this, arguments), delay);
+        };
+    }
 
-        // Set schedule default
-        this.setDefaultSchedule();
-
-        // Clock
-        this.updateClock();
-        setInterval(() => this.updateClock(), 1000);
-
-        // Input events
-        const pickupInput = document.getElementById('pickup');
-        const destInput = document.getElementById('destination');
-        pickupInput.addEventListener('input', (e) => this.handleTyping('pickup', e.target.value));
-        destInput.addEventListener('input', (e) => this.handleTyping('dest', e.target.value));
-        pickupInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.autoSelectFirst('pickup'); });
-        destInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.autoSelectFirst('dest'); });
-
-        // Toll & schedule change
-        document.getElementById('tolls').addEventListener('input', () => this.runFare());
-        document.getElementById('schedule').addEventListener('change', () => this.runFare());
-
-        // Initial GPS attempt
-        setTimeout(() => this.useGPS(true), 500);
-      },
-
-      // ---- Clock ----
-      updateClock() {
-        document.getElementById('clock').textContent =
-          new Date().toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' }) + ' (MYT)';
-      },
-
-      setDefaultSchedule() {
-        const el = document.getElementById('schedule');
-        const now = new Date();
-        const tzOffset = now.getTimezoneOffset() * 60000;
-        const localISOTime = (new Date(now.getTime() - tzOffset)).toISOString().slice(0, 16);
-        el.value = localISOTime;
-      },
-
-      // ---- Toast ----
-      showToast(msg, duration = 3000) {
-        const el = document.getElementById('toast');
-        el.textContent = msg;
-        el.classList.add('show');
-        clearTimeout(this._toastTimer);
-        this._toastTimer = setTimeout(() => el.classList.remove('show'), duration);
-      },
-
-      // ---- Geocoding & Search ----
-      handleTyping(mode, value) {
-        // Clear previous location data if typing
-        if (mode === 'pickup') {
-          state.pickup.lat = null; state.pickup.lon = null; state.pickup.geoData = null;
-          document.getElementById('pickup-badge').classList.add('hidden');
-        } else {
-          state.destination.lat = null; state.destination.lon = null; state.destination.geoData = null;
-          document.getElementById('dest-badge').classList.add('hidden');
+    function kemaskiniPandanganPeta() {
+        if (pickupCoords && dropoffCoords) {
+            const bounds = L.latLngBounds([pickupCoords.lat, pickupCoords.lon], [dropoffCoords.lat, dropoffCoords.lon]);
+            map.fitBounds(bounds, { padding: [50, 50] });
+        } else if (pickupCoords) {
+            map.setView([pickupCoords.lat, pickupCoords.lon], 14);
         }
-        document.getElementById('result-card').classList.add('hidden');
+    }
 
-        clearTimeout(this._typingTimer);
-        this._typingTimer = setTimeout(() => {
-          this.searchLocations(mode, value);
-        }, CONFIG.geocodingDebounce);
-      },
-
-      async searchLocations(mode, query) {
-        const container = document.getElementById(`${mode}-results`);
-        if (query.length < 3) {
-          container.classList.add('hidden');
-          return;
-        }
-        try {
-          const data = await Geocoder.search(query, CONFIG.defaultLat, CONFIG.defaultLon);
-          if (!data.features || data.features.length === 0) {
-            container.classList.add('hidden');
+    // 3. Logik Simulasi Pengiraan Menggunakan Rumus Matematik Betul (Darab)
+    async function kiraTambang() {
+        if (!pickupCoords || !dropoffCoords) {
+            alert("Sila pilih lokasi Pickup dan Dropoff yang sah terlebih dahulu.");
             return;
-          }
-          container.innerHTML = '';
-          data.features.forEach((feature, index) => {
-            const props = feature.properties;
-            const name = props.name || 'Unknown';
-            const context = [props.street, props.city, props.state, props.country].filter(Boolean).join(', ');
-            const item = document.createElement('div');
-            item.className = 'result-item';
-            item.setAttribute('role', 'option');
-            item.setAttribute('data-index', index);
-            // Use textContent to avoid XSS
-            const nameSpan = document.createElement('div');
-            nameSpan.className = 'font-bold text-yellow-500';
-            nameSpan.textContent = name;
-            const ctxSpan = document.createElement('div');
-            ctxSpan.className = 'text-[10px] text-slate-400 mt-0.5';
-            ctxSpan.textContent = context;
-            item.appendChild(nameSpan);
-            item.appendChild(ctxSpan);
-            item.addEventListener('click', () => {
-              const lat = feature.geometry.coordinates[1];
-              const lon = feature.geometry.coordinates[0];
-              const state = props.state || props.city || '';
-              this.selectLocation(mode, lat, lon, name, state);
-            });
-            container.appendChild(item);
-          });
-          container.classList.remove('hidden');
-          container.setAttribute('aria-expanded', 'true');
-        } catch (err) {
-          console.error('Geocoding error:', err);
-          this.showToast('Could not fetch suggestions. Please try again.');
-          container.classList.add('hidden');
-        }
-      },
-
-      autoSelectFirst(mode) {
-        const container = document.getElementById(`${mode}-results`);
-        const first = container.querySelector('.result-item');
-        if (first) first.click();
-      },
-
-      async selectLocation(mode, lat, lon, label, stateStr) {
-        // Close dropdowns
-        document.getElementById('pickup-results').classList.add('hidden');
-        document.getElementById('dest-results').classList.add('hidden');
-
-        const geo = geomatch(lat, lon, stateStr);
-        const input = document.getElementById(mode === 'pickup' ? 'pickup' : 'destination');
-        input.value = label;
-
-        if (mode === 'pickup') {
-          state.pickup.lat = lat;
-          state.pickup.lon = lon;
-          state.pickup.geoData = geo;
-          state.pickup.address = label;
-        } else {
-          state.destination.lat = lat;
-          state.destination.lon = lon;
-          state.destination.geoData = geo;
-          state.destination.address = label;
         }
 
-        this.updateBadges();
-        // If both locations are set, route
-        if (state.pickup.lat && state.destination.lat) {
-          await this.fetchRoute();
-        }
-      },
+        // Pengiraan jarak lurus Haversine sebagai fallback pantas/estimasi asas
+        const jarakKm = kiraJarakHaversine(pickupCoords.lat, pickupCoords.lon, dropoffCoords.lat, dropoffCoords.lon) * 1.3; // Tambah faktor 30% jalan raya melengkung
+        
+        // Anggaran masa pemanduan (Purata kelajuan bandar 40km/j)
+        const masaMinit = (jarakKm / 40) * 60;
 
-      updateBadges() {
-        const pBadge = document.getElementById('pickup-badge');
-        const dBadge = document.getElementById('dest-badge');
-        if (state.pickup.geoData && state.pickup.geoData.name) {
-          pBadge.innerHTML = `<span><strong>Region:</strong> ${state.pickup.geoData.name}</span> <span class="text-emerald-400 font-mono">System Active</span>`;
-          pBadge.classList.remove('hidden');
-        } else {
-          pBadge.classList.add('hidden');
-        }
-        if (state.destination.geoData && state.destination.geoData.name) {
-          dBadge.innerHTML = `<span><strong>Region:</strong> ${state.destination.geoData.name}</span> <span class="text-emerald-400 font-mono">System Active</span>`;
-          dBadge.classList.remove('hidden');
-        } else {
-          dBadge.classList.add('hidden');
-        }
-      },
+        // Ambil Nilai Multiplier dari UI
+        const multiplier = parseFloat(document.getElementById('traffic').value);
 
-      // ---- GPS ----
-      useGPS(initial = false) {
-        if (!navigator.geolocation) {
-          if (initial) document.getElementById('pickup').placeholder = 'Type pickup location...';
-          this.showToast('GPS not available. Please type your location.');
-          return;
-        }
-        navigator.geolocation.getCurrentPosition(
-          async (pos) => {
-            const lat = pos.coords.latitude;
-            const lon = pos.coords.longitude;
-            try {
-              const data = await Geocoder.reverse(lat, lon);
-              if (data && data.address) {
-                const road = data.address.road || data.address.suburb || data.address.town || 'Current Location';
-                const state = data.address.state || '';
-                const label = `${road}${state ? ', ' + state : ''}`;
-                this.selectLocation('pickup', lat, lon, label, state);
-              } else {
-                this.selectLocation('pickup', lat, lon, 'GPS Location', '');
-              }
-            } catch (err) {
-              console.error('Reverse geocoding error:', err);
-              this.selectLocation('pickup', lat, lon, 'GPS Location', '');
-              this.showToast('Could not get address from GPS, using coordinates.');
-            }
-          },
-          (err) => {
-            console.warn('GPS error:', err);
-            if (initial) document.getElementById('pickup').placeholder = 'Type pickup location...';
-            this.showToast('GPS permission denied. Please type your location.');
-          },
-          { enableHighAccuracy: true, timeout: 8000 }
-        );
-      },
+        // FORMULA BETUL (Logik Pendaraban Mengikut Pembetulan Kesilapan Fail Infografik)
+        const kosJarak = jarakKm * KADAR_KM;
+        const kosMasa = masaMinit * KADAR_MINIT;
+        const totalFare = (KADAR_BASE + kosJarak + kosMasa) * multiplier;
 
-      // ---- Swap ----
-      swap() {
-        const pInput = document.getElementById('pickup');
-        const dInput = document.getElementById('destination');
-        const tempVal = pInput.value;
-        pInput.value = dInput.value;
-        dInput.value = tempVal;
+        // Visualisasikan garisan arah mudah pada peta
+        if (routeLine) map.removeLayer(routeLine);
+        routeLine = L.polyline([[pickupCoords.lat, pickupCoords.lon], [dropoffCoords.lat, dropoffCoords.lon]], {color: 'blue', weight: 4}).addTo(map);
 
-        // Swap state
-        const temp = state.pickup;
-        state.pickup = state.destination;
-        state.destination = temp;
+        // Paparkan Keputusan Pada Skrin
+        document.getElementById('total-fare').textContent = `RM${totalFare.toFixed(2)}`;
+        document.getElementById('res-distance').textContent = `${jarakKm.toFixed(1)} km`;
+        document.getElementById('res-time').textContent = `${Math.round(masaMinit)} minit`;
+        document.getElementById('res-dist-cost').textContent = `RM${kosJarak.toFixed(2)}`;
+        document.getElementById('res-time-cost').textContent = `RM${kosMasa.toFixed(2)}`;
+        document.getElementById('res-surge').textContent = `${multiplier}x`;
+        
+        document.getElementById('result').style.display = 'block';
+    }
 
-        this.updateBadges();
-        if (state.pickup.lat && state.destination.lat) {
-          this.fetchRoute();
-        } else {
-          state.routeLayer.clearLayers();
-          state.markers.clearLayers();
-          document.getElementById('result-card').classList.add('hidden');
-        }
-      },
+    // Rumus Matematik Tulen Trigonometri untuk Estimasi Jarak Geografi
+    function kiraJarakHaversine(lat1, lon1, lat2, lon2) {
+        const R = 6371; // Radius bumi dalam KM
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+</script>
 
-      // ---- Routing ----
-      async fetchRoute() {
-        const p = state.pickup;
-        const d = state.destination;
-        if (!p.lat || !d.lat) return;
-
-        state.isRouting = true;
-        // Show loading on map (optional)
-        try {
-          const route = await Router.route(p.lat, p.lon, d.lat, d.lon);
-          state.distance = route.distance / 1000; // km
-          state.duration = route.duration / 60; // minutes
-          state.routeFetched = true;
-
-          // Update map
-          state.markers.clearLayers();
-          state.routeLayer.clearLayers();
-          L.marker([p.lat, p.lon]).addTo(state.markers);
-          L.marker([d.lat, d.lon]).addTo(state.markers);
-          const polyline = L.geoJSON(route.geometry, { color: '#10b981', weight: 5, opacity: 0.75 })
-            .addTo(state.routeLayer);
-          state.map.fitBounds(polyline.getBounds().pad(0.2));
-
-          this.runFare();
-        } catch (err) {
-          if (err.name === 'AbortError') return; // ignore
-          console.error('Routing error:', err);
-          this.showToast('Could not calculate route. Please try again.');
-          state.routeFetched = false;
-          state.distance = null;
-          state.duration = null;
-        } finally {
-          state.isRouting = false;
-        }
-      },
-
-      // ---- Fare Calculation ----
-      runFare() {
-        if (!state.routeFetched || state.distance === null) return;
-        const distance = state.distance;
-        const duration = state.duration;
-        const tolls = parseFloat(document.getElementById('tolls').value) || 0;
-        const schedule = document.getElementById('schedule').value;
-
-        const result = FareCalculator.compute({ distance, duration, tolls, schedule });
-
-        // Update UI
-        document.getElementById('result-card').classList.remove('hidden');
-        document.getElementById('trip-type').textContent =
-          (result.baseDist < CONFIG.shortTripLimit) ? "Short Radius Floor Protected Route" : "Standard Engine Territory Route";
-        document.getElementById('final-price').textContent = `RM ${result.finalFare.toFixed(2)}`;
-
-        const durLabel = result.duration >= 60 ?
-          `${Math.floor(result.duration / 60)} hr ${Math.round(result.duration % 60)} mins` :
-          `${Math.round(result.duration)} mins`;
-        document.getElementById('dist-label').textContent =
-          `${result.baseDist.toFixed(2)} km (+${CONFIG.distanceBuffer}km system offset) / ${durLabel}`;
-        document.getElementById('base-km-label').textContent =
-          `RM ${CONFIG.baseDistanceRate.toFixed(2)}/km (Total calculated distance: ${result.payableDist.toFixed(2)} km)`;
-        document.getElementById('peak-label').textContent =
-          `${result.peakLabel} [x${result.multiplier.toFixed(2)}]`;
-        document.getElementById('operator-label').textContent =
-          `RM ${result.operatorFee.toFixed(2)} (Assessed from Base)`;
-        document.getElementById('toll-label').textContent =
-          `RM ${result.toll.toFixed(2)}`;
-
-        const guaranteeRow = document.getElementById('guarantee-row');
-        const guaranteeLabel = document.getElementById('guarantee-label');
-        if (result.floorCorrection > 0) {
-          guaranteeLabel.textContent = `Floor Match (+RM ${result.floorCorrection.toFixed(2)})`;
-          guaranteeRow.classList.remove('hidden');
-        } else {
-          guaranteeRow.classList.add('hidden');
-        }
-      },
-
-      // ---- Reset ----
-      reset() {
-        document.getElementById('pickup').value = '';
-        document.getElementById('destination').value = '';
-        document.getElementById('pickup-badge').classList.add('hidden');
-        document.getElementById('dest-badge').classList.add('hidden');
-        document.getElementById('tolls').value = '0.00';
-        document.getElementById('result-card').classList.add('hidden');
-        document.getElementById('guarantee-row').classList.add('hidden');
-
-        state.pickup = { lat: null, lon: null, address: '', geoData: null };
-        state.destination = { lat: null, lon: null, address: '', geoData: null };
-        state.distance = null;
-        state.duration = null;
-        state.routeFetched = false;
-        state.markers.clearLayers();
-        state.routeLayer.clearLayers();
-        state.map.setView([CONFIG.defaultLat, CONFIG.defaultLon], CONFIG.defaultZoom);
-        this.setDefaultSchedule();
-        // Optionally re-attempt GPS
-        this.useGPS(false);
-      }
-    };
-
-    // ============================================================
-    //  BOOT
-    // ============================================================
-    document.addEventListener('DOMContentLoaded', () => app.init());
-  </script>
 </body>
 </html>
