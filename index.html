@@ -1,509 +1,721 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Premium Sedan Engine - Fully Automated Core</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <style>
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        #map { height: 240px; border-radius: 20px; filter: grayscale(0.1) contrast(1.05); }
-        
-        /* Mobile Pointer Event Overlay Fix */
-        .search-results { 
-            position: absolute; 
-            z-index: 50; 
-            width: 100%; 
-            background: #0f172a; 
-            border: 1px solid #334155; 
-            border-radius: 12px; 
-            max-height: 220px; 
-            overflow-y: auto; 
-            -webkit-overflow-scrolling: touch;
-        }
-        .search-results::-webkit-scrollbar { width: 6px; }
-        .search-results::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Premium Sedan Engine - Fully Automated Core</title>
+  <!-- Tailwind & Leaflet (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    #map { aspect-ratio: 16 / 9; border-radius: 20px; filter: grayscale(0.1) contrast(1.05); }
+
+    /* Dropdown with proper z-index and scrolling */
+    .search-results {
+      position: absolute;
+      z-index: 999;
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      max-height: 220px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+    }
+    .search-results::-webkit-scrollbar { width: 6px; }
+    .search-results::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    .result-item {
+      padding: 0.75rem;
+      border-bottom: 1px solid #1e293b;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .result-item:last-child { border-bottom: none; }
+    .result-item:hover,
+    .result-item.active { background: #1e293b; }
+
+    /* Toast notification */
+    #toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1e293b;
+      color: #facc15;
+      padding: 0.75rem 1.5rem;
+      border-radius: 12px;
+      border: 1px solid #334155;
+      font-size: 0.9rem;
+      z-index: 9999;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.8);
+      transition: opacity 0.3s, transform 0.3s;
+      opacity: 0;
+      pointer-events: none;
+      max-width: 90%;
+    }
+    #toast.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Loading spinner for map/route */
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #334155;
+      border-top-color: #10b981;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans min-h-screen p-4 md:p-8 flex justify-center items-start">
 
-    <div class="w-full max-w-xl space-y-4">
-        
-        <div class="flex justify-between items-center bg-slate-900/50 p-4 border border-slate-800 rounded-2xl">
-            <div>
-                <h1 class="text-xl font-black text-emerald-400 tracking-tighter">MALAYSIA PREMIUM SEDAN</h1>
-                <p class="text-[11px] text-slate-400">Zero Manual Selection • Automated Logic Core</p>
-            </div>
-            <div class="text-right">
-                <p id="clock" class="text-[10px] font-mono text-yellow-500 font-bold"></p>
-                <button onclick="resetEngine()" class="text-[9px] text-slate-400 border border-slate-700 px-2 py-0.5 rounded uppercase mt-1 hover:bg-slate-800 transition">Reset</button>
-            </div>
-        </div>
+  <!-- Toast container -->
+  <div id="toast"></div>
 
-        <div id="map" class="border border-slate-800 shadow-2xl"></div>
+  <div class="w-full max-w-xl space-y-4">
 
-        <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-4 shadow-md relative z-30">
-            
-            <div class="relative space-y-1.5">
-                <label class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">📍 Pickup Location</label>
-                <div class="flex gap-2">
-                    <input id="pickup" type="text" 
-                           oninput="handleTyping('pickup', this.value)" 
-                           onkeydown="if(event.key === 'Enter') autoSelectFirstResult('pickup')"
-                           class="flex-1 bg-slate-950 border border-slate-800 p-3 rounded-xl text-sm outline-none focus:border-emerald-500 transition" 
-                           placeholder="Locating current position...">
-                    <button onclick="getGPS()" class="bg-emerald-600 hover:bg-emerald-500 px-4 rounded-xl active:scale-95 transition-all text-white font-bold text-xs shadow-lg">GPS</button>
-                </div>
-                <div id="pickup-results" class="search-results hidden shadow-xl"></div>
-                <div id="pickup-badge" class="text-[11px] text-slate-400 bg-slate-950/60 p-2 rounded-lg border border-slate-800/80 hidden flex justify-between"></div>
-            </div>
-
-            <div class="flex justify-center -my-2 relative z-40">
-                <button onclick="swapLocations()" class="bg-slate-800 hover:bg-slate-700 p-2 rounded-full border border-slate-700 shadow-xl active:bg-emerald-500 active:text-black transition-all">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                        <path fill-rule="evenodd" d="M11.5 15a.5.5 0 0 0 .5-.5V2.707l3.146 3.147a.5.5 0 0 0 .708-.708l-4-4a.5.5 0 0 0-.708 0l-4 4a.5.5 0 1 0 .708.708L11 2.707V14.5a.5.5 0 0 0 .5-.5zm-7-14a.5.5 0 0 1 .5.5v11.793l3.146-3.147a.5.5 0 0 1 .708.708l-4 4a.5.5 0 0 1-.708 0l-4-4a.5.5 0 0 1 .708-.708L4 13.293V1.5a.5.5 0 0 1 .5-.5z"/>
-                    </svg>
-                </button>
-            </div>
-
-            <div class="relative space-y-1.5">
-                <label class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">🏁 Destination</label>
-                <input id="destination" type="text" 
-                       oninput="handleTyping('dest', this.value)" 
-                       onkeydown="if(event.key === 'Enter') autoSelectFirstResult('dest')"
-                       class="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl text-sm outline-none focus:border-emerald-500 transition" 
-                       placeholder="Type destination...">
-                <div id="dest-results" class="search-results hidden shadow-xl"></div>
-                <div id="dest-badge" class="text-[11px] text-slate-400 bg-slate-950/60 p-2 rounded-lg border border-slate-800/80 hidden flex justify-between"></div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3 border-t border-slate-800/80 pt-3">
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">📅 Booking Schedule</label>
-                    <input id="schedule" type="datetime-local" onchange="runFareCalculation()" class="w-full bg-slate-950 border border-slate-800 p-2 rounded-xl text-xs text-yellow-500 font-bold outline-none">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">🛣️ Manual Toll Adjustments</label>
-                    <div class="bg-slate-950 border border-slate-800 p-2 rounded-xl flex items-center px-3">
-                        <span class="text-[11px] text-slate-600 font-bold mr-1">RM</span>
-                        <input id="tolls" type="number" min="0" oninput="runFareCalculation()" class="w-full bg-transparent text-right text-xs font-mono font-bold text-slate-200 outline-none" value="0.00" step="1.00">
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div id="result-card" class="hidden p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-black border border-slate-800 shadow-2xl space-y-4">
-            <div class="text-center pb-2 border-b border-slate-800/60">
-                <p id="trip-type" class="text-[10px] font-black text-sky-400 uppercase tracking-widest mb-0.5"></p>
-                <h2 id="final-price" class="text-6xl font-black text-white tracking-tighter">RM 0.00</h2>
-                <p class="text-[9px] text-slate-500 mt-0.5 uppercase tracking-wider">Regulated Fare (Rounded to nearest 10 sen)</p>
-            </div>
-            
-            <div class="space-y-2.5 text-xs">
-                <div class="flex justify-between items-center"><span class="text-slate-500 font-medium">Distance & Duration Matrix</span><span id="dist-label" class="text-slate-200 font-mono font-bold"></span></div>
-                <div class="flex justify-between items-center"><span class="text-slate-500 font-medium">Base Fare & Scale Units</span><span id="base-km-label" class="text-slate-200 font-mono"></span></div>
-                <div class="flex justify-between items-center"><span class="text-slate-500 font-medium">Traffic Congestion Index</span><span id="traffic-label" class="text-slate-200 font-mono"></span></div>
-                <div class="flex justify-between items-center"><span class="text-slate-500 font-medium">Calendar / Hour Multiplier</span><span id="peak-label" class="text-slate-200 font-mono"></span></div>
-                <div id="premium-row" class="flex justify-between items-center hidden"><span class="text-slate-500 font-medium">State Premium Zone Surcharge</span><span id="premium-label" class="text-emerald-400 font-mono font-bold"></span></div>
-                <div class="flex justify-between items-center text-yellow-500 font-medium"><span class="flex items-center gap-1">🔄 Deadhead Outflow Recovery</span><span id="dh-label" class="font-mono font-bold"></span></div>
-                <div class="flex justify-between items-center"><span class="text-slate-500 font-medium">Dynamic Highway Toll Infrastructure</span><span id="toll-label" class="text-teal-400 font-mono font-bold"></span></div>
-                <div id="guarantee-row" class="flex justify-between items-center text-amber-500 font-medium hidden"><span>⭐ Driver Minimum Floor Coverage</span><span id="guarantee-label" class="font-mono font-bold"></span></div>
-            </div>
-        </div>
+    <!-- Header -->
+    <div class="flex justify-between items-center bg-slate-900/50 p-4 border border-slate-800 rounded-2xl">
+      <div>
+        <h1 class="text-xl font-black text-emerald-400 tracking-tighter">MALAYSIA PREMIUM SEDAN</h1>
+        <p class="text-[11px] text-slate-400">Zero Manual Selection • Automated Logic Core</p>
+      </div>
+      <div class="text-right">
+        <p id="clock" class="text-[10px] font-mono text-yellow-500 font-bold"></p>
+        <button onclick="app.reset()" class="text-[9px] text-slate-400 border border-slate-700 px-2 py-0.5 rounded uppercase mt-1 hover:bg-slate-800 transition">Reset</button>
+      </div>
     </div>
 
-    <script>
-        const GEOFENCES = [
-            { name: "Kuala Lumpur (Dense Urban)", code: "KL", premium: 8, risk: "low", bounds: [[3.03, 101.60], [3.24, 101.76]] },
-            { name: "Putrajaya Core Zone", code: "Putrajaya", premium: 5, risk: "low", bounds: [[2.86, 101.65], [2.98, 101.73]] },
-            { name: "Genting Highlands (Premium Resort)", code: "Pahang", premium: 12, risk: "high", bounds: [[3.39, 101.75], [3.45, 101.81]] },
-            { name: "Selangor Premium Core (Zone 1)", code: "Selangor", premium: 7, risk: "low", bounds: [[2.92, 101.45], [3.31, 101.75]] },
-            { name: "Penang Island Hub", code: "Penang", premium: 6, risk: "low", bounds: [[5.20, 100.16], [5.50, 100.32]] },
-            { name: "Iskandar Malaysia Zone (JB)", code: "Johor", premium: 6, risk: "low", bounds: [[1.40, 103.55], [1.65, 103.85]] }
-        ];
+    <!-- Map -->
+    <div id="map"></div>
 
-        // Adjusted default fallbacks to low risk unless explicitly deep rural
-        const MALAYSIA_STATES_FALLBACK = {
-            "selangor": { code: "Selangor", name: "Selangor", premium: 3, risk: "low" },
-            "kuala lumpur": { code: "KL", name: "Kuala Lumpur", premium: 5, risk: "low" },
-            "johor": { code: "Johor", name: "Johor", premium: 2, risk: "low" },
-            "penang": { code: "Penang", name: "Penang", premium: 2, risk: "low" },
-            "pulau pinang": { code: "Penang", name: "Penang", premium: 2, risk: "low" },
-            "pahang": { code: "Pahang", name: "Pahang", premium: 0, risk: "high" }, // Considered remote/mountainous areas
-            "negeri sembilan": { code: "Negeri Sembilan", name: "Negeri Sembilan", premium: 0, risk: "medium" },
-            "melaka": { code: "Melaka", name: "Melaka", premium: 0, risk: "low" },
-            "perak": { code: "Perak", name: "Perak", premium: 0, risk: "medium" },
-            "kedah": { code: "Kedah", name: "Kedah", premium: 0, risk: "high" }
+    <!-- Input card -->
+    <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-4 shadow-md relative z-30">
+
+      <!-- Pickup -->
+      <div class="relative space-y-1.5">
+        <label class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">📍 Pickup Location</label>
+        <div class="flex gap-2">
+          <input id="pickup" type="text"
+                 autocomplete="off"
+                 aria-autocomplete="list"
+                 role="combobox"
+                 aria-expanded="false"
+                 aria-controls="pickup-results"
+                 class="flex-1 bg-slate-950 border border-slate-800 p-3 rounded-xl text-sm outline-none focus:border-emerald-500 transition"
+                 placeholder="Type pickup location..." />
+          <button onclick="app.useGPS()" class="bg-emerald-600 hover:bg-emerald-500 px-4 rounded-xl active:scale-95 transition-all text-white font-bold text-xs shadow-lg">GPS</button>
+        </div>
+        <div id="pickup-results" class="search-results hidden" role="listbox"></div>
+        <div id="pickup-badge" class="text-[11px] text-slate-400 bg-slate-950/60 p-2 rounded-lg border border-slate-800/80 hidden flex justify-between"></div>
+      </div>
+
+      <!-- Swap -->
+      <div class="flex justify-center -my-2 relative z-40">
+        <button onclick="app.swap()" class="bg-slate-800 hover:bg-slate-700 p-2 rounded-full border border-slate-700 shadow-xl active:bg-emerald-500 active:text-black transition-all">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+            <path fill-rule="evenodd" d="M11.5 15a.5.5 0 0 0 .5-.5V2.707l3.146 3.147a.5.5 0 0 0 .708-.708l-4-4a.5.5 0 0 0-.708 0l-4 4a.5.5 0 1 0 .708.708L11 2.707V14.5a.5.5 0 0 0 .5-.5zm-7-14a.5.5 0 0 1 .5.5v11.793l3.146-3.147a.5.5 0 0 1 .708.708l-4 4a.5.5 0 0 1-.708 0l-4-4a.5.5 0 0 1 .708-.708L4 13.293V1.5a.5.5 0 0 1 .5-.5z"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Destination -->
+      <div class="relative space-y-1.5">
+        <label class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">🏁 Destination</label>
+        <input id="destination" type="text"
+               autocomplete="off"
+               aria-autocomplete="list"
+               role="combobox"
+               aria-expanded="false"
+               aria-controls="dest-results"
+               class="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl text-sm outline-none focus:border-emerald-500 transition"
+               placeholder="Type destination..." />
+        <div id="dest-results" class="search-results hidden" role="listbox"></div>
+        <div id="dest-badge" class="text-[11px] text-slate-400 bg-slate-950/60 p-2 rounded-lg border border-slate-800/80 hidden flex justify-between"></div>
+      </div>
+
+      <!-- Schedule & Tolls -->
+      <div class="grid grid-cols-2 gap-3 border-t border-slate-800/80 pt-3">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">📅 Booking Schedule</label>
+          <input id="schedule" type="datetime-local" class="w-full bg-slate-950 border border-slate-800 p-2 rounded-xl text-xs text-yellow-500 font-bold outline-none" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">🛣️ Manual Toll Adjustments</label>
+          <div class="bg-slate-950 border border-slate-800 p-2 rounded-xl flex items-center px-3">
+            <span class="text-[11px] text-slate-600 font-bold mr-1">RM</span>
+            <input id="tolls" type="number" min="0" step="0.50" class="w-full bg-transparent text-right text-xs font-mono font-bold text-slate-200 outline-none" value="0.00" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Result card -->
+    <div id="result-card" class="hidden p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-black border border-slate-800 shadow-2xl space-y-4">
+      <div class="text-center pb-2 border-b border-slate-800/60">
+        <p id="trip-type" class="text-[10px] font-black text-sky-400 uppercase tracking-widest mb-0.5"></p>
+        <h2 id="final-price" class="text-6xl font-black text-white tracking-tighter">RM 0.00</h2>
+        <p class="text-[9px] text-slate-500 mt-0.5 uppercase tracking-wider">Regulated Fare (Rounded to nearest 10 sen)</p>
+      </div>
+      <div class="space-y-2.5 text-xs">
+        <div class="flex justify-between items-center"><span class="text-slate-500 font-medium">Distance & Duration Matrix</span><span id="dist-label" class="text-slate-200 font-mono font-bold"></span></div>
+        <div class="flex justify-between items-center"><span class="text-slate-500 font-medium">Base Fare Plan</span><span id="base-km-label" class="text-slate-200 font-mono"></span></div>
+        <div class="flex justify-between items-center"><span class="text-slate-500 font-medium">Schedule Multiplier Status</span><span id="peak-label" class="text-slate-200 font-mono"></span></div>
+        <div class="flex justify-between items-center text-emerald-400"><span class="font-medium">Operator Commission Fee (10%)</span><span id="operator-label" class="font-mono"></span></div>
+        <div class="flex justify-between items-center"><span class="text-slate-500 font-medium">Dynamic Highway Toll Infrastructure</span><span id="toll-label" class="text-teal-400 font-mono font-bold"></span></div>
+        <div id="guarantee-row" class="flex justify-between items-center text-amber-500 font-medium hidden"><span>⭐ Minimum Fare Floor Correction</span><span id="guarantee-label" class="font-mono font-bold"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    //  CONFIGURATION
+    // ============================================================
+    const CONFIG = {
+      baseDistanceRate: 1.25,          // RM per km
+      distanceBuffer: 5.0,             // fixed system offset (km)
+      shortTripLimit: 2.0,             // km
+      shortTripMinFare: 8.00,          // RM
+      operatorFeePercent: 0.10,        // 10% of base fare
+      peakWindows: [                   // {day: 0=Sun, 5=Fri, etc.}
+        { day: 5, start: 12.0, end: 15.0, multiplier: 1.20, label: "Friday Rush (+20%)" },
+        { day: 0, start: 6.5, end: 9.5, multiplier: 1.20, label: "Weekday Morning Peak (+20%)" },
+        { day: 0, start: 17.0, end: 20.5, multiplier: 1.20, label: "Weekday Evening Peak (+20%)" }
+      ],
+      geocodingDebounce: 300,          // ms
+      routingDebounce: 400,
+      cacheTTL: 5 * 60 * 1000,         // 5 minutes
+      defaultLat: 4.2105,
+      defaultLon: 101.9758,
+      defaultZoom: 6
+    };
+
+    // ============================================================
+    //  STATE
+    // ============================================================
+    const state = {
+      pickup: { lat: null, lon: null, address: '', geoData: null },
+      destination: { lat: null, lon: null, address: '', geoData: null },
+      distance: null,      // km
+      duration: null,      // minutes
+      routeFetched: false,
+      map: null,
+      routeLayer: null,
+      markers: null,
+      geocodingCache: new Map(),
+      abortController: null,
+      routeAbortController: null,
+      isRouting: false
+    };
+
+    // ============================================================
+    //  SERVICES (Geocoder, Router, FareCalculator)
+    // ============================================================
+    const Geocoder = {
+      // Photon (search)
+      async search(query, lat = CONFIG.defaultLat, lon = CONFIG.defaultLon) {
+        const key = `search:${query}:${lat}:${lon}`;
+        const cached = state.geocodingCache.get(key);
+        if (cached && (Date.now() - cached.timestamp < CONFIG.cacheTTL)) {
+          return cached.data;
+        }
+        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=${lat}&lon=${lon}&limit=5`;
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`Geocoding HTTP ${resp.status}`);
+        const data = await resp.json();
+        state.geocodingCache.set(key, { data, timestamp: Date.now() });
+        return data;
+      },
+
+      // Nominatim reverse
+      async reverse(lat, lon) {
+        const key = `reverse:${lat}:${lon}`;
+        const cached = state.geocodingCache.get(key);
+        if (cached && (Date.now() - cached.timestamp < CONFIG.cacheTTL)) {
+          return cached.data;
+        }
+        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`Reverse geocoding HTTP ${resp.status}`);
+        const data = await resp.json();
+        state.geocodingCache.set(key, { data, timestamp: Date.now() });
+        return data;
+      }
+    };
+
+    const Router = {
+      async route(lat1, lon1, lat2, lon2) {
+        // Cancel previous route request
+        if (state.routeAbortController) {
+          state.routeAbortController.abort();
+        }
+        state.routeAbortController = new AbortController();
+        const url = `https://router.project-osrm.org/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`;
+        const resp = await fetch(url, { signal: state.routeAbortController.signal });
+        if (!resp.ok) throw new Error(`Routing HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (data.code !== 'Ok' || !data.routes || data.routes.length === 0) {
+          throw new Error('No route found');
+        }
+        return data.routes[0];
+      }
+    };
+
+    const FareCalculator = {
+      // Return object with all components
+      compute({ distance, duration, tolls, schedule }) {
+        const baseDist = parseFloat(distance) || 0;
+        const dur = parseFloat(duration) || 0;
+        const toll = Math.max(0, parseFloat(tolls) || 0);
+
+        // 1. Payable distance (distance + buffer)
+        const payableDist = baseDist + CONFIG.distanceBuffer;
+
+        // 2. Base fare (distance rate)
+        const baseFare = payableDist * CONFIG.baseDistanceRate;
+
+        // 3. Peak multiplier based on schedule
+        let multiplier = 1.0;
+        let peakLabel = "Standard Rate (0%)";
+        if (schedule) {
+          const dt = new Date(schedule);
+          const hour = dt.getHours() + dt.getMinutes() / 60;
+          const day = dt.getDay(); // 0=Sun, 1=Mon, ...
+          for (const win of CONFIG.peakWindows) {
+            if (win.day === day || (win.day === 0 && day >= 1 && day <= 5)) {
+              if (hour >= win.start && hour <= win.end) {
+                multiplier = win.multiplier;
+                peakLabel = win.label;
+                break;
+              }
+            }
+          }
+        }
+
+        // 4. Journey fare = baseFare * multiplier
+        const journeyFare = baseFare * multiplier;
+
+        // 5. Operator commission (on base fare before multiplier)
+        const operatorFee = baseFare * CONFIG.operatorFeePercent;
+
+        // 6. Subtotal before floor
+        let subtotal = journeyFare + toll;
+
+        // 7. Short trip floor
+        let floorCorrection = 0;
+        if (baseDist < CONFIG.shortTripLimit && subtotal < CONFIG.shortTripMinFare) {
+          floorCorrection = CONFIG.shortTripMinFare - subtotal;
+          subtotal = CONFIG.shortTripMinFare;
+        }
+
+        // 8. Round to nearest 10 sen (0.10)
+        const finalFare = Math.round(subtotal * 10) / 10;
+
+        return {
+          baseDist,
+          duration: dur,
+          payableDist,
+          baseFare,
+          multiplier,
+          peakLabel,
+          journeyFare,
+          operatorFee,
+          toll,
+          floorCorrection,
+          subtotal,
+          finalFare
         };
+      }
+    };
 
-        const DEADHEAD_MULTIPLIER = { "low": 0.00, "medium": 0.25, "high": 0.45, "very_high": 0.70 };
-        const CONFIG = { baseFare: 5.00, baseDistanceRate: 1.25, idleRatePerMin: 0.30, driverMinGuarantee: 10.00 };
+    // ============================================================
+    //  GEOMATCHING (Zone detection)
+    // ============================================================
+    const GEOFENCES = [
+      { name: "Kuala Lumpur (Dense Urban)", code: "KL", bounds: [[3.03, 101.60], [3.24, 101.76]] },
+      { name: "Putrajaya Core Zone", code: "Putrajaya", bounds: [[2.86, 101.65], [2.98, 101.73]] },
+      { name: "Genting Highlands (Premium Resort)", code: "Pahang", bounds: [[3.39, 101.75], [3.45, 101.81]] },
+      { name: "Selangor Premium Core (Zone 1)", code: "Selangor", bounds: [[2.92, 101.45], [3.31, 101.75]] },
+      { name: "Penang Island Hub", code: "Penang", bounds: [[5.20, 100.16], [5.50, 100.32]] },
+      { name: "Iskandar Malaysia Zone (JB)", code: "Johor", bounds: [[1.40, 103.55], [1.65, 103.85]] }
+    ];
 
-        let map = L.map('map', { zoomControl: false }).setView([4.2105, 101.9758], 6);
+    const STATE_FALLBACK = {
+      "selangor": { code: "Selangor", name: "Selangor" },
+      "kuala lumpur": { code: "KL", name: "Kuala Lumpur" },
+      "johor": { code: "Johor", name: "Johor" },
+      "penang": { code: "Penang", name: "Penang" },
+      "pulau pinang": { code: "Penang", name: "Penang" },
+      "pahang": { code: "Pahang", name: "Pahang" },
+      "negeri sembilan": { code: "Negeri Sembilan", name: "Negeri Sembilan" },
+      "melaka": { code: "Melaka", name: "Melaka" },
+      "perak": { code: "Perak", name: "Perak" },
+      "kedah": { code: "Kedah", name: "Kedah" }
+    };
+
+    function geomatch(lat, lon, stateStr) {
+      for (const zone of GEOFENCES) {
+        const b = zone.bounds;
+        if (lat >= b[0][0] && lat <= b[1][0] && lon >= b[0][1] && lon <= b[1][1]) {
+          return { code: zone.code, name: zone.name };
+        }
+      }
+      const cleaned = (stateStr || "").toLowerCase().trim();
+      for (const key in STATE_FALLBACK) {
+        if (cleaned.includes(key)) {
+          return STATE_FALLBACK[key];
+        }
+      }
+      return { code: "MY_ZONE", name: "Standard Territory" };
+    }
+
+    // ============================================================
+    //  APP CONTROLLER
+    // ============================================================
+    const app = {
+      // ---- Init ----
+      init() {
+        // Map
+        const map = L.map('map', { zoomControl: false })
+          .setView([CONFIG.defaultLat, CONFIG.defaultLon], CONFIG.defaultZoom);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
-        
-        let uLat, uLon, dLat, dLon;
-        let pGeoData = {}, dGeoData = {};
-        let routeMarkers = L.layerGroup().addTo(map);
-        let typingTimeout;
+        state.map = map;
+        state.markers = L.layerGroup().addTo(map);
+        state.routeLayer = L.layerGroup().addTo(map);
 
-        window.onload = function() {
-            setCurrentTimestamp();
-            document.getElementById('pickup').placeholder = "Type pickup location...";
-            setTimeout(() => { 
-                map.invalidateSize(); 
-                getGPS(true); 
-            }, 200);
-        };
+        // Set schedule default
+        this.setDefaultSchedule();
 
-        function setCurrentTimestamp() {
-            const timeElement = document.getElementById('schedule');
-            const now = new Date();
-            const tzOffset = now.getTimezoneOffset() * 60000;
-            const localISOTime = (new Date(now.getTime() - tzOffset)).toISOString().slice(0, 16);
-            timeElement.value = localISOTime;
+        // Clock
+        this.updateClock();
+        setInterval(() => this.updateClock(), 1000);
+
+        // Input events
+        const pickupInput = document.getElementById('pickup');
+        const destInput = document.getElementById('destination');
+        pickupInput.addEventListener('input', (e) => this.handleTyping('pickup', e.target.value));
+        destInput.addEventListener('input', (e) => this.handleTyping('dest', e.target.value));
+        pickupInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.autoSelectFirst('pickup'); });
+        destInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.autoSelectFirst('dest'); });
+
+        // Toll & schedule change
+        document.getElementById('tolls').addEventListener('input', () => this.runFare());
+        document.getElementById('schedule').addEventListener('change', () => this.runFare());
+
+        // Initial GPS attempt
+        setTimeout(() => this.useGPS(true), 500);
+      },
+
+      // ---- Clock ----
+      updateClock() {
+        document.getElementById('clock').textContent =
+          new Date().toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' }) + ' (MYT)';
+      },
+
+      setDefaultSchedule() {
+        const el = document.getElementById('schedule');
+        const now = new Date();
+        const tzOffset = now.getTimezoneOffset() * 60000;
+        const localISOTime = (new Date(now.getTime() - tzOffset)).toISOString().slice(0, 16);
+        el.value = localISOTime;
+      },
+
+      // ---- Toast ----
+      showToast(msg, duration = 3000) {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.classList.add('show');
+        clearTimeout(this._toastTimer);
+        this._toastTimer = setTimeout(() => el.classList.remove('show'), duration);
+      },
+
+      // ---- Geocoding & Search ----
+      handleTyping(mode, value) {
+        // Clear previous location data if typing
+        if (mode === 'pickup') {
+          state.pickup.lat = null; state.pickup.lon = null; state.pickup.geoData = null;
+          document.getElementById('pickup-badge').classList.add('hidden');
+        } else {
+          state.destination.lat = null; state.destination.lon = null; state.destination.geoData = null;
+          document.getElementById('dest-badge').classList.add('hidden');
         }
+        document.getElementById('result-card').classList.add('hidden');
 
-        setInterval(() => { 
-            document.getElementById('clock').innerText = new Date().toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' }) + ' (MYT)'; 
-        }, 1000);
+        clearTimeout(this._typingTimer);
+        this._typingTimer = setTimeout(() => {
+          this.searchLocations(mode, value);
+        }, CONFIG.geocodingDebounce);
+      },
 
-        function automaticGeomatch(lat, lon, rawStateString) {
-            for (const zone of GEOFENCES) {
-                const b = zone.bounds;
-                if (lat >= b[0][0] && lat <= b[1][0] && lon >= b[0][1] && lon <= b[1][1]) {
-                    return { state: zone.code, name: zone.name, premium: zone.premium, risk: zone.risk };
-                }
-            }
-            
-            const cleaned = (rawStateString || "").toLowerCase().trim();
-            for (const key in MALAYSIA_STATES_FALLBACK) {
-                if (cleaned.includes(key)) {
-                    const fallback = MALAYSIA_STATES_FALLBACK[key];
-                    return { state: fallback.code, name: fallback.name, premium: fallback.premium, risk: fallback.risk };
-                }
-            }
-            return { state: "MY_ZONE", name: "Standard Territory", premium: 0, risk: "low" };
+      async searchLocations(mode, query) {
+        const container = document.getElementById(`${mode}-results`);
+        if (query.length < 3) {
+          container.classList.add('hidden');
+          return;
         }
-
-        function handleTyping(mode, value) {
-            if (mode === 'pickup') {
-                uLat = undefined; uLon = undefined; pGeoData = {};
-                document.getElementById('pickup-badge').classList.add('hidden');
-            } else {
-                dLat = undefined; dLon = undefined; dGeoData = {};
-                document.getElementById('dest-badge').classList.add('hidden');
-            }
-            document.getElementById('result-card').classList.add('hidden');
-            
-            clearTimeout(typingTimeout);
-            typingTimeout = setTimeout(() => {
-                searchLoc(value, mode);
-            }, 300);
-        }
-
-        async function searchLoc(query, mode) {
-            const container = document.getElementById(`${mode}-results`);
-            if (query.length < 3) { container.classList.add('hidden'); return; }
-
-            try {
-                const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=4.2105&lon=101.9758&limit=5`);
-                const data = await response.json();
-                if (!data.features || data.features.length === 0) { container.classList.add('hidden'); return; }
-
-                container.innerHTML = '';
-                
-                data.features.forEach(feature => {
-                    const props = feature.properties;
-                    const primaryLabel = props.name || "Unknown Location";
-                    const fallbackContext = [props.street, props.city, props.state, props.country].filter(Boolean).join(', ');
-                    const detectedState = props.state || props.city || '';
-                    
-                    const item = document.createElement('div');
-                    item.className = "result-item p-3 border-b border-slate-800 text-xs cursor-pointer hover:bg-slate-800/60 transition text-left";
-                    item.innerHTML = `
-                        <div class="font-bold text-yellow-500">${primaryLabel}</div>
-                        <div class="text-[10px] text-slate-400 mt-0.5">${fallbackContext}</div>
-                    `;
-                    
-                    item.addEventListener('click', (e) => {
-                        document.getElementById(mode === 'pickup' ? 'pickup' : 'destination').blur();
-                        selectLocation(mode, feature.geometry.coordinates[1], feature.geometry.coordinates[0], primaryLabel, detectedState);
-                    });
-                    container.appendChild(item);
-                });
-                
-                container.classList.remove('hidden');
-            } catch (err) {
-                console.error("Geocoding failed:", err);
-            }
-        }
-
-        async function autoSelectFirstResult(mode) {
-            const container = document.getElementById(`${mode}-results`);
-            const firstResult = container.querySelector('.result-item');
-            if (firstResult) {
-                firstResult.click();
-            }
-        }
-
-        async function selectLocation(mode, lat, lon, label, detectedState) {
-            document.getElementById('pickup-results').classList.add('hidden');
-            document.getElementById('dest-results').classList.add('hidden');
-            document.getElementById(mode === 'pickup' ? 'pickup' : 'destination').value = label;
-
-            const trackingMetrics = automaticGeomatch(lat, lon, detectedState);
-
-            if (mode === 'pickup') {
-                uLat = lat; uLon = lon; pGeoData = trackingMetrics;
-            } else {
-                dLat = lat; dLon = lon; dGeoData = trackingMetrics;
-            }
-
-            updateBadgesAndLabels();
-            await executeRoutingEngine();
-        }
-
-        function updateBadgesAndLabels() {
-            const pBadge = document.getElementById('pickup-badge');
-            const dBadge = document.getElementById('dest-badge');
-
-            if (pGeoData && pGeoData.name) {
-                pBadge.innerHTML = `<span><strong>Region:</strong> ${pGeoData.name}</span> <span class="text-emerald-400 font-mono">Premium: +RM ${pGeoData.premium}</span>`;
-                pBadge.classList.remove('hidden');
-            } else { pBadge.classList.add('hidden'); }
-
-            if (dGeoData && dGeoData.name) {
-                if (dGeoData.state === pGeoData.state && dGeoData.premium > 0) {
-                    dBadge.innerHTML = `<span><strong>Region:</strong> ${dGeoData.name}</span> <span class="text-sky-400 font-mono font-bold">Zone Shared (No Double Charge)</span>`;
-                } else {
-                    dBadge.innerHTML = `<span><strong>Region:</strong> ${dGeoData.name}</span> <span class="text-emerald-400 font-mono">Premium: +RM ${dGeoData.premium}</span>`;
-                }
-                dBadge.classList.remove('hidden');
-            } else { dBadge.classList.add('hidden'); }
-        }
-
-        function swapLocations() {
-            const pInput = document.getElementById('pickup');
-            const dInput = document.getElementById('destination');
-            const tempVal = pInput.value;
-            pInput.value = dInput.value;
-            dInput.value = tempVal;
-
-            [uLat, dLat] = [dLat, uLat];
-            [uLon, dLon] = [dLon, uLon];
-            [pGeoData, dGeoData] = [dGeoData, pGeoData];
-
-            updateBadgesAndLabels();
-
-            if (uLat && dLat) {
-                executeRoutingEngine();
-            } else {
-                routeMarkers.clearLayers();
-                document.getElementById('result-card').classList.add('hidden');
-            }
-        }
-
-        function getGPS(isInitialLoad = false) {
-            if (!navigator.geolocation) {
-                if (isInitialLoad) document.getElementById('pickup').placeholder = "Type pickup location...";
-                return;
-            }
-            navigator.geolocation.getCurrentPosition(async pos => {
-                uLat = pos.coords.latitude; uLon = pos.coords.longitude;
-                try {
-                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${uLat}&lon=${uLon}`);
-                    const data = await response.json();
-                    if (data && data.address) {
-                        const streetLabel = data.address.road || data.address.suburb || data.address.town || "Current Location";
-                        const stateLabel = data.address.state || '';
-                        
-                        document.getElementById('pickup').value = `${streetLabel}${stateLabel ? ', ' + stateLabel : ''}`;
-                        pGeoData = automaticGeomatch(uLat, uLon, data.address.state);
-                        updateBadgesAndLabels();
-                        
-                        map.setView([uLat, uLon], 14);
-                        routeMarkers.clearLayers();
-                        L.marker([uLat, uLon]).addTo(routeMarkers);
-                        
-                        if (dLat && dLon) {
-                            await executeRoutingEngine();
-                        }
-                    }
-                } catch (err) {
-                    console.error("GPS classification sync issue:", err);
-                    if (isInitialLoad) document.getElementById('pickup').value = "Current Location (GPS Coordinates)";
-                }
-            }, error => {
-                console.warn("Location permission denied.");
-                if (isInitialLoad) document.getElementById('pickup').placeholder = "Type pickup location...";
-            }, {
-                enableHighAccuracy: true,
-                timeout: 8000
+        try {
+          const data = await Geocoder.search(query, CONFIG.defaultLat, CONFIG.defaultLon);
+          if (!data.features || data.features.length === 0) {
+            container.classList.add('hidden');
+            return;
+          }
+          container.innerHTML = '';
+          data.features.forEach((feature, index) => {
+            const props = feature.properties;
+            const name = props.name || 'Unknown';
+            const context = [props.street, props.city, props.state, props.country].filter(Boolean).join(', ');
+            const item = document.createElement('div');
+            item.className = 'result-item';
+            item.setAttribute('role', 'option');
+            item.setAttribute('data-index', index);
+            // Use textContent to avoid XSS
+            const nameSpan = document.createElement('div');
+            nameSpan.className = 'font-bold text-yellow-500';
+            nameSpan.textContent = name;
+            const ctxSpan = document.createElement('div');
+            ctxSpan.className = 'text-[10px] text-slate-400 mt-0.5';
+            ctxSpan.textContent = context;
+            item.appendChild(nameSpan);
+            item.appendChild(ctxSpan);
+            item.addEventListener('click', () => {
+              const lat = feature.geometry.coordinates[1];
+              const lon = feature.geometry.coordinates[0];
+              const state = props.state || props.city || '';
+              this.selectLocation(mode, lat, lon, name, state);
             });
+            container.appendChild(item);
+          });
+          container.classList.remove('hidden');
+          container.setAttribute('aria-expanded', 'true');
+        } catch (err) {
+          console.error('Geocoding error:', err);
+          this.showToast('Could not fetch suggestions. Please try again.');
+          container.classList.add('hidden');
+        }
+      },
+
+      autoSelectFirst(mode) {
+        const container = document.getElementById(`${mode}-results`);
+        const first = container.querySelector('.result-item');
+        if (first) first.click();
+      },
+
+      async selectLocation(mode, lat, lon, label, stateStr) {
+        // Close dropdowns
+        document.getElementById('pickup-results').classList.add('hidden');
+        document.getElementById('dest-results').classList.add('hidden');
+
+        const geo = geomatch(lat, lon, stateStr);
+        const input = document.getElementById(mode === 'pickup' ? 'pickup' : 'destination');
+        input.value = label;
+
+        if (mode === 'pickup') {
+          state.pickup.lat = lat;
+          state.pickup.lon = lon;
+          state.pickup.geoData = geo;
+          state.pickup.address = label;
+        } else {
+          state.destination.lat = lat;
+          state.destination.lon = lon;
+          state.destination.geoData = geo;
+          state.destination.address = label;
         }
 
-        async function executeRoutingEngine() {
-            if (!uLat || !dLat) return;
+        this.updateBadges();
+        // If both locations are set, route
+        if (state.pickup.lat && state.destination.lat) {
+          await this.fetchRoute();
+        }
+      },
+
+      updateBadges() {
+        const pBadge = document.getElementById('pickup-badge');
+        const dBadge = document.getElementById('dest-badge');
+        if (state.pickup.geoData && state.pickup.geoData.name) {
+          pBadge.innerHTML = `<span><strong>Region:</strong> ${state.pickup.geoData.name}</span> <span class="text-emerald-400 font-mono">System Active</span>`;
+          pBadge.classList.remove('hidden');
+        } else {
+          pBadge.classList.add('hidden');
+        }
+        if (state.destination.geoData && state.destination.geoData.name) {
+          dBadge.innerHTML = `<span><strong>Region:</strong> ${state.destination.geoData.name}</span> <span class="text-emerald-400 font-mono">System Active</span>`;
+          dBadge.classList.remove('hidden');
+        } else {
+          dBadge.classList.add('hidden');
+        }
+      },
+
+      // ---- GPS ----
+      useGPS(initial = false) {
+        if (!navigator.geolocation) {
+          if (initial) document.getElementById('pickup').placeholder = 'Type pickup location...';
+          this.showToast('GPS not available. Please type your location.');
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
             try {
-                routeMarkers.clearLayers();
-                L.marker([uLat, uLon]).addTo(routeMarkers);
-                L.marker([dLat, dLon]).addTo(routeMarkers);
-
-                const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${uLon},${uLat};${dLon},${dLat}?overview=full&geometries=geojson`);
-                if (!response.ok) throw new Error("Network routing issue");
-                const data = await response.json();
-                if (data.code !== 'Ok' || !data.routes || data.routes.length === 0) return;
-
-                const routeTrack = data.routes[0];
-                const routePolyline = L.geoJSON(routeTrack.geometry, { color: '#10b981', weight: 5, opacity: 0.75 }).addTo(routeMarkers);
-                map.fitBounds(routePolyline.getBounds().pad(0.2));
-
-                window.calculatedDistanceKm = routeTrack.distance / 1000;
-                window.calculatedDurationMins = routeTrack.duration / 60;
-
-                runFareCalculation();
+              const data = await Geocoder.reverse(lat, lon);
+              if (data && data.address) {
+                const road = data.address.road || data.address.suburb || data.address.town || 'Current Location';
+                const state = data.address.state || '';
+                const label = `${road}${state ? ', ' + state : ''}`;
+                this.selectLocation('pickup', lat, lon, label, state);
+              } else {
+                this.selectLocation('pickup', lat, lon, 'GPS Location', '');
+              }
             } catch (err) {
-                console.error("OSRM interface error:", err);
+              console.error('Reverse geocoding error:', err);
+              this.selectLocation('pickup', lat, lon, 'GPS Location', '');
+              this.showToast('Could not get address from GPS, using coordinates.');
             }
+          },
+          (err) => {
+            console.warn('GPS error:', err);
+            if (initial) document.getElementById('pickup').placeholder = 'Type pickup location...';
+            this.showToast('GPS permission denied. Please type your location.');
+          },
+          { enableHighAccuracy: true, timeout: 8000 }
+        );
+      },
+
+      // ---- Swap ----
+      swap() {
+        const pInput = document.getElementById('pickup');
+        const dInput = document.getElementById('destination');
+        const tempVal = pInput.value;
+        pInput.value = dInput.value;
+        dInput.value = tempVal;
+
+        // Swap state
+        const temp = state.pickup;
+        state.pickup = state.destination;
+        state.destination = temp;
+
+        this.updateBadges();
+        if (state.pickup.lat && state.destination.lat) {
+          this.fetchRoute();
+        } else {
+          state.routeLayer.clearLayers();
+          state.markers.clearLayers();
+          document.getElementById('result-card').classList.add('hidden');
         }
+      },
 
-        function runFareCalculation() {
-            if (uLat === dLat && uLon === dLon) {
-                document.getElementById('result-card').classList.add('hidden');
-                return;
-            }
+      // ---- Routing ----
+      async fetchRoute() {
+        const p = state.pickup;
+        const d = state.destination;
+        if (!p.lat || !d.lat) return;
 
-            if (window.calculatedDistanceKm === undefined || !uLat || !dLat) return;
+        state.isRouting = true;
+        // Show loading on map (optional)
+        try {
+          const route = await Router.route(p.lat, p.lon, d.lat, d.lon);
+          state.distance = route.distance / 1000; // km
+          state.duration = route.duration / 60; // minutes
+          state.routeFetched = true;
 
-            const distance = parseFloat(window.calculatedDistanceKm) || 0;
-            const durationMinutes = parseFloat(window.calculatedDurationMins) || 0;
-            
-            let manualTollInput = parseFloat(document.getElementById('tolls').value);
-            if (isNaN(manualTollInput) || manualTollInput < 0) manualTollInput = 0.00;
+          // Update map
+          state.markers.clearLayers();
+          state.routeLayer.clearLayers();
+          L.marker([p.lat, p.lon]).addTo(state.markers);
+          L.marker([d.lat, d.lon]).addTo(state.markers);
+          const polyline = L.geoJSON(route.geometry, { color: '#10b981', weight: 5, opacity: 0.75 })
+            .addTo(state.routeLayer);
+          state.map.fitBounds(polyline.getBounds().pad(0.2));
 
-            const pickupRisk = pGeoData.risk || "low";
-            const dropoffRisk = dGeoData.risk || "low";
-            const pickupPremium = parseFloat(pGeoData.premium) || 0;
-            const dropoffPremium = parseFloat(dGeoData.premium) || 0;
-
-            const computedSpeedKmh = durationMinutes > 0 ? (distance / (durationMinutes / 60)) : 45;
-            let trafficMultiplier = 1.00, trafficLabel = "Smooth (>40 km/h)", useTimeFare = false;
-
-            if (computedSpeedKmh < 15) {
-                trafficMultiplier = 1.35; trafficLabel = "Severe Gridlock (<15 km/h)"; useTimeFare = true;
-            } else if (computedSpeedKmh < 25) {
-                trafficMultiplier = 1.20; trafficLabel = "Heavy Congestion (15-25 km/h)";
-            } else if (computedSpeedKmh < 40) {
-                trafficMultiplier = 1.15; trafficLabel = "Moderate Traffic (25-40 km/h)";
-            }
-
-            const rawSchedule = document.getElementById('schedule').value;
-            const checkedDate = rawSchedule ? new Date(rawSchedule) : new Date();
-            const bookingHour = checkedDate.getHours(), bookingDay = checkedDate.getDay();
-            const decimalTime = bookingHour + (checkedDate.getMinutes() / 60);
-
-            let scheduleMultiplier = 1.00, scheduleLabel = "Standard Flat-Rate (0%)";
-            
-            if (bookingDay === 5 && decimalTime >= 12.0 && decimalTime <= 15.0) {
-                scheduleMultiplier = 1.25; scheduleLabel = "Friday Rush Premium (+25%)";
-            } else if ((decimalTime >= 6.5 && decimalTime <= 9.5) || (decimalTime >= 17.0 && decimalTime <= 20.5)) {
-                scheduleMultiplier = 1.15; scheduleLabel = "Peak Hours Commute (+15%)";
-            }
-
-            const baseFareCost = CONFIG.baseFare;
-            const effectiveDistanceRate = CONFIG.baseDistanceRate * trafficMultiplier;
-            const distanceFareTotal = distance * effectiveDistanceRate;
-            const calculatedTimeFare = useTimeFare ? (durationMinutes * CONFIG.idleRatePerMin) : 0;
-
-            const activeZonePremium = Math.max(pickupPremium, dropoffPremium);
-            
-            const primarySubtotal = baseFareCost + distanceFareTotal + calculatedTimeFare;
-            const computedPeakSurcharge = primarySubtotal * (scheduleMultiplier - 1);
-
-            // DETECT RURAL / REMOTE AND INTERSTATE CONDITIONS
-            const isInterstate = pGeoData.state !== dGeoData.state;
-            const targetHasRuralRisk = (pickupRisk === "high" || pickupRisk === "very_high" || dropoffRisk === "high" || dropoffRisk === "very_high");
-            const isLongDistanceRemote = distance > 100 && targetHasRuralRisk;
-
-            let deadheadRate = 0.00;
-            
-            // Only apply deadhead if explicitly rural/remote or an interstate rural route
-            if (targetHasRuralRisk || (isInterstate && isLongDistanceRemote)) {
-                const riskMapping = { "low": 0, "medium": 0.15, "high": 0.45, "very_high": 0.70 };
-                const maxRisk = riskMapping[pickupRisk] > riskMapping[dropoffRisk] ? pickupRisk : dropoffRisk;
-                deadheadRate = riskMapping[maxRisk] || 0.35; 
-            }
-
-            const compiledDeadheadFee = distance * CONFIG.baseDistanceRate * deadheadRate;
-            const automatedHighwayToll = distance > 20 ? (distance * 0.15) : 0;
-            const compiledTollFees = automatedHighwayToll + manualTollInput;
-
-            let rawCombinedTotal = primarySubtotal + activeZonePremium + computedPeakSurcharge + compiledDeadheadFee + compiledTollFees;
-
-            let driverGuaranteeAdjustment = 0;
-            const guaranteeRow = document.getElementById('guarantee-row');
-            const guaranteeLabel = document.getElementById('guarantee-label');
-
-            if (rawCombinedTotal < CONFIG.driverMinGuarantee) {
-                driverGuaranteeAdjustment = CONFIG.driverMinGuarantee - rawCombinedTotal;
-                rawCombinedTotal = CONFIG.driverMinGuarantee;
-                if (guaranteeRow && guaranteeLabel) {
-                    guaranteeLabel.innerText = `+RM ${driverGuaranteeAdjustment.toFixed(2)}`;
-                    guaranteeRow.classList.remove('hidden');
-                }
-            } else {
-                if (guaranteeRow) guaranteeRow.classList.add('hidden');
-            }
-
-            const finalRoundedFare = (Math.round(rawCombinedTotal * 10) / 10).toFixed(2);
-
-            document.getElementById('result-card').classList.remove('hidden');
-            document.getElementById('trip-type').innerText = (distance > 80) ? "Long Distance / Interstate Route" : "Urban / Local Territory Trip";
-            document.getElementById('final-price').innerText = `RM ${finalRoundedFare}`;
-            
-            const durationLabel = durationMinutes >= 60 ? `${Math.floor(durationMinutes / 60)} hr ${Math.round(durationMinutes % 60)} mins` : `${Math.round(durationMinutes)} mins`;
-            document.getElementById('dist-label').innerText = `${distance.toFixed(2)} km / ${durationLabel}`;
-            document.getElementById('base-km-label').innerText = `RM ${baseFareCost.toFixed(2)} + (RM ${effectiveDistanceRate.toFixed(2)}/km)`;
-            document.getElementById('traffic-label').innerText = `${trafficLabel} [x${trafficMultiplier.toFixed(2)}]`;
-            document.getElementById('peak-label').innerText = `${scheduleLabel}`;
-
-            if (activeZonePremium > 0) {
-                document.getElementById('premium-row').classList.remove('hidden');
-                document.getElementById('premium-label').innerText = `+RM ${activeZonePremium.toFixed(2)}`;
-            } else {
-                document.getElementById('premium-row').classList.add('hidden');
-            }
-
-            if (compiledDeadheadFee > 0) {
-                document.getElementById('dh-label').innerText = `RM ${compiledDeadheadFee.toFixed(2)} (${Math.round(deadheadRate * 100)}%)`;
-            } else {
-                document.getElementById('dh-label').innerText = "N/A (Urban / Core Territory)";
-            }
-            
-            document.getElementById('toll-label').innerText = `RM ${compiledTollFees.toFixed(2)} (Estimated)`;
+          this.runFare();
+        } catch (err) {
+          if (err.name === 'AbortError') return; // ignore
+          console.error('Routing error:', err);
+          this.showToast('Could not calculate route. Please try again.');
+          state.routeFetched = false;
+          state.distance = null;
+          state.duration = null;
+        } finally {
+          state.isRouting = false;
         }
+      },
 
-        function resetEngine() {
-            document.getElementById('pickup').value = '';
-            document.getElementById('destination').value = '';
-            document.getElementById('pickup-badge').classList.add('hidden');
-            document.getElementById('dest-badge').classList.add('hidden');
-            document.getElementById('tolls').value = '0.00';
-            document.getElementById('result-card').classList.add('hidden');
-            const guaranteeRow = document.getElementById('guarantee-row');
-            if (guaranteeRow) guaranteeRow.classList.add('hidden');
-            routeMarkers.clearLayers();
-            uLat = undefined; uLon = undefined; dLat = undefined; dLon = undefined;
-            pGeoData = {}; dGeoData = {};
-            if(map) { map.setView([4.2105, 101.9758], 6); map.invalidateSize(); }
-            setCurrentTimestamp();
-            window.calculatedDistanceKm = undefined;
-            window.calculatedDurationMins = undefined;
-            getGPS(false);
+      // ---- Fare Calculation ----
+      runFare() {
+        if (!state.routeFetched || state.distance === null) return;
+        const distance = state.distance;
+        const duration = state.duration;
+        const tolls = parseFloat(document.getElementById('tolls').value) || 0;
+        const schedule = document.getElementById('schedule').value;
+
+        const result = FareCalculator.compute({ distance, duration, tolls, schedule });
+
+        // Update UI
+        document.getElementById('result-card').classList.remove('hidden');
+        document.getElementById('trip-type').textContent =
+          (result.baseDist < CONFIG.shortTripLimit) ? "Short Radius Floor Protected Route" : "Standard Engine Territory Route";
+        document.getElementById('final-price').textContent = `RM ${result.finalFare.toFixed(2)}`;
+
+        const durLabel = result.duration >= 60 ?
+          `${Math.floor(result.duration / 60)} hr ${Math.round(result.duration % 60)} mins` :
+          `${Math.round(result.duration)} mins`;
+        document.getElementById('dist-label').textContent =
+          `${result.baseDist.toFixed(2)} km (+${CONFIG.distanceBuffer}km system offset) / ${durLabel}`;
+        document.getElementById('base-km-label').textContent =
+          `RM ${CONFIG.baseDistanceRate.toFixed(2)}/km (Total calculated distance: ${result.payableDist.toFixed(2)} km)`;
+        document.getElementById('peak-label').textContent =
+          `${result.peakLabel} [x${result.multiplier.toFixed(2)}]`;
+        document.getElementById('operator-label').textContent =
+          `RM ${result.operatorFee.toFixed(2)} (Assessed from Base)`;
+        document.getElementById('toll-label').textContent =
+          `RM ${result.toll.toFixed(2)}`;
+
+        const guaranteeRow = document.getElementById('guarantee-row');
+        const guaranteeLabel = document.getElementById('guarantee-label');
+        if (result.floorCorrection > 0) {
+          guaranteeLabel.textContent = `Floor Match (+RM ${result.floorCorrection.toFixed(2)})`;
+          guaranteeRow.classList.remove('hidden');
+        } else {
+          guaranteeRow.classList.add('hidden');
         }
-    </script>
+      },
+
+      // ---- Reset ----
+      reset() {
+        document.getElementById('pickup').value = '';
+        document.getElementById('destination').value = '';
+        document.getElementById('pickup-badge').classList.add('hidden');
+        document.getElementById('dest-badge').classList.add('hidden');
+        document.getElementById('tolls').value = '0.00';
+        document.getElementById('result-card').classList.add('hidden');
+        document.getElementById('guarantee-row').classList.add('hidden');
+
+        state.pickup = { lat: null, lon: null, address: '', geoData: null };
+        state.destination = { lat: null, lon: null, address: '', geoData: null };
+        state.distance = null;
+        state.duration = null;
+        state.routeFetched = false;
+        state.markers.clearLayers();
+        state.routeLayer.clearLayers();
+        state.map.setView([CONFIG.defaultLat, CONFIG.defaultLon], CONFIG.defaultZoom);
+        this.setDefaultSchedule();
+        // Optionally re-attempt GPS
+        this.useGPS(false);
+      }
+    };
+
+    // ============================================================
+    //  BOOT
+    // ============================================================
+    document.addEventListener('DOMContentLoaded', () => app.init());
+  </script>
 </body>
 </html>
