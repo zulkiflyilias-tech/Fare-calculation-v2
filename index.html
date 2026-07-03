@@ -1,329 +1,445 @@
 <!DOCTYPE html>
-<html lang="ms">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Pengiraan Tambang Adil</title>
-    
-    <!-- Leaflet CSS & JS -->
+    <title>Route Estimator</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
     <style>
         :root {
-            --primary: #0056b3;
-            --dark: #212529;
-            --light: #f8f9fa;
-            --success: #198754;
+            --petal-bg: #121212;
+            --petal-card: #1e1e1e;
+            --petal-text: #ffffff;
+            --petal-text-muted: #aaaaaa;
+            --petal-accent: #3073ff;
+            --petal-border: #2d2d2d;
         }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        body, html {
             margin: 0;
             padding: 0;
-            background-color: var(--light);
-            color: var(--dark);
-        }
-
-        .container {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--petal-bg);
+            color: var(--petal-text);
+            overflow: hidden;
         }
 
         #map {
-            flex: 1;
             width: 100%;
-            min-height: 35vh;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            z-index: 1;
         }
 
-        .panel {
-            padding: 20px;
-            background: white;
-            box-shadow: 0 -3px 10px rgba(0,0,0,0.1);
-            border-radius: 16px 16px 0 0;
-            z-index: 1000;
-            max-height: 65vh;
-            overflow-y: auto;
-        }
-
-        h2 { margin-top: 0; font-size: 1.4rem; color: var(--primary); }
-
-        .input-group {
-            position: relative;
-            margin-bottom: 15px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-            font-size: 0.9rem;
-        }
-
-        input, select {
-            width: 100%;
+        /* Top Navigation Header - Petal Maps Style */
+        .search-container {
+            position: absolute;
+            top: 16px;
+            left: 5%;
+            width: 90%;
+            z-index: 10;
+            background: var(--petal-card);
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
             padding: 12px;
             box-sizing: border-box;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            font-size: 1rem;
+            border: 1px solid var(--petal-border);
         }
 
-        /* Cadangan Autocomplete Dropdown */
-        .suggestions {
+        .input-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            position: relative;
+        }
+
+        .input-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .icon-indicator {
+            width: 12px;
+            height: 12px;
+            margin-right: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .pickup-dot { background-color: #34a853; }
+        .dropoff-dot { background-color: #ea4335; }
+
+        .search-input {
+            width: 100%;
+            background: #2a2a2a;
+            border: none;
+            color: var(--petal-text);
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 14px;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        .search-input::placeholder {
+            color: var(--petal-text-muted);
+        }
+
+        /* Bottom Sheet UI - Petal Maps Signature */
+        .bottom-sheet {
             position: absolute;
-            background: white;
-            border: 1px solid #ccc;
+            bottom: 0;
+            left: 0;
             width: 100%;
-            z-index: 2000;
-            max-height: 200px;
-            overflow-y: auto;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            border-radius: 0 0 8px 8px;
-            display: none;
+            background: var(--petal-card);
+            border-top-left-radius: 24px;
+            border-top-right-radius: 24px;
+            z-index: 10;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+            transition: transform 0.3s ease-out;
+            box-sizing: border-box;
+            padding: 20px;
+            border-top: 1px solid var(--petal-border);
         }
 
-        .suggestions div {
-            padding: 10px;
-            cursor: pointer;
-            border-bottom: 1px solid #eee;
+        .drag-handle {
+            width: 40px;
+            height: 4px;
+            background: #444;
+            border-radius: 2px;
+            margin: -10px auto 15px auto;
         }
 
-        .suggestions div:hover { background-color: #f0f0f0; }
+        .route-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
 
-        .btn {
-            width: 100%;
-            background: var(--primary);
+        .distance-info h2 {
+            margin: 0;
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--petal-text);
+        }
+
+        .distance-info p {
+            margin: 4px 0 0 0;
+            font-size: 14px;
+            color: var(--petal-text-muted);
+        }
+
+        .calc-btn {
+            background: var(--petal-accent);
             color: white;
             border: none;
-            padding: 14px;
-            font-size: 1rem;
-            font-weight: bold;
-            border-radius: 8px;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 15px;
             cursor: pointer;
+            box-shadow: 0 4px 12px rgba(48, 115, 255, 0.3);
+        }
+
+        .calc-btn:disabled {
+            background: #333;
+            color: #777;
+            box-shadow: none;
+        }
+
+        /* Cross Check Options Wrapper */
+        .cross-check-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--petal-text-muted);
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .cross-check-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .external-map-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #252525;
+            border: 1px solid var(--petal-border);
+            border-radius: 12px;
+            padding: 12px;
+            text-decoration: none;
+            color: var(--petal-text);
+            font-size: 14px;
+            font-weight: 500;
             transition: background 0.2s;
         }
 
-        .btn:hover { background: #004085; }
-
-        .result-box {
-            margin-top: 20px;
-            padding: 15px;
-            background: #e9ecef;
-            border-radius: 8px;
-            display: none;
+        .external-map-btn:hover {
+            background: #2d2d2d;
         }
 
-        .fare-large {
-            font-size: 2rem;
-            font-weight: 800;
-            color: var(--success);
-            text-align: center;
-            margin: 10px 0;
+        .external-map-btn img {
+            width: 18px;
+            height: 18px;
+            margin-right: 8px;
+            border-radius: 4px;
         }
 
-        .details-table {
-            width: 100%;
-            font-size: 0.9rem;
-            margin-top: 10px;
+        /* Suggestions Dropdown Styling */
+        .suggestions-box {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #1a1a1a;
+            border: 1px solid var(--petal-border);
+            border-radius: 10px;
+            margin-top: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
         }
 
-        .details-table td { padding: 4px 0; }
-        .details-table td:last-child { text-align: right; font-weight: bold; }
+        .suggestion-item {
+            padding: 12px;
+            font-size: 13px;
+            border-bottom: 1px solid #252525;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .suggestion-item:hover {
+            background: #252525;
+        }
+        
+        /* Dark map adjustments */
+        .leaflet-container {
+            background: #111 !important;
+        }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <!-- Paparan Peta -->
-    <div id="map"></div>
-
-    <!-- Panel Kawalan / Input -->
-    <div class="panel">
-        <h2>Rideshare MY - Pengiraan Tambang Adil</h2>
-        
-        <!-- Lokasi Mula -->
-        <div class="input-group">
-            <label for="pickup">Lokasi Pengambilan (Pickup)</label>
-            <input type="text" id="pickup" placeholder="Cari lokasi mula..." autocomplete="off">
-            <div id="pickup-suggestions" class="suggestions"></div>
+    <div class="search-container">
+        <div class="input-row">
+            <div class="icon-indicator pickup-dot"></div>
+            <input type="text" id="pickup" class="search-input" placeholder="Enter Pickup Location..." autocomplete="off">
+            <div id="pickup-suggestions" class="suggestions-box" style="display: none;"></div>
         </div>
-
-        <!-- Lokasi Tamat -->
-        <div class="input-group">
-            <label for="dropoff">Lokasi Destinasi (Dropoff)</label>
-            <input type="text" id="dropoff" placeholder="Cari destinasi..." autocomplete="off">
-            <div id="dropoff-suggestions" class="suggestions"></div>
-        </div>
-
-        <!-- Tetapan Faktor Trafik / Masa Realiti -->
-        <div class="input-group">
-            <label for="traffic">Keadaan Trafik Semasa (Multiplier)</label>
-            <select id="traffic">
-                <option value="1.0">Lancar (1.0x)</option>
-                <option value="1.2">Kesesakan Sederhana (1.2x)</option>
-                <option value="1.5">Kesesakan Tinggi / Waktu Puncak (1.5x)</option>
-                <option value="2.0">Kesesakan Melampau / Hujan Lebat (2.0x)</option>
-            </select>
-        </div>
-
-        <button class="btn" onclick="kiraTambang()">Kira Estimasi Tambang</button>
-
-        <!-- Paparan Keputusan Matematik Sebenar -->
-        <div id="result" class="result-box">
-            <label>Estimasi Tambang Adil (Kos Sebenar):</label>
-            <div class="fare-large" id="total-fare">RM0.00</div>
-            
-            <table class="details-table">
-                <tr><td>Jarak Anggaran:</td><td id="res-distance">0.0 km</td></tr>
-                <tr><td>Masa Anggaran:</td><td id="res-time">0 minit</td></tr>
-                <tr style="border-top: 1px solid #ccc;"><td colspan="2"><b>Pecahan Kos Komponen:</b></td></tr>
-                <tr><td>Tambang Asas (Base):</td><td id="res-base">RM8.00</td></tr>
-                <tr><td>Kos Jarak (RM1.50/km):</td><td id="res-dist-cost">RM0.00</td></tr>
-                <tr><td>Kos Masa (RM0.40/min):</td><td id="res-time-cost">RM0.00</td></tr>
-                <tr><td>Faktor Lonjakan (Surge):</td><td id="res-surge">1.0x</td></tr>
-            </table>
+        <div class="input-row">
+            <div class="icon-indicator dropoff-dot"></div>
+            <input type="text" id="dropoff" class="search-input" placeholder="Enter Dropoff Location..." autocomplete="off">
+            <div id="dropoff-suggestions" class="suggestions-box" style="display: none;"></div>
         </div>
     </div>
-</div>
 
-<script>
-    // 1. Inisialisasi Peta - Fokus Semenanjung Malaysia (Kuala Lumpur)
-    const map = L.map('map').setView([3.1390, 101.6869], 8);
-    
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+    <div id="map"></div>
 
-    let pickupMarker, dropoffMarker, routeLine;
-    let pickupCoords = null, dropoffCoords = null;
+    <div class="bottom-sheet">
+        <div class="drag-handle"></div>
+        <div class="route-summary">
+            <div class="distance-info">
+                <h2 id="display-distance">-- km</h2>
+                <p id="display-duration">Select pickup & dropoff</p>
+            </div>
+            <button id="calc-btn" class="calc-btn" onclick="calculateRoute()">Find Route</button>
+        </div>
 
-    // Tetapan Struktur Kos Cadangan Sebenar
-    const KADAR_BASE = 8.00;
-    const KADAR_KM = 1.50;
-    const KADAR_MINIT = 0.40;
+        <div class="cross-check-title">Cross Check Verification</div>
+        <div class="cross-check-grid">
+            <a id="link-google" href="#" target="_blank" class="external-map-btn" style="pointer-events: none; opacity: 0.5;">
+                <img src="https://www.google.com/images/branding/product/ico/maps16_b.png" alt="Google">
+                Google Maps
+            </a>
+            <a id="link-waze" href="#" target="_blank" class="external-map-btn" style="pointer-events: none; opacity: 0.5;">
+                <img src="https://g.vawme.com/waze/waze_favicon_v2.ico" onerror="this.src='https://www.waze.com/favicon.ico'" alt="Waze">
+                Waze
+            </a>
+        </div>
+    </div>
 
-    // 2. Integrasi Geocoding Menggunakan Photon API (Percuma & Pantas)
-    setupAutocomplete('pickup', 'pickup-suggestions', (coords) => {
-        pickupCoords = coords;
-        if (pickupMarker) map.removeLayer(pickupMarker);
-        pickupMarker = L.marker([coords.lat, coords.lon], {draggable: false}).addTo(map).bindPopup("Pickup").openPopup();
-        kemaskiniPandanganPeta();
-    });
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    setupAutocomplete('dropoff', 'dropoff-suggestions', (coords) => {
-        dropoffCoords = coords;
-        if (dropoffMarker) map.removeLayer(dropoffMarker);
-        dropoffMarker = L.marker([coords.lat, coords.lon], {draggable: false}).addTo(map).bindPopup("Dropoff").openPopup();
-        kemaskiniPandanganPeta();
-    });
+    <script>
+        // API Configurations
+        const ORS_API_KEY = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImVlYzI5ZTA0OTM2YTRlZDNhNjk1NTcyNGQ1OTJmYmNjIiwiaCI6Im11cm11cjY0In0=';
+        
+        let map;
+        let routeLayer = null;
+        let pickupCoords = null;
+        let dropoffCoords = null;
+        let pickupMarker = null;
+        let dropoffMarker = null;
 
-    function setupAutocomplete(inputId, suggestionsId, onSelect) {
-        const input = document.getElementById(inputId);
-        const suggestionsBox = document.getElementById(suggestionsId);
-
-        input.addEventListener('input', debounce(async function() {
-            const query = input.value;
-            if (query.length < 3) { suggestionsBox.style.display = 'none'; return; }
-
-            // Menghadkan carian geocoding sekitar Malaysia sahaja (Semenanjung fokus)
-            const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&bias={{101.68,3.13}}&limit=5`;
+        // Initialize Map centered dynamically over Peninsular Malaysia
+        function initMap() {
+            map = L.map('map', { zoomControl: false }).setView([4.2105, 101.9758], 7);
             
-            try {
-                const response = await fetch(url);
-                const data = await response.json();
-                suggestionsBox.innerHTML = '';
-                
-                // Tapis entiti yang berada dalam radius Malaysia sahaja
-                const myFeatures = data.features.filter(f => f.properties.countrycode === 'MY');
+            // CartoDB Dark Matter tiles match Petal Maps premium dark aesthetics perfectly
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap &copy; CARTO'
+            }).addTo(map);
+        }
 
-                if(myFeatures.length === 0) { suggestionsBox.style.display = 'none'; return; }
+        // Setup Autocomplete Geocoding Hooked into OpenRouteService
+        function setupAutocomplete(inputElement, suggestionsElement, type) {
+            let timeout = null;
+            
+            inputElement.addEventListener('input', () => {
+                clearTimeout(timeout);
+                const query = inputElement.value.trim();
+                if (query.length < 3) {
+                    suggestionsElement.style.display = 'none';
+                    return;
+                }
 
-                myFeatures.forEach(feature => {
-                    const props = feature.properties;
-                    const name = `${props.name || ''} ${props.street || ''} ${props.city || ''}`.trim();
-                    const div = document.createElement('div');
-                    div.textContent = name;
-                    div.onclick = () => {
-                        input.value = name;
-                        suggestionsBox.style.display = 'none';
-                        onSelect({ lat: feature.geometry.coordinates[1], lon: feature.geometry.coordinates[0] });
-                    };
-                    suggestionsBox.appendChild(div);
-                });
-                suggestionsBox.style.display = 'block';
-            } catch (err) {
-                console.error("Ralat Geocoding:", err);
+                timeout = setTimeout(() => {
+                    // Focus restrictions biased tightly near local operational zones inside Malaysia
+                    fetch(`https://api.openrouteservice.org/geocode/search?api_key=${ORS_API_KEY}&text=${encodeURIComponent(query)}&boundary.country=MY&size=5`)
+                        .then(res => res.json())
+                        .then(data => {
+                            suggestionsElement.innerHTML = '';
+                            if (data.features && data.features.length > 0) {
+                                data.features.forEach(feature => {
+                                    const item = document.createElement('div');
+                                    item.className = 'suggestion-item';
+                                    item.innerText = feature.properties.label;
+                                    item.addEventListener('click', () => {
+                                        inputElement.value = feature.properties.label;
+                                        suggestionsElement.style.display = 'none';
+                                        
+                                        const coords = feature.geometry.coordinates; // [lon, lat]
+                                        setCoordinate(type, [coords[1], coords[0]]);
+                                    });
+                                    suggestionsElement.appendChild(item);
+                                });
+                                suggestionsElement.style.display = 'block';
+                            } else {
+                                suggestionsElement.style.display = 'none';
+                            }
+                        }).catch(err => console.error(err));
+                }, 400);
+            });
+
+            // Close suggestions dropdown when tapping elsewhere
+            document.addEventListener('click', (e) => {
+                if (e.target !== inputElement) {
+                    suggestionsElement.style.display = 'none';
+                }
+            });
+        }
+
+        function setCoordinate(type, latlng) {
+            if (type === 'pickup') {
+                pickupCoords = latlng;
+                if (pickupMarker) map.removeLayer(pickupMarker);
+                pickupMarker = L.marker(latlng).addTo(map).bindPopup("Pickup").openPopup();
+                map.panTo(latlng);
+            } else {
+                dropoffCoords = latlng;
+                if (dropoffMarker) map.removeLayer(dropoffMarker);
+                dropoffMarker = L.marker(latlng).addTo(map).bindPopup("Dropoff").openPopup();
+                map.panTo(latlng);
             }
-        }, 400));
-    }
 
-    function debounce(func, delay) {
-        let timer;
-        return function() {
-            clearTimeout(timer);
-            timer = setTimeout(() => func.apply(this, arguments), delay);
+            if (pickupCoords && dropoffCoords) {
+                map.fitBounds(L.latLngBounds([pickupCoords, dropoffCoords]), { padding: [80, 80] });
+            }
+        }
+
+        // Direct Route Processing
+        function calculateRoute() {
+            if (!pickupCoords || !dropoffCoords) {
+                alert("Please select valid pickup and dropoff points from suggestions first.");
+                return;
+            }
+
+            const btn = document.getElementById('calc-btn');
+            btn.disabled = true;
+            btn.innerText = "Routing...";
+
+            // Payload structures parameters matching [longitude, latitude] arrays natively expected by ORS
+            const payload = {
+                coordinates: [
+                    [pickupCoords[1], pickupCoords[0]], 
+                    [dropoffCoords[1], dropoffCoords[0]]
+                ]
+            };
+
+            fetch(`https://api.openrouteservice.org/v2/directions/driving-car/geojson`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': ORS_API_KEY,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(res => {
+                if(!res.ok) throw new Error("Failed to query path details.");
+                return res.json();
+            })
+            .then(data => {
+                const properties = data.features[0].properties;
+                const distanceKm = (properties.summary.distance / 1000).toFixed(2);
+                const durationMins = Math.round(properties.summary.duration / 60);
+
+                // Update Bottom UI display element
+                document.getElementById('display-distance').innerText = `${distanceKm} km`;
+                document.getElementById('display-duration').innerText = `Est. Driving Time: ~${durationMins} mins`;
+
+                // Render geometry details over Leaflet
+                if (routeLayer) map.removeLayer(routeLayer);
+                routeLayer = L.geoJSON(data, {
+                    style: { color: '#3073ff', weight: 5, opacity: 0.85 }
+                }).addTo(map);
+
+                map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
+
+                // Construct Deep links instantly validating data metrics
+                updateCrossCheckLinks();
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Error structuralizing coordinates or downloading routing layout properties.");
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerText = "Find Route";
+            });
+        }
+
+        function updateCrossCheckLinks() {
+            const gLink = document.getElementById('link-google');
+            const wLink = document.getElementById('link-waze');
+
+            // Formulate standard cross-device external system navigation chains
+            const googleUrl = `https://www.google.com/maps/dir/?api=1&origin=${pickupCoords[0]},${pickupCoords[1]}&destination=${dropoffCoords[0]},${dropoffCoords[1]}&travelmode=driving`;
+            const wazeUrl = `https://waze.com/ul?ll=${dropoffCoords[0]},${dropoffCoords[1]}&navigate=yes&from=${pickupCoords[0]},${pickupCoords[1]}`;
+
+            gLink.href = googleUrl;
+            wLink.href = wazeUrl;
+
+            gLink.style.pointerEvents = "auto"; gLink.style.opacity = "1";
+            wLink.style.pointerEvents = "auto"; wLink.style.opacity = "1";
+        }
+
+        // Boot system scripts on window initialization finish
+        window.onload = () => {
+            initMap();
+            setupAutocomplete(document.getElementById('pickup'), document.getElementById('pickup-suggestions'), 'pickup');
+            setupAutocomplete(document.getElementById('dropoff'), document.getElementById('dropoff-suggestions'), 'dropoff');
         };
-    }
-
-    function kemaskiniPandanganPeta() {
-        if (pickupCoords && dropoffCoords) {
-            const bounds = L.latLngBounds([pickupCoords.lat, pickupCoords.lon], [dropoffCoords.lat, dropoffCoords.lon]);
-            map.fitBounds(bounds, { padding: [50, 50] });
-        } else if (pickupCoords) {
-            map.setView([pickupCoords.lat, pickupCoords.lon], 14);
-        }
-    }
-
-    // 3. Logik Simulasi Pengiraan Menggunakan Rumus Matematik Betul (Darab)
-    async function kiraTambang() {
-        if (!pickupCoords || !dropoffCoords) {
-            alert("Sila pilih lokasi Pickup dan Dropoff yang sah terlebih dahulu.");
-            return;
-        }
-
-        // Pengiraan jarak lurus Haversine sebagai fallback pantas/estimasi asas
-        const jarakKm = kiraJarakHaversine(pickupCoords.lat, pickupCoords.lon, dropoffCoords.lat, dropoffCoords.lon) * 1.3; // Tambah faktor 30% jalan raya melengkung
-        
-        // Anggaran masa pemanduan (Purata kelajuan bandar 40km/j)
-        const masaMinit = (jarakKm / 40) * 60;
-
-        // Ambil Nilai Multiplier dari UI
-        const multiplier = parseFloat(document.getElementById('traffic').value);
-
-        // FORMULA BETUL (Logik Pendaraban Mengikut Pembetulan Kesilapan Fail Infografik)
-        const kosJarak = jarakKm * KADAR_KM;
-        const kosMasa = masaMinit * KADAR_MINIT;
-        const totalFare = (KADAR_BASE + kosJarak + kosMasa) * multiplier;
-
-        // Visualisasikan garisan arah mudah pada peta
-        if (routeLine) map.removeLayer(routeLine);
-        routeLine = L.polyline([[pickupCoords.lat, pickupCoords.lon], [dropoffCoords.lat, dropoffCoords.lon]], {color: 'blue', weight: 4}).addTo(map);
-
-        // Paparkan Keputusan Pada Skrin
-        document.getElementById('total-fare').textContent = `RM${totalFare.toFixed(2)}`;
-        document.getElementById('res-distance').textContent = `${jarakKm.toFixed(1)} km`;
-        document.getElementById('res-time').textContent = `${Math.round(masaMinit)} minit`;
-        document.getElementById('res-dist-cost').textContent = `RM${kosJarak.toFixed(2)}`;
-        document.getElementById('res-time-cost').textContent = `RM${kosMasa.toFixed(2)}`;
-        document.getElementById('res-surge').textContent = `${multiplier}x`;
-        
-        document.getElementById('result').style.display = 'block';
-    }
-
-    // Rumus Matematik Tulen Trigonometri untuk Estimasi Jarak Geografi
-    function kiraJarakHaversine(lat1, lon1, lat2, lon2) {
-        const R = 6371; // Radius bumi dalam KM
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                  Math.sin(dLon/2) * Math.sin(dLon/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return R * c;
-    }
-</script>
-
+    </script>
 </body>
 </html>
