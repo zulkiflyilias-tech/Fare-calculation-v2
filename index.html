@@ -10,6 +10,7 @@
             --primary-color: #00B14F; 
             --dark-color: #2A2A2A;
             --light-bg: #F8F9FA;
+            --border-radius: 12px;
         }
 
         body {
@@ -39,11 +40,37 @@
             margin-top: 0;
             color: var(--primary-color);
             font-weight: 700;
+            font-size: 22px;
+            letter-spacing: -0.5px;
+        }
+
+        /* Grab Native App Style Address Container */
+        .grab-route-container {
+            position: relative;
+            background: #F6F6F6;
+            border-radius: var(--border-radius);
+            padding: 16px 16px 16px 44px;
+            margin-bottom: 20px;
+        }
+
+        .grab-route-container::before {
+            content: '';
+            position: absolute;
+            left: 21px;
+            top: 32px;
+            bottom: 32px;
+            width: 2px;
+            border-left: 2px dashed #BDBDBD;
+            z-index: 1;
         }
 
         .input-group {
             position: relative;
-            margin-bottom: 16px;
+            margin-bottom: 0;
+        }
+
+        .input-group:first-child {
+            margin-bottom: 14px;
         }
 
         .input-wrapper {
@@ -52,40 +79,57 @@
             align-items: center;
         }
 
-        label {
-            display: block;
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-            margin-bottom: 6px;
-            color: #666;
+        /* Native Node Icons */
+        .route-node {
+            position: absolute;
+            left: -28px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            z-index: 2;
+            background: white;
+        }
+
+        .node-pickup {
+            border: 3px solid var(--primary-color);
+            top: calc(50% - 9px);
+        }
+
+        .node-dropoff {
+            border: 3px solid #EB5757;
+            top: calc(50% - 9px);
         }
 
         input {
             width: 100%;
-            padding: 12px;
-            padding-right: 40px;
-            border: 1px solid #E0E0E0;
-            border-radius: 8px;
+            padding: 10px 36px 10px 0;
+            border: none;
+            background: transparent;
+            border-bottom: 1px solid #E0E0E0;
             box-sizing: border-box;
-            font-size: 14px;
-            transition: border 0.2s;
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--dark-color);
+        }
+
+        .input-group:last-child input {
+            border-bottom: none;
         }
 
         input:focus {
-            border-color: var(--primary-color);
             outline: none;
+            border-bottom-color: var(--primary-color);
         }
 
         .geo-btn {
             position: absolute;
-            right: 12px;
+            right: 0;
             background: none;
             border: none;
             cursor: pointer;
-            font-size: 18px;
+            font-size: 16px;
             color: var(--primary-color);
-            padding: 0;
+            padding: 4px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -93,43 +137,47 @@
         }
 
         .geo-btn:hover {
-            transform: scale(1.15);
+            transform: scale(1.1);
         }
 
         .suggestions {
             position: absolute;
             top: 100%;
-            left: 0;
-            right: 0;
+            left: -44px;
+            right: -16px;
             background: white;
             border: 1px solid #E0E0E0;
-            border-top: none;
-            border-radius: 0 0 8px 8px;
-            max-height: 200px;
+            border-radius: var(--border-radius);
+            max-height: 220px;
             overflow-y: auto;
             z-index: 2000;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            margin-top: 4px;
         }
 
         .suggestion-item {
-            padding: 10px 12px;
+            padding: 12px 16px;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 14px;
             border-bottom: 1px solid #F5F5F5;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .suggestion-item:hover {
             background-color: #F0F9F4;
+            color: var(--primary-color);
         }
 
         #fare-container {
             margin-top: auto;
             background: #F9F9F9;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             padding: 16px;
             border: 1px solid #EAEAEA;
             display: none;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
         }
 
         #total-fare-box {
@@ -137,7 +185,6 @@
             justify-content: space-between;
             align-items: center;
             cursor: pointer;
-            padding: 4px 0;
         }
 
         .fare-price {
@@ -147,8 +194,12 @@
         }
 
         .toggle-arrow {
-            font-size: 14px;
-            color: #888;
+            font-size: 13px;
+            font-weight: 600;
+            color: #777;
+            background: #EEE;
+            padding: 4px 8px;
+            border-radius: 20px;
         }
 
         #fare-breakdown {
@@ -163,12 +214,14 @@
             display: flex;
             justify-content: space-between;
             margin-bottom: 8px;
-            color: #555;
+            color: #666;
         }
 
         .breakdown-row.total-calc {
-            font-weight: 600;
+            font-weight: 700;
             color: #000;
+            font-size: 15px;
+            margin-top: 4px;
         }
 
         .surge-badge {
@@ -178,6 +231,7 @@
             border-radius: 4px;
             font-size: 11px;
             font-weight: 700;
+            margin-right: 4px;
         }
 
         #map {
@@ -190,11 +244,12 @@
             background: var(--primary-color);
             color: white;
             border: none;
-            padding: 14px;
-            border-radius: 8px;
+            padding: 16px;
+            border-radius: var(--border-radius);
             font-size: 16px;
-            font-weight: 600;
+            font-weight: 700;
             cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 177, 79, 0.2);
         }
 
         #book-btn:hover {
@@ -205,9 +260,9 @@
             background: #FFF0F0;
             color: #D93838;
             font-size: 13px;
-            padding: 10px;
-            border-radius: 6px;
-            margin-bottom: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
             display: none;
             border: 1px solid #FFE0E0;
         }
@@ -221,32 +276,34 @@
         
         <div id="error-box" class="error-msg"></div>
 
-        <div class="input-group">
-            <label for="pickup">Pickup Location</label>
-            <div class="input-wrapper">
-                <input type="text" id="pickup" placeholder="Enter pickup location..." autocomplete="off">
-                <button class="geo-btn" id="current-loc-btn" title="Use current location">🎯</button>
+        <div class="grab-route-container">
+            <div class="input-group">
+                <div class="route-node node-pickup"></div>
+                <div class="input-wrapper">
+                    <input type="text" id="pickup" placeholder="Enter pickup location..." autocomplete="off">
+                    <button class="geo-btn" id="current-loc-btn" title="Use current location">🎯</button>
+                </div>
+                <div id="pickup-suggestions" class="suggestions"></div>
             </div>
-            <div id="pickup-suggestions" class="suggestions"></div>
-        </div>
 
-        <div class="input-group">
-            <label for="dropoff">Drop-off Location</label>
-            <div class="input-wrapper">
-                <input type="text" id="dropoff" placeholder="Where to?" autocomplete="off">
+            <div class="input-group">
+                <div class="route-node node-dropoff"></div>
+                <div class="input-wrapper">
+                    <input type="text" id="dropoff" placeholder="Where to?" autocomplete="off">
+                </div>
+                <div id="dropoff-suggestions" class="suggestions"></div>
             </div>
-            <div id="dropoff-suggestions" class="suggestions"></div>
         </div>
 
         <div id="fare-container">
             <div id="total-fare-box" onclick="toggleBreakdown()">
                 <div>
-                    <div style="font-size: 12px; color: #777; font-weight: 600;">ESTIMATED FARE</div>
+                    <div style="font-size: 11px; color: #777; font-weight: 700; letter-spacing: 0.5px;">ESTIMATED FARE</div>
                     <div class="fare-price" id="total-fare-display">RM 0.00</div>
                 </div>
-                <div style="text-align: right;">
+                <div style="text-align: right; display: flex; align-items: center;">
                     <span id="surge-tag"></span>
-                    <span class="toggle-arrow" id="arrow-icon">▼ Details</span>
+                    <span class="toggle-arrow" id="arrow-icon">Details ▼</span>
                 </div>
             </div>
             
@@ -288,12 +345,8 @@
         let pickupCoords = null;
         let dropoffCoords = null;
 
-        // =========================================================================
-        // FIXED ARCHITECTURAL LAYER
-        // =========================================================================
         const AppArchitecture = {
             checkCache: function(key) {
-                // FIXED: encodeURIComponent completely bypasses the ASCII/btoa limitations
                 const safeKey = encodeURIComponent(key.toLowerCase().trim());
                 const cached = sessionStorage.getItem(`geo_${safeKey}`);
                 return cached ? JSON.parse(cached) : null;
@@ -420,7 +473,7 @@
             if (surge > 1) {
                 document.getElementById('row-surge').style.display = 'flex';
                 document.getElementById('txt-surge-mult').innerText = `${surge}x`;
-                document.getElementById('surge-tag').innerHTML = `<span class="surge-badge">⚡ Surge active</span>`;
+                document.getElementById('surge-tag').innerHTML = `<span class="surge-badge">⚡ Surge</span>`;
             } else {
                 document.getElementById('row-surge').style.display = 'none';
                 document.getElementById('surge-tag').innerHTML = '';
@@ -512,10 +565,10 @@
             const arrow = document.getElementById('arrow-icon');
             if (breakdown.style.display === 'none' || !breakdown.style.display) {
                 breakdown.style.display = 'block';
-                arrow.innerText = '▲ Close';
+                arrow.innerText = 'Details ▲';
             } else {
                 breakdown.style.display = 'none';
-                arrow.innerText = '▼ Details';
+                arrow.innerText = 'Details ▼';
             }
         }
 
