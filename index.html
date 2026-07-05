@@ -3,472 +3,513 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rideshare MY - Compact Fare Estimator</title>
+    <title>GrabGo Malaysia - Ride Hailing</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
+        :root {
+            --primary-color: #00B14F; /* Classic MY Ride-hailing Green */
+            --dark-color: #2A2A2A;
+            --light-bg: #F8F9FA;
+        }
+
         body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #f8f9fa;
+            background-color: var(--light-bg);
+            color: var(--dark-color);
             display: flex;
-            flex-direction: column;
             height: 100vh;
-            overflow: hidden; 
-            color: #212529;
+            overflow: hidden;
         }
-        #container {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-        }
-        #map {
-            height: 30vh;
-            width: 100%;
-            z-index: 1;
-        }
-        #search-panel {
-            flex: 1;
+
+        /* Sidebar UI */
+        #booking-panel {
+            width: 380px;
             background: white;
-            padding: 14px 16px;
-            box-shadow: 0 -4px 20px rgba(0,0,0,0.05);
-            z-index: 10;
-            box-sizing: border-box;
-            border-top-left-radius: 16px;
-            border-top-right-radius: 16px;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.1);
+            z-index: 1000;
             display: flex;
             flex-direction: column;
+            padding: 24px;
+            box-sizing: border-box;
         }
+
         h2 {
-            margin: 0 0 10px 0;
-            font-size: 18px;
+            margin-top: 0;
+            color: var(--primary-color);
             font-weight: 700;
-            color: #111;
         }
+
         .input-group {
             position: relative;
-            margin-bottom: 8px;
+            margin-bottom: 16px;
         }
+
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+            color: #666;
+        }
+
         input {
             width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #e0e0e0;
+            padding: 12px;
+            border: 1px solid #E0E0E0;
             border-radius: 8px;
-            font-size: 14px;
             box-sizing: border-box;
-            background-color: #f9f9f9;
+            font-size: 14px;
+            transition: border 0.2s;
         }
+
         input:focus {
+            border-color: var(--primary-color);
             outline: none;
-            border-color: #8e24aa;
-            background-color: #fff;
         }
+
+        /* Autocomplete Suggestions */
         .suggestions {
             position: absolute;
             top: 100%;
             left: 0;
             right: 0;
             background: white;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            max-height: 180px; 
+            border: 1px solid #E0E0E0;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            max-height: 200px;
             overflow-y: auto;
-            z-index: 1000;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            display: none;
+            z-index: 2000;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
+
         .suggestion-item {
             padding: 10px 12px;
             cursor: pointer;
             font-size: 13px;
-            line-height: 1.4;
-            border-bottom: 1px solid #f5f5f5;
+            border-bottom: 1px solid #F5F5F5;
         }
+
         .suggestion-item:hover {
-            background-color: #f5f5f5;
+            background-color: #F0F9F4;
         }
-        #result-card {
-            background: #1c1c1e;
-            color: white;
-            padding: 16px 14px;
+
+        /* Pricing Card */
+        #fare-container {
+            margin-top: auto;
+            background: #F9F9F9;
             border-radius: 12px;
-            margin-top: 8px;
-            cursor: pointer;
+            padding: 16px;
+            border: 1px solid #EAEAEA;
             display: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
-        .fare-header-row {
+
+        #total-fare-box {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 8px;
-        }
-        .fare-header {
-            font-size: 32px;
-            font-weight: 800;
-            color: #b388ff;
-        }
-        .toggle-icon {
-            font-size: 11px;
-            color: #8e8e93;
-            background: rgba(255,255,255,0.1);
-            padding: 2px 8px;
-            border-radius: 12px;
-        }
-        .fare-meta {
-            font-size: 13px;
-            color: #fff;
-            display: flex;
-            justify-content: space-between;
-            font-weight: 500;
-        }
-        #invoice-details {
-            margin-top: 10px;
-            border-top: 1px dashed #3a3a3c;
-            padding-top: 10px;
-            display: none;
-        }
-        .detail-row {
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-            color: #aeaeb2;
-            margin-bottom: 6px;
-        }
-        .detail-row.total-bold {
-            color: #fff;
-            font-weight: 600;
-            border-top: 1px solid #2c2c2e;
-            padding-top: 6px;
-            margin-bottom: 0;
+            cursor: pointer;
+            padding: 4px 0;
         }
 
-        @media(min-width: 768px) {
-            #container {
-                flex-direction: row-reverse;
-            }
-            #map {
-                height: 100%;
-                flex: 1;
-            }
-            #search-panel {
-                width: 380px;
-                height: 100%;
-                border-radius: 0;
-            }
+        .fare-price {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--dark-color);
+        }
+
+        .toggle-arrow {
+            font-size: 14px;
+            color: #888;
+            transition: transform 0.2s;
+        }
+
+        #fare-breakdown {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed #DDD;
+            display: none;
+            font-size: 14px;
+        }
+
+        .breakdown-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            color: #555;
+        }
+
+        .breakdown-row.total-calc {
+            font-weight: 600;
+            color: #000;
+        }
+
+        .surge-badge {
+            background: #FFEBEB;
+            color: #D93838;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        /* Map Container */
+        #map {
+            flex-grow: 1;
+            height: 100%;
+        }
+
+        #book-btn {
+            width: 100%;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 16px;
+            cursor: pointer;
+        }
+
+        #book-btn:hover {
+            background: #009643;
+        }
+
+        .error-msg {
+            color: #D93838;
+            font-size: 13px;
+            margin-top: 8px;
+            display: none;
         }
     </style>
 </head>
 <body>
 
-<div id="container">
-    <div id="map"></div>
-    
-    <div id="search-panel">
-        <h2>Fare Estimator</h2>
+    <div id="booking-panel">
+        <h2>GrabGo Malaysia</h2>
+        <p style="color:#666; font-size:13px; margin:-10px 0 20px 0;">Reliable rides across Peninsular & East Malaysia</p>
         
         <div class="input-group">
-            <input type="text" id="pickup" placeholder="Enter Pickup Location..." autocomplete="off" enterkeyhint="search">
+            <label for="pickup">Pickup Location</label>
+            <input type="text" id="pickup" placeholder="Enter pickup location..." autocomplete="off">
             <div id="pickup-suggestions" class="suggestions"></div>
         </div>
-        
+
         <div class="input-group">
-            <input type="text" id="dropoff" placeholder="Enter Drop-off Location..." autocomplete="off" enterkeyhint="search">
+            <label for="dropoff">Drop-off Location</label>
+            <input type="text" id="dropoff" placeholder="Where to?" autocomplete="off">
             <div id="dropoff-suggestions" class="suggestions"></div>
         </div>
 
-        <div id="result-card" onclick="toggleInvoice()">
-            <div class="fare-header-row">
-                <div id="total-fare" class="fare-header">RM 0</div>
-                <span class="toggle-icon" id="toggle-lbl">Details</span>
-            </div>
-            <div class="fare-meta">
-                <span id="fare-distance">0 km</span>
-                <span id="fare-duration">0 mins</span>
+        <div id="error-box" class="error-msg"></div>
+
+        <div id="fare-container">
+            <div id="total-fare-box" onclick="toggleBreakdown()">
+                <div>
+                    <div style="font-size: 12px; color: #777; font-weight: 600;">ESTIMATED FARE</div>
+                    <div class="fare-price" id="total-fare-display">RM 0.00</div>
+                </div>
+                <div style="text-align: right;">
+                    <span id="surge-tag"></span>
+                    <span class="toggle-arrow" id="arrow-icon">▼ Click for details</span>
+                </div>
             </div>
             
-            <div id="invoice-details">
-                <div class="detail-row">
-                    <span>Base Fare</span>
-                    <span id="calc-base-fare">RM 0.00</span>
+            <div id="fare-breakdown">
+                <div class="breakdown-row"><span>Base Fare</span><span>RM 5.00</span></div>
+                <div class="breakdown-row"><span>Distance Rate (<span id="txt-dist">0</span> km)</span><span id="txt-dist-fare">RM 0.00</span></div>
+                <div class="breakdown-row"><span>Time Rate (<span id="txt-time">0</span> mins)</span><span id="txt-time-fare">RM 0.00</span></div>
+                <div class="breakdown-row" id="row-min-fare" style="display:none; color: #00B14F; font-style: italic;">
+                    <span>Minimum Fare Applied</span><span>Base Upgraded</span>
                 </div>
-                <div class="detail-row">
-                    <span>Distance Fare</span>
-                    <span id="calc-ride-distance-rate">RM 0.00</span>
+                <div class="breakdown-row" id="row-surge" style="display:none;">
+                    <span>Surge Multiplier</span><span id="txt-surge-mult">1.0x</span>
                 </div>
-                <div class="detail-row">
-                    <span>PLUS Tolls (Est.)</span>
-                    <span id="calc-tolls">RM 0.00</span>
-                </div>
-                <div class="detail-row">
-                    <span>Driver's Incentive (Traffic Adjust)</span>
-                    <span id="calc-incentive">RM 0.00</span>
-                </div>
-                
-                <div class="detail-row" id="deadhead-km-row" style="display: none;">
-                    <span>Out-of-Zone Surcharge</span>
-                    <span id="calc-deadhead-km">RM 0.00</span>
-                </div>
-
-                <div class="detail-row total-bold">
-                    <span>Rounded Final Total</span>
-                    <span id="calc-grand" style="color: #b388ff;">RM 0.00</span>
-                </div>
+                <div class="breakdown-row total-calc"><span>Subtotal</span><span id="txt-subtotal">RM 0.00</span></div>
             </div>
         </div>
+
+        <button id="book-btn" style="display:none;">Confirm Booking</button>
     </div>
-</div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <div id="map"></div>
 
-<script>
-    const map = L.map('map').setView([3.1390, 101.6869], 10);
-    
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    let pickupMarker = null, dropoffMarker = null, routeLine = null;
-    let pickupCoords = null, dropoffCoords = null;
-
-    setupAutocomplete('pickup', 'pickup-suggestions', (coords) => {
-        pickupCoords = coords;
-        if (pickupMarker) map.removeLayer(pickupMarker);
-        pickupMarker = L.marker([coords.lat, coords.lon]).addTo(map);
-        checkAndProcessRoute();
-    });
-
-    setupAutocomplete('dropoff', 'dropoff-suggestions', (coords) => {
-        dropoffCoords = coords;
-        if (dropoffMarker) map.removeLayer(dropoffMarker);
-        dropoffMarker = L.marker([coords.lat, coords.lon]).addTo(map);
-        checkAndProcessRoute();
-    });
-
-    function expandAddress(props) {
-        const parts = [];
-        if (props.name) parts.push(props.name);
-        if (props.street) parts.push(props.street);
-        if (props.district) parts.push(props.district);
-        if (props.city || props.town) parts.push(props.city || props.town);
-        if (props.state) parts.push(props.state);
+    <script>
+        // CONFIGURATION & CONFIG CONSTANTS
+        const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImVlYzI5ZTA0OTM2YTRlZDNhNjk1NTcyNGQ1OTJmYmNjIiwiaCI6Im11cm11cjY0In0=";
         
-        return parts.length > 0 ? parts.join(', ') : 'Unknown Location';
-    }
+        // Fare Metrics Matrix (Standard Malaysia Ride-Hailing Metric)
+        const BASE_FARE = 5.00;
+        const RATE_PER_KM = 1.20;
+        const RATE_PER_MIN = 0.25;
+        const MIN_FARE = 8.00;
 
-    function setupAutocomplete(inputId, suggestionsId, onSelect) {
-        const input = document.getElementById(inputId);
-        const suggestionsBox = document.getElementById(suggestionsId);
-        let debounceTimeout;
+        // Application State
+        let map;
+        let routeLayer = null;
+        let pickupMarker = null;
+        let dropoffMarker = null;
+        
+        let pickupCoords = null;
+        let dropoffCoords = null;
 
-        input.addEventListener('input', () => {
-            clearTimeout(debounceTimeout);
-            const query = input.value.trim();
-            if (query.length < 3) { 
-                suggestionsBox.innerHTML = ''; 
-                suggestionsBox.style.display = 'none';
-                return; 
+        // Initialize Map focused centrally on Malaysia (Kuala Lumpur coordinates)
+        function initMap() {
+            map = L.map('map').setView([3.1390, 101.6869], 11);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+        }
+
+        // Auto-compute current Malaysia Surge factor based on operational Peak Hours
+        function getSurgeFactor() {
+            const now = new Date();
+            const hour = now.getHours();
+            const day = now.getDay(); // 0 = Sunday, 6 = Saturday
+
+            // Morning Rush (7:30 AM - 9:30 AM)
+            if ((hour === 7 && now.getMinutes() >= 30) || hour === 8 || (hour === 9 && now.getMinutes() <= 30)) {
+                return 1.8;
             }
+            // Evening Rush (5:00 PM - 7:30 PM)
+            if (hour >= 17 && (hour < 19 || (hour === 19 && now.getMinutes() <= 30))) {
+                return 2.2;
+            }
+            // Late Night Weekend Surge
+            if ((day === 5 || day === 6) && (hour >= 22 || hour <= 2)) {
+                return 1.5;
+            }
+            return 1.0; // Standard baseline multiplier
+        }
 
-            debounceTimeout = setTimeout(() => {
-                const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&bbox=99.6,0.8,119.5,7.4&limit=5`;
-                fetch(url).then(res => res.json()).then(data => {
-                    suggestionsBox.innerHTML = '';
-                    if(data.features.length === 0) {
-                        suggestionsBox.style.display = 'none';
-                        return;
-                    }
-                    suggestionsBox.style.display = 'block';
-                    data.features.forEach(feature => {
-                        const props = feature.properties;
-                        const detailedAddress = expandAddress(props);
-                        
-                        const div = document.createElement('div');
-                        div.className = 'suggestion-item';
-                        div.textContent = detailedAddress;
-                        div.addEventListener('click', () => {
-                            input.value = props.name || detailedAddress;
-                            suggestionsBox.innerHTML = '';
-                            suggestionsBox.style.display = 'none';
-                            const [lon, lat] = feature.geometry.coordinates;
-                            onSelect({ lat, lon });
-                        });
-                        suggestionsBox.appendChild(div);
-                    });
-                }).catch(err => console.error(err));
-            }, 300);
-        });
+        // Setup Autocomplete Hooks for Text Inputs
+        function setupAutocomplete(inputId, suggestionId, callback) {
+            const input = document.getElementById(inputId);
+            const sugBox = document.getElementById(suggestionId);
 
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                input.blur();
+            input.addEventListener('input', debounce(async function() {
                 const query = input.value.trim();
-                if (query.length >= 3) {
-                    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&bbox=99.6,0.8,119.5,7.4&limit=1`;
-                    fetch(url).then(res => res.json()).then(data => {
-                        if (data.features && data.features.length > 0) {
-                            const feature = data.features[0];
-                            input.value = feature.properties.name || expandAddress(feature.properties);
-                            suggestionsBox.innerHTML = '';
-                            suggestionsBox.style.display = 'none';
-                            const [lon, lat] = feature.geometry.coordinates;
-                            onSelect({ lat, lon });
-                        }
-                    }).catch(err => console.error(err));
-                }
-            }
-        });
-
-        document.addEventListener('click', (e) => {
-            if (e.target !== input && e.target !== suggestionsBox) {
-                suggestionsBox.innerHTML = '';
-                suggestionsBox.style.display = 'none';
-            }
-        });
-    }
-
-    function checkAndProcessRoute() {
-        if (!pickupCoords || !dropoffCoords) return;
-
-        const url = `https://router.project-osrm.org/route/v1/driving/${pickupCoords.lon},${pickupCoords.lat};${dropoffCoords.lon},${dropoffCoords.lat}?overview=full&geometries=geojson`;
-
-        fetch(url)
-            .then(res => {
-                if (!res.ok) throw new Error('Network routing execution breakdown.');
-                return res.json();
-            })
-            .then(data => {
-                if (!data.routes || data.routes.length === 0) {
-                    alert("No valid drivable route could be calculated between these selected nodes.");
+                if (query.length < 3) {
+                    sugBox.innerHTML = '';
                     return;
                 }
 
-                const route = data.routes[0];
-                const distanceKm = route.distance / 1000;
-                let baseDurationMins = route.duration / 60;
-
-                // --- GOOGLE MAPS TRAFFIC MIRRORING ENGINE (V3 - MICRO & MACRO BALANCED) ---
-                const now = new Date();
-                const currentHour = now.getHours();
-                const isWeekend = (now.getDay() === 0 || now.getDay() === 6);
-
-                let timeFactor = 1.02; 
-
-                if (!isWeekend) {
-                    if ((currentHour >= 7 && currentHour <= 9.5) || (currentHour >= 16.5 && currentHour <= 19.5)) {
-                        timeFactor = 1.50; // Active Peak Commute
-                    } else if (currentHour >= 12 && currentHour <= 14) {
-                        timeFactor = 1.20; // Midday Window
+                // Call ORS Geocoding API constrained to Malaysia bounding zone
+                const url = `https://api.openrouteservice.org/geocode/search?api_key=${ORS_API_KEY}&text=${encodeURIComponent(query)}&boundary.country=MY&size=5`;
+                
+                try {
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    
+                    sugBox.innerHTML = '';
+                    if(data.features) {
+                        data.features.forEach(feature => {
+                            const item = document.createElement('div');
+                            item.className = 'suggestion-item';
+                            item.innerText = feature.properties.label;
+                            item.addEventListener('click', () => {
+                                input.value = feature.properties.label;
+                                sugBox.innerHTML = '';
+                                const coords = feature.geometry.coordinates; // [lng, lat]
+                                callback([coords[1], coords[0]]); // Pass as [lat, lng]
+                            });
+                            sugBox.appendChild(item);
+                        });
                     }
-                } else {
-                    if (currentHour >= 16 && currentHour <= 21) {
-                        timeFactor = 1.30; // Weekend social windows
-                    }
+                } catch (error) {
+                    console.error("Geocoding Error: ", error);
                 }
-
-                let distanceFactor = 1.0;
-                if (distanceKm <= 6) {
-                    distanceFactor = 1.85; 
-                } else if (distanceKm > 6 && distanceKm <= 30) {
-                    distanceFactor = 1.85 - (((distanceKm - 6) / 24) * 0.65); 
-                } else if (distanceKm > 30 && distanceKm <= 100) {
-                    distanceFactor = 1.20 - (((distanceKm - 30) / 70) * 0.15); 
-                } else {
-                    distanceFactor = Math.max(1.00, 1.05 - (((distanceKm - 100) / 700) * 0.05)); 
-                }
-
-                const finalTrafficMultiplier = timeFactor * distanceFactor;
-                const correctedDurationMins = Math.round(baseDurationMins * finalTrafficMultiplier);
-                // --- END TRAFFIC SCALING ENGINE ---
-
-                if (routeLine) map.removeLayer(routeLine);
-                routeLine = L.geoJSON(route.geometry, { style: { color: '#8e24aa', weight: 4, opacity: 0.85 } }).addTo(map);
-                map.fitBounds(L.latLngBounds([pickupCoords.lat, pickupCoords.lon], [dropoffCoords.lat, dropoffCoords.lon]), { padding: [20, 20] });
-
-                processCalculations(distanceKm, correctedDurationMins);
-            })
-            .catch(err => {
-                console.error(err);
-                alert("Routing service is currently unreachable. Please check your network connection.");
-            });
-    }
-
-    function formatDuration(totalMins) {
-        if (totalMins < 60) {
-            return `${totalMins} mins`;
+            }, 400));
         }
-        const hours = Math.floor(totalMins / 60);
-        const mins = totalMins % 60;
-        return mins > 0 ? `${hours} hrs ${mins} mins` : `${hours} hrs`;
-    }
 
-    function roundToMalaysianCents(value) {
-        return Math.round(value * 10) / 10;
-    }
+        // Process pricing computations 
+        function calculateFare(distanceKm, durationMins) {
+            const surge = getSurgeFactor();
+            
+            const distCost = distanceKm * RATE_PER_KM;
+            const timeCost = durationMins * RATE_PER_MIN;
+            
+            // Formula Execution: Base + (d * Rate/km) + (t * Rate/min)
+            let calculatedFare = BASE_FARE + distCost + timeCost;
+            
+            let isMinApplied = false;
+            if (calculatedFare < MIN_FARE) {
+                calculatedFare = MIN_FARE;
+                isMinApplied = true;
+            }
 
-    function processCalculations(distance, duration) {
-        // 1. Standardized Base Fare and flat per-km configurations
-        const baseFare = 5.00;
-        const perKmRate = 1.25;
-        const rideDistanceFare = distance * perKmRate;
-        
-        // 2. Progressive Toll Matrix
-        let dynamicTolls = 0;
-        if (distance > 5) {
-            if (distance <= 50) {
-                dynamicTolls = 2.50; 
+            // Apply Surge Multiplier
+            const finalFare = calculatedFare * surge;
+
+            // Render output visual breakdown
+            document.getElementById('total-fare-display').innerText = `RM ${finalFare.toFixed(2)}`;
+            document.getElementById('txt-dist').innerText = distanceKm.toFixed(2);
+            document.getElementById('txt-dist-fare').innerText = `RM ${distCost.toFixed(2)}`;
+            document.getElementById('txt-time').innerText = Math.round(durationMins);
+            document.getElementById('txt-time-fare').innerText = `RM ${timeCost.toFixed(2)}`;
+            document.getElementById('txt-subtotal').innerText = `RM ${finalFare.toFixed(2)}`;
+            
+            if (isMinApplied) {
+                document.getElementById('row-min-fare').style.display = 'flex';
             } else {
-                dynamicTolls = 3.50 + (distance * 0.112); 
+                document.getElementById('row-min-fare').style.display = 'none';
+            }
+
+            if (surge > 1) {
+                document.getElementById('row-surge').style.display = 'flex';
+                document.getElementById('txt-surge-mult').innerText = `${surge}x`;
+                document.getElementById('surge-tag').innerHTML = `<span class="surge-badge">⚡ Surge active</span>`;
+            } else {
+                document.getElementById('row-surge').style.display = 'none';
+                document.getElementById('surge-tag').innerHTML = '';
+            }
+
+            document.getElementById('fare-container').style.display = 'block';
+            document.getElementById('book-btn').style.display = 'block';
+        }
+
+        // Fetch directions data from OpenRouteService
+        async function getRoute() {
+            if (!pickupCoords || !dropoffCoords) return;
+
+            document.getElementById('error-box').style.display = 'none';
+
+            // Coordinates ordered as JSON requires [lng, lat]
+            const body = {
+                coordinates: [
+                    [pickupCoords[1], pickupCoords[0]], 
+                    [dropoffCoords[1], dropoffCoords[0]]
+                ]
+            };
+
+            const url = `https://api.openrouteservice.org/v2/directions/driving-car`;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': ORS_API_KEY,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(body)
+                });
+
+                if (!response.ok) throw new Error("Routing failed. Dynamic path mapping unavailable.");
+
+                const data = await response.json();
+                const route = data.routes[0];
+                
+                const distanceKm = route.summary.distance / 1000; 
+                const durationMins = route.summary.duration / 60; 
+
+                // Paint path line on map framework
+                const geometry = route.geometry;
+                displayRouteLine(geometry);
+
+                // Run final localized calculations
+                calculateFare(distanceKm, durationMins);
+
+            } catch (err) {
+                const errBox = document.getElementById('error-box');
+                errBox.innerText = "Error tracking path route between nodes. Please verify destination points.";
+                errBox.style.display = 'block';
             }
         }
 
-        // 3. Driver Incentive
-        const driverIncentive = (duration / 60) * 18.00;
-
-        // 4. Out-of-Zone Surcharge (Triggers past 10km, scales linearly up to 80% at 400km+)
-        let deadheadCost = 0;
-        if (distance > 10) {
-            const effectiveKm = Math.min(distance, 400);
-            const currentSurchargePercentage = ((effectiveKm - 10) / (400 - 10)) * 0.80;
-            // Surcharge scales purely off the Distance Fare accumulation component
-            deadheadCost = rideDistanceFare * currentSurchargePercentage;
+        function displayRouteLine(encodedPolyline) {
+            if (routeLayer) map.removeLayer(routeLayer);
             
-            document.getElementById('deadhead-km-row').style.display = 'flex';
-        } else {
-            document.getElementById('deadhead-km-row').style.display = 'none';
+            // Decodes standard GeoJSON coordinate structures returned natively by ORS API POST configurations
+            const coordinates = decodePolyline(encodedPolyline); 
+            
+            routeLayer = L.polyline(coordinates, {color: '#00B14F', weight: 5, opacity: 0.8}).addTo(map);
+            map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
         }
 
-        // Calculation Master Wrap
-        const rawTotal = baseFare + rideDistanceFare + dynamicTolls + driverIncentive + deadheadCost;
-        const roundedTotal = roundToMalaysianCents(rawTotal);
-        const wholeFare = Math.round(roundedTotal);
-
-        document.getElementById('total-fare').textContent = `RM ${wholeFare}`;
-        document.getElementById('fare-distance').textContent = `${distance.toFixed(1)} km`;
-        document.getElementById('fare-duration').textContent = formatDuration(duration);
-
-        document.getElementById('calc-base-fare').textContent = `RM ${baseFare.toFixed(2)}`;
-        document.getElementById('calc-ride-distance-rate').textContent = `RM ${rideDistanceFare.toFixed(2)}`;
-        document.getElementById('calc-tolls').textContent = `RM ${dynamicTolls.toFixed(2)}`;
-        document.getElementById('calc-incentive').textContent = `RM ${driverIncentive.toFixed(2)}`;
-        document.getElementById('calc-deadhead-km').textContent = `RM ${deadheadCost.toFixed(2)}`;
-        document.getElementById('calc-grand').textContent = `RM ${roundedTotal.toFixed(2)}`;
-
-        document.getElementById('result-card').style.display = 'block';
-    }
-
-    function toggleInvoice() {
-        const details = document.getElementById('invoice-details');
-        const lbl = document.getElementById('toggle-lbl');
-        if (details.style.display === 'none' || !details.style.display) {
-            details.style.display = 'block';
-            lbl.textContent = 'Hide';
-        } else {
-            details.style.display = 'none';
-            lbl.textContent = 'Details';
+        // Utility: Parse polyline geometry safely
+        function decodePolyline(str) {
+            // Simple handling assuming LineString structures if returned raw or parsed via coordinates array standard.
+            // When standard format requires coordinates conversion directly:
+            if(typeof str === 'object' || Array.isArray(str)) return str;
+            return [];
         }
-    }
-</script>
+
+        // Direct implementation of ORS geometry decoder fallback framework helper
+        async function getRoute() {
+            if (!pickupCoords || !dropoffCoords) return;
+            const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${ORS_API_KEY}&start=${pickupCoords[1]},${pickupCoords[0]}&end=${dropoffCoords[1]},${dropoffCoords[0]}`;
+            
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                const route = data.features[0];
+                
+                const distanceKm = route.properties.summary.distance / 1000;
+                const durationMins = route.properties.summary.duration / 60;
+
+                // Handle layer painting
+                if (routeLayer) map.removeLayer(routeLayer);
+                
+                // Flip GeoJSON Coordinates [lng, lat] to Leaflet Format [lat, lng]
+                const flippedCoords = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+                routeLayer = L.polyline(flippedCoords, {color: '#00B14F', weight: 5, opacity: 0.85}).addTo(map);
+                
+                map.fitBounds(routeLayer.getBounds(), { padding: [40, 40] });
+                calculateFare(distanceKm, durationMins);
+            } catch(e) {
+                document.getElementById('error-box').innerText = "Unable to compute route or pricing between locations.";
+                document.getElementById('error-box').style.display = 'block';
+            }
+        }
+
+        // Handle Layout expansion functions
+        function toggleBreakdown() {
+            const breakdown = document.getElementById('fare-breakdown');
+            const arrow = document.getElementById('arrow-icon');
+            if (breakdown.style.display === 'none' || !breakdown.style.display) {
+                breakdown.style.display = 'block';
+                arrow.innerText = '▲ Close details';
+            } else {
+                breakdown.style.display = 'none';
+                arrow.innerText = '▼ Click for details';
+            }
+        }
+
+        // Standard optimization helper function
+        function debounce(func, delay) {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), delay);
+            };
+        }
+
+        // UI Event Listeners
+        window.onload = () => {
+            initMap();
+            
+            setupAutocomplete('pickup', 'pickup-suggestions', (latlng) => {
+                pickupCoords = latlng;
+                if (pickupMarker) map.removeLayer(pickupMarker);
+                pickupMarker = L.marker(latlng, {title: "Pickup"}).addTo(map);
+                map.panTo(latlng);
+                getRoute();
+            });
+
+            setupAutocomplete('dropoff', 'dropoff-suggestions', (latlng) => {
+                dropoffCoords = latlng;
+                if (dropoffMarker) map.removeLayer(dropoffMarker);
+                dropoffMarker = L.marker(latlng, {title: "Dropoff"}).addTo(map);
+                map.panTo(latlng);
+                getRoute();
+            });
+        };
+    </script>
 </body>
 </html>
