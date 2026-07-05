@@ -483,16 +483,29 @@
             document.getElementById('book-btn').style.display = 'block';
         }
 
+        // AMENDED: Converted from an uncompliant GET to a proper HTTP POST implementation 
         async function getRoute() {
             if (!pickupCoords || !dropoffCoords) return;
             document.getElementById('error-box').style.display = 'none';
 
-            const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${ORS_API_KEY}&start=${pickupCoords[1]},${pickupCoords[0]}&end=${dropoffCoords[1]},${dropoffCoords[0]}`;
+            const url = `https://api.openrouteservice.org/v2/directions/driving-car/geojson`;
             
             try {
-                const response = await fetch(url);
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': ORS_API_KEY
+                    },
+                    body: JSON.stringify({
+                        coordinates: [
+                            [pickupCoords[1], pickupCoords[0]], 
+                            [dropoffCoords[1], dropoffCoords[0]]  
+                        ]
+                    })
+                });
+
                 await AppArchitecture.handleApiThrottling(response);
-                
                 if (!response.ok) throw new Error("Route calculation error.");
                 
                 const data = await response.json();
@@ -509,6 +522,7 @@
                 map.fitBounds(routeLayer.getBounds(), { padding: [40, 40] });
                 calculateFare(distanceKm, durationMins);
             } catch(e) {
+                console.error(e);
                 showError("Unable to compute route or travel configurations between selected areas.");
             }
         }
