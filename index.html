@@ -289,32 +289,27 @@
         let dropoffCoords = null;
 
         // =========================================================================
-        // PRODUCTION ARCHITECTURAL RECOMMENDATIONS BLOCK (DOCUMENTED IN-SCRIPT)
+        // FIXED ARCHITECTURAL LAYER
         // =========================================================================
         const AppArchitecture = {
-            /**
-             * Recommendation 1: Session Caching Layer
-             * Mitigates downstream proxy routing costs and preserves ORS API rate limits.
-             */
             checkCache: function(key) {
-                const cached = sessionStorage.getItem(`geo_${btoa(key)}`);
+                // FIXED: encodeURIComponent completely bypasses the ASCII/btoa limitations
+                const safeKey = encodeURIComponent(key.toLowerCase().trim());
+                const cached = sessionStorage.getItem(`geo_${safeKey}`);
                 return cached ? JSON.parse(cached) : null;
             },
             setCache: function(key, data) {
-                sessionStorage.setItem(`geo_${btoa(key)}`, JSON.stringify(data));
+                const safeKey = encodeURIComponent(key.toLowerCase().trim());
+                sessionStorage.setItem(`geo_${safeKey}`, JSON.stringify(data));
             },
-            
-            /**
-             * Recommendation 2: High Availability Fallback Cluster
-             * Routes geocoding queries through secondary vectors if primary API key encounters a 429 error.
-             */
             handleApiThrottling: async function(response) {
                 if (response.status === 429) {
-                    console.warn("Architecture Warning: Rate limit tripped. Transitioning to secondary mirror cluster.");
+                    showError("API limit reached. Please check back shortly.");
+                } else if (response.status === 401 || response.status === 403) {
+                    showError("Invalid or unauthorized OpenRouteService API Token.");
                 }
             }
         };
-        // =========================================================================
 
         function initMap() {
             map = L.map('map').setView([3.1390, 101.6869], 11);
@@ -351,7 +346,6 @@
                     return;
                 }
 
-                // Architectural implementation check
                 const cachedData = AppArchitecture.checkCache(query);
                 if (cachedData) {
                     renderSuggestions(cachedData, sugBox, input, callback);
@@ -363,6 +357,8 @@
                 try {
                     const response = await fetch(url);
                     await AppArchitecture.handleApiThrottling(response);
+                    
+                    if (!response.ok) return;
                     const data = await response.json();
                     
                     if (data.features) {
@@ -377,6 +373,8 @@
 
         function renderSuggestions(features, sugBox, input, callback) {
             sugBox.innerHTML = '';
+            if (!features || features.length === 0) return;
+            
             features.forEach(feature => {
                 const item = document.createElement('div');
                 item.className = 'suggestion-item';
@@ -440,6 +438,8 @@
             
             try {
                 const response = await fetch(url);
+                await AppArchitecture.handleApiThrottling(response);
+                
                 if (!response.ok) throw new Error("Route calculation error.");
                 
                 const data = await response.json();
