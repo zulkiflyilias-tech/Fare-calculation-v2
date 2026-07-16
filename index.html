@@ -3,235 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GrabGo Malaysia - Ride Hailing</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <title>Petal Go - Navigation & Fare</title>
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
     <style>
         :root {
-            --primary-color: #00B14F; 
-            --dark-color: #2A2A2A;
-            --light-bg: #F8F9FA;
-            --border-radius: 12px;
+            --petal-primary: #007dff;
+            --petal-bg: #f4f6f9;
+            --petal-card: #ffffff;
+            --petal-text: #191919;
+            --petal-text-secondary: #888888;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background-color: var(--light-bg);
-            color: var(--dark-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--petal-bg);
+            color: var(--petal-text);
             display: flex;
             height: 100vh;
             overflow: hidden;
         }
 
-        #booking-panel {
+        #sidebar {
             width: 380px;
-            background: white;
-            box-shadow: 4px 0 15px rgba(0,0,0,0.1);
-            z-index: 1000;
+            background: var(--petal-card);
+            box-shadow: 4px 0 15px rgba(0,0,0,0.05);
             display: flex;
             flex-direction: column;
+            z-index: 10;
             padding: 24px;
             box-sizing: border-box;
-            overflow-y: auto;
-        }
-
-        h2 {
-            margin-top: 0;
-            color: var(--primary-color);
-            font-weight: 700;
-            font-size: 22px;
-            letter-spacing: -0.5px;
-        }
-
-        /* Grab Native App Style Address Container */
-        .grab-route-container {
-            position: relative;
-            background: #F6F6F6;
-            border-radius: var(--border-radius);
-            padding: 16px 16px 16px 44px;
-            margin-bottom: 20px;
-        }
-
-        .grab-route-container::before {
-            content: '';
-            position: absolute;
-            left: 21px;
-            top: 32px;
-            bottom: 32px;
-            width: 2px;
-            border-left: 2px dashed #BDBDBD;
-            z-index: 1;
-        }
-
-        .input-group {
-            position: relative;
-            margin-bottom: 0;
-        }
-
-        .input-group:first-child {
-            margin-bottom: 14px;
-        }
-
-        .input-wrapper {
-            position: relative;
-            display: flex;
-            align-items: center;
-        }
-
-        /* Native Node Icons */
-        .route-node {
-            position: absolute;
-            left: -28px;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            z-index: 2;
-            background: white;
-        }
-
-        .node-pickup {
-            border: 3px solid var(--primary-color);
-            top: calc(50% - 9px);
-        }
-
-        .node-dropoff {
-            border: 3px solid #EB5757;
-            top: calc(50% - 9px);
-        }
-
-        input {
-            width: 100%;
-            padding: 10px 36px 10px 0;
-            border: none;
-            background: transparent;
-            border-bottom: 1px solid #E0E0E0;
-            box-sizing: border-box;
-            font-size: 15px;
-            font-weight: 500;
-            color: var(--dark-color);
-        }
-
-        .input-group:last-child input {
-            border-bottom: none;
-        }
-
-        input:focus {
-            outline: none;
-            border-bottom-color: var(--primary-color);
-        }
-
-        .geo-btn {
-            position: absolute;
-            right: 0;
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 16px;
-            color: var(--primary-color);
-            padding: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: transform 0.2s;
-        }
-
-        .geo-btn:hover {
-            transform: scale(1.1);
-        }
-
-        .suggestions {
-            position: absolute;
-            top: 100%;
-            left: -44px;
-            right: -16px;
-            background: white;
-            border: 1px solid #E0E0E0;
-            border-radius: var(--border-radius);
-            max-height: 220px;
-            overflow-y: auto;
-            z-index: 2000;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-            margin-top: 4px;
-        }
-
-        .suggestion-item {
-            padding: 12px 16px;
-            cursor: pointer;
-            font-size: 14px;
-            border-bottom: 1px solid #F5F5F5;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .suggestion-item:hover {
-            background-color: #F0F9F4;
-            color: var(--primary-color);
-        }
-
-        #fare-container {
-            margin-top: auto;
-            background: #F9F9F9;
-            border-radius: var(--border-radius);
-            padding: 16px;
-            border: 1px solid #EAEAEA;
-            display: none;
-            margin-bottom: 16px;
-        }
-
-        #total-fare-box {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-        }
-
-        .fare-price {
-            font-size: 28px;
-            font-weight: 800;
-            color: var(--dark-color);
-        }
-
-        .toggle-arrow {
-            font-size: 13px;
-            font-weight: 600;
-            color: #777;
-            background: #EEE;
-            padding: 4px 8px;
-            border-radius: 20px;
-        }
-
-        #fare-breakdown {
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px dashed #DDD;
-            display: none;
-            font-size: 14px;
-        }
-
-        .breakdown-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            color: #666;
-        }
-
-        .breakdown-row.total-calc {
-            font-weight: 700;
-            color: #000;
-            font-size: 15px;
-            margin-top: 4px;
-        }
-
-        .surge-badge {
-            background: #FFEBEB;
-            color: #D93838;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 700;
-            margin-right: 4px;
         }
 
         #map {
@@ -239,381 +41,338 @@
             height: 100%;
         }
 
-        #book-btn {
+        .brand {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--petal-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .search-container {
+            position: relative;
+            margin-bottom: 16px;
+        }
+
+        .input-field {
             width: 100%;
-            background: var(--primary-color);
+            padding: 14px 40px 14px 16px;
+            border: 1px solid #e5e5e5;
+            border-radius: 12px;
+            font-size: 14px;
+            box-sizing: border-box;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--petal-primary);
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(0, 125, 255, 0.1);
+        }
+
+        /* Toggle Switch Styling */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 12px;
+        }
+
+        .toggle-label {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .switch input { 
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .3s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--petal-primary);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+
+        /* Fare & Route Matrix Card */
+        .info-card {
+            background: linear-gradient(135deg, #007dff 0%, #0056b3 100%);
+            color: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-top: auto;
+            box-shadow: 0 8px 20px rgba(0, 125, 255, 0.2);
+            display: none;
+        }
+
+        .info-card.active {
+            display: block;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .info-row:last-child {
+            margin-bottom: 0;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .info-label {
+            font-size: 13px;
+            opacity: 0.8;
+        }
+
+        .info-value {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .fare-value {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .btn-route {
+            width: 100%;
+            background: var(--petal-primary);
             color: white;
             border: none;
-            padding: 16px;
-            border-radius: var(--border-radius);
-            font-size: 16px;
-            font-weight: 700;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
             cursor: pointer;
-            box-shadow: 0 4px 12px rgba(0, 177, 79, 0.2);
+            transition: background 0.2s;
         }
 
-        #book-btn:hover {
-            background: #009643;
-        }
-
-        .error-msg {
-            background: #FFF0F0;
-            color: #D93838;
-            font-size: 13px;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 16px;
-            display: none;
-            border: 1px solid #FFE0E0;
+        .btn-route:hover {
+            background: #0066d1;
         }
     </style>
 </head>
 <body>
 
-    <div id="booking-panel">
-        <h2>GrabGo Malaysia</h2>
-        <p style="color:#666; font-size:13px; margin:-10px 0 20px 0;">Reliable rides across Peninsular & East Malaysia</p>
+    <div id="sidebar">
+        <div class="brand">🌸 Petal Go</div>
         
-        <div id="error-box" class="error-msg"></div>
-
-        <div class="grab-route-container">
-            <div class="input-group">
-                <div class="route-node node-pickup"></div>
-                <div class="input-wrapper">
-                    <input type="text" id="pickup" placeholder="Enter pickup location..." autocomplete="off">
-                    <button class="geo-btn" id="current-loc-btn" title="Use current location">🎯</button>
-                </div>
-                <div id="pickup-suggestions" class="suggestions"></div>
-            </div>
-
-            <div class="input-group">
-                <div class="route-node node-dropoff"></div>
-                <div class="input-wrapper">
-                    <input type="text" id="dropoff" placeholder="Where to?" autocomplete="off">
-                </div>
-                <div id="dropoff-suggestions" class="suggestions"></div>
-            </div>
+        <div class="search-container">
+            <input type="text" id="start-search" class="input-field" placeholder="Starting point...">
+        </div>
+        
+        <div class="search-container">
+            <input type="text" id="dest-search" class="input-field" placeholder="Where to? (Destination)">
         </div>
 
-        <div id="fare-container">
-            <div id="total-fare-box" onclick="toggleBreakdown()">
-                <div>
-                    <div style="font-size: 11px; color: #777; font-weight: 700; letter-spacing: 0.5px;">ESTIMATED FARE</div>
-                    <div class="fare-price" id="total-fare-display">RM 0.00</div>
-                </div>
-                <div style="text-align: right; display: flex; align-items: center;">
-                    <span id="surge-tag"></span>
-                    <span class="toggle-arrow" id="arrow-icon">Details ▼</span>
-                </div>
-            </div>
-            
-            <div id="fare-breakdown">
-                <div class="breakdown-row"><span>Base Fare</span><span>RM 5.00</span></div>
-                <div class="breakdown-row"><span>Distance Rate (<span id="txt-dist">0</span> km)</span><span id="txt-dist-fare">RM 0.00</span></div>
-                <div class="breakdown-row"><span>Time Rate (<span id="txt-time">0</span> mins)</span><span id="txt-time-fare">RM 0.00</span></div>
-                <div class="breakdown-row"><span>Estimated MY Toll Pass-thru</span><span id="txt-toll-fare">RM 0.00</span></div>
-                <div class="breakdown-row" id="row-min-fare" style="display:none; color: #00B14F; font-style: italic;">
-                    <span>Minimum Fare Applied</span><span>Base Upgraded</span>
-                </div>
-                <div class="breakdown-row" id="row-surge" style="display:none;">
-                    <span>Surge Multiplier</span><span id="txt-surge-mult">1.0x</span>
-                </div>
-                <div class="breakdown-row total-calc"><span>Subtotal</span><span id="txt-subtotal">RM 0.00</span></div>
-            </div>
+        <div class="toggle-container">
+            <span class="toggle-label">Use Current Location as Origin</span>
+            <label class="switch">
+                <input type="checkbox" id="current-loc-toggle">
+                <span class="slider"></span>
+            </label>
         </div>
 
-        <button id="book-btn" style="display:none;">Confirm Booking</button>
+        <button class="btn-route" id="calc-route-btn">Find Route & Fare</button>
+
+        <div class="info-card" id="fare-card">
+            <div class="info-row">
+                <span class="info-label">Distance</span>
+                <span class="info-value" id="dist-display">0.0 km</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Estimated Time</span>
+                <span class="info-value" id="time-display">0 mins</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Total Fare (RM1.50/km)</span>
+                <span class="fare-value" id="fare-display">RM 0.00</span>
+            </div>
+        </div>
     </div>
 
     <div id="map"></div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
     <script>
-        const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImVlYzI5ZTA0OTM2YTRlZDNhNjk1NTcyNGQ1OTJmYmNjIiwiaCI6Im11cm11cjY0In0=";
-        
-        const BASE_FARE = 5.00;
-        const RATE_PER_KM = 1.20;
-        const RATE_PER_MIN = 0.25;
-        const MIN_FARE = 8.00;
+        // API Configuration elements provided
+        const API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImVlYzI5ZTA0OTM2YTRlZDNhNjk1NTcyNGQ1OTJmYmNjIiwiaCI6Im11cm11cjY0In0=";
+        const FARE_PER_KM = 1.50;
 
-        let map;
-        let routeLayer = null;
-        let pickupMarker = null;
-        let dropoffMarker = null;
-        
-        let pickupCoords = null;
-        let dropoffCoords = null;
+        // Initialize MapLibre Engine (Mimicking standard mapping layers)
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: `https://tiles.openfreemap.org/styles/bright`, // Seamless, clean global vector style
+            center: [101.6869, 3.1390], // Default center layout (Kuala Lumpur context)
+            zoom: 12
+        });
 
-        const AppArchitecture = {
-            checkCache: function(key) {
-                const safeKey = encodeURIComponent(key.toLowerCase().trim());
-                const cached = sessionStorage.getItem(`geo_${safeKey}`);
-                return cached ? JSON.parse(cached) : null;
-            },
-            setCache: function(key, data) {
-                const safeKey = encodeURIComponent(key.toLowerCase().trim());
-                sessionStorage.setItem(`geo_${safeKey}`, JSON.stringify(data));
-            },
-            handleApiThrottling: async function(response) {
-                if (response.status === 429) {
-                    showError("API limit reached. Please check back shortly.");
-                } else if (response.status === 401 || response.status === 403) {
-                    showError("Invalid or unauthorized OpenRouteService API Token.");
-                }
-            }
-        };
+        let startCoords = null;
+        let destCoords = null;
+        let currentPosition = null;
 
-        function initMap() {
-            map = L.map('map').setView([3.1390, 101.6869], 11);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(map);
-        }
-
-        function getSurgeFactor() {
-            const now = new Date();
-            const hour = now.getHours();
-            const day = now.getDay(); 
-
-            if ((hour === 7 && now.getMinutes() >= 30) || hour === 8 || (hour === 9 && now.getMinutes() <= 30)) {
-                return 1.8;
-            }
-            if (hour >= 17 && (hour < 19 || (hour === 19 && now.getMinutes() <= 30))) {
-                return 2.2;
-            }
-            if ((day === 5 || day === 6) && (hour >= 22 || hour <= 2)) {
-                return 1.5;
-            }
-            return 1.0; 
-        }
-
-        function setupAutocomplete(inputId, suggestionId, callback) {
-            const input = document.getElementById(inputId);
-            const sugBox = document.getElementById(suggestionId);
-
-            input.addEventListener('input', debounce(async function() {
-                const query = input.value.trim();
-                if (query.length < 3) {
-                    sugBox.innerHTML = '';
-                    return;
-                }
-
-                const cachedData = AppArchitecture.checkCache(query);
-                if (cachedData) {
-                    renderSuggestions(cachedData, sugBox, input, callback);
-                    return;
-                }
-
-                const url = `https://api.openrouteservice.org/geocode/search?api_key=${ORS_API_KEY}&text=${encodeURIComponent(query)}&boundary.country=MY&size=5`;
-                
-                try {
-                    const response = await fetch(url);
-                    await AppArchitecture.handleApiThrottling(response);
-                    
-                    if (!response.ok) return;
-                    const data = await response.json();
-                    
-                    if (data.features) {
-                        AppArchitecture.setCache(query, data.features);
-                        renderSuggestions(data.features, sugBox, input, callback);
-                    }
-                } catch (error) {
-                    console.error("Geocoding Error: ", error);
-                }
-            }, 400));
-        }
-
-        function renderSuggestions(features, sugBox, input, callback) {
-            sugBox.innerHTML = '';
-            if (!features || features.length === 0) return;
-            
-            features.forEach(feature => {
-                const item = document.createElement('div');
-                item.className = 'suggestion-item';
-                item.innerText = feature.properties.label;
-                item.addEventListener('click', () => {
-                    input.value = feature.properties.label;
-                    sugBox.innerHTML = '';
-                    const coords = feature.geometry.coordinates; 
-                    callback([coords[1], coords[0]]); 
-                });
-                sugBox.appendChild(item);
+        // Obtain real-time geolocation tracking
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(position => {
+                currentPosition = [position.coords.longitude, position.coords.latitude];
             });
         }
 
-        function calculateFare(distanceKm, durationMins) {
-            const surge = getSurgeFactor();
-            
-            const distCost = distanceKm * RATE_PER_KM;
-            const timeCost = durationMins * RATE_PER_MIN;
-            
-            const simulatedTolls = distanceKm > 15 ? (distanceKm * 0.12) : 0.00;
-            
-            let calculatedFare = BASE_FARE + distCost + timeCost;
-            let isMinApplied = false;
-            
-            if (calculatedFare < MIN_FARE) {
-                calculatedFare = MIN_FARE;
-                isMinApplied = true;
-            }
-
-            const finalFare = (calculatedFare * surge) + simulatedTolls;
-
-            document.getElementById('total-fare-display').innerText = `RM ${finalFare.toFixed(2)}`;
-            document.getElementById('txt-dist').innerText = distanceKm.toFixed(2);
-            document.getElementById('txt-dist-fare').innerText = `RM ${distCost.toFixed(2)}`;
-            document.getElementById('txt-time').innerText = Math.round(durationMins);
-            document.getElementById('txt-time-fare').innerText = `RM ${timeCost.toFixed(2)}`;
-            document.getElementById('txt-toll-fare').innerText = `RM ${simulatedTolls.toFixed(2)}`;
-            document.getElementById('txt-subtotal').innerText = `RM ${finalFare.toFixed(2)}`;
-            
-            document.getElementById('row-min-fare').style.display = isMinApplied ? 'flex' : 'none';
-
-            if (surge > 1) {
-                document.getElementById('row-surge').style.display = 'flex';
-                document.getElementById('txt-surge-mult').innerText = `${surge}x`;
-                document.getElementById('surge-tag').innerHTML = `<span class="surge-badge">⚡ Surge</span>`;
+        // Toggle handling logic for starting coordinates
+        document.getElementById('current-loc-toggle').addEventListener('change', async (e) => {
+            const startInput = document.getElementById('start-search');
+            if (e.target.checked) {
+                if (currentPosition) {
+                    startCoords = currentPosition;
+                    startInput.disabled = true;
+                    startInput.value = "Fetching your location...";
+                    
+                    // Reverse Geocoding call to resolve user-friendly address
+                    const address = await reverseGeocode(currentPosition[1], currentPosition[0]);
+                    startInput.value = address || "Current Location Saved";
+                } else {
+                    alert("Location permissions not allowed or unavailable.");
+                    e.target.checked = false;
+                }
             } else {
-                document.getElementById('row-surge').style.display = 'none';
-                document.getElementById('surge-tag').innerHTML = '';
+                startInput.disabled = false;
+                startInput.value = "";
+                startCoords = null;
             }
+        });
 
-            document.getElementById('fare-container').style.display = 'block';
-            document.getElementById('book-btn').style.display = 'block';
+        // Modularized Reverse Geocoding Routine using OpenStreetMap/Nominatim Engine
+        async function reverseGeocode(lat, lon) {
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+                const data = await response.json();
+                return data.display_name.split(',').slice(0, 3).join(','); // High level context parser
+            } catch (error) {
+                console.error("Geocoding failed", error);
+                return null;
+            }
         }
 
-        // AMENDED: Converted from an uncompliant GET to a proper HTTP POST implementation 
-        async function getRoute() {
-            if (!pickupCoords || !dropoffCoords) return;
-            document.getElementById('error-box').style.display = 'none';
+        // Simple forward geocoder integration for static queries
+        async function forwardGeocode(query) {
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                if(data && data.length > 0) {
+                    return [parseFloat(data[0].lon), parseFloat(data[0].lat)];
+                }
+                return null;
+            } catch(e) {
+                return null;
+            }
+        }
 
-            const url = `https://api.openrouteservice.org/v2/directions/driving-car/geojson`;
+        // Calculation event hook 
+        document.getElementById('calc-route-btn').addEventListener('click', async () => {
+            const destInput = document.getElementById('dest-search').value;
+            const startInput = document.getElementById('start-search').value;
+
+            if(!startCoords && startInput) {
+                startCoords = await forwardGeocode(startInput);
+            }
+            destCoords = await forwardGeocode(destInput);
+
+            if(!startCoords || !destCoords) {
+                alert("Please declare complete valid starting and target destinations.");
+                return;
+            }
+
+            // Standard OSRM Route parsing Engine to map distance vectors
+            const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${startCoords[0]},${startCoords[1]};${destCoords[0]},${destCoords[1]}?overview=full&geometries=geojson`;
             
             try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': ORS_API_KEY
-                    },
-                    body: JSON.stringify({
-                        coordinates: [
-                            [pickupCoords[1], pickupCoords[0]], 
-                            [dropoffCoords[1], dropoffCoords[0]]  
-                        ]
-                    })
-                });
-
-                await AppArchitecture.handleApiThrottling(response);
-                if (!response.ok) throw new Error("Route calculation error.");
-                
+                const response = await fetch(osrmUrl);
                 const data = await response.json();
-                const route = data.features[0];
                 
-                const distanceKm = route.properties.summary.distance / 1000;
-                const durationMins = route.properties.summary.duration / 60;
-
-                if (routeLayer) map.removeLayer(routeLayer);
-                
-                const flippedCoords = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
-                routeLayer = L.polyline(flippedCoords, {color: '#00B14F', weight: 5, opacity: 0.85}).addTo(map);
-                
-                map.fitBounds(routeLayer.getBounds(), { padding: [40, 40] });
-                calculateFare(distanceKm, durationMins);
-            } catch(e) {
-                console.error(e);
-                showError("Unable to compute route or travel configurations between selected areas.");
-            }
-        }
-
-        function setupCurrentLocation() {
-            const locBtn = document.getElementById('current-loc-btn');
-            locBtn.addEventListener('click', () => {
-                if (!navigator.geolocation) {
-                    showError("Geolocation is not supported by your browser.");
-                    return;
-                }
-
-                locBtn.innerText = "⏳";
-                navigator.geolocation.getCurrentPosition(async (position) => {
-                    const lat = position.coords.latitude;
-                    const lon = position.coords.longitude;
-                    pickupCoords = [lat, lon];
-
-                    if (pickupMarker) map.removeLayer(pickupMarker);
-                    pickupMarker = L.marker(pickupCoords, {title: "Pickup Point"}).addTo(map);
-                    map.setView(pickupCoords, 14);
-
-                    const revUrl = `https://api.openrouteservice.org/geocode/reverse?api_key=${ORS_API_KEY}&point.lon=${lon}&point.lat=${lat}&size=1`;
-                    try {
-                        const res = await fetch(revUrl);
-                        const data = await res.json();
-                        if (data.features && data.features.length > 0) {
-                            document.getElementById('pickup').value = data.features[0].properties.label;
-                        } else {
-                            document.getElementById('pickup').value = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
-                        }
-                    } catch (err) {
-                        document.getElementById('pickup').value = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
-                    }
+                if(data.routes && data.routes.length > 0) {
+                    const route = data.routes[0];
+                    const distanceKm = route.distance / 1000;
+                    const durationMins = Math.round(route.duration / 60);
                     
-                    locBtn.innerText = "🎯";
-                    getRoute();
-                }, (error) => {
-                    locBtn.innerText = "🎯";
-                    showError("Location access denied. Please grant permission manually.");
-                });
-            });
-        }
+                    // Matrix Cost Formula calculation
+                    const totalFare = distanceKm * FARE_PER_KM;
 
-        function showError(msg) {
-            const errBox = document.getElementById('error-box');
-            errBox.innerText = msg;
-            errBox.style.display = 'block';
-            setTimeout(() => { errBox.style.display = 'none'; }, 6000);
-        }
+                    // UI Mutation Layer
+                    document.getElementById('dist-display').innerText = `${distanceKm.toFixed(2)} km`;
+                    document.getElementById('time-display').innerText = `${durationMins} mins`;
+                    document.getElementById('fare-display').innerText = `RM ${totalFare.toFixed(2)}`;
+                    document.getElementById('fare-card').classList.add('active');
 
-        function toggleBreakdown() {
-            const breakdown = document.getElementById('fare-breakdown');
-            const arrow = document.getElementById('arrow-icon');
-            if (breakdown.style.display === 'none' || !breakdown.style.display) {
-                breakdown.style.display = 'block';
-                arrow.innerText = 'Details ▲';
-            } else {
-                breakdown.style.display = 'none';
-                arrow.innerText = 'Details ▼';
+                    // Render Geospatial Route on Map View
+                    renderRoute(route.geometry);
+                }
+            } catch(err) {
+                alert("Error configuring standard route parameters.");
             }
+        });
+
+        function renderRoute(geometry) {
+            if (map.getSource('route')) {
+                map.getSource('route').setData(geometry);
+            } else {
+                map.addSource('route', {
+                    'type': 'geojson',
+                    'data': geometry
+                });
+                map.addLayer({
+                    'id': 'route',
+                    'type': 'line',
+                    'source': 'route',
+                    'layout': { 'line-join': 'round', 'line-cap': 'round' },
+                    'paint': { 'line-color': '#007dff', 'line-width': 6 }
+                });
+            }
+
+            // Fit map view camera bounds elegantly over the path coordinates
+            const coordinates = geometry.coordinates;
+            const bounds = coordinates.reduce((acc, coord) => acc.extend(coord), new maplibregl.LngLatBounds(coordinates[0], coordinates[0]));
+            map.fitBounds(bounds, { padding: 50 });
         }
-
-        function debounce(func, delay) {
-            let timeout;
-            return function(...args) {
-                clearTimeout(timeout);
-                timeout = setTimeout(() => func.apply(this, args), delay);
-            };
-        }
-
-        window.onload = () => {
-            initMap();
-            setupCurrentLocation();
-            
-            setupAutocomplete('pickup', 'pickup-suggestions', (latlng) => {
-                pickupCoords = latlng;
-                if (pickupMarker) map.removeLayer(pickupMarker);
-                pickupMarker = L.marker(latlng, {title: "Pickup"}).addTo(map);
-                map.panTo(latlng);
-                getRoute();
-            });
-
-            setupAutocomplete('dropoff', 'dropoff-suggestions', (latlng) => {
-                dropoffCoords = latlng;
-                if (dropoffMarker) map.removeLayer(dropoffMarker);
-                dropoffMarker = L.marker(latlng, {title: "Dropoff"}).addTo(map);
-                map.panTo(latlng);
-                getRoute();
-            });
-        };
     </script>
 </body>
 </html>
