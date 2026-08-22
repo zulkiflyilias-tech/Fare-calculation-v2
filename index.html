@@ -84,7 +84,7 @@
             display: flex;
             align-items: center;
         }
-        input {
+        input[type="text"], input[type="number"] {
             width: 100%;
             padding: 12px 64px 12px 12px;
             border: 1px solid #e0e0e0;
@@ -161,6 +161,32 @@
             transform: scale(1.1) translateY(-45%);
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
             background-color: #fcf5ff;
+        }
+
+        .pickup-config-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f1f3f5;
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+        .pickup-config-row label {
+            font-weight: 600;
+            color: #495057;
+        }
+        .pickup-inputs {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .pickup-inputs input {
+            width: 60px;
+            padding: 4px 6px;
+            font-size: 12px;
+            text-align: center;
         }
 
         .suggestions {
@@ -393,7 +419,7 @@
     
     <div id="search-panel">
         <div class="header-row">
-            <h2>Fare Estimator (2026 Structure)</h2>
+            <h2>Fare Estimator</h2>
             <button class="registry-trigger-btn" onclick="toggleRegistry(true)">🗺️ Toll Registry</button>
         </div>
         
@@ -420,6 +446,16 @@
             </div>
         </div>
 
+        <div class="pickup-config-row">
+            <label for="pickup-dist">Driver Pickup Approach:</label>
+            <div class="pickup-inputs">
+                <input type="number" id="pickup-dist" min="0" value="0" step="0.5" onchange="checkAndProcessRoute()">
+                <span>km</span>
+                <input type="number" id="pickup-time" min="0" value="0" step="1" onchange="checkAndProcessRoute()">
+                <span>min</span>
+            </div>
+        </div>
+
         <div id="error-msg"></div>
 
         <div id="result-card">
@@ -433,7 +469,7 @@
             
             <div id="invoice-details">
                 <div class="detail-row">
-                    <span>Base Fare & Schedule Zone</span>
+                    <span>Base Fare</span>
                     <span id="calc-base-fare">RM 4.00</span>
                 </div>
                 <div class="detail-row">
@@ -441,28 +477,16 @@
                     <span id="calc-ride-distance-rate">RM 0.00</span>
                 </div>
                 <div class="detail-row">
-                    <span>Time Rate Fare</span>
+                    <span>Time Fare</span>
                     <span id="calc-time-rate">RM 0.00</span>
                 </div>
-                <div class="detail-row">
-                    <span id="toll-type-label">Tolls (Est.)</span>
-                    <span id="calc-tolls">RM 0.00</span>
+                <div class="detail-row" id="pickup-surcharge-row" style="display: none;">
+                    <span>Pickup Approach Surcharge</span>
+                    <span id="calc-pickup-surcharge">RM 0.00</span>
                 </div>
-                <div class="detail-row" id="midnight-row" style="display: none;">
-                    <span>Midnight Surcharge (+25%)</span>
-                    <span id="calc-midnight">RM 0.00</span>
-                </div>
-                <div class="detail-row" id="highland-row" style="display: none;">
-                    <span>Highland / Risk Area Surcharge (+50%)</span>
-                    <span id="calc-highland">RM 0.00</span>
-                </div>
-                <div class="detail-row" id="penang-bridge-row" style="display: none;">
-                    <span>Penang Island Bridge Crossing</span>
-                    <span id="calc-penang-bridge">RM 7.00</span>
-                </div>
-                <div class="detail-row" id="interstate-row" style="display: none;">
-                    <span>Interstate Cross-Border (+25%)</span>
-                    <span id="calc-interstate">RM 0.00</span>
+                <div class="detail-row" id="surcharge-row" style="display: none;">
+                    <span id="surcharge-label">Special Surcharges</span>
+                    <span id="calc-surcharge">RM 0.00</span>
                 </div>
 
                 <div class="detail-row total-bold">
@@ -750,7 +774,7 @@
         if(currentRouteTimeout) clearTimeout(currentRouteTimeout);
         
         currentRouteTimeout = setTimeout(() => {
-            const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${ORS_API_KEY}&start=${pickupCoords.lon},${pickupCoords.lat}&end=${dropoffCoords.lon},${dropoffCoords.lat}&extra_info=tollways`;
+            const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${ORS_API_KEY}&start=${pickupCoords.lon},${pickupCoords.lat}&end=${dropoffCoords.lon},${dropoffCoords.lat}`;
 
             fetch(url)
                 .then(res => {
@@ -767,46 +791,7 @@
                     const summary = feature.properties.summary;
                     
                     const distanceKm = summary.distance / 1000;
-                    const baseDurationMins = summary.duration / 60;
-
-                    let routeHasTolls = false;
-                    const extras = feature.properties.extras;
-                    if (extras && extras.tollways && extras.tollways.values) {
-                        routeHasTolls = extras.tollways.values.some(valueArray => valueArray[2] === 1);
-                    } else if (distanceKm > 50) {
-                        routeHasTolls = true;
-                    }
-
-                    const now = new Date();
-                    const currentHour = now.getHours();
-                    const isWeekend = (now.getDay() === 0 || now.getDay() === 6);
-
-                    let trafficDelayFactor = 1.15; 
-                    if (!isWeekend) {
-                        if ((currentHour >= 7 && currentHour <= 9) || (currentHour >= 17 && currentHour <= 19.5)) {
-                            trafficDelayFactor = 1.55; 
-                        } else if (currentHour >= 12 && currentHour <= 14) {
-                            trafficDelayFactor = 1.25; 
-                        }
-                    } else {
-                        if (currentHour >= 16 && currentHour <= 21) {
-                            trafficDelayFactor = 1.35; 
-                        }
-                    }
-
-                    let distanceImpactModifier = 1.0;
-                    if (distanceKm <= 5) {
-                        distanceImpactModifier = 0.65;
-                    } else if (distanceKm <= 15) {
-                        distanceImpactModifier = 0.85;
-                    } else if (distanceKm > 100) {
-                        distanceImpactModifier = 0.35; 
-                    } else if (distanceKm > 50) {
-                        distanceImpactModifier = 0.60;
-                    }
-
-                    const localizedTrafficWeight = 1 + ((trafficDelayFactor - 1) * distanceImpactModifier);
-                    const correctedDurationMins = Math.max(1, Math.round(baseDurationMins * localizedTrafficWeight));
+                    const durationMins = Math.max(1, Math.round(summary.duration / 60));
 
                     if (routeLine) map.removeLayer(routeLine);
                     
@@ -814,9 +799,9 @@
                         style: { color: '#8e24aa', weight: 5, opacity: 0.85 } 
                     }).addTo(map);
                     
- map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+                    map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
 
-                    processCalculations(distanceKm, correctedDurationMins, routeHasTolls);
+                    processCalculations(distanceKm, durationMins, pickupCoords, dropoffCoords);
                 })
                 .catch(err => {
                     console.error("ORS Infrastructure Error:", err);
@@ -832,168 +817,174 @@
         return mins > 0 ? `${hours} hr ${mins} mins` : `${hours} hr`;
     }
 
-    function roundToMalaysianCents(value) {
-        return Math.round(value * 10) / 10;
+    // Spatial Helpers (Bounding Boxes & Haversine Spherical Distances)
+    function isPointInBoundingBox(point, box) {
+        return point.lat >= box.minLat && point.lat <= box.maxLat &&
+               point.lon >= box.minLon && point.lon <= box.maxLon;
     }
 
-    function processCalculations(distance, duration, routeHasTolls) {
-        const pickupText = document.getElementById('pickup').value.toLowerCase();
-        const dropoffText = document.getElementById('dropoff').value.toLowerCase();
+    function haversineDistanceKm(p1, p2) {
+        const R = 6371;
+        const dLat = (p2.lat - p1.lat) * Math.PI / 180;
+        const dLon = (p2.lon - p1.lon) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(p1.lat * Math.PI / 180) * Math.cos(p2.lat * Math.PI / 180) *
+                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
 
-        // Check Airport Minima (Section 2.2)
-        const isKlia = pickupText.includes('klia') || dropoffText.includes('klia');
-        const isOtherAirport = pickupText.includes('subang airport') || dropoffText.includes('subang airport') ||
-                               pickupText.includes('senai') || dropoffText.includes('senai') ||
-                               pickupText.includes('penang airport') || dropoffText.includes('penang airport');
+    // Zone 1 Spatial Definitions (Lembah Klang, Penang, Johor, NS, Melaka)
+    const ZONE_1_BOXES = [
+        { name: 'Klang Valley / Selangor / NS / Melaka', minLat: 2.1, maxLat: 3.9, minLon: 101.0, maxLon: 102.6 },
+        { name: 'Penang', minLat: 5.1, maxLat: 5.6, minLon: 100.1, maxLon: 100.6 },
+        { name: 'Johor', minLat: 1.2, maxLat: 2.8, minLon: 102.5, maxLon: 104.3 }
+    ];
 
-        let isJadual1 = true;
-        const jadual2Regions = ['perlis', 'kedah', 'perak', 'pahang', 'kelantan', 'terengganu', 'sabah', 'sarawak'];
-        if (jadual2Regions.some(reg => pickupText.includes(reg) || dropoffText.includes(reg))) {
-            isJadual1 = false;
-        }
+    const KLANG_VALLEY_BOX = { minLat: 2.7, maxLat: 3.5, minLon: 101.2, maxLon: 101.95 };
+    const PENANG_ISLAND_BOX = { minLat: 5.25, maxLat: 5.48, minLon: 100.18, maxLon: 100.32 };
+    const PENANG_MAINLAND_BOX = { minLat: 5.12, maxLat: 5.52, minLon: 100.33, maxLon: 100.55 };
 
-        let baseFare = 4.00;
-        let perKmRate = isJadual1 ? 1.50 : 1.25;
-        let perMinRate = 0.50;
-        let minimumFare = isJadual1 ? 8.00 : 7.00;
+    // Key Airports & Coordinates
+    const AIRPORTS = {
+        KLIA: { lat: 2.7456, lon: 101.7072, radiusKm: 8 },
+        SUBANG: { lat: 3.1306, lon: 101.5492, radiusKm: 4 },
+        PENANG: { lat: 5.2971, lon: 100.2769, radiusKm: 4 },
+        SENAI: { lat: 1.6413, lon: 103.6696, radiusKm: 4 },
+        KUCHING: { lat: 1.4855, lon: 110.3472, radiusKm: 4 },
+        KK: { lat: 5.9224, lon: 116.0512, radiusKm: 4 }
+    };
 
-        let rideDistanceFare = 0;
-        let timeRateFare = 0;
+    // Highland Regions
+    const HIGHLANDS = [
+        { name: 'Genting', lat: 3.4236, lon: 101.7932, radiusKm: 12 },
+        { name: 'Cameron', lat: 4.4721, lon: 101.3801, radiusKm: 20 },
+        { name: 'Fraser', lat: 3.7188, lon: 101.7367, radiusKm: 10 },
+        { name: 'Kundasang', lat: 6.0333, lon: 116.5833, radiusKm: 15 }
+    ];
 
-        if (isKlia) {
-            minimumFare = 30.00;
-            if (distance > 15) {
-                const extraKm = distance - 15;
-                rideDistanceFare = extraKm * perKmRate;
-                timeRateFare = duration * perMinRate;
+    function isZone1Point(p) {
+        return ZONE_1_BOXES.some(box => isPointInBoundingBox(p, box));
+    }
+
+    function processCalculations(distance, duration, pickup, dropoff) {
+        // 1. Zonal Determination via Geofence
+        const isZone1 = isZone1Point(pickup);
+
+        const baseFare = 4.00;
+        const perKmRate = isZone1 ? 1.50 : 1.25;
+        const perMinRate = 0.50;
+        const minFare = isZone1 ? 8.00 : 7.00;
+
+        let calculatedDistanceFare = distance * perKmRate;
+        let calculatedTimeFare = duration * perMinRate;
+        
+        let initialCalculatedFare = baseFare + calculatedDistanceFare + calculatedTimeFare;
+        
+        // 2. Spatial Airport Minimum Fare Gate
+        const isKLIA = haversineDistanceKm(pickup, AIRPORTS.KLIA) <= AIRPORTS.KLIA.radiusKm ||
+                       haversineDistanceKm(dropoff, AIRPORTS.KLIA) <= AIRPORTS.KLIA.radiusKm;
+
+        const isRegionalAirport = Object.keys(AIRPORTS).some(key => {
+            if (key === 'KLIA') return false;
+            const ap = AIRPORTS[key];
+            return haversineDistanceKm(pickup, ap) <= ap.radiusKm || haversineDistanceKm(dropoff, ap) <= ap.radiusKm;
+        });
+
+        if (isKLIA) {
+            if (distance <= 15) {
+                initialCalculatedFare = 30.00;
+            } else {
+                initialCalculatedFare = 30.00 + ((distance - 15) * 1.50) + (duration * 0.50);
             }
-        } else if (isOtherAirport) {
-            minimumFare = 20.00;
-            if (distance > 10) {
-                const extraKm = distance - 10;
-                rideDistanceFare = extraKm * perKmRate;
-                timeRateFare = duration * perMinRate;
+        } else if (isRegionalAirport) {
+            if (distance <= 10) {
+                initialCalculatedFare = 20.00;
+            } else {
+                initialCalculatedFare = 20.00 + ((distance - 10) * 1.25) + (duration * 0.50);
             }
         } else {
-            // Standard Calculation with 3km/6min Minimum Fare window logic
+            // Standard Min Fare Rule (First 3 km / 6 mins)
             if (distance <= 3 && duration <= 6) {
-                rideDistanceFare = 0;
-                timeRateFare = 0;
-            } else {
-                rideDistanceFare = distance * perKmRate;
-                timeRateFare = duration * perMinRate;
+                initialCalculatedFare = Math.max(initialCalculatedFare, minFare);
             }
         }
 
-        // Toll Override Calculations
-        let dynamicTolls = 0;
-        let tollSystemLabel = "PLUS Tolls (Est.)";
-
-        const isKlangKaparOrigin = pickupText.includes('meru') || pickupText.includes('kapar') || pickupText.includes('bukit raja') || pickupText.includes('klang');
-        const isKlangKaparDest = dropoffText.includes('meru') || dropoffText.includes('kapar') || dropoffText.includes('bukit raja') || dropoffText.includes('klang');
-        const isJohorBahruDest = dropoffText.includes('holiday plaza') || dropoffText.includes('jb sentral') || dropoffText.includes('skudai') || dropoffText.includes('r&f mall') || dropoffText.includes('johor');
-        const isJohorBahruOrigin = pickupText.includes('holiday plaza') || pickupText.includes('jb sentral') || pickupText.includes('skudai') || pickupText.includes('r&f mall') || pickupText.includes('johor');
-        const isGentingDest = dropoffText.includes('genting') || dropoffText.includes('premium outlet') || dropoffText.includes('ghpo') || dropoffText.includes('gohtong');
-        const isGentingOrigin = pickupText.includes('genting') || pickupText.includes('premium outlet') || pickupText.includes('ghpo') || pickupText.includes('gohtong');
-        const isKelantanDest = dropoffText.includes('pengkalan kubor') || dropoffText.includes('kota bharu') || dropoffText.includes('kubor') || dropoffText.includes('kelantan');
-        const isKelantanOrigin = pickupText.includes('pengkalan kubor') || pickupText.includes('kota bharu') || pickupText.includes('kubor') || pickupText.includes('kelantan');
-        const isBangiKajangDest = dropoffText.includes('bangi') || dropoffText.includes('pelangi') || dropoffText.includes('kajang') || dropoffText.includes('reko');
-        const isBangiKajangOrigin = pickupText.includes('bangi') || pickupText.includes('pelangi') || pickupText.includes('kajang') || pickupText.includes('reko');
-        const isDamansaraDest = dropoffText.includes('the curve') || dropoffText.includes('mutiara damansara') || dropoffText.includes('one utama') || dropoffText.includes('pj') || dropoffText.includes('damansara');
-        const isDamansaraOrigin = pickupText.includes('the curve') || pickupText.includes('mutiara damansara') || pickupText.includes('one utama') || pickupText.includes('pj') || pickupText.includes('damansara');
-        const isPuncakPerdanaDest = dropoffText.includes('puncak perdana') || dropoffText.includes('uitm puncak') || dropoffText.includes('subang dua');
-        const isPuncakPerdanaOrigin = pickupText.includes('puncak perdana') || pickupText.includes('uitm puncak') || pickupText.includes('subang dua');
-        const isKLCenterDest = dropoffText.includes('klcc') || dropoffText.includes('kuala lumpur') || dropoffText.includes('kl tower') || dropoffText.includes('bintang') || dropoffText.includes('sentral');
-        const isKLCenterOrigin = pickupText.includes('klcc') || pickupText.includes('kuala lumpur') || pickupText.includes('kl tower') || pickupText.includes('bintang') || pickupText.includes('sentral');
-        const isSerembanDest = dropoffText.includes('seremban') || dropoffText.includes('tuanku jaafar') || dropoffText.includes('senawang') || dropoffText.includes('nilai');
-        const isSerembanOrigin = pickupText.includes('seremban') || pickupText.includes('tuanku jaafar') || pickupText.includes('senawang') || pickupText.includes('nilai');
-
-        if ((isKlangKaparOrigin && isJohorBahruDest) || (isJohorBahruOrigin && isKlangKaparDest)) {
-            dynamicTolls = 37.31; 
-            tollSystemLabel = "PLUS Tolls (Actual)";
-        } else if ((isKlangKaparOrigin && isSerembanDest) || (isSerembanOrigin && isKlangKaparDest)) {
-            dynamicTolls = 9.30; 
-            tollSystemLabel = "PLUS Tolls (NKVE-ELITE)";
-        } else if ((isPuncakPerdanaOrigin && isKLCenterDest) || (isKLCenterOrigin && isPuncakPerdanaDest)) {
-            dynamicTolls = 5.00; 
-            tollSystemLabel = "DASH + SPRINT/DUKE Toll";
-        } else if ((isKlangKaparOrigin && isDamansaraDest) || (isDamansaraOrigin && isKlangKaparDest) || (isDamansaraOrigin && isPuncakPerdanaDest) || (isPuncakPerdanaOrigin && isDamansaraDest)) {
-            dynamicTolls = 2.30; 
-            tollSystemLabel = "DASH Toll (Actual)";
-        } else if ((isKlangKaparOrigin && isGentingDest) || (isGentingOrigin && isKlangKaparDest)) {
-            dynamicTolls = 12.10; 
-            tollSystemLabel = "PLUS + Karak Tolls";
-        } else if ((isKlangKaparOrigin && isKelantanDest) || (isKelantanOrigin && isKlangKaparDest)) {
-            dynamicTolls = 24.30; 
-            tollSystemLabel = "PLUS + LPT Tolls";
-        } else if ((isKlangKaparOrigin && isBangiKajangDest) || (isBangiKajangOrigin && isKlangKaparDest)) {
-            dynamicTolls = 6.91; 
-            tollSystemLabel = "PLUS Tolls (Actual)";
-        } else if (routeHasTolls) {
-            dynamicTolls = distance <= 45 ? 2.50 : 3.50 + ((distance - 45) * 0.095);
-            tollSystemLabel = "PLUS Tolls (Est.)";
+        // 3. Pickup Approach Charge Calculation (Policy Item 5)
+        const pickupApproachKm = parseFloat(document.getElementById('pickup-dist').value) || 0;
+        const pickupApproachMin = parseFloat(document.getElementById('pickup-time').value) || 0;
+        
+        let pickupApproachSurcharge = 0;
+        // Triggered if total trip exceed minimum fare bounds
+        if (pickupApproachKm > 0 || pickupApproachMin > 0) {
+            pickupApproachSurcharge = (pickupApproachKm * 0.60) + (pickupApproachMin * 0.40);
         }
 
-        document.getElementById('toll-type-label').textContent = tollSystemLabel;
+        // 4. Spatial Surcharges
+        let surchargeMultiplier = 0.0;
+        let flatSurcharge = 0.0;
+        let surchargeLabels = [];
 
-        // Subtotal before surcharges
-        let subtotal = baseFare + rideDistanceFare + timeRateFare;
-
-        // Apply Surcharges (Section 2.3)
-        let midnightSurcharge = 0;
+        // Midnight Charge (+25% for 00:00 - 06:00)
         const currentHour = new Date().getHours();
         if (currentHour >= 0 && currentHour < 6) {
-            midnightSurcharge = subtotal * 0.25;
-            document.getElementById('midnight-row').style.display = 'flex';
-            document.getElementById('calc-midnight').textContent = `RM ${midnightSurcharge.toFixed(2)}`;
-        } else {
-            document.getElementById('midnight-row').style.display = 'none';
+            surchargeMultiplier += 0.25;
+            surchargeLabels.push("Midnight (+25%)");
         }
 
-        let highlandSurcharge = 0;
-        const isHighland = isGentingDest || isGentingOrigin || pickupText.includes('cameron') || dropoffText.includes('cameron') || pickupText.includes("fraser") || dropoffText.includes("fraser");
+        // Highland / Risk Driving Charge (+50%)
+        const isHighland = HIGHLANDS.some(h => 
+            haversineDistanceKm(pickup, h) <= h.radiusKm || haversineDistanceKm(dropoff, h) <= h.radiusKm
+        );
         if (isHighland) {
-            highlandSurcharge = subtotal * 0.50;
-            document.getElementById('highland-row').style.display = 'flex';
-            document.getElementById('calc-highland').textContent = `RM ${highlandSurcharge.toFixed(2)}`;
-        } else {
-            document.getElementById('highland-row').style.display = 'none';
+            surchargeMultiplier += 0.50;
+            surchargeLabels.push("Highland (+50%)");
         }
 
-        let penangBridgeFee = 0;
-        const isPenangBridge = (pickupText.includes('seberang perai') && dropoffText.includes('pulau pinang')) || (pickupText.includes('pulau pinang') && dropoffText.includes('seberang perai'));
-        if (isPenangBridge) {
-            penangBridgeFee = 7.00;
-            document.getElementById('penang-bridge-row').style.display = 'flex';
-            document.getElementById('calc-penang-bridge').textContent = `RM ${penangBridgeFee.toFixed(2)}`;
-        } else {
-            document.getElementById('penang-bridge-row').style.display = 'none';
+        // Penang Bridge Flat Fee (+RM 7.00)
+        const isPenangCross = (isPointInBoundingBox(pickup, PENANG_ISLAND_BOX) && isPointInBoundingBox(dropoff, PENANG_MAINLAND_BOX)) ||
+                              (isPointInBoundingBox(pickup, PENANG_MAINLAND_BOX) && isPointInBoundingBox(dropoff, PENANG_ISLAND_BOX));
+        if (isPenangCross) {
+            flatSurcharge += 7.00;
+            surchargeLabels.push("Penang Bridge (RM 7.00)");
         }
 
-        let interstateSurcharge = 0;
-        const isKlangValleyStartAndEnd = (isKlangKaparOrigin || isKLCenterOrigin || isDamansaraOrigin) && (isKlangKaparDest || isKLCenterDest || isDamansaraDest);
-        if (distance > 60 && !isKlangValleyStartAndEnd) {
-            interstateSurcharge = subtotal * 0.25;
-            document.getElementById('interstate-row').style.display = 'flex';
-            document.getElementById('calc-interstate').textContent = `RM ${interstateSurcharge.toFixed(2)}`;
-        } else {
-            document.getElementById('interstate-row').style.display = 'none';
+        // Interstate Travel Charge (+25% for >60km cross-border unless in Klang Valley)
+        const isCrossState = (isZone1Point(pickup) !== isZone1Point(dropoff)) || distance > 60;
+        const isInsideKlangValley = isPointInBoundingBox(pickup, KLANG_VALLEY_BOX) && isPointInBoundingBox(dropoff, KLANG_VALLEY_BOX);
+        if (distance > 60 && isCrossState && !isInsideKlangValley) {
+            surchargeMultiplier += 0.25;
+            surchargeLabels.push("Interstate (+25%)");
         }
 
-        const rawTotal = subtotal + midnightSurcharge + highlandSurcharge + penangBridgeFee + interstateSurcharge + dynamicTolls;
-        const finalCalculatedFare = Math.max(minimumFare, rawTotal);
-        const roundedTotal = roundToMalaysianCents(finalCalculatedFare);
-        const finalDisplayedWholeFare = Math.round(roundedTotal);
+        const totalSurchargeAmount = (initialCalculatedFare * surchargeMultiplier) + flatSurcharge;
+        const grandTotal = initialCalculatedFare + totalSurchargeAmount + pickupApproachSurcharge;
 
-        document.getElementById('total-fare').textContent = `RM ${finalDisplayedWholeFare}`;
+        // UI Updates
+        document.getElementById('calc-base-fare').textContent = `RM ${baseFare.toFixed(2)}`;
+        document.getElementById('calc-ride-distance-rate').textContent = `RM ${calculatedDistanceFare.toFixed(2)}`;
+        document.getElementById('calc-time-rate').textContent = `RM ${calculatedTimeFare.toFixed(2)}`;
+
+        const pickupSurchargeRow = document.getElementById('pickup-surcharge-row');
+        if (pickupApproachSurcharge > 0) {
+            pickupSurchargeRow.style.display = 'flex';
+            document.getElementById('calc-pickup-surcharge').textContent = `RM ${pickupApproachSurcharge.toFixed(2)}`;
+        } else {
+            pickupSurchargeRow.style.display = 'none';
+        }
+
+        const surchargeRow = document.getElementById('surcharge-row');
+        if (totalSurchargeAmount > 0) {
+            surchargeRow.style.display = 'flex';
+            document.getElementById('surcharge-label').textContent = surchargeLabels.join(', ');
+            document.getElementById('calc-surcharge').textContent = `RM ${totalSurchargeAmount.toFixed(2)}`;
+        } else {
+            surchargeRow.style.display = 'none';
+        }
+
+        document.getElementById('total-fare').textContent = `RM ${Math.round(grandTotal)}`;
         document.getElementById('fare-distance').textContent = `${distance.toFixed(1)} km`;
         document.getElementById('fare-duration').textContent = formatDuration(duration);
-
-        document.getElementById('calc-base-fare').textContent = `RM ${baseFare.toFixed(2)} (${isJadual1 ? 'Jadual 1' : 'Jadual 2'})`;
-        document.getElementById('calc-ride-distance-rate').textContent = `RM ${rideDistanceFare.toFixed(2)}`;
-        document.getElementById('calc-time-rate').textContent = `RM ${timeRateFare.toFixed(2)}`;
-        document.getElementById('calc-tolls').textContent = `RM ${dynamicTolls.toFixed(2)}`;
-        document.getElementById('calc-grand').textContent = `RM ${roundedTotal.toFixed(2)}`;
+        document.getElementById('calc-grand').textContent = `RM ${grandTotal.toFixed(2)}`;
 
         document.getElementById('result-card').style.display = 'block';
     }
