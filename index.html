@@ -155,7 +155,7 @@
             border-radius: 8px;
             max-height: 180px; 
             overflow-y: auto;
-            z-index: 1000;
+            z-index: 100;
             box-shadow: 0 6px 16px rgba(0,0,0,0.15);
             display: none;
         }
@@ -166,8 +166,8 @@
             line-height: 1.4;
             border-bottom: 1px solid #f5f5f5;
         }
-        .suggestion-item:hover {
-            background-color: #f5f5f5;
+        .suggestion-item:hover, .suggestion-item:active {
+            background-color: #f0f0f0;
         }
         
         #result-card {
@@ -178,6 +178,8 @@
             margin-top: 10px;
             display: none;
             box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+            position: relative;
+            z-index: 5;
         }
         .fare-header-row {
             display: flex;
@@ -334,12 +336,19 @@
     let pickupCoords = null, dropoffCoords = null;
     let currentRouteTimeout = null;
 
-    document.addEventListener('click', function (e) {
-        if (!e.target.closest('.input-container')) {
-            document.querySelectorAll('.suggestions').forEach(box => {
-                box.style.display = 'none';
-            });
-        }
+    function hideAllSuggestions() {
+        document.querySelectorAll('.suggestions').forEach(box => {
+            box.innerHTML = '';
+            box.style.display = 'none';
+        });
+    }
+
+    ['click', 'touchstart'].forEach(eventType => {
+        document.addEventListener(eventType, function (e) {
+            if (!e.target.closest('.input-container')) {
+                hideAllSuggestions();
+            }
+        });
     });
 
     setupAutocomplete('pickup', 'pickup-suggestions', 'clear-pickup', (coords) => {
@@ -390,12 +399,16 @@
                             document.getElementById('pickup').value = `Current Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
                         }
                         document.getElementById('clear-pickup').style.display = 'block';
+                        hideAllSuggestions();
+                        document.getElementById('pickup').blur();
                         checkAndProcessRoute();
                     })
                     .catch(() => {
                         btn.textContent = "🎯";
                         document.getElementById('pickup').value = `Current Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
                         document.getElementById('clear-pickup').style.display = 'block';
+                        hideAllSuggestions();
+                        document.getElementById('pickup').blur();
                         checkAndProcessRoute();
                     });
             },
@@ -418,6 +431,7 @@
     }
 
     function executeLocationSwap() {
+        hideAllSuggestions();
         const pickupInput = document.getElementById('pickup');
         const dropoffInput = document.getElementById('dropoff');
         const tempText = pickupInput.value;
@@ -497,13 +511,19 @@
                             const div = document.createElement('div');
                             div.className = 'suggestion-item';
                             div.textContent = detailedAddress;
-                            div.addEventListener('click', () => {
+                            
+                            const selectHandler = (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 input.value = props.name || detailedAddress;
-                                suggestionsBox.innerHTML = '';
-                                suggestionsBox.style.display = 'none';
+                                hideAllSuggestions();
+                                input.blur(); 
                                 const [lon, lat] = feature.geometry.coordinates;
                                 onSelect({ lat, lon });
-                            });
+                            };
+
+                            div.addEventListener('click', selectHandler);
+                            div.addEventListener('touchend', selectHandler);
                             suggestionsBox.appendChild(div);
                         });
                     }).catch(err => console.error(err));
@@ -552,7 +572,6 @@
         }
     }
 
-    // Secondary/Fallback routing engine using standard OSRM service
     function fetchOSRMRoute() {
         const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${pickupCoords.lon},${pickupCoords.lat};${dropoffCoords.lon},${dropoffCoords.lat}?overview=full&geometries=geojson`;
         
@@ -619,11 +638,11 @@
     function checkAndProcessRoute() {
         if (!pickupCoords || !dropoffCoords) return;
         
+        hideAllSuggestions();
         document.getElementById('error-msg').style.display = 'none';
         if(currentRouteTimeout) clearTimeout(currentRouteTimeout);
         
         currentRouteTimeout = setTimeout(() => {
-            // Attempt standard OSRM routing directly to avoid ORS key errors
             fetchOSRMRoute();
         }, 250);
     }
