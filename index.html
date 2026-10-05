@@ -48,6 +48,7 @@
         resetCalculationDisplay();
     });
 
+    // HERE API Reverse Geocoding for Current Location
     document.getElementById('current-loc-btn').addEventListener('click', () => {
         if (!navigator.geolocation) {
             showError("Location services unsupported by browser.");
@@ -146,6 +147,7 @@
         document.getElementById('result-card').style.display = 'none';
     }
 
+    // HERE Autosuggest API Integration
     function setupAutocomplete(inputId, suggestionsId, clearBtnId, onSelect, onClear) {
         const input = document.getElementById(inputId);
         const suggestionsBox = document.getElementById(suggestionsId);
@@ -212,15 +214,18 @@
         });
     }
 
-    // Official HERE Flexible Polyline Decoder (Supports 2D & 3D coordinate streams)
+    // Flexible Polyline Decoder for HERE API V8
     function decodeFlexiblePolyline(encoded) {
         let index = 0;
         const len = encoded.length;
-        let lat = 0, lng = 0, z = 0;
+        let lat = 0;
+        let lng = 0;
         const coordinates = [];
 
         function decodeVarint() {
-            let res = 0, shift = 0, byte = 0;
+            let res = 0;
+            let shift = 0;
+            let byte = 0;
             do {
                 byte = encoded.charCodeAt(index++) - 63;
                 res |= (byte & 0x1f) << shift;
@@ -232,19 +237,16 @@
         const header = decodeVarint();
         const precision = header & 15;
         const factor = Math.pow(10, precision);
-        const hasZ = ((header >> 4) & 7) !== 0; 
 
         while (index < len) {
             lat += decodeVarint();
             lng += decodeVarint();
-            if (hasZ) {
-                z += decodeVarint(); 
-            }
             coordinates.push([lat / factor, lng / factor]);
         }
         return coordinates;
     }
 
+    // HERE Routing API (v8) Integration replacing OSRM
     function fetchHERERoute() {
         const origin = `${pickupCoords.lat},${pickupCoords.lon}`;
         const destination = `${dropoffCoords.lat},${dropoffCoords.lon}`;
