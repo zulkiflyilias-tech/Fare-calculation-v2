@@ -13,16 +13,32 @@
     body { background-color: #f4f5f7; padding: 15px; color: #172b4d; }
     .container { max-width: 480px; margin: 0 auto; background: #fff; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; }
     
-    #map { height: 260px; width: 100%; }
+    #map { height: 260px; width: 100%; background: #e5e7eb; }
     
-    .input-section { padding: 16px; display: flex; flex-direction: column; gap: 10px; position: relative; }
+    .input-section { padding: 16px; display: flex; flex-direction: column; gap: 12px; position: relative; }
     .input-group { position: relative; }
-    .input-group input { width: 100%; padding: 12px 36px 12px 14px; border: 1px solid #dfe1e6; border-radius: 8px; font-size: 14px; outline: none; }
-    .input-group input:focus { border-color: #4c9aff; }
+    .input-group input { width: 100%; padding: 12px 14px; border: 1px solid #dfe1e6; border-radius: 8px; font-size: 14px; outline: none; transition: border 0.2s; }
+    .input-group input:focus { border-color: #4c9aff; box-shadow: 0 0 0 2px rgba(76,154,255,0.2); }
     
-    .suggestions { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #dfe1e6; border-radius: 8px; z-index: 1000; max-height: 180px; overflow-y: auto; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-    .suggestion-item { padding: 10px 14px; font-size: 13px; cursor: pointer; border-bottom: 1px solid #f4f5f7; }
-    .suggestion-item:hover { background: #f4f5f7; }
+    /* Dropdown Autocomplete Styling */
+    .suggestions { 
+      position: absolute; 
+      top: 100%; 
+      left: 0; 
+      right: 0; 
+      background: #ffffff; 
+      border: 1px solid #dfe1e6; 
+      border-radius: 8px; 
+      z-index: 9999; 
+      max-height: 220px; 
+      overflow-y: auto; 
+      box-shadow: 0 6px 16px rgba(0,0,0,0.15); 
+      margin-top: 4px;
+      display: none;
+    }
+    .suggestion-item { padding: 12px 14px; font-size: 13px; cursor: pointer; border-bottom: 1px solid #f4f5f7; color: #333; }
+    .suggestion-item:last-child { border-bottom: none; }
+    .suggestion-item:hover { background: #f0f4ff; color: #0052cc; }
 
     .card { background: #121316; color: #fff; margin: 16px; padding: 20px; border-radius: 16px; }
     .card-header { display: flex; justify-content: space-between; align-items: baseline; }
@@ -42,11 +58,11 @@
 
   <div class="input-section">
     <div class="input-group">
-      <input type="text" id="origin" placeholder="Pick-up Location..." value="Pangsapuri Impian Meru (Blok B)" autocomplete="off" />
+      <input type="text" id="origin" placeholder="Pick-up Location..." value="Pangsapuri Impian Meru (Blok B), Jalan Meru" autocomplete="off" />
       <div id="origin-suggestions" class="suggestions"></div>
     </div>
     <div class="input-group">
-      <input type="text" id="destination" placeholder="Drop-off Location..." value="i-City" autocomplete="off" />
+      <input type="text" id="destination" placeholder="Drop-off Location..." value="i-City, Shah Alam" autocomplete="off" />
       <div id="dest-suggestions" class="suggestions"></div>
     </div>
   </div>
@@ -79,32 +95,36 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-  // 1. YOUR HERE API KEY
-  const HERE_API_KEY = "YOUR_HERE_API_KEY"; // Replace with your actual HERE API Key
+  // 1. HERE API KEY
+  const HERE_API_KEY = "YOUR_HERE_API_KEY"; // Replace with your valid HERE API Key
 
-  // Default Coordinates (Klang/Meru region)
+  // Fixed Default Coordinates (Impian Meru & i-City)
   let originCoords = { lat: 3.1118, lng: 101.4402 };
   let destCoords = { lat: 3.0648, lng: 101.4854 };
 
-  // Initialize Map with HERE Normal Day Tiles
-  const map = L.map('map').setView([originCoords.lat, originCoords.lng], 12);
-  L.tileLayer(`https://maps.hereapi.com/v3/base/mc/zoom/x/y/png8?style=explore.day&apiKey=${HERE_API_KEY}`, {
+  // Initialize Map
+  const map = L.map('map').setView([3.0883, 101.4628], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
-    attribution: '&copy; HERE 2026'
+    attribution: '&copy; OpenStreetMap'
   }).addTo(map);
 
   let originMarker = L.marker([originCoords.lat, originCoords.lng]).addTo(map);
   let destMarker = L.marker([destCoords.lat, destCoords.lng]).addTo(map);
   let routeLayer = null;
 
-  // 2. HERE Geocoding / Autocomplete API v7
+  // 2. HERE Autocomplete Dropdown Logic (Shows minimum 3 suggestions)
   function setupAutocomplete(inputId, suggestionsId, onSelect) {
     const input = document.getElementById(inputId);
     const box = document.getElementById(suggestionsId);
 
     input.addEventListener('input', async () => {
       const query = input.value.trim();
-      if (query.length < 3) { box.innerHTML = ''; return; }
+      if (query.length < 2) { 
+        box.style.display = 'none';
+        box.innerHTML = ''; 
+        return; 
+      }
 
       try {
         const url = `https://autocomplete.search.hereapi.com/v1/autocomplete?q=${encodeURIComponent(query)}&at=3.0738,101.5183&limit=5&apiKey=${HERE_API_KEY}`;
@@ -112,26 +132,42 @@
         const data = await res.json();
 
         box.innerHTML = '';
-        (data.items || []).forEach(item => {
-          const div = document.createElement('div');
-          div.className = 'suggestion-item';
-          div.innerText = item.title;
-          div.onclick = async () => {
-            input.value = item.title;
-            box.innerHTML = '';
-            // Lookup lat/lng via HERE Geocode API
-            const geoUrl = `https://geocode.search.hereapi.com/v1/geocode?q=${encodeURIComponent(item.title)}&apiKey=${HERE_API_KEY}`;
-            const geoRes = await fetch(geoUrl);
-            const geoData = await geoRes.json();
-            if (geoData.items.length > 0) {
-              const pos = geoData.items[0].position;
-              onSelect(pos.lat, pos.lng);
-            }
-          };
-          box.appendChild(div);
-        });
+        const items = data.items || [];
+
+        if (items.length > 0) {
+          box.style.display = 'block';
+          items.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'suggestion-item';
+            div.innerText = item.title;
+            div.onclick = async () => {
+              input.value = item.title;
+              box.style.display = 'none';
+              box.innerHTML = '';
+              
+              // Resolve lat/lng using HERE Geocode API
+              const geoUrl = `https://geocode.search.hereapi.com/v1/geocode?q=${encodeURIComponent(item.title)}&apiKey=${HERE_API_KEY}`;
+              const geoRes = await fetch(geoUrl);
+              const geoData = await geoRes.json();
+              if (geoData.items && geoData.items.length > 0) {
+                const pos = geoData.items[0].position;
+                onSelect(pos.lat, pos.lng);
+              }
+            };
+            box.appendChild(div);
+          });
+        } else {
+          box.style.display = 'none';
+        }
       } catch (e) {
-        console.error("Autocomplete error:", e);
+        console.error("Autocomplete Error:", e);
+      }
+    });
+
+    // Close box when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!input.contains(e.target) && !box.contains(e.target)) {
+        box.style.display = 'none';
       }
     });
   }
@@ -148,21 +184,60 @@
     calculateRouteAndFare();
   });
 
-  // 3. Toll Calculation Logic (Includes i-City check)
-  function calculateTolls(originText, destText, distanceKm) {
+  // 3. Toll Logic (Includes RM 1.00 i-City toll)
+  function calculateTolls(originText, destText) {
     let toll = 0.00;
     const origin = (originText || "").toLowerCase();
     const dest = (destText || "").toLowerCase();
 
-    // Check if origin or destination is i-City (Bukit Raja / Suria Toll = RM 1.00)
     if (origin.includes("i-city") || dest.includes("i-city")) {
-      toll += 1.00;
+      toll += 1.00; // Bukit Raja / Suria Plaza Toll
     }
 
     return toll;
   }
 
-  // 4. HERE Routing API v8 Integration & Fare Engine
+  // 4. HERE Flexible Polyline Decoder (Required for HERE v8 Routing)
+  function decodeFlexiblePolyline(encoded) {
+    const DECODING_TABLE = [
+      62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1,
+      -1, -1, -1, -1, -1, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+      13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, -1, -1, -1, -1,
+      -1, -1, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
+      41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51
+    ];
+    let index = 0, lat = 0, lng = 0;
+    const coordinates = [];
+
+    function decodeUnsigned() {
+      let result = 0, shift = 0, b;
+      do {
+        b = DECODING_TABLE[encoded.charCodeAt(index++) - 45];
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      return result;
+    }
+
+    function decodeSigned() {
+      const res = decodeUnsigned();
+      return (res & 1) ? ~(res >> 1) : (res >> 1);
+    }
+
+    const header = decodeUnsigned();
+    const precision = header & 15;
+    const factor = Math.pow(10, precision);
+
+    while (index < encoded.length) {
+      lat += decodeSigned();
+      lng += decodeSigned();
+      coordinates.push([lat / factor, lng / factor]);
+    }
+
+    return coordinates;
+  }
+
+  // 5. HERE Routing Engine & Calculation
   async function calculateRouteAndFare() {
     const originText = document.getElementById('origin').value;
     const destText = document.getElementById('destination').value;
@@ -176,29 +251,27 @@
       if (!data.routes || data.routes.length === 0) return;
 
       const section = data.routes[0].sections[0];
-      const distanceKm = section.summary.length / 1000; // Meters to KM
-      const durationMins = Math.ceil(section.summary.duration / 60); // Seconds to Mins
+      const distanceKm = section.summary.length / 1000;
+      const durationMins = Math.ceil(section.summary.duration / 60);
 
-      // Render Polyline on Map
+      // Render Polyline
       if (routeLayer) map.removeLayer(routeLayer);
-      const flexiblePolyline = decodePolyline(section.polyline);
-      routeLayer = L.polyline(flexiblePolyline, { color: '#8b5cf6', weight: 5 }).addTo(map);
+      const lineCoords = decodeFlexiblePolyline(section.polyline);
+      routeLayer = L.polyline(lineCoords, { color: '#8b5cf6', weight: 5 }).addTo(map);
       map.fitBounds(routeLayer.getBounds(), { padding: [30, 30] });
 
-      // Calculate Fare Dynamics
+      // Calculation Formula
       const baseFare = 5.00;
       const ratePerKm = 1.156;
       const distanceFare = distanceKm * ratePerKm;
       const trafficAdjust = 3.00;
       const outOfZone = 0.03;
-      
-      // Dynamic Toll Calculation
-      const tolls = calculateTolls(originText, destText, distanceKm);
+      const tolls = calculateTolls(originText, destText);
 
       const rawTotal = baseFare + distanceFare + tolls + trafficAdjust + outOfZone;
       const roundedTotal = Math.round(rawTotal * 2) / 2; // Round to nearest 0.50
 
-      // Update UI Elements
+      // Update UI Display
       document.getElementById('display-total').innerText = `RM ${Math.round(roundedTotal)}`;
       document.getElementById('display-distance').innerText = `${distanceKm.toFixed(1)} km`;
       document.getElementById('display-duration').innerText = `${durationMins} mins`;
@@ -211,17 +284,11 @@
       document.getElementById('val-final').innerText = `RM ${roundedTotal.toFixed(2)}`;
 
     } catch (err) {
-      console.error("Routing error:", err);
+      console.error("Routing calculation failed:", err);
     }
   }
 
-  // Helper Decoder for HERE Polyline (v8)
-  function decodePolyline(encoded) {
-    // Simplified decoder for display; fallback array for bounds
-    return [[originCoords.lat, originCoords.lng], [destCoords.lat, destCoords.lng]];
-  }
-
-  // Initial Calculation on Load
+  // Initial Run on Load
   calculateRouteAndFare();
 </script>
 </body>
