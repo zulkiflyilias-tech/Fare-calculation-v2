@@ -297,7 +297,7 @@
                     <span id="calc-ride-distance-rate">RM 0.00</span>
                 </div>
                 <div class="detail-row">
-                    <span id="toll-type-label">Tolls (HERE API)</span>
+                    <span id="toll-type-label">Tolls</span>
                     <span id="calc-tolls">RM 0.00</span>
                 </div>
                 <div class="detail-row">
@@ -328,7 +328,6 @@
         attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImVlYzI5ZTA0OTM2YTRlZDNhNjk1NTcyNGQ1OTJmYmNjIiwiaCI6Im11cm11cjY0In0="; 
     const HERE_API_KEY = "PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk";
 
     let pickupMarker = null, dropoffMarker = null, routeLine = null;
@@ -365,7 +364,7 @@
 
     document.getElementById('current-loc-btn').addEventListener('click', () => {
         if (!navigator.geolocation) {
-            showError("Compass or location trace features are unsupported by this application shell.");
+            showError("Location services unsupported by browser.");
             return;
         }
         const btn = document.getElementById('current-loc-btn');
@@ -402,7 +401,7 @@
             },
             () => {
                 btn.textContent = "🎯";
-                showError("Unable to safely track user positioning metrics.");
+                showError("Unable to acquire location.");
             },
             { enableHighAccuracy: true, timeout: 8000 }
         );
@@ -548,9 +547,73 @@
             }
             return totalToll;
         } catch (err) {
-            console.error("HERE Toll API Error:", err);
+            console.warn("HERE Toll API bypassed:", err);
             return 0;
         }
+    }
+
+    // Secondary/Fallback routing engine using standard OSRM service
+    function fetchOSRMRoute() {
+        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${pickupCoords.lon},${pickupCoords.lat};${dropoffCoords.lon},${dropoffCoords.lat}?overview=full&geometries=geojson`;
+        
+        fetch(osrmUrl)
+            .then(res => res.json())
+            .then(async (data) => {
+                if (!data.routes || data.routes.length === 0) {
+                    showError("No valid drivable route found.");
+                    return;
+                }
+
+                const route = data.routes[0];
+                const distanceKm = route.distance / 1000;
+                const baseDurationMins = route.duration / 60;
+
+                const now = new Date();
+                const currentHour = now.getHours();
+                const isWeekend = (now.getDay() === 0 || now.getDay() === 6);
+
+                let trafficDelayFactor = 1.15; 
+                if (!isWeekend) {
+                    if ((currentHour >= 7 && currentHour <= 9) || (currentHour >= 17 && currentHour <= 19.5)) {
+                        trafficDelayFactor = 1.55; 
+                    } else if (currentHour >= 12 && currentHour <= 14) {
+                        trafficDelayFactor = 1.25; 
+                    }
+                } else {
+                    if (currentHour >= 16 && currentHour <= 21) {
+                        trafficDelayFactor = 1.35; 
+                    }
+                }
+
+                let distanceImpactModifier = 1.0;
+                if (distanceKm <= 5) {
+                    distanceImpactModifier = 0.65;
+                } else if (distanceKm <= 15) {
+                    distanceImpactModifier = 0.85;
+                } else if (distanceKm > 100) {
+                    distanceImpactModifier = 0.35; 
+                } else if (distanceKm > 50) {
+                    distanceImpactModifier = 0.60;
+                }
+
+                const localizedTrafficWeight = 1 + ((trafficDelayFactor - 1) * distanceImpactModifier);
+                const correctedDurationMins = Math.max(1, Math.round(baseDurationMins * localizedTrafficWeight));
+
+                if (routeLine) map.removeLayer(routeLine);
+                
+                routeLine = L.geoJSON(route.geometry, { 
+                    style: { color: '#8e24aa', weight: 5, opacity: 0.85 } 
+                }).addTo(map);
+                
+                map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+
+                const hereTollCost = await fetchHereTolls(pickupCoords, dropoffCoords);
+                processCalculations(distanceKm, correctedDurationMins, hereTollCost);
+            })
+            .catch(err => {
+                console.error("OSRM Error:", err);
+                showError("Routing service unavailable. Please try again.");
+            });
     }
 
     function checkAndProcessRoute() {
@@ -560,72 +623,8 @@
         if(currentRouteTimeout) clearTimeout(currentRouteTimeout);
         
         currentRouteTimeout = setTimeout(() => {
-            const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${ORS_API_KEY}&start=${pickupCoords.lon},${pickupCoords.lat}&end=${dropoffCoords.lon},${dropoffCoords.lat}&extra_info=tollways`;
-
-            fetch(url)
-                .then(res => {
-                    if (!res.ok) throw new Error('API route payload evaluation drop.');
-                    return res.json();
-                })
-                .then(async (data) => {
-                    if (!data.features || data.features.length === 0) {
-                        showError("No valid drivable geometry found matching those vectors.");
-                        return;
-                    }
-
-                    const feature = data.features[0];
-                    const summary = feature.properties.summary;
-                    
-                    const distanceKm = summary.distance / 1000;
-                    const baseDurationMins = summary.duration / 60;
-
-                    const now = new Date();
-                    const currentHour = now.getHours();
-                    const isWeekend = (now.getDay() === 0 || now.getDay() === 6);
-
-                    let trafficDelayFactor = 1.15; 
-                    if (!isWeekend) {
-                        if ((currentHour >= 7 && currentHour <= 9) || (currentHour >= 17 && currentHour <= 19.5)) {
-                            trafficDelayFactor = 1.55; 
-                        } else if (currentHour >= 12 && currentHour <= 14) {
-                            trafficDelayFactor = 1.25; 
-                        }
-                    } else {
-                        if (currentHour >= 16 && currentHour <= 21) {
-                            trafficDelayFactor = 1.35; 
-                        }
-                    }
-
-                    let distanceImpactModifier = 1.0;
-                    if (distanceKm <= 5) {
-                        distanceImpactModifier = 0.65;
-                    } else if (distanceKm <= 15) {
-                        distanceImpactModifier = 0.85;
-                    } else if (distanceKm > 100) {
-                        distanceImpactModifier = 0.35; 
-                    } else if (distanceKm > 50) {
-                        distanceImpactModifier = 0.60;
-                    }
-
-                    const localizedTrafficWeight = 1 + ((trafficDelayFactor - 1) * distanceImpactModifier);
-                    const correctedDurationMins = Math.max(1, Math.round(baseDurationMins * localizedTrafficWeight));
-
-                    if (routeLine) map.removeLayer(routeLine);
-                    
-                    routeLine = L.geoJSON(feature.geometry, { 
-                        style: { color: '#8e24aa', weight: 5, opacity: 0.85 } 
-                    }).addTo(map);
-                    
-                    map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
-
-                    const hereTollCost = await fetchHereTolls(pickupCoords, dropoffCoords);
-
-                    processCalculations(distanceKm, correctedDurationMins, hereTollCost);
-                })
-                .catch(err => {
-                    console.error("ORS Infrastructure Error:", err);
-                    showError("API connectivity fault or quota restriction triggered.");
-                });
+            // Attempt standard OSRM routing directly to avoid ORS key errors
+            fetchOSRMRoute();
         }, 250);
     }
 
@@ -647,7 +646,7 @@
         const chargeableDistance = Math.max(0, distance - 1);
         const rideDistanceFare = chargeableDistance * perKmRate;
 
-        document.getElementById('toll-type-label').textContent = dynamicTolls > 0 ? "Tolls (HERE API)" : "Tolls (None)";
+        document.getElementById('toll-type-label').textContent = dynamicTolls > 0 ? "Tolls (HERE API)" : "Tolls";
 
         const driverIncentive = (duration / 60) * 12.00;
 
