@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Malaysia Fare Calculator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fare Calculator</title>
 
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -21,42 +21,33 @@
       position: relative;
     }
 
-    #map-wrapper { 
-      border-top-left-radius: 16px; 
-      border-top-right-radius: 16px; 
-      overflow: hidden; 
-      position: relative;
-    }
-    #map { height: 260px; width: 100%; background: #e5e7eb; z-index: 1; }
+    #map-wrapper { border-top-left-radius: 16px; border-top-right-radius: 16px; overflow: hidden; position: relative; }
+    #map { height: 260px; width: 100%; background: #e5e7eb; }
 
     .input-section {
       padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 14px;
       position: relative;
       z-index: 1000;
     }
 
-    .input-group { 
-      position: relative; 
-      display: flex; 
-      align-items: center; 
-    }
+    .input-group { position: relative; display: flex; align-items: center; }
 
     .input-group input {
       width: 100%;
-      padding: 12px 70px 12px 14px;
-      border: 1px solid #dfe1e6;
+      padding: 12px 75px 12px 14px;
+      border: 1.5px solid #dfe1e6;
       border-radius: 8px;
       font-size: 14px;
       outline: none;
       background: #fff;
     }
-    .input-group input:focus { border-color: #0052cc; box-shadow: 0 0 0 2px rgba(0,82,204,0.2); }
+    .input-group input:focus { border-color: #0052cc; box-shadow: 0 0 0 2px rgba(0,82,204,0.15); }
 
-    /* Action Buttons Inside Input */
-    .btn-container {
+    /* Action buttons inside inputs */
+    .input-actions {
       position: absolute;
       right: 8px;
       display: flex;
@@ -64,7 +55,7 @@
       gap: 4px;
     }
 
-    .icon-btn {
+    .btn-icon {
       background: none;
       border: none;
       cursor: pointer;
@@ -75,16 +66,15 @@
       color: #6b7280;
       border-radius: 50%;
     }
-    .icon-btn:hover { background-color: #f3f4f6; color: #111827; }
-    .icon-btn svg { width: 18px; height: 18px; fill: currentColor; }
-    
-    .clear-btn { display: none; font-size: 16px; font-weight: bold; width: 28px; height: 28px; }
-    .clear-btn.active { display: flex; }
+    .btn-icon:hover { background-color: #f3f4f6; color: #111827; }
+    .btn-icon.loc-btn { color: #0052cc; }
+    .btn-icon.loc-btn:hover { background-color: #eff6ff; }
+    .btn-icon svg { width: 18px; height: 18px; fill: currentColor; }
 
-    /* Autocomplete Suggestions Container */
+    /* Dropdown Suggestions Menu */
     .suggestions {
       position: absolute;
-      top: 100%;
+      top: calc(100% + 4px);
       left: 0;
       right: 0;
       background: #ffffff;
@@ -93,28 +83,28 @@
       z-index: 99999;
       max-height: 220px;
       overflow-y: auto;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.18);
-      margin-top: 4px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.16);
       display: none;
     }
-
     .suggestion-item {
-      padding: 10px 14px;
+      padding: 12px 14px;
       font-size: 13px;
       cursor: pointer;
       border-bottom: 1px solid #f4f5f7;
       color: #1f2937;
+      line-height: 1.4;
     }
     .suggestion-item:last-child { border-bottom: none; }
-    .suggestion-item:hover { background: #eff6ff; color: #1d4ed8; }
-    .suggestion-item strong { display: block; color: #111827; }
-    .suggestion-item small { color: #6b7280; font-size: 11px; }
+    .suggestion-item:hover { background: #eff6ff; color: #0052cc; }
+    .suggestion-item strong { display: block; font-size: 13.5px; color: #111827; }
+    .suggestion-item small { color: #6b7280; font-size: 11.5px; }
 
-    /* Fare Card */
+    /* Pricing Display Card */
     .card { background: #121316; color: #fff; margin: 16px; padding: 20px; border-radius: 16px; }
     .card-header { display: flex; justify-content: space-between; align-items: baseline; }
     .total-price { font-size: 32px; font-weight: 800; color: #a855f7; }
     .route-meta { display: flex; justify-content: space-between; margin: 8px 0 16px 0; font-size: 14px; color: #9ca3af; font-weight: 600; }
+
     .divider { height: 1px; background: #2d3748; margin-bottom: 12px; }
     .breakdown-row { display: flex; justify-content: space-between; font-size: 13px; color: #d1d5db; margin-bottom: 8px; }
     .breakdown-row.final { font-weight: 700; color: #fff; margin-top: 12px; font-size: 15px; }
@@ -131,10 +121,12 @@
   <div class="input-section">
     <!-- Pickup Input -->
     <div class="input-group">
-      <input type="text" id="origin" placeholder="Pick-up location in Malaysia..." autocomplete="off" />
-      <div class="btn-container">
-        <button type="button" class="icon-btn clear-btn" id="clear-origin" title="Clear text">✕</button>
-        <button type="button" class="icon-btn" id="loc-btn" title="Use My Current Location">
+      <input type="text" id="origin" placeholder="Pick-up Location..." value="Pangsapuri Impian Meru, Meru, Klang" autocomplete="off" />
+      <div class="input-actions">
+        <button type="button" class="btn-icon" id="clear-origin" title="Clear Search">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+        <button type="button" class="btn-icon loc-btn" id="loc-btn" title="Use Current Location">
           <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
         </button>
       </div>
@@ -143,15 +135,16 @@
 
     <!-- Drop-off Input -->
     <div class="input-group">
-      <input type="text" id="destination" placeholder="Drop-off location in Malaysia..." autocomplete="off" />
-      <div class="btn-container">
-        <button type="button" class="icon-btn clear-btn" id="clear-dest" title="Clear text">✕</button>
+      <input type="text" id="destination" placeholder="Drop-off Location..." value="Mydin Klang" autocomplete="off" />
+      <div class="input-actions">
+        <button type="button" class="btn-icon" id="clear-dest" title="Clear Search">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
       </div>
       <div id="dest-suggestions" class="suggestions"></div>
     </div>
   </div>
 
-  <!-- Price Summary -->
   <div class="card">
     <div class="card-header">
       <div class="total-price" id="display-total">RM 0</div>
@@ -165,7 +158,7 @@
 
     <div class="breakdown-row"><span>Base Fare</span><span id="val-base">RM 5.00</span></div>
     <div class="breakdown-row"><span>Distance Fare</span><span id="val-distance">RM 0.00</span></div>
-    <div class="breakdown-row"><span>Tolls (Estimated)</span><span id="val-tolls">RM 0.00</span></div>
+    <div class="breakdown-row"><span>Tolls</span><span id="val-tolls">RM 0.00</span></div>
     <div class="breakdown-row"><span>Traffic Adjust & Incentive</span><span id="val-traffic">RM 3.00</span></div>
     <div class="breakdown-row"><span>Out-of-Zone Surcharge</span><span id="val-outzone">RM 0.03</span></div>
 
@@ -180,13 +173,12 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-  // Default Peninsular Malaysia coordinates (Klang/Meru default)
+  // Initial Coordinates (Klang Valley default)
   let originCoords = { lat: 3.1384, lng: 101.4280 };
-  let destCoords = { lat: 3.0735, lng: 101.5385 };
+  let destCoords = { lat: 3.0450, lng: 101.4450 };
 
   // Initialize Map
-  const map = L.map('map').setView([originCoords.lat, originCoords.lng], 13);
-  
+  const map = L.map('map').setView([originCoords.lat, originCoords.lng], 12);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap'
@@ -197,59 +189,63 @@
   let routePolyline = null;
 
   // -------------------------------------------------------------
-  // Reverse Geocoding (Lat/Lng to Address Name using Photon)
+  // Marker Drag Handlers
   // -------------------------------------------------------------
-  async function reverseGeocode(lat, lng, targetInputId, clearBtnId) {
-    try {
-      const res = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`);
-      const data = await res.json();
-      if (data.features && data.features.length > 0) {
-        const props = data.features[0].properties;
-        const name = props.name || props.street || props.district || props.city || "Selected Location";
-        const city = props.city || props.county || props.state || "";
-        const fullName = city ? `${name}, ${city}` : name;
-        
-        const input = document.getElementById(targetInputId);
-        input.value = fullName;
-        document.getElementById(clearBtnId).classList.add('active');
-      }
-    } catch (e) {
-      console.error("Reverse geocode failed:", e);
-    }
-  }
-
   originMarker.on('dragend', async (e) => {
     const pos = e.target.getLatLng();
     originCoords = { lat: pos.lat, lng: pos.lng };
-    await reverseGeocode(pos.lat, pos.lng, 'origin', 'clear-origin');
-    calculateRoute();
+    await reverseGeocode('origin', pos.lat, pos.lng);
+    calculateRouteAndFare();
   });
 
   destMarker.on('dragend', async (e) => {
     const pos = e.target.getLatLng();
     destCoords = { lat: pos.lat, lng: pos.lng };
-    await reverseGeocode(pos.lat, pos.lng, 'destination', 'clear-dest');
-    calculateRoute();
+    await reverseGeocode('destination', pos.lat, pos.lng);
+    calculateRouteAndFare();
+  });
+
+  async function reverseGeocode(inputId, lat, lng) {
+    try {
+      const res = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`);
+      const data = await res.json();
+      if (data.features && data.features.length > 0) {
+        const p = data.features[0].properties;
+        const name = p.name || p.street || p.city || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        const city = p.city || p.county || p.state || '';
+        document.getElementById(inputId).value = city ? `${name}, ${city}` : name;
+      }
+    } catch (e) {
+      document.getElementById(inputId).value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
+  }
+
+  // -------------------------------------------------------------
+  // Reset / Clear Inputs
+  // -------------------------------------------------------------
+  document.getElementById('clear-origin').addEventListener('click', () => {
+    const input = document.getElementById('origin');
+    input.value = '';
+    input.focus();
+    document.getElementById('origin-suggestions').style.display = 'none';
+  });
+
+  document.getElementById('clear-dest').addEventListener('click', () => {
+    const input = document.getElementById('destination');
+    input.value = '';
+    input.focus();
+    document.getElementById('dest-suggestions').style.display = 'none';
   });
 
   // -------------------------------------------------------------
-  // Autocomplete Suggestions Engine (Photon API - Malaysia restricted)
+  // Photon Autocomplete Engine (Restricted to Malaysia: countrycode=my)
   // -------------------------------------------------------------
-  function setupMalaysiaAutocomplete(inputId, clearBtnId, suggestionsId, onSelect) {
+  function setupAutocomplete(inputId, suggestionsId, onSelect) {
     const input = document.getElementById(inputId);
-    const clearBtn = document.getElementById(clearBtnId);
     const box = document.getElementById(suggestionsId);
     let debounceTimer;
 
-    // Toggle Clear Button Visibility
     input.addEventListener('input', () => {
-      if (input.value.trim().length > 0) {
-        clearBtn.classList.add('active');
-      } else {
-        clearBtn.classList.remove('active');
-        box.style.display = 'none';
-      }
-
       clearTimeout(debounceTimer);
       const query = input.value.trim();
 
@@ -258,11 +254,10 @@
         return;
       }
 
-      // Debounce API Calls
       debounceTimer = setTimeout(async () => {
         try {
-          // Restrict results strictly to Malaysia (&countrycodes=my) and minimum 5 items (&limit=5)
-          const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&countrycodes=my&limit=5&lat=${originCoords.lat}&lon=${originCoords.lng}`;
+          // Restricted to Malaysia (countrycode=my) & prioritized around Selangor/KL coordinates
+          const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5&countrycode=my&lat=3.1390&lon=101.6869`;
           const res = await fetch(url);
           const data = await res.json();
 
@@ -273,16 +268,18 @@
             box.style.display = 'block';
             features.forEach(feat => {
               const p = feat.properties;
-              const name = p.name || p.street || "Unnamed Location";
-              const subDetail = [p.district, p.city, p.state].filter(Boolean).join(', ');
+              const title = p.name || p.street || 'Address Location';
+              
+              const parts = [p.district, p.city || p.county, p.state].filter(Boolean);
+              const subtitle = parts.join(', ');
 
               const div = document.createElement('div');
               div.className = 'suggestion-item';
-              div.innerHTML = `<strong>${name}</strong><small>${subDetail}</small>`;
+              div.innerHTML = `<strong>${title}</strong><small>${subtitle}</small>`;
 
               div.onclick = (e) => {
                 e.stopPropagation();
-                input.value = name + (subDetail ? `, ${subDetail}` : '');
+                input.value = subtitle ? `${title}, ${subtitle}` : title;
                 box.style.display = 'none';
                 
                 const [lng, lat] = feat.geometry.coordinates;
@@ -299,15 +296,6 @@
       }, 250);
     });
 
-    // Clear Button Reset Functionality
-    clearBtn.addEventListener('click', () => {
-      input.value = '';
-      clearBtn.classList.remove('active');
-      box.style.display = 'none';
-      input.focus();
-    });
-
-    // Close dropdown on outside click
     document.addEventListener('click', (e) => {
       if (!input.contains(e.target) && !box.contains(e.target)) {
         box.style.display = 'none';
@@ -315,55 +303,43 @@
     });
   }
 
-  setupMalaysiaAutocomplete('origin', 'clear-origin', 'origin-suggestions', (lat, lng) => {
+  setupAutocomplete('origin', 'origin-suggestions', (lat, lng) => {
     originCoords = { lat, lng };
     originMarker.setLatLng([lat, lng]);
-    calculateRoute();
+    calculateRouteAndFare();
   });
 
-  setupMalaysiaAutocomplete('destination', 'clear-dest', 'dest-suggestions', (lat, lng) => {
+  setupAutocomplete('destination', 'dest-suggestions', (lat, lng) => {
     destCoords = { lat, lng };
     destMarker.setLatLng([lat, lng]);
-    calculateRoute();
+    calculateRouteAndFare();
   });
 
   // -------------------------------------------------------------
-  // Current Location Detector
+  // Current Location Handler
   // -------------------------------------------------------------
-  document.getElementById('loc-btn').addEventListener('click', getUserLocation);
+  document.getElementById('loc-btn').addEventListener('click', () => {
+    if (!navigator.geolocation) return alert("Geolocation is not supported by your browser.");
 
-  function getUserLocation() {
-    if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser.");
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        originCoords = { lat, lng };
-        
-        originMarker.setLatLng([lat, lng]);
-        map.setView([lat, lng], 14);
-
-        await reverseGeocode(lat, lng, 'origin', 'clear-origin');
-        calculateRoute();
-      },
-      (error) => {
-        alert("Unable to fetch location. Please turn on GPS on your device.");
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  }
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      originCoords = { lat, lng };
+      originMarker.setLatLng([lat, lng]);
+      map.setView([lat, lng], 14);
+      await reverseGeocode('origin', lat, lng);
+      calculateRouteAndFare();
+    }, (err) => {
+      alert("Unable to retrieve location. Please check location permissions.");
+    }, { enableHighAccuracy: true });
+  });
 
   // -------------------------------------------------------------
-  // OSRM Routing Engine & Fare Logic
+  // OpenRouteService / OSRM Routing Engine
   // -------------------------------------------------------------
-  async function calculateRoute() {
-    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${originCoords.lng},${originCoords.lat};${destCoords.lng},${destCoords.lat}?overview=full&geometries=geojson`;
-
+  async function calculateRouteAndFare() {
     try {
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${originCoords.lng},${originCoords.lat};${destCoords.lng},${destCoords.lat}?overview=full&geometries=geojson`;
       const res = await fetch(osrmUrl);
       const data = await res.json();
 
@@ -373,26 +349,25 @@
       const distanceKm = route.distance / 1000;
       const durationMins = Math.ceil(route.duration / 60);
 
-      // Draw Route Polyline
+      // Draw polyline route
       if (routePolyline) map.removeLayer(routePolyline);
-      const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
-      routePolyline = L.polyline(coords, { color: '#8b5cf6', weight: 5 }).addTo(map);
+      const latLngs = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+      routePolyline = L.polyline(latLngs, { color: '#8b5cf6', weight: 5, opacity: 0.9 }).addTo(map);
 
-      // Auto-fit map to route bounds
-      map.fitBounds(routePolyline.getBounds(), { padding: [40, 40] });
+      map.fitBounds(routePolyline.getBounds(), { padding: [40, 40], animate: true });
 
-      // Pricing Formula Calculations
+      // Fare Calculation Formula
       const baseFare = 5.00;
       const ratePerKm = 1.156;
       const distanceFare = distanceKm * ratePerKm;
-      const tolls = distanceKm > 15 ? 1.60 : 0.00; // Sample toll estimation for long distance
+      const tolls = 0.60;
       const trafficAdjust = 3.00;
       const outOfZone = 0.03;
 
       const rawTotal = baseFare + distanceFare + tolls + trafficAdjust + outOfZone;
-      const roundedTotal = Math.round(rawTotal * 2) / 2; // Rounding to nearest 0.50
+      const roundedTotal = Math.round(rawTotal * 2) / 2;
 
-      // Update UI Display
+      // Update Card UI
       document.getElementById('display-total').innerText = `RM ${Math.round(roundedTotal)}`;
       document.getElementById('display-distance').innerText = `${distanceKm.toFixed(1)} km`;
       document.getElementById('display-duration').innerText = `${durationMins} mins`;
@@ -409,8 +384,8 @@
     }
   }
 
-  // Initial setup: Fetch current location on load or fallback to default Meru
-  getUserLocation();
+  // Initial Route Run
+  calculateRouteAndFare();
 </script>
 </body>
 </html>
