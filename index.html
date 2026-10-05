@@ -171,10 +171,10 @@
             background: white;
             border: 1px solid #e0e0e0;
             border-radius: 8px;
-            max-height: 200px; 
+            max-height: 180px; 
             overflow-y: auto;
             z-index: 1000;
-            box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.15);
             display: none;
         }
         .suggestion-item {
@@ -531,6 +531,14 @@
     let pickupMarker = null, dropoffMarker = null, routeLine = null;
     let pickupCoords = null, dropoffCoords = null;
     let currentRouteTimeout = null;
+
+    document.addEventListener('click', function (e) {
+        if (!e.target.closest('.input-container')) {
+            document.querySelectorAll('.suggestions').forEach(box => {
+                box.style.display = 'none';
+            });
+        }
+    });
 
     function toggleRegistry(open) {
         const backdrop = document.getElementById('registry-backdrop');
@@ -889,7 +897,13 @@
         document.getElementById('calc-deadhead-km').textContent = `RM ${deadheadCost.toFixed(2)}`;
         document.getElementById('calc-grand').textContent = `RM ${roundedTotal.toFixed(2)}`;
 
-        document.getElementById('result-card').style.display = 'block';
+        const resultCard = document.getElementById('result-card');
+        resultCard.style.display = 'block';
+
+        // Auto-scroll the container so the detailed breakdowns are fully visible
+        setTimeout(() => {
+            resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 100);
     }
 </script>
 </body>
