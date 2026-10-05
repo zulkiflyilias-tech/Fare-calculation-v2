@@ -1,5 +1,3 @@
-<!-- Official HERE Flexible Polyline Decoder Library -->
-<script src="https://unpkg.com/@here/flexible-polyline"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
@@ -214,6 +212,48 @@
         });
     }
 
+    // Pure standalone HERE Flexible Polyline Decoder (Header & 3D/Z-dimension aware)
+    function decodeFlexiblePolyline(encoded) {
+        let index = 0;
+        const len = encoded.length;
+        
+        function decodeUnsigned() {
+            let res = 0, shift = 0, byte = 0;
+            do {
+                byte = encoded.charCodeAt(index++) - 63;
+                res |= (byte & 0x1f) << shift;
+                shift += 5;
+            } while (byte >= 0x20);
+            return res;
+        }
+
+        function decodeSigned() {
+            const res = decodeUnsigned();
+            return (res & 1) ? ~(res >> 1) : (res >> 1);
+        }
+
+        const header = decodeUnsigned();
+        const precision = header & 15;
+        const factor = Math.pow(10, precision);
+        const numDims = ((header >> 4) & 7) + 2; 
+
+        let lat = 0, lng = 0;
+        const coordinates = [];
+
+        while (index < len) {
+            lat += decodeSigned();
+            lng += decodeSigned();
+            
+            // Skip altitude or additional dimension deltas
+            for (let i = 2; i < numDims; i++) {
+                decodeSigned();
+            }
+            
+            coordinates.push([lat / factor, lng / factor]);
+        }
+        return coordinates;
+    }
+
     function fetchHERERoute() {
         const origin = `${pickupCoords.lat},${pickupCoords.lon}`;
         const destination = `${dropoffCoords.lat},${dropoffCoords.lon}`;
@@ -237,10 +277,9 @@
                     totalDistanceMeters += section.summary.length || 0;
                     totalDurationSeconds += section.summary.duration || 0;
 
-                    if (section.polyline && window.flexiblePolyline) {
-                        const decoded = window.flexiblePolyline.decode(section.polyline);
-                        const leafletPolyline = decoded.polyline.map(pt => [pt[0], pt[1]]);
-                        polylineCoords = polylineCoords.concat(leafletPolyline);
+                    if (section.polyline) {
+                        const decoded = decodeFlexiblePolyline(section.polyline);
+                        polylineCoords = polylineCoords.concat(decoded);
                     }
 
                     if (section.tolls) {
