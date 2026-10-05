@@ -539,18 +539,60 @@
         });
     }
 
-    async function fetchHereTolls(origin, destination) {
+    // Decode Flexible Polyline format used by HERE API v8
+    function decodeFlexiblePolyline(encoded) {
+        let index = 0, lat = 0, lng = 0;
+        const coordinates = [];
+        const header = encoded.charCodeAt(index++) - 63;
+        const precision = header & 15;
+        const factor = Math.pow(10, precision);
+
+        while (index < encoded.length) {
+            let result = 0, shift = 0, byte = null;
+            do {
+                byte = encoded.charCodeAt(index++) - 63;
+                result |= (byte & 0x1f) << shift;
+                shift += 5;
+            } while (byte >= 0x20);
+            const deltaLat = (result & 1) ? ~(result >> 1) : (result >> 1);
+            lat += deltaLat;
+
+            result = 0; shift = 0;
+            do {
+                byte = encoded.charCodeAt(index++) - 63;
+                result |= (byte & 0x1f) << shift;
+                shift += 5;
+            } while (byte >= 0x20);
+            const deltaLng = (result & 1) ? ~(result >> 1) : (result >> 1);
+            lng += deltaLng;
+
+            coordinates.push([lat / factor, lng / factor]);
+        }
+        return coordinates;
+    }
+
+    async function fetchPrimaryRoute() {
+        // First attempt: Fetch directly via HERE Routing API (Unified Route + Tolls + Geometry)
         try {
-            const hereUrl = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${origin.lat},${origin.lon}&destination=${destination.lat},${destination.lon}&return=tolls,summary&apiKey=${HERE_API_KEY}`;
+            const hereUrl = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&return=polyline,summary,tolls&apiKey=${HERE_API_KEY}`;
             const res = await fetch(hereUrl);
-            if (!res.ok) return 0;
-            const data = await res.json();
-            
-            let totalToll = 0;
-            if (data.routes && data.routes.length > 0) {
-                const route = data.routes[0];
-                if (route.sections) {
+            if (res.ok) {
+                const data = await res.json();
+                if (data.routes && data.routes.length > 0) {
+                    const route = data.routes[0];
+                    let distanceKm = 0;
+                    let baseDurationMins = 0;
+                    let totalToll = 0;
+                    let polylineCoords = [];
+
                     route.sections.forEach(section => {
+                        if (section.summary) {
+                            distanceKm += section.summary.length / 1000;
+                            baseDurationMins += section.summary.duration / 60;
+                        }
+                        if (section.polyline) {
+                            polylineCoords = polylineCoords.concat(decodeFlexiblePolyline(section.polyline));
+                        }
                         if (section.tolls) {
                             section.tolls.forEach(toll => {
                                 if (toll.fares) {
@@ -563,13 +605,17 @@
                             });
                         }
                     });
+
+                    drawRouteAndCalculate(polylineCoords, distanceKm, baseDurationMins, totalToll);
+                    return;
                 }
             }
-            return totalToll;
         } catch (err) {
-            console.warn("HERE Toll API bypassed:", err);
-            return 0;
+            console.warn("HERE Routing primary attempt failed, falling back to OSRM:", err);
         }
+
+        // Fallback attempt: OSRM Route
+        fetchOSRMRoute();
     }
 
     function fetchOSRMRoute() {
@@ -580,7 +626,7 @@
                 if (!res.ok) throw new Error("OSRM server error: " + res.status);
                 return res.json();
             })
-            .then(async (data) => {
+            .then(data => {
                 if (!data.routes || data.routes.length === 0) {
                     showError("No valid drivable route found.");
                     return;
@@ -590,52 +636,57 @@
                 const distanceKm = route.distance / 1000;
                 const baseDurationMins = route.duration / 60;
 
-                const now = new Date();
-                const currentHour = now.getHours();
-                const isWeekend = (now.getDay() === 0 || now.getDay() === 6);
-
-                let trafficDelayFactor = 1.15; 
-                if (!isWeekend) {
-                    if ((currentHour >= 7 && currentHour <= 9) || (currentHour >= 17 && currentHour <= 19.5)) {
-                        trafficDelayFactor = 1.55; 
-                    } else if (currentHour >= 12 && currentHour <= 14) {
-                        trafficDelayFactor = 1.25; 
-                    }
-                } else {
-                    if (currentHour >= 16 && currentHour <= 21) {
-                        trafficDelayFactor = 1.35; 
-                    }
-                }
-
-                let distanceImpactModifier = 1.0;
-                if (distanceKm <= 5) {
-                    distanceImpactModifier = 0.65;
-                } else if (distanceKm <= 15) {
-                    distanceImpactModifier = 0.85;
-                } else if (distanceKm > 100) {
-                    distanceImpactModifier = 0.35; 
-                } else if (distanceKm > 50) {
-                    distanceImpactModifier = 0.60;
-                }
-
-                const localizedTrafficWeight = 1 + ((trafficDelayFactor - 1) * distanceImpactModifier);
-                const correctedDurationMins = Math.max(1, Math.round(baseDurationMins * localizedTrafficWeight));
-
-                if (routeLine) map.removeLayer(routeLine);
-                
-                routeLine = L.geoJSON(route.geometry, { 
-                    style: { color: '#8e24aa', weight: 5, opacity: 0.85 } 
-                }).addTo(map);
-                
-                map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
-
-                const hereTollCost = await fetchHereTolls(pickupCoords, dropoffCoords);
-                processCalculations(distanceKm, correctedDurationMins, hereTollCost);
+                // OSRM does not support Malaysia tolls natively; set to 0.00 to avoid misaligned toll display
+                const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+                drawRouteAndCalculate(coords, distanceKm, baseDurationMins, 0);
             })
             .catch(err => {
                 console.error("OSRM Error:", err);
                 showError("Routing service unavailable. Please try again.");
             });
+    }
+
+    function drawRouteAndCalculate(polylineCoords, distanceKm, baseDurationMins, totalToll) {
+        const now = new Date();
+        const currentHour = now.getHours();
+        const isWeekend = (now.getDay() === 0 || now.getDay() === 6);
+
+        let trafficDelayFactor = 1.15; 
+        if (!isWeekend) {
+            if ((currentHour >= 7 && currentHour <= 9) || (currentHour >= 17 && currentHour <= 19.5)) {
+                trafficDelayFactor = 1.55; 
+            } else if (currentHour >= 12 && currentHour <= 14) {
+                trafficDelayFactor = 1.25; 
+            }
+        } else {
+            if (currentHour >= 16 && currentHour <= 21) {
+                trafficDelayFactor = 1.35; 
+            }
+        }
+
+        let distanceImpactModifier = 1.0;
+        if (distanceKm <= 5) {
+            distanceImpactModifier = 0.65;
+        } else if (distanceKm <= 15) {
+            distanceImpactModifier = 0.85;
+        } else if (distanceKm > 100) {
+            distanceImpactModifier = 0.35; 
+        } else if (distanceKm > 50) {
+            distanceImpactModifier = 0.60;
+        }
+
+        const localizedTrafficWeight = 1 + ((trafficDelayFactor - 1) * distanceImpactModifier);
+        const correctedDurationMins = Math.max(1, Math.round(baseDurationMins * localizedTrafficWeight));
+
+        if (routeLine) map.removeLayer(routeLine);
+        
+        routeLine = L.polyline(polylineCoords, { 
+            color: '#8e24aa', weight: 5, opacity: 0.85 
+        }).addTo(map);
+        
+        map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+
+        processCalculations(distanceKm, correctedDurationMins, totalToll);
     }
 
     function checkAndProcessRoute() {
@@ -646,7 +697,7 @@
         if(currentRouteTimeout) clearTimeout(currentRouteTimeout);
         
         currentRouteTimeout = setTimeout(() => {
-            fetchOSRMRoute();
+            fetchPrimaryRoute();
         }, 250);
     }
 
@@ -690,7 +741,6 @@
         document.getElementById('fare-distance').textContent = `${distance.toFixed(1)} km`;
         document.getElementById('fare-duration').textContent = formatDuration(duration);
 
-        // Standardized element ID lookup
         document.getElementById('calc-base-fare').textContent = `RM ${baseFare.toFixed(2)}`;
         document.getElementById('calc-ride-distance-rate').textContent = `RM ${rideDistanceFare.toFixed(2)}`;
         document.getElementById('calc-tolls').textContent = `RM ${dynamicTolls.toFixed(2)}`;
