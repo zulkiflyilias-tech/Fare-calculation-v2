@@ -10,14 +10,43 @@
   
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background-color: #f4f5f7; padding: 15px; color: #172b4d; }
-    .container { max-width: 480px; margin: 0 auto; background: #fff; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; }
+    body { background-color: #f4f5f7; padding: 12px; color: #172b4d; }
     
-    #map { height: 260px; width: 100%; background: #e5e7eb; position: relative; }
+    /* Container allows overflowing autocomplete dropdowns */
+    .container { 
+      max-width: 480px; 
+      margin: 0 auto; 
+      background: #fff; 
+      border-radius: 16px; 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+      overflow: visible; 
+      position: relative;
+    }
     
-    .input-section { padding: 16px; display: flex; flex-direction: column; gap: 12px; position: relative; }
-    .input-group { position: relative; display: flex; align-items: center; }
-    .input-group input { width: 100%; padding: 12px 40px 12px 14px; border: 1px solid #dfe1e6; border-radius: 8px; font-size: 14px; outline: none; transition: border 0.2s; }
+    #map-wrapper { border-top-left-radius: 16px; border-top-right-radius: 16px; overflow: hidden; }
+    #map { height: 250px; width: 100%; background: #e5e7eb; }
+    
+    .input-section { 
+      padding: 16px; 
+      display: flex; 
+      flex-direction: column; 
+      gap: 14px; 
+      position: relative;
+      z-index: 1000;
+    }
+    
+    .input-group { position: relative; display: flex; align-items: center; z-index: 1001; }
+    .input-group.dest-group { z-index: 1000; }
+    
+    .input-group input { 
+      width: 100%; 
+      padding: 12px 42px 12px 14px; 
+      border: 1px solid #dfe1e6; 
+      border-radius: 8px; 
+      font-size: 14px; 
+      outline: none; 
+      background: #fff;
+    }
     .input-group input:focus { border-color: #4c9aff; box-shadow: 0 0 0 2px rgba(76,154,255,0.2); }
     
     /* Current Location Toggle Button */
@@ -27,7 +56,7 @@
       background: none; 
       border: none; 
       cursor: pointer; 
-      padding: 4px; 
+      padding: 6px; 
       display: flex; 
       align-items: center; 
       justify-content: center;
@@ -47,12 +76,11 @@
       border: 1px solid #dfe1e6; 
       border-radius: 8px; 
       z-index: 99999; 
-      max-height: 220px; 
+      max-height: 200px; 
       overflow-y: auto; 
-      box-shadow: 0 6px 16px rgba(0,0,0,0.15); 
+      box-shadow: 0 8px 20px rgba(0,0,0,0.18); 
       margin-top: 4px;
       display: none;
-      pointer-events: auto;
     }
     .suggestion-item { padding: 12px 14px; font-size: 13px; cursor: pointer; border-bottom: 1px solid #f4f5f7; color: #333; }
     .suggestion-item:last-child { border-bottom: none; }
@@ -74,7 +102,7 @@
     .leaflet-control-recenter:hover { background-color: #f4f4f4; }
     .leaflet-control-recenter svg { width: 18px; height: 18px; fill: #333; }
 
-    .card { background: #121316; color: #fff; margin: 16px; padding: 20px; border-radius: 16px; }
+    .card { background: #121316; color: #fff; margin: 16px; padding: 20px; border-radius: 16px; z-index: 1; position: relative; }
     .card-header { display: flex; justify-content: space-between; align-items: baseline; }
     .total-price { font-size: 32px; font-weight: 800; color: #a855f7; }
     .route-meta { display: flex; justify-content: space-between; margin: 8px 0 16px 0; font-size: 14px; color: #9ca3af; font-weight: 600; }
@@ -88,12 +116,14 @@
 <body>
 
 <div class="container">
-  <div id="map"></div>
+  <div id="map-wrapper">
+    <div id="map"></div>
+  </div>
 
   <div class="input-section">
-    <!-- Pick-up Input with Current Location Toggle Button -->
+    <!-- Pickup Input -->
     <div class="input-group">
-      <input type="text" id="origin" placeholder="Pick-up Location..." value="Pangsapuri Impian Meru (Blok B), Jalan Meru" autocomplete="off" />
+      <input type="text" id="origin" placeholder="Pick-up Location..." value="Pangsapuri Impian Meru, Meru, Klang" autocomplete="off" />
       <button type="button" class="location-btn" id="loc-btn" title="Use Current Location">
         <svg viewBox="0 0 24 24">
           <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
@@ -102,9 +132,9 @@
       <div id="origin-suggestions" class="suggestions"></div>
     </div>
 
-    <!-- Destination Input with Autocomplete -->
-    <div class="input-group">
-      <input type="text" id="destination" placeholder="Drop-off Location..." value="i-City, Shah Alam" autocomplete="off" />
+    <!-- Drop-off Input -->
+    <div class="input-group dest-group">
+      <input type="text" id="destination" placeholder="Drop-off Location..." value="Giant Shah Alam" autocomplete="off" />
       <div id="dest-suggestions" class="suggestions"></div>
     </div>
   </div>
@@ -137,21 +167,17 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-  // 1. HERE API KEY
-  const HERE_API_KEY = "YOUR_HERE_API_KEY"; // Replace with your valid HERE API Key
+  // Exact Coordinates for Pangsapuri Impian Meru & Giant Shah Alam
+  let originCoords = { lat: 3.1383, lng: 101.4280 };
+  let destCoords = { lat: 3.0735, lng: 101.5385 };
 
-  // Default Coordinates
-  let originCoords = { lat: 3.1118, lng: 101.4402 };
-  let destCoords = { lat: 3.0648, lng: 101.4854 };
-
-  // Initialize Map
-  const map = L.map('map').setView([3.0883, 101.4628], 12);
+  // Initialize Leaflet Map
+  const map = L.map('map').setView([3.1059, 101.4832], 12);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap'
   }).addTo(map);
 
-  // Markers set to Draggable
   let originMarker = L.marker([originCoords.lat, originCoords.lng], { draggable: true }).addTo(map);
   let destMarker = L.marker([destCoords.lat, destCoords.lng], { draggable: true }).addTo(map);
   let routeLayer = null;
@@ -162,68 +188,58 @@
   originMarker.on('dragend', async (e) => {
     const latLng = e.target.getLatLng();
     originCoords = { lat: latLng.lat, lng: latLng.lng };
-    await updateAddressFromCoords('origin', latLng.lat, latLng.lng);
+    await reverseGeocode('origin', latLng.lat, latLng.lng);
     calculateRouteAndFare();
   });
 
   destMarker.on('dragend', async (e) => {
     const latLng = e.target.getLatLng();
     destCoords = { lat: latLng.lat, lng: latLng.lng };
-    await updateAddressFromCoords('destination', latLng.lat, latLng.lng);
+    await reverseGeocode('destination', latLng.lat, latLng.lng);
     calculateRouteAndFare();
   });
 
-  async function updateAddressFromCoords(inputId, lat, lng) {
+  async function reverseGeocode(inputId, lat, lng) {
     try {
-      const revGeoUrl = `https://revgeocode.search.hereapi.com/v1/revgeocode?at=${lat},${lng}&apiKey=${HERE_API_KEY}`;
-      const res = await fetch(revGeoUrl);
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
       const data = await res.json();
-      if (data.items && data.items.length > 0) {
-        document.getElementById(inputId).value = data.items[0].title;
-      } else {
-        document.getElementById(inputId).value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      if (data && data.display_name) {
+        document.getElementById(inputId).value = data.display_name.split(',').slice(0, 3).join(',');
       }
-    } catch (err) {
+    } catch (e) {
       document.getElementById(inputId).value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
     }
   }
 
   // -------------------------------------------------------------
-  // Custom Map Re-center Button Control
+  // Map Re-center Control
   // -------------------------------------------------------------
   const RecenterControl = L.Control.extend({
     options: { position: 'topright' },
-    onAdd: function (map) {
+    onAdd: function () {
       const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-recenter');
-      container.title = "Re-center Map to Route";
+      container.title = "Re-center Map";
       container.innerHTML = `
         <svg viewBox="0 0 24 24">
           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v4h-2zm0 6h2v6h-2z"/>
-        </svg>
-      `;
+        </svg>`;
       L.DomEvent.disableClickPropagation(container);
-      container.onclick = function () {
-        fitMapBounds();
-      };
+      container.onclick = fitMapBounds;
       return container;
     }
   });
   map.addControl(new RecenterControl());
 
   function fitMapBounds() {
-    if (routeLayer) {
-      map.fitBounds(routeLayer.getBounds(), { padding: [40, 40], animate: true });
-    } else {
-      const bounds = L.latLngBounds([
-        [originCoords.lat, originCoords.lng],
-        [destCoords.lat, destCoords.lng]
-      ]);
-      map.fitBounds(bounds, { padding: [50, 50], animate: true });
-    }
+    const bounds = L.latLngBounds([
+      [originCoords.lat, originCoords.lng],
+      [destCoords.lat, destCoords.lng]
+    ]);
+    map.fitBounds(bounds, { padding: [40, 40], animate: true });
   }
 
   // -------------------------------------------------------------
-  // HERE Autocomplete Handler
+  // Universal Autocomplete Search (Photon API - Free & Fast)
   // -------------------------------------------------------------
   function setupAutocomplete(inputId, suggestionsId, onSelect) {
     const input = document.getElementById(inputId);
@@ -232,48 +248,37 @@
     input.addEventListener('input', async () => {
       const query = input.value.trim();
       if (query.length < 2) { 
-        box.style.display = 'none';
-        box.innerHTML = ''; 
+        box.style.display = 'none'; 
         return; 
       }
 
       try {
-        const url = `https://autocomplete.search.hereapi.com/v1/autocomplete?q=${encodeURIComponent(query)}&at=3.0738,101.5183&limit=5&apiKey=${HERE_API_KEY}`;
+        // Search centered around Selangor/Klang region
+        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=3.0738&lon=101.5183&limit=5`;
         const res = await fetch(url);
         const data = await res.json();
 
         box.innerHTML = '';
-        const items = data.items || [];
+        const features = data.features || [];
 
-        if (items.length > 0) {
+        if (features.length > 0) {
           box.style.display = 'block';
-          items.forEach(item => {
+          features.forEach(feat => {
+            const props = feat.properties;
+            const coords = feat.geometry.coordinates; // [lng, lat]
+            
+            const name = props.name || props.street || query;
+            const details = [props.district, props.city, props.state].filter(Boolean).join(', ');
+
             const div = document.createElement('div');
             div.className = 'suggestion-item';
-            
-            const titleText = item.title;
-            const addressText = item.address ? item.address.label : '';
-            div.innerHTML = `<strong>${titleText}</strong><br><small style="color: #6b7280;">${addressText}</small>`;
+            div.innerHTML = `<strong>${name}</strong>${details ? `<br><small style="color: #6b7280;">${details}</small>` : ''}`;
 
             div.onclick = (e) => {
               e.stopPropagation();
-              input.value = item.title;
+              input.value = name;
               box.style.display = 'none';
-              box.innerHTML = '';
-              
-              if (item.position && item.position.lat && item.position.lng) {
-                onSelect(item.position.lat, item.position.lng);
-              } else {
-                fetch(`https://geocode.search.hereapi.com/v1/geocode?q=${encodeURIComponent(item.title)}&apiKey=${HERE_API_KEY}`)
-                  .then(r => r.json())
-                  .then(geoData => {
-                    if (geoData.items && geoData.items.length > 0) {
-                      const pos = geoData.items[0].position;
-                      onSelect(pos.lat, pos.lng);
-                    }
-                  })
-                  .catch(err => console.error("Geocoding fallback failed:", err));
-              }
+              onSelect(coords[1], coords[0]);
             };
             box.appendChild(div);
           });
@@ -281,7 +286,7 @@
           box.style.display = 'none';
         }
       } catch (e) {
-        console.error("Autocomplete fetch failed:", e);
+        console.error("Autocomplete failed:", e);
       }
     });
 
@@ -305,89 +310,41 @@
   });
 
   // -------------------------------------------------------------
-  // Current Location Button
+  // Current Location Action
   // -------------------------------------------------------------
-  document.getElementById('loc-btn').addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser.");
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(async (position) => {
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-
+  document.getElementById('loc-btn').addEventListener('click', () => {
+    if (!navigator.geolocation) return alert("Geolocation not supported.");
+    
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
       originCoords = { lat, lng };
       originMarker.setLatLng([lat, lng]);
-      await updateAddressFromCoords('origin', lat, lng);
+      await reverseGeocode('origin', lat, lng);
       calculateRouteAndFare();
-    }, () => {
-      alert("Unable to retrieve location. Please check browser permissions.");
-    });
+    }, () => alert("Could not fetch location permissions."));
   });
 
   // -------------------------------------------------------------
-  // Flexible Polyline Decoder
-  // -------------------------------------------------------------
-  function decodeFlexiblePolyline(encoded) {
-    const DECODING_TABLE = [
-      62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1,
-      -1, -1, -1, -1, -1, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
-      13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, -1, -1, -1, -1,
-      -1, -1, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
-      41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51
-    ];
-    let index = 0, lat = 0, lng = 0;
-    const coordinates = [];
-
-    function decodeUnsigned() {
-      let result = 0, shift = 0, b;
-      do {
-        b = DECODING_TABLE[encoded.charCodeAt(index++) - 45];
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      return result;
-    }
-
-    function decodeSigned() {
-      const res = decodeUnsigned();
-      return (res & 1) ? ~(res >> 1) : (res >> 1);
-    }
-
-    const header = decodeUnsigned();
-    const precision = header & 15;
-    const factor = Math.pow(10, precision);
-
-    while (index < encoded.length) {
-      lat += decodeSigned();
-      lng += decodeSigned();
-      coordinates.push([lat / factor, lng / factor]);
-    }
-
-    return coordinates;
-  }
-
-  // -------------------------------------------------------------
-  // Route & Fare Calculation Engine
+  // Route & Fare Calculation (OSRM Engine)
   // -------------------------------------------------------------
   async function calculateRouteAndFare() {
-    const routeUrl = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${originCoords.lat},${originCoords.lng}&destination=${destCoords.lat},${destCoords.lng}&return=polyline,summary&apiKey=${HERE_API_KEY}`;
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${originCoords.lng},${originCoords.lat};${destCoords.lng},${destCoords.lat}?overview=full&geometries=geojson`;
 
     try {
-      const response = await fetch(routeUrl);
-      const data = await response.json();
+      const res = await fetch(osrmUrl);
+      const data = await res.json();
 
       if (!data.routes || data.routes.length === 0) return;
 
-      const section = data.routes[0].sections[0];
-      const distanceKm = section.summary.length / 1000;
-      const durationMins = Math.ceil(section.summary.duration / 60);
+      const route = data.routes[0];
+      const distanceKm = route.distance / 1000;
+      const durationMins = Math.ceil(route.duration / 60);
 
+      // Render Polyline
       if (routeLayer) map.removeLayer(routeLayer);
-      const lineCoords = decodeFlexiblePolyline(section.polyline);
-      routeLayer = L.polyline(lineCoords, { color: '#8b5cf6', weight: 5 }).addTo(map);
+      const latLngs = route.geometry.coordinates.map(c => [c[1], c[0]]);
+      routeLayer = L.polyline(latLngs, { color: '#8b5cf6', weight: 5 }).addTo(map);
       
       fitMapBounds();
 
@@ -402,7 +359,7 @@
       const rawTotal = baseFare + distanceFare + tolls + trafficAdjust + outOfZone;
       const roundedTotal = Math.round(rawTotal * 2) / 2;
 
-      // DOM Updates
+      // Update Card Elements
       document.getElementById('display-total').innerText = `RM ${Math.round(roundedTotal)}`;
       document.getElementById('display-distance').innerText = `${distanceKm.toFixed(1)} km`;
       document.getElementById('display-duration').innerText = `${durationMins} mins`;
@@ -415,11 +372,11 @@
       document.getElementById('val-final').innerText = `RM ${roundedTotal.toFixed(2)}`;
 
     } catch (err) {
-      console.error("Routing calculation failed:", err);
+      console.error("Routing error:", err);
     }
   }
 
-  // Initial Execution
+  // Initial Run
   calculateRouteAndFare();
 </script>
 </body>
