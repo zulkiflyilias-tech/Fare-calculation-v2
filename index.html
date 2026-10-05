@@ -1,326 +1,3 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rideshare MY - Professional Fare Estimator</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #f8f9fa;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden; 
-            color: #212529;
-        }
-        #container {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            position: relative;
-        }
-        #map {
-            height: 35vh;
-            width: 100%;
-            z-index: 1;
-        }
-        #search-panel {
-            flex: 1;
-            background: white;
-            padding: 16px;
-            box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
-            z-index: 10;
-            box-sizing: border-box;
-            border-top-left-radius: 16px;
-            border-top-right-radius: 16px;
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
-        }
-        .header-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-        h2 {
-            margin: 0;
-            font-size: 18px;
-            font-weight: 700;
-            color: #111;
-        }
-        
-        .routing-wrapper {
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-bottom: 10px;
-        }
-        .input-container {
-            position: relative;
-            display: flex;
-            align-items: center;
-        }
-        input {
-            width: 100%;
-            padding: 12px 64px 12px 12px;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
-            box-sizing: border-box;
-            background-color: #f9f9f9;
-            transition: all 0.2s ease;
-        }
-        #pickup {
-            padding-right: 88px;
-        }
-        input:focus {
-            outline: none;
-            border-color: #8e24aa;
-            background-color: #fff;
-            box-shadow: 0 0 0 2px rgba(142, 36, 170, 0.1);
-        }
-        
-        .action-group {
-            position: absolute;
-            right: 8px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            z-index: 5;
-        }
-        .icon-btn {
-            border: none;
-            background: none;
-            color: #757575;
-            font-size: 16px;
-            cursor: pointer;
-            padding: 6px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.2s;
-        }
-        .icon-btn:hover {
-            background-color: #f0f0f0;
-            color: #8e24aa;
-        }
-        .clear-btn {
-            display: none;
-            font-size: 18px;
-            color: #aaa;
-        }
-        
-        .swap-container {
-            position: absolute;
-            right: 48px;
-            top: 50%;
-            transform: translateY(-50%);
-            z-index: 15;
-        }
-        .swap-btn {
-            background: white;
-            border: 1px solid #e0e0e0;
-            color: #8e24aa;
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-            transition: all 0.2s ease;
-            font-size: 14px;
-        }
-        .swap-btn:hover {
-            transform: scale(1.1) translateY(-45%);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            background-color: #fcf5ff;
-        }
-
-        .suggestions {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: white;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            max-height: 180px; 
-            overflow-y: auto;
-            z-index: 100;
-            box-shadow: 0 6px 16px rgba(0,0,0,0.15);
-            display: none;
-        }
-        .suggestion-item {
-            padding: 12px;
-            cursor: pointer;
-            font-size: 13px;
-            line-height: 1.4;
-            border-bottom: 1px solid #f5f5f5;
-        }
-        .suggestion-item:hover, .suggestion-item:active {
-            background-color: #f0f0f0;
-        }
-        
-        #result-card {
-            background: #1c1c1e;
-            color: white;
-            padding: 16px;
-            border-radius: 12px;
-            margin-top: 10px;
-            display: none;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.15);
-            position: relative;
-            z-index: 5;
-        }
-        .fare-header-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-        .fare-header {
-            font-size: 32px;
-            font-weight: 800;
-            color: #b388ff;
-        }
-        .fare-meta {
-            font-size: 13px;
-            color: #e5e5ea;
-            display: flex;
-            justify-content: space-between;
-            font-weight: 500;
-        }
-        #invoice-details {
-            margin-top: 12px;
-            border-top: 1px dashed #3a3a3c;
-            padding-top: 12px;
-            display: block;
-        }
-        .detail-row {
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-            color: #aeaeb2;
-            margin-bottom: 8px;
-        }
-        .detail-row.total-bold {
-            color: #fff;
-            font-weight: 600;
-            border-top: 1px solid #2c2c2e;
-            padding-top: 8px;
-            margin-bottom: 0;
-            font-size: 14px;
-        }
-        #error-msg {
-            color: #ff3b30;
-            font-size: 13px;
-            margin-top: 8px;
-            display: none;
-            font-weight: 500;
-        }
-
-        @media(min-width: 768px) {
-            #container {
-                flex-direction: row-reverse;
-            }
-            #map {
-                height: 100%;
-                flex: 1;
-            }
-            #search-panel {
-                width: 380px;
-                height: 100%;
-                border-radius: 0;
-                box-shadow: -4px 0 20px rgba(0,0,0,0.05);
-            }
-        }
-    </style>
-</head>
-<body>
-
-<div id="container">
-    <div id="map"></div>
-    
-    <div id="search-panel">
-        <div class="header-row">
-            <h2>Fare Estimator</h2>
-        </div>
-        
-        <div class="routing-wrapper">
-            <div class="input-container">
-                <input type="text" id="pickup" placeholder="Enter Pickup Location..." autocomplete="off" enterkeyhint="search">
-                <div class="action-group">
-                    <button class="icon-btn" id="current-loc-btn" title="Use current location">🎯</button>
-                    <button class="icon-btn clear-btn" id="clear-pickup">&times;</button>
-                </div>
-                <div id="pickup-suggestions" class="suggestions"></div>
-            </div>
-            
-            <div class="swap-container">
-                <button class="swap-btn" id="swap-locations-btn" title="Swap locations" onclick="executeLocationSwap()">⇅</button>
-            </div>
-            
-            <div class="input-container">
-                <input type="text" id="dropoff" placeholder="Enter Drop-off Location..." autocomplete="off" enterkeyhint="search">
-                <div class="action-group">
-                    <button class="icon-btn clear-btn" id="clear-dropoff">&times;</button>
-                </div>
-                <div id="dropoff-suggestions" class="suggestions"></div>
-            </div>
-        </div>
-
-        <div id="error-msg"></div>
-
-        <div id="result-card">
-            <div class="fare-header-row">
-                <div id="total-fare" class="fare-header">RM --</div>
-            </div>
-            <div class="fare-meta">
-                <span id="fare-distance">0 km</span>
-                <span id="fare-duration">0 mins</span>
-            </div>
-            
-            <div id="invoice-details">
-                <div class="detail-row">
-                    <span>Base Fare</span>
-                    <span id="calc-base-fare">RM 5.00</span>
-                </div>
-                <div class="detail-row">
-                    <span>Distance Fare</span>
-                    <span id="calc-ride-distance-rate">RM 0.00</span>
-                </div>
-                <div class="detail-row">
-                    <span id="toll-type-label">Tolls</span>
-                    <span id="calc-tolls">RM 0.00</span>
-                </div>
-                <div class="detail-row">
-                    <span>Traffic Adjust & Incentive</span>
-                    <span id="calc-incentive">RM 0.00</span>
-                </div>
-                
-                <div class="detail-row" id="deadhead-km-row" style="display: none;">
-                    <span>Out-of-Zone Surcharge</span>
-                    <span id="calc-deadhead-km">RM 0.00</span>
-                </div>
-
-                <div class="detail-row total-bold">
-                    <span>Rounded Final Total</span>
-                    <span id="calc-grand" style="color: #b388ff;">RM 0.00</span>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
@@ -371,6 +48,7 @@
         resetCalculationDisplay();
     });
 
+    // HERE API Reverse Geocoding for Current Location
     document.getElementById('current-loc-btn').addEventListener('click', () => {
         if (!navigator.geolocation) {
             showError("Location services unsupported by browser.");
@@ -388,13 +66,15 @@
                 updateMarker('pickup', pickupCoords);
                 map.setView([lat, lon], 14);
                 
-                const reverseGeocodeUrl = `https://photon.komoot.io/reverse?lon=${lon}&lat=${lat}`;
-                fetch(reverseGeocodeUrl)
+                const revGeocodeUrl = `https://revgeocode.search.hereapi.com/v1/revgeocode?at=${lat},${lon}&lang=en-US&apiKey=${HERE_API_KEY}`;
+                
+                fetch(revGeocodeUrl)
                     .then(res => res.json())
                     .then(data => {
                         btn.textContent = "🎯";
-                        if (data.features && data.features.length > 0) {
-                            document.getElementById('pickup').value = expandAddress(data.features[0].properties);
+                        if (data.items && data.items.length > 0) {
+                            const item = data.items[0];
+                            document.getElementById('pickup').value = item.title || item.address.label;
                         } else {
                             document.getElementById('pickup').value = `Current Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
                         }
@@ -454,16 +134,6 @@
         else resetCalculationDisplay();
     }
 
-    function expandAddress(props) {
-        const parts = [];
-        if (props.name) parts.push(props.name);
-        if (props.street) parts.push(props.street);
-        if (props.district) parts.push(props.district);
-        if (props.city || props.town) parts.push(props.city || props.town);
-        if (props.state) parts.push(props.state);
-        return parts.length > 0 ? parts.join(', ') : 'Target Location Coordinates';
-    }
-
     function resetCalculationDisplay() {
         if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
         document.getElementById('result-card').style.display = 'none';
@@ -477,6 +147,7 @@
         document.getElementById('result-card').style.display = 'none';
     }
 
+    // HERE Autosuggest API Integration
     function setupAutocomplete(inputId, suggestionsId, clearBtnId, onSelect, onClear) {
         const input = document.getElementById(inputId);
         const suggestionsBox = document.getElementById(suggestionsId);
@@ -495,38 +166,42 @@
             }
 
             debounceTimeout = setTimeout(() => {
-                const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&bbox=99.6,0.8,119.5,7.4&limit=5`;
-                fetch(url)
+                const hereAutosuggestUrl = `https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=3.1390,101.6869&in=countryCode:MYS&limit=5&apiKey=${HERE_API_KEY}`;
+                
+                fetch(hereAutosuggestUrl)
                     .then(res => res.json())
                     .then(data => {
                         suggestionsBox.innerHTML = '';
-                        if(!data.features || data.features.length === 0) {
+                        if (!data.items || data.items.length === 0) {
                             suggestionsBox.style.display = 'none';
                             return;
                         }
                         suggestionsBox.style.display = 'block';
-                        data.features.forEach(feature => {
-                            const props = feature.properties;
-                            const detailedAddress = expandAddress(props);
+                        
+                        data.items.forEach(item => {
+                            if (!item.position) return;
+
+                            const displayName = item.title;
+                            const addressLabel = item.address ? item.address.label : displayName;
+
                             const div = document.createElement('div');
                             div.className = 'suggestion-item';
-                            div.textContent = detailedAddress;
+                            div.textContent = addressLabel;
                             
                             const selectHandler = (e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                input.value = props.name || detailedAddress;
+                                input.value = displayName;
                                 hideAllSuggestions();
                                 input.blur(); 
-                                const [lon, lat] = feature.geometry.coordinates;
-                                onSelect({ lat, lon });
+                                onSelect({ lat: item.position.lat, lon: item.position.lng });
                             };
 
                             div.addEventListener('click', selectHandler);
                             div.addEventListener('touchend', selectHandler);
                             suggestionsBox.appendChild(div);
                         });
-                    }).catch(err => console.error(err));
+                    }).catch(err => console.error("HERE Autosuggest Error:", err));
             }, 350);
         });
 
@@ -539,53 +214,82 @@
         });
     }
 
-    async function fetchHereTolls(origin, destination) {
-        try {
-            const hereUrl = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${origin.lat},${origin.lon}&destination=${destination.lat},${destination.lon}&return=tolls,summary&apiKey=${HERE_API_KEY}`;
-            const res = await fetch(hereUrl);
-            if (!res.ok) return 0;
-            const data = await res.json();
-            
-            let totalToll = 0;
-            if (data.routes && data.routes.length > 0) {
-                const route = data.routes[0];
-                if (route.sections) {
-                    route.sections.forEach(section => {
-                        if (section.tolls) {
-                            section.tolls.forEach(toll => {
-                                if (toll.fares) {
-                                    toll.fares.forEach(fare => {
-                                        if (fare.price && fare.price.value) {
-                                            totalToll += fare.price.value;
-                                        }
-                                    });
-                                }
-                            });
-                        }
-                    });
-                }
-            }
-            return totalToll;
-        } catch (err) {
-            console.warn("HERE Toll API bypassed:", err);
-            return 0;
+    // Flexible Polyline Decoder for HERE API V8
+    function decodeFlexiblePolyline(encoded) {
+        let index = 0;
+        const len = encoded.length;
+        let lat = 0;
+        let lng = 0;
+        const coordinates = [];
+
+        function decodeVarint() {
+            let res = 0;
+            let shift = 0;
+            let byte = 0;
+            do {
+                byte = encoded.charCodeAt(index++) - 63;
+                res |= (byte & 0x1f) << shift;
+                shift += 5;
+            } while (byte >= 0x20);
+            return (res & 1) ? ~(res >> 1) : (res >> 1);
         }
+
+        const header = decodeVarint();
+        const precision = header & 15;
+        const factor = Math.pow(10, precision);
+
+        while (index < len) {
+            lat += decodeVarint();
+            lng += decodeVarint();
+            coordinates.push([lat / factor, lng / factor]);
+        }
+        return coordinates;
     }
 
-    function fetchOSRMRoute() {
-        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${pickupCoords.lon},${pickupCoords.lat};${dropoffCoords.lon},${dropoffCoords.lat}?overview=full&geometries=geojson`;
+    // HERE Routing API (v8) Integration replacing OSRM
+    function fetchHERERoute() {
+        const origin = `${pickupCoords.lat},${pickupCoords.lon}`;
+        const destination = `${dropoffCoords.lat},${dropoffCoords.lon}`;
+        const hereRouteUrl = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${origin}&destination=${destination}&return=polyline,summary,tolls&apiKey=${HERE_API_KEY}`;
         
-        fetch(osrmUrl)
+        fetch(hereRouteUrl)
             .then(res => res.json())
-            .then(async (data) => {
+            .then(data => {
                 if (!data.routes || data.routes.length === 0) {
                     showError("No valid drivable route found.");
                     return;
                 }
 
                 const route = data.routes[0];
-                const distanceKm = route.distance / 1000;
-                const baseDurationMins = route.duration / 60;
+                let totalDistanceMeters = 0;
+                let totalDurationSeconds = 0;
+                let totalTollCost = 0;
+                let polylineCoords = [];
+
+                route.sections.forEach(section => {
+                    totalDistanceMeters += section.summary.length || 0;
+                    totalDurationSeconds += section.summary.duration || 0;
+
+                    if (section.polyline) {
+                        const decoded = decodeFlexiblePolyline(section.polyline);
+                        polylineCoords = polylineCoords.concat(decoded);
+                    }
+
+                    if (section.tolls) {
+                        section.tolls.forEach(toll => {
+                            if (toll.fares) {
+                                toll.fares.forEach(fare => {
+                                    if (fare.price && fare.price.value) {
+                                        totalTollCost += fare.price.value;
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
+
+                const distanceKm = totalDistanceMeters / 1000;
+                const baseDurationMins = totalDurationSeconds / 60;
 
                 const now = new Date();
                 const currentHour = now.getHours();
@@ -620,17 +324,17 @@
 
                 if (routeLine) map.removeLayer(routeLine);
                 
-                routeLine = L.geoJSON(route.geometry, { 
-                    style: { color: '#8e24aa', weight: 5, opacity: 0.85 } 
-                }).addTo(map);
-                
-                map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+                if (polylineCoords.length > 0) {
+                    routeLine = L.polyline(polylineCoords, { 
+                        color: '#8e24aa', weight: 5, opacity: 0.85 
+                    }).addTo(map);
+                    map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+                }
 
-                const hereTollCost = await fetchHereTolls(pickupCoords, dropoffCoords);
-                processCalculations(distanceKm, correctedDurationMins, hereTollCost);
+                processCalculations(distanceKm, correctedDurationMins, totalTollCost);
             })
             .catch(err => {
-                console.error("OSRM Error:", err);
+                console.error("HERE Routing API Error:", err);
                 showError("Routing service unavailable. Please try again.");
             });
     }
@@ -643,7 +347,7 @@
         if(currentRouteTimeout) clearTimeout(currentRouteTimeout);
         
         currentRouteTimeout = setTimeout(() => {
-            fetchOSRMRoute();
+            fetchHERERoute();
         }, 250);
     }
 
@@ -702,5 +406,3 @@
         }, 100);
     }
 </script>
-</body>
-</html>
