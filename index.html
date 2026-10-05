@@ -2,110 +2,119 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fare Calculator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Malaysia Fare Calculator</title>
 
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  
+
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #f4f5f7; padding: 12px; color: #172b4d; }
-    
-    .container { 
-      max-width: 480px; 
-      margin: 0 auto; 
-      background: #fff; 
-      border-radius: 16px; 
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
-      overflow: visible; 
+
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
       position: relative;
     }
-    
-    #map-wrapper { border-top-left-radius: 16px; border-top-right-radius: 16px; overflow: hidden; }
-    #map { height: 250px; width: 100%; background: #e5e7eb; }
-    
-    .input-section { 
-      padding: 16px; 
-      display: flex; 
-      flex-direction: column; 
-      gap: 14px; 
+
+    #map-wrapper { 
+      border-top-left-radius: 16px; 
+      border-top-right-radius: 16px; 
+      overflow: hidden; 
+      position: relative;
+    }
+    #map { height: 260px; width: 100%; background: #e5e7eb; z-index: 1; }
+
+    .input-section {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
       position: relative;
       z-index: 1000;
     }
-    
-    .input-group { position: relative; display: flex; align-items: center; z-index: 1001; }
-    .input-group.dest-group { z-index: 1000; }
-    
-    .input-group input { 
-      width: 100%; 
-      padding: 12px 42px 12px 14px; 
-      border: 1px solid #dfe1e6; 
-      border-radius: 8px; 
-      font-size: 14px; 
-      outline: none; 
-      background: #fff;
-    }
-    .input-group input:focus { border-color: #4c9aff; box-shadow: 0 0 0 2px rgba(76,154,255,0.2); }
-    
-    /* Current Location Toggle Button */
-    .location-btn { 
-      position: absolute; 
-      right: 10px; 
-      background: none; 
-      border: none; 
-      cursor: pointer; 
-      padding: 6px; 
+
+    .input-group { 
+      position: relative; 
       display: flex; 
       align-items: center; 
-      justify-content: center;
-      color: #0052cc;
-      border-radius: 50%;
     }
-    .location-btn:hover { background-color: #f0f4ff; }
-    .location-btn svg { width: 20px; height: 20px; fill: currentColor; }
 
-    /* Dropdown Autocomplete Styling */
-    .suggestions { 
-      position: absolute; 
-      top: 100%; 
-      left: 0; 
-      right: 0; 
-      background: #ffffff; 
-      border: 1px solid #dfe1e6; 
-      border-radius: 8px; 
-      z-index: 99999; 
-      max-height: 200px; 
-      overflow-y: auto; 
-      box-shadow: 0 8px 20px rgba(0,0,0,0.18); 
-      margin-top: 4px;
-      display: none;
+    .input-group input {
+      width: 100%;
+      padding: 12px 70px 12px 14px;
+      border: 1px solid #dfe1e6;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+      background: #fff;
     }
-    .suggestion-item { padding: 12px 14px; font-size: 13px; cursor: pointer; border-bottom: 1px solid #f4f5f7; color: #333; }
-    .suggestion-item:last-child { border-bottom: none; }
-    .suggestion-item:hover { background: #f0f4ff; color: #0052cc; }
+    .input-group input:focus { border-color: #0052cc; box-shadow: 0 0 0 2px rgba(0,82,204,0.2); }
 
-    /* Custom Map Control Button */
-    .leaflet-control-recenter {
-      background-color: #ffffff;
-      border: 2px solid rgba(0,0,0,0.2);
-      border-radius: 4px;
-      width: 34px;
-      height: 34px;
+    /* Action Buttons Inside Input */
+    .btn-container {
+      position: absolute;
+      right: 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .icon-btn {
+      background: none;
+      border: none;
       cursor: pointer;
-      box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+      padding: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
+      color: #6b7280;
+      border-radius: 50%;
     }
-    .leaflet-control-recenter:hover { background-color: #f4f4f4; }
-    .leaflet-control-recenter svg { width: 18px; height: 18px; fill: #333; }
+    .icon-btn:hover { background-color: #f3f4f6; color: #111827; }
+    .icon-btn svg { width: 18px; height: 18px; fill: currentColor; }
+    
+    .clear-btn { display: none; font-size: 16px; font-weight: bold; width: 28px; height: 28px; }
+    .clear-btn.active { display: flex; }
 
-    .card { background: #121316; color: #fff; margin: 16px; padding: 20px; border-radius: 16px; z-index: 1; position: relative; }
+    /* Autocomplete Suggestions Container */
+    .suggestions {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #ffffff;
+      border: 1px solid #dfe1e6;
+      border-radius: 8px;
+      z-index: 99999;
+      max-height: 220px;
+      overflow-y: auto;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.18);
+      margin-top: 4px;
+      display: none;
+    }
+
+    .suggestion-item {
+      padding: 10px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      border-bottom: 1px solid #f4f5f7;
+      color: #1f2937;
+    }
+    .suggestion-item:last-child { border-bottom: none; }
+    .suggestion-item:hover { background: #eff6ff; color: #1d4ed8; }
+    .suggestion-item strong { display: block; color: #111827; }
+    .suggestion-item small { color: #6b7280; font-size: 11px; }
+
+    /* Fare Card */
+    .card { background: #121316; color: #fff; margin: 16px; padding: 20px; border-radius: 16px; }
     .card-header { display: flex; justify-content: space-between; align-items: baseline; }
     .total-price { font-size: 32px; font-weight: 800; color: #a855f7; }
     .route-meta { display: flex; justify-content: space-between; margin: 8px 0 16px 0; font-size: 14px; color: #9ca3af; font-weight: 600; }
-    
     .divider { height: 1px; background: #2d3748; margin-bottom: 12px; }
     .breakdown-row { display: flex; justify-content: space-between; font-size: 13px; color: #d1d5db; margin-bottom: 8px; }
     .breakdown-row.final { font-weight: 700; color: #fff; margin-top: 12px; font-size: 15px; }
@@ -122,22 +131,27 @@
   <div class="input-section">
     <!-- Pickup Input -->
     <div class="input-group">
-      <input type="text" id="origin" placeholder="Pick-up Location..." value="Pangsapuri Impian Meru, Meru, Klang" autocomplete="off" />
-      <button type="button" class="location-btn" id="loc-btn" title="Use Current Location">
-        <svg viewBox="0 0 24 24">
-          <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
-        </svg>
-      </button>
+      <input type="text" id="origin" placeholder="Pick-up location in Malaysia..." autocomplete="off" />
+      <div class="btn-container">
+        <button type="button" class="icon-btn clear-btn" id="clear-origin" title="Clear text">✕</button>
+        <button type="button" class="icon-btn" id="loc-btn" title="Use My Current Location">
+          <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+        </button>
+      </div>
       <div id="origin-suggestions" class="suggestions"></div>
     </div>
 
     <!-- Drop-off Input -->
-    <div class="input-group dest-group">
-      <input type="text" id="destination" placeholder="Drop-off Location..." value="Giant Hypermarket, Shah Alam" autocomplete="off" />
+    <div class="input-group">
+      <input type="text" id="destination" placeholder="Drop-off location in Malaysia..." autocomplete="off" />
+      <div class="btn-container">
+        <button type="button" class="icon-btn clear-btn" id="clear-dest" title="Clear text">✕</button>
+      </div>
       <div id="dest-suggestions" class="suggestions"></div>
     </div>
   </div>
 
+  <!-- Price Summary -->
   <div class="card">
     <div class="card-header">
       <div class="total-price" id="display-total">RM 0</div>
@@ -151,10 +165,10 @@
 
     <div class="breakdown-row"><span>Base Fare</span><span id="val-base">RM 5.00</span></div>
     <div class="breakdown-row"><span>Distance Fare</span><span id="val-distance">RM 0.00</span></div>
-    <div class="breakdown-row"><span>Tolls</span><span id="val-tolls">RM 0.00</span></div>
+    <div class="breakdown-row"><span>Tolls (Estimated)</span><span id="val-tolls">RM 0.00</span></div>
     <div class="breakdown-row"><span>Traffic Adjust & Incentive</span><span id="val-traffic">RM 3.00</span></div>
     <div class="breakdown-row"><span>Out-of-Zone Surcharge</span><span id="val-outzone">RM 0.03</span></div>
-    
+
     <div class="breakdown-row final">
       <span>Rounded Final Total</span>
       <span class="final-val" id="val-final">RM 0.00</span>
@@ -166,15 +180,13 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-  // HERE API Key
-  const HERE_API_KEY = "PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk";
-
-  // Coordinates
-  let originCoords = { lat: 3.1383, lng: 101.4280 };
+  // Default Peninsular Malaysia coordinates (Klang/Meru default)
+  let originCoords = { lat: 3.1384, lng: 101.4280 };
   let destCoords = { lat: 3.0735, lng: 101.5385 };
 
   // Initialize Map
-  const map = L.map('map').setView([3.1059, 101.4832], 12);
+  const map = L.map('map').setView([originCoords.lat, originCoords.lng], 13);
+  
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap'
@@ -182,133 +194,120 @@
 
   let originMarker = L.marker([originCoords.lat, originCoords.lng], { draggable: true }).addTo(map);
   let destMarker = L.marker([destCoords.lat, destCoords.lng], { draggable: true }).addTo(map);
-  let routeLayer = null;
+  let routePolyline = null;
 
   // -------------------------------------------------------------
-  // Marker Drag Events with HERE Reverse Geocoding
+  // Reverse Geocoding (Lat/Lng to Address Name using Photon)
   // -------------------------------------------------------------
+  async function reverseGeocode(lat, lng, targetInputId, clearBtnId) {
+    try {
+      const res = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`);
+      const data = await res.json();
+      if (data.features && data.features.length > 0) {
+        const props = data.features[0].properties;
+        const name = props.name || props.street || props.district || props.city || "Selected Location";
+        const city = props.city || props.county || props.state || "";
+        const fullName = city ? `${name}, ${city}` : name;
+        
+        const input = document.getElementById(targetInputId);
+        input.value = fullName;
+        document.getElementById(clearBtnId).classList.add('active');
+      }
+    } catch (e) {
+      console.error("Reverse geocode failed:", e);
+    }
+  }
+
   originMarker.on('dragend', async (e) => {
-    const latLng = e.target.getLatLng();
-    originCoords = { lat: latLng.lat, lng: latLng.lng };
-    await reverseGeocode('origin', latLng.lat, latLng.lng);
-    calculateRouteAndFare();
+    const pos = e.target.getLatLng();
+    originCoords = { lat: pos.lat, lng: pos.lng };
+    await reverseGeocode(pos.lat, pos.lng, 'origin', 'clear-origin');
+    calculateRoute();
   });
 
   destMarker.on('dragend', async (e) => {
-    const latLng = e.target.getLatLng();
-    destCoords = { lat: latLng.lat, lng: latLng.lng };
-    await reverseGeocode('destination', latLng.lat, latLng.lng);
-    calculateRouteAndFare();
+    const pos = e.target.getLatLng();
+    destCoords = { lat: pos.lat, lng: pos.lng };
+    await reverseGeocode(pos.lat, pos.lng, 'destination', 'clear-dest');
+    calculateRoute();
   });
 
-  async function reverseGeocode(inputId, lat, lng) {
-    try {
-      const url = `https://revgeocode.search.hereapi.com/v1/revgeocode?at=${lat},${lng}&apiKey=${HERE_API_KEY}`;
-      const res = await fetch(url);
-      const data = await res.json();
-      if (data.items && data.items.length > 0) {
-        document.getElementById(inputId).value = data.items[0].title;
-      } else {
-        document.getElementById(inputId).value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-      }
-    } catch (e) {
-      document.getElementById(inputId).value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-    }
-  }
-
   // -------------------------------------------------------------
-  // Map Re-center Control
+  // Autocomplete Suggestions Engine (Photon API - Malaysia restricted)
   // -------------------------------------------------------------
-  const RecenterControl = L.Control.extend({
-    options: { position: 'topright' },
-    onAdd: function () {
-      const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-recenter');
-      container.title = "Re-center Map";
-      container.innerHTML = `
-        <svg viewBox="0 0 24 24">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v4h-2zm0 6h2v6h-2z"/>
-        </svg>`;
-      L.DomEvent.disableClickPropagation(container);
-      container.onclick = fitMapBounds;
-      return container;
-    }
-  });
-  map.addControl(new RecenterControl());
-
-  function fitMapBounds() {
-    if (routeLayer) {
-      map.fitBounds(routeLayer.getBounds(), { padding: [40, 40], animate: true });
-    } else {
-      const bounds = L.latLngBounds([
-        [originCoords.lat, originCoords.lng],
-        [destCoords.lat, destCoords.lng]
-      ]);
-      map.fitBounds(bounds, { padding: [40, 40], animate: true });
-    }
-  }
-
-  // -------------------------------------------------------------
-  // HERE Autocomplete API Handler (Malaysia Only: in=countryCode:MYS)
-  // -------------------------------------------------------------
-  function setupAutocomplete(inputId, suggestionsId, onSelect) {
+  function setupMalaysiaAutocomplete(inputId, clearBtnId, suggestionsId, onSelect) {
     const input = document.getElementById(inputId);
+    const clearBtn = document.getElementById(clearBtnId);
     const box = document.getElementById(suggestionsId);
+    let debounceTimer;
 
-    input.addEventListener('input', async () => {
+    // Toggle Clear Button Visibility
+    input.addEventListener('input', () => {
+      if (input.value.trim().length > 0) {
+        clearBtn.classList.add('active');
+      } else {
+        clearBtn.classList.remove('active');
+        box.style.display = 'none';
+      }
+
+      clearTimeout(debounceTimer);
       const query = input.value.trim();
-      if (query.length < 2) { 
-        box.style.display = 'none'; 
-        return; 
+
+      if (query.length < 2) {
+        box.style.display = 'none';
+        return;
       }
 
-      try {
-        // Strict Malaysia filtering using in=countryCode:MYS
-        const url = `https://autocomplete.search.hereapi.com/v1/autocomplete?q=${encodeURIComponent(query)}&in=countryCode:MYS&at=3.1390,101.6869&limit=5&apiKey=${HERE_API_KEY}`;
-        const res = await fetch(url);
-        const data = await res.json();
+      // Debounce API Calls
+      debounceTimer = setTimeout(async () => {
+        try {
+          // Restrict results strictly to Malaysia (&countrycodes=my) and minimum 5 items (&limit=5)
+          const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&countrycodes=my&limit=5&lat=${originCoords.lat}&lon=${originCoords.lng}`;
+          const res = await fetch(url);
+          const data = await res.json();
 
-        box.innerHTML = '';
-        const items = data.items || [];
+          box.innerHTML = '';
+          const features = data.features || [];
 
-        if (items.length > 0) {
-          box.style.display = 'block';
-          items.forEach(item => {
-            const div = document.createElement('div');
-            div.className = 'suggestion-item';
-            
-            const titleText = item.title;
-            const addressText = item.address ? item.address.label : '';
-            div.innerHTML = `<strong>${titleText}</strong><br><small style="color: #6b7280;">${addressText}</small>`;
+          if (features.length > 0) {
+            box.style.display = 'block';
+            features.forEach(feat => {
+              const p = feat.properties;
+              const name = p.name || p.street || "Unnamed Location";
+              const subDetail = [p.district, p.city, p.state].filter(Boolean).join(', ');
 
-            div.onclick = (e) => {
-              e.stopPropagation();
-              input.value = item.title;
-              box.style.display = 'none';
-              
-              if (item.position && item.position.lat && item.position.lng) {
-                onSelect(item.position.lat, item.position.lng);
-              } else {
-                fetch(`https://geocode.search.hereapi.com/v1/geocode?q=${encodeURIComponent(item.title)}&in=countryCode:MYS&apiKey=${HERE_API_KEY}`)
-                  .then(r => r.json())
-                  .then(geoData => {
-                    if (geoData.items && geoData.items.length > 0) {
-                      const pos = geoData.items[0].position;
-                      onSelect(pos.lat, pos.lng);
-                    }
-                  })
-                  .catch(err => console.error("Geocoding failed:", err));
-              }
-            };
-            box.appendChild(div);
-          });
-        } else {
-          box.style.display = 'none';
+              const div = document.createElement('div');
+              div.className = 'suggestion-item';
+              div.innerHTML = `<strong>${name}</strong><small>${subDetail}</small>`;
+
+              div.onclick = (e) => {
+                e.stopPropagation();
+                input.value = name + (subDetail ? `, ${subDetail}` : '');
+                box.style.display = 'none';
+                
+                const [lng, lat] = feat.geometry.coordinates;
+                onSelect(lat, lng);
+              };
+              box.appendChild(div);
+            });
+          } else {
+            box.style.display = 'none';
+          }
+        } catch (err) {
+          console.error("Autocomplete error:", err);
         }
-      } catch (e) {
-        console.error("Autocomplete failed:", e);
-      }
+      }, 250);
     });
 
+    // Clear Button Reset Functionality
+    clearBtn.addEventListener('click', () => {
+      input.value = '';
+      clearBtn.classList.remove('active');
+      box.style.display = 'none';
+      input.focus();
+    });
+
+    // Close dropdown on outside click
     document.addEventListener('click', (e) => {
       if (!input.contains(e.target) && !box.contains(e.target)) {
         box.style.display = 'none';
@@ -316,125 +315,84 @@
     });
   }
 
-  setupAutocomplete('origin', 'origin-suggestions', (lat, lng) => {
+  setupMalaysiaAutocomplete('origin', 'clear-origin', 'origin-suggestions', (lat, lng) => {
     originCoords = { lat, lng };
     originMarker.setLatLng([lat, lng]);
-    calculateRouteAndFare();
+    calculateRoute();
   });
 
-  setupAutocomplete('destination', 'dest-suggestions', (lat, lng) => {
+  setupMalaysiaAutocomplete('destination', 'clear-dest', 'dest-suggestions', (lat, lng) => {
     destCoords = { lat, lng };
     destMarker.setLatLng([lat, lng]);
-    calculateRouteAndFare();
+    calculateRoute();
   });
 
   // -------------------------------------------------------------
-  // Current Location Action
+  // Current Location Detector
   // -------------------------------------------------------------
-  document.getElementById('loc-btn').addEventListener('click', () => {
-    if (!navigator.geolocation) return alert("Geolocation not supported.");
-    
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      originCoords = { lat, lng };
-      originMarker.setLatLng([lat, lng]);
-      await reverseGeocode('origin', lat, lng);
-      calculateRouteAndFare();
-    }, () => alert("Could not fetch location permissions."));
-  });
+  document.getElementById('loc-btn').addEventListener('click', getUserLocation);
 
-  // -------------------------------------------------------------
-  // Flexible Polyline Decoder (HERE Routing v8)
-  // -------------------------------------------------------------
-  function decodeFlexiblePolyline(encoded) {
-    const DECODING_TABLE = [
-      62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1,
-      -1, -1, -1, -1, -1, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
-      13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, -1, -1, -1, -1,
-      -1, -1, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
-      41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51
-    ];
-    let index = 0, lat = 0, lng = 0;
-    const coordinates = [];
-
-    function decodeUnsigned() {
-      let result = 0, shift = 0, b;
-      do {
-        b = DECODING_TABLE[encoded.charCodeAt(index++) - 45];
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      return result;
+  function getUserLocation() {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      return;
     }
 
-    function decodeSigned() {
-      const res = decodeUnsigned();
-      return (res & 1) ? ~(res >> 1) : (res >> 1);
-    }
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        originCoords = { lat, lng };
+        
+        originMarker.setLatLng([lat, lng]);
+        map.setView([lat, lng], 14);
 
-    const header = decodeUnsigned();
-    const precision = header & 15;
-    const factor = Math.pow(10, precision);
-
-    while (index < encoded.length) {
-      lat += decodeSigned();
-      lng += decodeSigned();
-      coordinates.push([lat / factor, lng / factor]);
-    }
-
-    return coordinates;
+        await reverseGeocode(lat, lng, 'origin', 'clear-origin');
+        calculateRoute();
+      },
+      (error) => {
+        alert("Unable to fetch location. Please turn on GPS on your device.");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   }
 
   // -------------------------------------------------------------
-  // HERE Routing v8 Engine with Toll Calculation
+  // OSRM Routing Engine & Fare Logic
   // -------------------------------------------------------------
-  async function calculateRouteAndFare() {
-    const routeUrl = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${originCoords.lat},${originCoords.lng}&destination=${destCoords.lat},${destCoords.lng}&return=polyline,summary,tolls&apiKey=${HERE_API_KEY}`;
+  async function calculateRoute() {
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${originCoords.lng},${originCoords.lat};${destCoords.lng},${destCoords.lat}?overview=full&geometries=geojson`;
 
     try {
-      const response = await fetch(routeUrl);
-      const data = await response.json();
+      const res = await fetch(osrmUrl);
+      const data = await res.json();
 
       if (!data.routes || data.routes.length === 0) return;
 
       const route = data.routes[0];
-      const section = route.sections[0];
-      const distanceKm = section.summary.length / 1000;
-      const durationMins = Math.ceil(section.summary.duration / 60);
+      const distanceKm = route.distance / 1000;
+      const durationMins = Math.ceil(route.duration / 60);
 
-      // Extract Toll Fares dynamically from HERE API
-      let tolls = 0.00;
-      if (section.tolls && section.tolls.length > 0) {
-        section.tolls.forEach(toll => {
-          if (toll.fares) {
-            toll.fares.forEach(fare => {
-              if (fare.price && fare.price.value) {
-                tolls += fare.price.value;
-              }
-            });
-          }
-        });
-      }
+      // Draw Route Polyline
+      if (routePolyline) map.removeLayer(routePolyline);
+      const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+      routePolyline = L.polyline(coords, { color: '#8b5cf6', weight: 5 }).addTo(map);
 
-      // Draw Polyline
-      if (routeLayer) map.removeLayer(routeLayer);
-      const lineCoords = decodeFlexiblePolyline(section.polyline);
-      routeLayer = L.polyline(lineCoords, { color: '#8b5cf6', weight: 5 }).addTo(map);
-      
-      fitMapBounds();
+      // Auto-fit map to route bounds
+      map.fitBounds(routePolyline.getBounds(), { padding: [40, 40] });
 
-      // Fare Formula
+      // Pricing Formula Calculations
       const baseFare = 5.00;
       const ratePerKm = 1.156;
       const distanceFare = distanceKm * ratePerKm;
+      const tolls = distanceKm > 15 ? 1.60 : 0.00; // Sample toll estimation for long distance
       const trafficAdjust = 3.00;
       const outOfZone = 0.03;
 
       const rawTotal = baseFare + distanceFare + tolls + trafficAdjust + outOfZone;
-      const roundedTotal = Math.round(rawTotal * 2) / 2;
+      const roundedTotal = Math.round(rawTotal * 2) / 2; // Rounding to nearest 0.50
 
-      // Update UI
+      // Update UI Display
       document.getElementById('display-total').innerText = `RM ${Math.round(roundedTotal)}`;
       document.getElementById('display-distance').innerText = `${distanceKm.toFixed(1)} km`;
       document.getElementById('display-duration').innerText = `${durationMins} mins`;
@@ -447,12 +405,12 @@
       document.getElementById('val-final').innerText = `RM ${roundedTotal.toFixed(2)}`;
 
     } catch (err) {
-      console.error("HERE Routing error:", err);
+      console.error("Routing error:", err);
     }
   }
 
-  // Initial Run
-  calculateRouteAndFare();
+  // Initial setup: Fetch current location on load or fallback to default Meru
+  getUserLocation();
 </script>
 </body>
 </html>
