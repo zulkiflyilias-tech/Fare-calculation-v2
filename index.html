@@ -539,71 +539,28 @@
         });
     }
 
-    // Decode Flexible Polyline format used by HERE API v8
-    function decodeFlexiblePolyline(encoded) {
-        let index = 0, lat = 0, lng = 0;
-        const coordinates = [];
-        const header = encoded.charCodeAt(index++) - 63;
-        const precision = header & 15;
-        const factor = Math.pow(10, precision);
-
-        while (index < encoded.length) {
-            let result = 0, shift = 0, byte = null;
-            do {
-                byte = encoded.charCodeAt(index++) - 63;
-                result |= (byte & 0x1f) << shift;
-                shift += 5;
-            } while (byte >= 0x20);
-            const deltaLat = (result & 1) ? ~(result >> 1) : (result >> 1);
-            lat += deltaLat;
-
-            result = 0; shift = 0;
-            do {
-                byte = encoded.charCodeAt(index++) - 63;
-                result |= (byte & 0x1f) << shift;
-                shift += 5;
-            } while (byte >= 0x20);
-            const deltaLng = (result & 1) ? ~(result >> 1) : (result >> 1);
-            lng += deltaLng;
-
-            coordinates.push([lat / factor, lng / factor]);
-        }
-        return coordinates;
-    }
-
     async function fetchPrimaryRoute() {
-        // First attempt: Fetch directly via HERE Routing API (Unified Route + Tolls + Geometry)
+        // Fetch route geometry and tolls directly using HERE Routing API v7 (CORS compatible)
+        const hereRoutingUrl = `https://route.ls.hereapi.com/routing/7.2/calculateroutes.json?apiKey=${HERE_API_KEY}&waypoint0=geo!${pickupCoords.lat},${pickupCoords.lon}&waypoint1=geo!${dropoffCoords.lat},${dropoffCoords.lon}&mode=fastest;car&routeattributes=shape,summary,tolls`;
+
         try {
-            const hereUrl = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&return=polyline,summary,tolls&apiKey=${HERE_API_KEY}`;
-            const res = await fetch(hereUrl);
+            const res = await fetch(hereRoutingUrl);
             if (res.ok) {
                 const data = await res.json();
-                if (data.routes && data.routes.length > 0) {
-                    const route = data.routes[0];
-                    let distanceKm = 0;
-                    let baseDurationMins = 0;
+                if (data.response && data.response.route && data.response.route.length > 0) {
+                    const route = data.response.route[0];
+                    const distanceKm = route.summary.distance / 1000;
+                    const baseDurationMins = route.summary.travelTime / 60;
+                    
                     let totalToll = 0;
-                    let polylineCoords = [];
+                    if (route.tollCost && route.tollCost.value) {
+                        totalToll = route.tollCost.value;
+                    }
 
-                    route.sections.forEach(section => {
-                        if (section.summary) {
-                            distanceKm += section.summary.length / 1000;
-                            baseDurationMins += section.summary.duration / 60;
-                        }
-                        if (section.polyline) {
-                            polylineCoords = polylineCoords.concat(decodeFlexiblePolyline(section.polyline));
-                        }
-                        if (section.tolls) {
-                            section.tolls.forEach(toll => {
-                                if (toll.fares) {
-                                    toll.fares.forEach(fare => {
-                                        if (fare.price && fare.price.value) {
-                                            totalToll += fare.price.value;
-                                        }
-                                    });
-                                }
-                            });
-                        }
+                    // Extract coordinates from HERE v7 shape
+                    const polylineCoords = route.shape.map(pt => {
+                        const parts = pt.split(',');
+                        return [parseFloat(parts[0]), parseFloat(parts[1])];
                     });
 
                     drawRouteAndCalculate(polylineCoords, distanceKm, baseDurationMins, totalToll);
@@ -611,10 +568,10 @@
                 }
             }
         } catch (err) {
-            console.warn("HERE Routing primary attempt failed, falling back to OSRM:", err);
+            console.warn("HERE API routing failed, using fallback:", err);
         }
 
-        // Fallback attempt: OSRM Route
+        // Fallback to OSRM if HERE API fails
         fetchOSRMRoute();
     }
 
@@ -636,7 +593,6 @@
                 const distanceKm = route.distance / 1000;
                 const baseDurationMins = route.duration / 60;
 
-                // OSRM does not support Malaysia tolls natively; set to 0.00 to avoid misaligned toll display
                 const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
                 drawRouteAndCalculate(coords, distanceKm, baseDurationMins, 0);
             })
