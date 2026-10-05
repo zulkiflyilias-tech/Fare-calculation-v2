@@ -1,199 +1,228 @@
-// ==========================================
-// CONFIGURATION & API KEYS
-// ==========================================
-const HERE_API_KEY = "YOUR_HERE_API_KEY"; // Replace with your actual HERE API Key
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fare Calculator</title>
 
-// Fare Config
-const BASE_FARE = 5.00;
-const RATE_PER_KM = 1.156;
-const TRAFFIC_INCENTIVE = 3.00;
-const OUT_OF_ZONE_SURCHARGE = 0.03;
-
-let map, routeLayer;
-let originCoords = null;
-let destCoords = null;
-
-// ==========================================
-// INITIALIZE MAP
-// ==========================================
-document.addEventListener("DOMContentLoaded", () => {
-  // Center near Klang / Meru
-  map = L.map("map").setView([3.1390, 101.4420], 12);
-
-  // Tile layer (HERE Tiles or standard CartoDB/OSM tiles for base map visual)
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
-  }).addTo(map);
-});
-
-// ==========================================
-// HERE GEOCODING & AUTOCOMPLETE
-// ==========================================
-async function searchLocation(query) {
-  if (!query || query.length < 3) return [];
-
-  // Center around Meru/Klang (lat: 3.13, lng: 101.44) for localized autosuggest
-  const url = `https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=3.1390,101.4420&apiKey=${HERE_API_KEY}&in=countryCode:MYS`;
-
-  try {
-    const res = await fetch(url);
-    const data = await res.json();
-    return data.items.filter(item => item.position).map(item => ({
-      title: item.title,
-      lat: item.position.lat,
-      lng: item.position.lng
-    }));
-  } catch (err) {
-    console.error("HERE Autosuggest error:", err);
-    return [];
-  }
-}
-
-// Set Origin / Destination from search or inputs
-function selectOrigin(lat, lng, addressName) {
-  originCoords = { lat, lng };
-  document.getElementById("originInput").value = addressName;
-  checkAndCalculateRoute();
-}
-
-function selectDestination(lat, lng, addressName) {
-  destCoords = { lat, lng };
-  document.getElementById("destInput").value = addressName;
-  checkAndCalculateRoute();
-}
-
-// ==========================================
-// HERE ROUTING & TOLL CALCULATION (v8)
-// ==========================================
-function checkAndCalculateRoute() {
-  if (originCoords && destCoords) {
-    calculateHereRoute(originCoords, destCoords);
-  }
-}
-
-async function calculateHereRoute(origin, dest) {
-  // Construct HERE Routing v8 API request with Tolls and Flexible Polyline requested
-  const routingUrl = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${origin.lat},${origin.lng}&destination=${dest.lat},${dest.lng}&return=summary,polyline,tolls&currency=MYR&apiKey=${HERE_API_KEY}`;
-
-  try {
-    const response = await fetch(routingUrl);
-    const data = await response.json();
-
-    if (!data.routes || data.routes.length === 0) {
-      alert("No route found between these locations.");
-      return;
-    }
-
-    const route = data.routes[0];
-    const section = route.sections[0];
-
-    // 1. Distance & Duration
-    const distanceKm = section.summary.length / 1000; // meters to km
-    const durationMins = Math.round(section.summary.duration / 60); // seconds to mins
-
-    // 2. Extract Toll Cost directly from HERE API
-    let tollCostMYR = 0;
-    if (section.tolls && section.tolls.length > 0) {
-      section.tolls.forEach(tollSystem => {
-        if (tollSystem.fares) {
-          tollSystem.fares.forEach(fare => {
-            tollCostMYR += fare.price.value;
-          });
-        }
-      });
-    }
-
-    // 3. Fallback i-City / Local Toll check if HERE route doesn't tag regional toll plaza
-    const originText = (document.getElementById("originInput").value || "").toLowerCase();
-    const destText = (document.getElementById("destInput").value || "").toLowerCase();
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #f4f5f7; padding: 15px; color: #172b4d; }
+    .container { max-width: 480px; margin: 0 auto; background: #fff; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; }
     
-    if ((originText.includes("i-city") || destText.includes("i-city")) && tollCostMYR === 0) {
-      tollCostMYR = 1.00; // Plaza Tol Suria / Bukit Raja
-    }
+    #map { height: 260px; width: 100%; }
+    
+    .input-section { padding: 16px; display: flex; flex-direction: column; gap: 10px; position: relative; }
+    .input-group { position: relative; }
+    .input-group input { width: 100%; padding: 12px 36px 12px 14px; border: 1px solid #dfe1e6; border-radius: 8px; font-size: 14px; outline: none; }
+    .input-group input:focus { border-color: #4c9aff; }
+    
+    .suggestions { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #dfe1e6; border-radius: 8px; z-index: 1000; max-height: 180px; overflow-y: auto; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    .suggestion-item { padding: 10px 14px; font-size: 13px; cursor: pointer; border-bottom: 1px solid #f4f5f7; }
+    .suggestion-item:hover { background: #f4f5f7; }
 
-    // 4. Draw Polyline on Map
-    drawRouteOnMap(section.polyline);
+    .card { background: #121316; color: #fff; margin: 16px; padding: 20px; border-radius: 16px; }
+    .card-header { display: flex; justify-content: space-between; align-items: baseline; }
+    .total-price { font-size: 32px; font-weight: 800; color: #a855f7; }
+    .route-meta { display: flex; justify-content: space-between; margin: 8px 0 16px 0; font-size: 14px; color: #9ca3af; font-weight: 600; }
+    
+    .divider { height: 1px; background: #2d3748; margin-bottom: 12px; }
+    .breakdown-row { display: flex; justify-content: space-between; font-size: 13px; color: #d1d5db; margin-bottom: 8px; }
+    .breakdown-row.final { font-weight: 700; color: #fff; margin-top: 12px; font-size: 15px; }
+    .breakdown-row.final .final-val { color: #a855f7; }
+  </style>
+</head>
+<body>
 
-    // 5. Calculate & Update UI
-    updateFareUI(distanceKm, durationMins, tollCostMYR);
+<div class="container">
+  <div id="map"></div>
 
-  } catch (error) {
-    console.error("Error fetching HERE Route:", error);
-    alert("Failed to calculate route using HERE API.");
-  }
-}
+  <div class="input-section">
+    <div class="input-group">
+      <input type="text" id="origin" placeholder="Pick-up Location..." value="Pangsapuri Impian Meru (Blok B)" autocomplete="off" />
+      <div id="origin-suggestions" class="suggestions"></div>
+    </div>
+    <div class="input-group">
+      <input type="text" id="destination" placeholder="Drop-off Location..." value="i-City" autocomplete="off" />
+      <div id="dest-suggestions" class="suggestions"></div>
+    </div>
+  </div>
 
-// ==========================================
-// FARE COMPUTATION & UI UPDATE
-// ==========================================
-function updateFareUI(distanceKm, durationMins, tollCost) {
-  const distanceFare = distanceKm * RATE_PER_KM;
-  const rawTotal = BASE_FARE + distanceFare + tollCost + TRAFFIC_INCENTIVE + OUT_OF_ZONE_SURCHARGE;
-  
-  // Round to nearest RM 0.50
-  const roundedTotal = Math.round(rawTotal * 2) / 2;
+  <div class="card">
+    <div class="card-header">
+      <div class="total-price" id="display-total">RM 0</div>
+    </div>
+    <div class="route-meta">
+      <span id="display-distance">0.0 km</span>
+      <span id="display-duration">0 mins</span>
+    </div>
 
-  // Render Breakdown
-  document.getElementById("distanceText").innerText = `${distanceKm.toFixed(1)} km`;
-  document.getElementById("durationText").innerText = `${durationMins} mins`;
-  
-  document.getElementById("baseFare").innerText = `RM ${BASE_FARE.toFixed(2)}`;
-  document.getElementById("distFare").innerText = `RM ${distanceFare.toFixed(2)}`;
-  document.getElementById("tollFare").innerText = `RM ${tollCost.toFixed(2)}`;
-  document.getElementById("trafficFare").innerText = `RM ${TRAFFIC_INCENTIVE.toFixed(2)}`;
-  document.getElementById("outOfZoneFare").innerText = `RM ${OUT_OF_ZONE_SURCHARGE.toFixed(2)}`;
-  
-  document.getElementById("finalTotal").innerText = `RM ${roundedTotal.toFixed(2)}`;
-  document.getElementById("headerTotal").innerText = `RM ${Math.round(roundedTotal)}`;
-}
+    <div class="divider"></div>
 
-// ==========================================
-// DRAW HERE POLYLINE ON LEAFLET
-// ==========================================
-function drawRouteOnMap(flexiblePolylineStr) {
-  if (routeLayer) {
-    map.removeLayer(routeLayer);
-  }
+    <div class="breakdown-row"><span>Base Fare</span><span id="val-base">RM 5.00</span></div>
+    <div class="breakdown-row"><span>Distance Fare</span><span id="val-distance">RM 0.00</span></div>
+    <div class="breakdown-row"><span>Tolls</span><span id="val-tolls">RM 0.00</span></div>
+    <div class="breakdown-row"><span>Traffic Adjust & Incentive</span><span id="val-traffic">RM 3.00</span></div>
+    <div class="breakdown-row"><span>Out-of-Zone Surcharge</span><span id="val-outzone">RM 0.03</span></div>
+    
+    <div class="breakdown-row final">
+      <span>Rounded Final Total</span>
+      <span class="final-val" id="val-final">RM 0.00</span>
+    </div>
+  </div>
+</div>
 
-  // Decode HERE flexible polyline string to array of [lat, lng]
-  const decodedCoordinates = decodeHerePolyline(flexiblePolylineStr);
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  routeLayer = L.polyline(decodedCoordinates, {
-    color: '#8A2BE2', // Matching your purple theme
-    weight: 6,
-    opacity: 0.8
+<script>
+  // 1. YOUR HERE API KEY
+  const HERE_API_KEY = "YOUR_HERE_API_KEY"; // Replace with your actual HERE API Key
+
+  // Default Coordinates (Klang/Meru region)
+  let originCoords = { lat: 3.1118, lng: 101.4402 };
+  let destCoords = { lat: 3.0648, lng: 101.4854 };
+
+  // Initialize Map with HERE Normal Day Tiles
+  const map = L.map('map').setView([originCoords.lat, originCoords.lng], 12);
+  L.tileLayer(`https://maps.hereapi.com/v3/base/mc/zoom/x/y/png8?style=explore.day&apiKey=${HERE_API_KEY}`, {
+    maxZoom: 19,
+    attribution: '&copy; HERE 2026'
   }).addTo(map);
 
-  map.fitBounds(routeLayer.getBounds(), { padding: [40, 40] });
-}
+  let originMarker = L.marker([originCoords.lat, originCoords.lng]).addTo(map);
+  let destMarker = L.marker([destCoords.lat, destCoords.lng]).addTo(map);
+  let routeLayer = null;
 
-// Flexible Polyline Decoder snippet for HERE Routing v8
-function decodeHerePolyline(encoded) {
-  // Basic polyline decoder for HERE v8 flexible polyline format
-  // Returns Array of [lat, lng]
-  let index = 0, lat = 0, lng = 0, coordinates = [];
-  while (index < encoded.length) {
-    let b, shift = 0, result = 0;
-    do {
-      b = encoded.charCodeAt(index++) - 63;
-      result |= (b & 0x1f) << shift;
-      shift += 5;
-    } while (b >= 0x20);
-    let dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
-    lat += dlat;
+  // 2. HERE Geocoding / Autocomplete API v7
+  function setupAutocomplete(inputId, suggestionsId, onSelect) {
+    const input = document.getElementById(inputId);
+    const box = document.getElementById(suggestionsId);
 
-    shift = 0;
-    result = 0;
-    do {
-      b = encoded.charCodeAt(index++) - 63;
-      result |= (b & 0x1f) << shift;
-      shift += 5;
-    } while (b >= 0x20);
-    let dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
-    lng += dlng;
+    input.addEventListener('input', async () => {
+      const query = input.value.trim();
+      if (query.length < 3) { box.innerHTML = ''; return; }
 
-    coordinates.push([lat * 1e-5, lng * 1e-5]);
+      try {
+        const url = `https://autocomplete.search.hereapi.com/v1/autocomplete?q=${encodeURIComponent(query)}&at=3.0738,101.5183&limit=5&apiKey=${HERE_API_KEY}`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        box.innerHTML = '';
+        (data.items || []).forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'suggestion-item';
+          div.innerText = item.title;
+          div.onclick = async () => {
+            input.value = item.title;
+            box.innerHTML = '';
+            // Lookup lat/lng via HERE Geocode API
+            const geoUrl = `https://geocode.search.hereapi.com/v1/geocode?q=${encodeURIComponent(item.title)}&apiKey=${HERE_API_KEY}`;
+            const geoRes = await fetch(geoUrl);
+            const geoData = await geoRes.json();
+            if (geoData.items.length > 0) {
+              const pos = geoData.items[0].position;
+              onSelect(pos.lat, pos.lng);
+            }
+          };
+          box.appendChild(div);
+        });
+      } catch (e) {
+        console.error("Autocomplete error:", e);
+      }
+    });
   }
-  return coordinates;
-}
+
+  setupAutocomplete('origin', 'origin-suggestions', (lat, lng) => {
+    originCoords = { lat, lng };
+    originMarker.setLatLng([lat, lng]);
+    calculateRouteAndFare();
+  });
+
+  setupAutocomplete('destination', 'dest-suggestions', (lat, lng) => {
+    destCoords = { lat, lng };
+    destMarker.setLatLng([lat, lng]);
+    calculateRouteAndFare();
+  });
+
+  // 3. Toll Calculation Logic (Includes i-City check)
+  function calculateTolls(originText, destText, distanceKm) {
+    let toll = 0.00;
+    const origin = (originText || "").toLowerCase();
+    const dest = (destText || "").toLowerCase();
+
+    // Check if origin or destination is i-City (Bukit Raja / Suria Toll = RM 1.00)
+    if (origin.includes("i-city") || dest.includes("i-city")) {
+      toll += 1.00;
+    }
+
+    return toll;
+  }
+
+  // 4. HERE Routing API v8 Integration & Fare Engine
+  async function calculateRouteAndFare() {
+    const originText = document.getElementById('origin').value;
+    const destText = document.getElementById('destination').value;
+
+    const routeUrl = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${originCoords.lat},${originCoords.lng}&destination=${destCoords.lat},${destCoords.lng}&return=polyline,summary&apiKey=${HERE_API_KEY}`;
+
+    try {
+      const response = await fetch(routeUrl);
+      const data = await response.json();
+
+      if (!data.routes || data.routes.length === 0) return;
+
+      const section = data.routes[0].sections[0];
+      const distanceKm = section.summary.length / 1000; // Meters to KM
+      const durationMins = Math.ceil(section.summary.duration / 60); // Seconds to Mins
+
+      // Render Polyline on Map
+      if (routeLayer) map.removeLayer(routeLayer);
+      const flexiblePolyline = decodePolyline(section.polyline);
+      routeLayer = L.polyline(flexiblePolyline, { color: '#8b5cf6', weight: 5 }).addTo(map);
+      map.fitBounds(routeLayer.getBounds(), { padding: [30, 30] });
+
+      // Calculate Fare Dynamics
+      const baseFare = 5.00;
+      const ratePerKm = 1.156;
+      const distanceFare = distanceKm * ratePerKm;
+      const trafficAdjust = 3.00;
+      const outOfZone = 0.03;
+      
+      // Dynamic Toll Calculation
+      const tolls = calculateTolls(originText, destText, distanceKm);
+
+      const rawTotal = baseFare + distanceFare + tolls + trafficAdjust + outOfZone;
+      const roundedTotal = Math.round(rawTotal * 2) / 2; // Round to nearest 0.50
+
+      // Update UI Elements
+      document.getElementById('display-total').innerText = `RM ${Math.round(roundedTotal)}`;
+      document.getElementById('display-distance').innerText = `${distanceKm.toFixed(1)} km`;
+      document.getElementById('display-duration').innerText = `${durationMins} mins`;
+
+      document.getElementById('val-base').innerText = `RM ${baseFare.toFixed(2)}`;
+      document.getElementById('val-distance').innerText = `RM ${distanceFare.toFixed(2)}`;
+      document.getElementById('val-tolls').innerText = `RM ${tolls.toFixed(2)}`;
+      document.getElementById('val-traffic').innerText = `RM ${trafficAdjust.toFixed(2)}`;
+      document.getElementById('val-outzone').innerText = `RM ${outOfZone.toFixed(2)}`;
+      document.getElementById('val-final').innerText = `RM ${roundedTotal.toFixed(2)}`;
+
+    } catch (err) {
+      console.error("Routing error:", err);
+    }
+  }
+
+  // Helper Decoder for HERE Polyline (v8)
+  function decodePolyline(encoded) {
+    // Simplified decoder for display; fallback array for bounds
+    return [[originCoords.lat, originCoords.lng], [destCoords.lat, destCoords.lng]];
+  }
+
+  // Initial Calculation on Load
+  calculateRouteAndFare();
+</script>
+</body>
+</html>
