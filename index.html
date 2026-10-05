@@ -576,7 +576,10 @@
         const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${pickupCoords.lon},${pickupCoords.lat};${dropoffCoords.lon},${dropoffCoords.lat}?overview=full&geometries=geojson`;
         
         fetch(osrmUrl)
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) throw new Error("OSRM server error: " + res.status);
+                return res.json();
+            })
             .then(async (data) => {
                 if (!data.routes || data.routes.length === 0) {
                     showError("No valid drivable route found.");
@@ -687,7 +690,8 @@
         document.getElementById('fare-distance').textContent = `${distance.toFixed(1)} km`;
         document.getElementById('fare-duration').textContent = formatDuration(duration);
 
-        document.getElementById('calc-https://zulkiflyilias-tech.github.io/Fare-calculation-v2/').textContent = `RM ${baseFare.toFixed(2)}`;
+        // Standardized element ID lookup
+        document.getElementById('calc-base-fare').textContent = `RM ${baseFare.toFixed(2)}`;
         document.getElementById('calc-ride-distance-rate').textContent = `RM ${rideDistanceFare.toFixed(2)}`;
         document.getElementById('calc-tolls').textContent = `RM ${dynamicTolls.toFixed(2)}`;
         document.getElementById('calc-incentive').textContent = `RM ${driverIncentive.toFixed(2)}`;
