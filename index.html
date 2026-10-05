@@ -1,3 +1,5 @@
+<!-- Official HERE Flexible Polyline Decoder Library -->
+<script src="https://unpkg.com/@here/flexible-polyline"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
@@ -179,17 +181,17 @@
                         data.items.forEach(item => {
                             if (!item.position) return;
 
-                            const displayName = item.title;
-                            const addressLabel = item.address ? item.address.label : displayName;
+                            const placeTitle = item.title || (item.address ? item.address.label : '');
+                            const detailedAddress = item.address ? item.address.label : placeTitle;
 
                             const div = document.createElement('div');
                             div.className = 'suggestion-item';
-                            div.textContent = addressLabel;
+                            div.textContent = detailedAddress;
                             
                             const selectHandler = (e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                input.value = displayName;
+                                input.value = placeTitle;
                                 hideAllSuggestions();
                                 input.blur(); 
                                 onSelect({ lat: item.position.lat, lon: item.position.lng });
@@ -210,38 +212,6 @@
             suggestionsBox.style.display = 'none';
             onClear();
         });
-    }
-
-    function decodeFlexiblePolyline(encoded) {
-        let index = 0;
-        const len = encoded.length;
-        let lat = 0, lng = 0, z = 0;
-        const coordinates = [];
-
-        function decodeVarint() {
-            let res = 0, shift = 0, byte = 0;
-            do {
-                byte = encoded.charCodeAt(index++) - 63;
-                res |= (byte & 0x1f) << shift;
-                shift += 5;
-            } while (byte >= 0x20);
-            return (res & 1) ? ~(res >> 1) : (res >> 1);
-        }
-
-        const header = decodeVarint();
-        const precision = header & 15;
-        const factor = Math.pow(10, precision);
-        const hasZ = ((header >> 4) & 7) !== 0; 
-
-        while (index < len) {
-            lat += decodeVarint();
-            lng += decodeVarint();
-            if (hasZ) {
-                z += decodeVarint(); 
-            }
-            coordinates.push([lat / factor, lng / factor]);
-        }
-        return coordinates;
     }
 
     function fetchHERERoute() {
@@ -267,9 +237,10 @@
                     totalDistanceMeters += section.summary.length || 0;
                     totalDurationSeconds += section.summary.duration || 0;
 
-                    if (section.polyline) {
-                        const decoded = decodeFlexiblePolyline(section.polyline);
-                        polylineCoords = polylineCoords.concat(decoded);
+                    if (section.polyline && window.flexiblePolyline) {
+                        const decoded = window.flexiblePolyline.decode(section.polyline);
+                        const leafletPolyline = decoded.polyline.map(pt => [pt[0], pt[1]]);
+                        polylineCoords = polylineCoords.concat(leafletPolyline);
                     }
 
                     if (section.tolls) {
