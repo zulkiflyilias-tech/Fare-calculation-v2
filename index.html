@@ -75,7 +75,7 @@
       border: 1px solid #dfe1e6; 
       border-radius: 8px; 
       z-index: 99999; 
-      max-height: 200px; 
+      max-height: 220px; 
       overflow-y: auto; 
       box-shadow: 0 8px 20px rgba(0,0,0,0.18); 
       margin-top: 4px;
@@ -166,14 +166,13 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-  // 1. HERE API KEY
   const HERE_API_KEY = "PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk";
 
-  // Coordinates
+  // Default Coordinates
   let originCoords = { lat: 3.1383, lng: 101.4280 };
   let destCoords = { lat: 3.0735, lng: 101.5385 };
 
-  // Initialize Leaflet Map
+  // Initialize Map
   const map = L.map('map').setView([3.1059, 101.4832], 12);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
@@ -184,9 +183,7 @@
   let destMarker = L.marker([destCoords.lat, destCoords.lng], { draggable: true }).addTo(map);
   let routeLayer = null;
 
-  // -------------------------------------------------------------
-  // Marker Drag Events with HERE Reverse Geocoding
-  // -------------------------------------------------------------
+  // Drag Events
   originMarker.on('dragend', async (e) => {
     const latLng = e.target.getLatLng();
     originCoords = { lat: latLng.lat, lng: latLng.lng };
@@ -203,7 +200,7 @@
 
   async function reverseGeocode(inputId, lat, lng) {
     try {
-      const url = `https://revgeocode.search.hereapi.com/v1/revgeocode?at=${lat},${lng}&apiKey=${HERE_API_KEY}`;
+      const url = `https://revgeocode.search.hereapi.com/v1/revgeocode?at=${lat},${lng}&in=countryCode:MYS&apiKey=${HERE_API_KEY}`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.items && data.items.length > 0) {
@@ -216,9 +213,7 @@
     }
   }
 
-  // -------------------------------------------------------------
-  // Map Re-center Control
-  // -------------------------------------------------------------
+  // Map Controls
   const RecenterControl = L.Control.extend({
     options: { position: 'topright' },
     onAdd: function () {
@@ -247,9 +242,7 @@
     }
   }
 
-  // -------------------------------------------------------------
-  // HERE Autocomplete API Handler
-  // -------------------------------------------------------------
+  // HERE Autocomplete API restricted strictly to Malaysia (in=countryCode:MYS)
   function setupAutocomplete(inputId, suggestionsId, onSelect) {
     const input = document.getElementById(inputId);
     const box = document.getElementById(suggestionsId);
@@ -262,7 +255,8 @@
       }
 
       try {
-        const url = `https://autocomplete.search.hereapi.com/v1/autocomplete?q=${encodeURIComponent(query)}&at=3.0738,101.5183&limit=5&apiKey=${HERE_API_KEY}`;
+        // Enforces country restriction to Malaysia (MYS) and biases towards Selangor/KL coordinates
+        const url = `https://autocomplete.search.hereapi.com/v1/autocomplete?q=${encodeURIComponent(query)}&in=countryCode:MYS&at=3.0738,101.5183&limit=5&apiKey=${HERE_API_KEY}`;
         const res = await fetch(url);
         const data = await res.json();
 
@@ -287,7 +281,7 @@
               if (item.position && item.position.lat && item.position.lng) {
                 onSelect(item.position.lat, item.position.lng);
               } else {
-                fetch(`https://geocode.search.hereapi.com/v1/geocode?q=${encodeURIComponent(item.title)}&apiKey=${HERE_API_KEY}`)
+                fetch(`https://geocode.search.hereapi.com/v1/geocode?q=${encodeURIComponent(item.title)}&in=countryCode:MYS&apiKey=${HERE_API_KEY}`)
                   .then(r => r.json())
                   .then(geoData => {
                     if (geoData.items && geoData.items.length > 0) {
@@ -327,9 +321,7 @@
     calculateRouteAndFare();
   });
 
-  // -------------------------------------------------------------
   // Current Location Action
-  // -------------------------------------------------------------
   document.getElementById('loc-btn').addEventListener('click', () => {
     if (!navigator.geolocation) return alert("Geolocation not supported.");
     
@@ -343,9 +335,7 @@
     }, () => alert("Could not fetch location permissions."));
   });
 
-  // -------------------------------------------------------------
-  // Flexible Polyline Decoder (HERE Routing v8)
-  // -------------------------------------------------------------
+  // Polyline Decoder
   function decodeFlexiblePolyline(encoded) {
     const DECODING_TABLE = [
       62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1,
@@ -385,11 +375,8 @@
     return coordinates;
   }
 
-  // -------------------------------------------------------------
-  // HERE Routing v8 Engine with Toll Calculation
-  // -------------------------------------------------------------
+  // HERE Routing Engine
   async function calculateRouteAndFare() {
-    // Requesting toll summary + polyline from HERE v8 API
     const routeUrl = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${originCoords.lat},${originCoords.lng}&destination=${destCoords.lat},${destCoords.lng}&return=polyline,summary,tolls&apiKey=${HERE_API_KEY}`;
 
     try {
@@ -403,7 +390,6 @@
       const distanceKm = section.summary.length / 1000;
       const durationMins = Math.ceil(section.summary.duration / 60);
 
-      // Extract Toll Fares dynamically from HERE API
       let tolls = 0.00;
       if (section.tolls && section.tolls.length > 0) {
         section.tolls.forEach(toll => {
@@ -417,14 +403,13 @@
         });
       }
 
-      // Draw Polyline
       if (routeLayer) map.removeLayer(routeLayer);
       const lineCoords = decodeFlexiblePolyline(section.polyline);
       routeLayer = L.polyline(lineCoords, { color: '#8b5cf6', weight: 5 }).addTo(map);
       
       fitMapBounds();
 
-      // Calculation Formula
+      // Fare Formula
       const baseFare = 5.00;
       const ratePerKm = 1.156;
       const distanceFare = distanceKm * ratePerKm;
@@ -434,7 +419,6 @@
       const rawTotal = baseFare + distanceFare + tolls + trafficAdjust + outOfZone;
       const roundedTotal = Math.round(rawTotal * 2) / 2;
 
-      // Update Card Elements
       document.getElementById('display-total').innerText = `RM ${Math.round(roundedTotal)}`;
       document.getElementById('display-distance').innerText = `${distanceKm.toFixed(1)} km`;
       document.getElementById('display-duration').innerText = `${durationMins} mins`;
@@ -451,7 +435,7 @@
     }
   }
 
-  // Initial Run
+  // Run on load
   calculateRouteAndFare();
 </script>
 </body>
