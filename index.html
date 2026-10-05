@@ -16,10 +16,27 @@
     #map { height: 260px; width: 100%; background: #e5e7eb; }
     
     .input-section { padding: 16px; display: flex; flex-direction: column; gap: 12px; position: relative; }
-    .input-group { position: relative; }
-    .input-group input { width: 100%; padding: 12px 14px; border: 1px solid #dfe1e6; border-radius: 8px; font-size: 14px; outline: none; transition: border 0.2s; }
+    .input-group { position: relative; display: flex; align-items: center; }
+    .input-group input { width: 100%; padding: 12px 40px 12px 14px; border: 1px solid #dfe1e6; border-radius: 8px; font-size: 14px; outline: none; transition: border 0.2s; }
     .input-group input:focus { border-color: #4c9aff; box-shadow: 0 0 0 2px rgba(76,154,255,0.2); }
     
+    /* Current Location Toggle Button */
+    .location-btn { 
+      position: absolute; 
+      right: 10px; 
+      background: none; 
+      border: none; 
+      cursor: pointer; 
+      padding: 4px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center;
+      color: #0052cc;
+      border-radius: 50%;
+    }
+    .location-btn:hover { background-color: #f0f4ff; }
+    .location-btn svg { width: 20px; height: 20px; fill: currentColor; }
+
     /* Dropdown Autocomplete Styling */
     .suggestions { 
       position: absolute; 
@@ -57,10 +74,18 @@
   <div id="map"></div>
 
   <div class="input-section">
+    <!-- Pick-up Input with Current Location Toggle Button -->
     <div class="input-group">
       <input type="text" id="origin" placeholder="Pick-up Location..." value="Pangsapuri Impian Meru (Blok B), Jalan Meru" autocomplete="off" />
+      <button type="button" class="location-btn" id="loc-btn" title="Use Current Location">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
+        </svg>
+      </button>
       <div id="origin-suggestions" class="suggestions"></div>
     </div>
+
+    <!-- Destination Input with Autocomplete -->
     <div class="input-group">
       <input type="text" id="destination" placeholder="Drop-off Location..." value="i-City, Shah Alam" autocomplete="off" />
       <div id="dest-suggestions" class="suggestions"></div>
@@ -98,7 +123,7 @@
   // 1. HERE API KEY
   const HERE_API_KEY = "YOUR_HERE_API_KEY"; // Replace with your valid HERE API Key
 
-  // Fixed Default Coordinates (Impian Meru & i-City)
+  // Default Coordinates (Klang/Meru region)
   let originCoords = { lat: 3.1118, lng: 101.4402 };
   let destCoords = { lat: 3.0648, lng: 101.4854 };
 
@@ -113,7 +138,7 @@
   let destMarker = L.marker([destCoords.lat, destCoords.lng]).addTo(map);
   let routeLayer = null;
 
-  // 2. HERE Autocomplete Dropdown Logic (Shows minimum 3 suggestions)
+  // 2. HERE Autocomplete Dropdown Logic (Destination & Pickup)
   function setupAutocomplete(inputId, suggestionsId, onSelect) {
     const input = document.getElementById(inputId);
     const box = document.getElementById(suggestionsId);
@@ -184,20 +209,41 @@
     calculateRouteAndFare();
   });
 
-  // 3. Toll Logic (Includes RM 1.00 i-City toll)
-  function calculateTolls(originText, destText) {
-    let toll = 0.00;
-    const origin = (originText || "").toLowerCase();
-    const dest = (destText || "").toLowerCase();
-
-    if (origin.includes("i-city") || dest.includes("i-city")) {
-      toll += 1.00; // Bukit Raja / Suria Plaza Toll
+  // 3. Current Location Button Handler (Geolocate + Reverse Geocode via HERE)
+  document.getElementById('loc-btn').addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      return;
     }
 
-    return toll;
-  }
+    navigator.geolocation.getCurrentPosition(async (position) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
 
-  // 4. HERE Flexible Polyline Decoder (Required for HERE v8 Routing)
+      originCoords = { lat, lng };
+      originMarker.setLatLng([lat, lng]);
+
+      // Reverse Geocode using HERE API
+      try {
+        const revGeoUrl = `https://revgeocode.search.hereapi.com/v1/revgeocode?at=${lat},${lng}&apiKey=${HERE_API_KEY}`;
+        const res = await fetch(revGeoUrl);
+        const data = await res.json();
+        if (data.items && data.items.length > 0) {
+          document.getElementById('origin').value = data.items[0].title;
+        } else {
+          document.getElementById('origin').value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        }
+      } catch (err) {
+        document.getElementById('origin').value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      }
+
+      calculateRouteAndFare();
+    }, (error) => {
+      alert("Unable to retrieve your location. Please check browser permissions.");
+    });
+  });
+
+  // 4. HERE Flexible Polyline Decoder
   function decodeFlexiblePolyline(encoded) {
     const DECODING_TABLE = [
       62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1,
@@ -237,11 +283,8 @@
     return coordinates;
   }
 
-  // 5. HERE Routing Engine & Calculation
+  // 5. HERE Routing Engine & Fare Calculation
   async function calculateRouteAndFare() {
-    const originText = document.getElementById('origin').value;
-    const destText = document.getElementById('destination').value;
-
     const routeUrl = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${originCoords.lat},${originCoords.lng}&destination=${destCoords.lat},${destCoords.lng}&return=polyline,summary&apiKey=${HERE_API_KEY}`;
 
     try {
@@ -266,7 +309,7 @@
       const distanceFare = distanceKm * ratePerKm;
       const trafficAdjust = 3.00;
       const outOfZone = 0.03;
-      const tolls = calculateTolls(originText, destText);
+      const tolls = 0.00; // Removed test toll logic
 
       const rawTotal = baseFare + distanceFare + tolls + trafficAdjust + outOfZone;
       const roundedTotal = Math.round(rawTotal * 2) / 2; // Round to nearest 0.50
