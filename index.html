@@ -13,7 +13,7 @@
     body { background-color: #f4f5f7; padding: 15px; color: #172b4d; }
     .container { max-width: 480px; margin: 0 auto; background: #fff; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; }
     
-    #map { height: 260px; width: 100%; background: #e5e7eb; }
+    #map { height: 260px; width: 100%; background: #e5e7eb; position: relative; }
     
     .input-section { padding: 16px; display: flex; flex-direction: column; gap: 12px; position: relative; }
     .input-group { position: relative; display: flex; align-items: center; }
@@ -46,16 +46,33 @@
       background: #ffffff; 
       border: 1px solid #dfe1e6; 
       border-radius: 8px; 
-      z-index: 9999; 
+      z-index: 99999; 
       max-height: 220px; 
       overflow-y: auto; 
       box-shadow: 0 6px 16px rgba(0,0,0,0.15); 
       margin-top: 4px;
       display: none;
+      pointer-events: auto;
     }
     .suggestion-item { padding: 12px 14px; font-size: 13px; cursor: pointer; border-bottom: 1px solid #f4f5f7; color: #333; }
     .suggestion-item:last-child { border-bottom: none; }
     .suggestion-item:hover { background: #f0f4ff; color: #0052cc; }
+
+    /* Custom Map Control Button */
+    .leaflet-control-recenter {
+      background-color: #ffffff;
+      border: 2px solid rgba(0,0,0,0.2);
+      border-radius: 4px;
+      width: 34px;
+      height: 34px;
+      cursor: pointer;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .leaflet-control-recenter:hover { background-color: #f4f4f4; }
+    .leaflet-control-recenter svg { width: 18px; height: 18px; fill: #333; }
 
     .card { background: #121316; color: #fff; margin: 16px; padding: 20px; border-radius: 16px; }
     .card-header { display: flex; justify-content: space-between; align-items: baseline; }
@@ -123,7 +140,7 @@
   // 1. HERE API KEY
   const HERE_API_KEY = "YOUR_HERE_API_KEY"; // Replace with your valid HERE API Key
 
-  // Default Coordinates (Klang/Meru region)
+  // Default Coordinates
   let originCoords = { lat: 3.1118, lng: 101.4402 };
   let destCoords = { lat: 3.0648, lng: 101.4854 };
 
@@ -134,11 +151,80 @@
     attribution: '&copy; OpenStreetMap'
   }).addTo(map);
 
-  let originMarker = L.marker([originCoords.lat, originCoords.lng]).addTo(map);
-  let destMarker = L.marker([destCoords.lat, destCoords.lng]).addTo(map);
+  // Markers set to Draggable
+  let originMarker = L.marker([originCoords.lat, originCoords.lng], { draggable: true }).addTo(map);
+  let destMarker = L.marker([destCoords.lat, destCoords.lng], { draggable: true }).addTo(map);
   let routeLayer = null;
 
-  // 2. HERE Autocomplete Dropdown Logic (Destination & Pickup)
+  // -------------------------------------------------------------
+  // Marker Drag Events
+  // -------------------------------------------------------------
+  originMarker.on('dragend', async (e) => {
+    const latLng = e.target.getLatLng();
+    originCoords = { lat: latLng.lat, lng: latLng.lng };
+    await updateAddressFromCoords('origin', latLng.lat, latLng.lng);
+    calculateRouteAndFare();
+  });
+
+  destMarker.on('dragend', async (e) => {
+    const latLng = e.target.getLatLng();
+    destCoords = { lat: latLng.lat, lng: latLng.lng };
+    await updateAddressFromCoords('destination', latLng.lat, latLng.lng);
+    calculateRouteAndFare();
+  });
+
+  async function updateAddressFromCoords(inputId, lat, lng) {
+    try {
+      const revGeoUrl = `https://revgeocode.search.hereapi.com/v1/revgeocode?at=${lat},${lng}&apiKey=${HERE_API_KEY}`;
+      const res = await fetch(revGeoUrl);
+      const data = await res.json();
+      if (data.items && data.items.length > 0) {
+        document.getElementById(inputId).value = data.items[0].title;
+      } else {
+        document.getElementById(inputId).value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      }
+    } catch (err) {
+      document.getElementById(inputId).value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
+  }
+
+  // -------------------------------------------------------------
+  // Custom Map Re-center Button Control
+  // -------------------------------------------------------------
+  const RecenterControl = L.Control.extend({
+    options: { position: 'topright' },
+    onAdd: function (map) {
+      const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-recenter');
+      container.title = "Re-center Map to Route";
+      container.innerHTML = `
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v4h-2zm0 6h2v6h-2z"/>
+        </svg>
+      `;
+      L.DomEvent.disableClickPropagation(container);
+      container.onclick = function () {
+        fitMapBounds();
+      };
+      return container;
+    }
+  });
+  map.addControl(new RecenterControl());
+
+  function fitMapBounds() {
+    if (routeLayer) {
+      map.fitBounds(routeLayer.getBounds(), { padding: [40, 40], animate: true });
+    } else {
+      const bounds = L.latLngBounds([
+        [originCoords.lat, originCoords.lng],
+        [destCoords.lat, destCoords.lng]
+      ]);
+      map.fitBounds(bounds, { padding: [50, 50], animate: true });
+    }
+  }
+
+  // -------------------------------------------------------------
+  // HERE Autocomplete Handler
+  // -------------------------------------------------------------
   function setupAutocomplete(inputId, suggestionsId, onSelect) {
     const input = document.getElementById(inputId);
     const box = document.getElementById(suggestionsId);
@@ -164,19 +250,29 @@
           items.forEach(item => {
             const div = document.createElement('div');
             div.className = 'suggestion-item';
-            div.innerText = item.title;
-            div.onclick = async () => {
+            
+            const titleText = item.title;
+            const addressText = item.address ? item.address.label : '';
+            div.innerHTML = `<strong>${titleText}</strong><br><small style="color: #6b7280;">${addressText}</small>`;
+
+            div.onclick = (e) => {
+              e.stopPropagation();
               input.value = item.title;
               box.style.display = 'none';
               box.innerHTML = '';
               
-              // Resolve lat/lng using HERE Geocode API
-              const geoUrl = `https://geocode.search.hereapi.com/v1/geocode?q=${encodeURIComponent(item.title)}&apiKey=${HERE_API_KEY}`;
-              const geoRes = await fetch(geoUrl);
-              const geoData = await geoRes.json();
-              if (geoData.items && geoData.items.length > 0) {
-                const pos = geoData.items[0].position;
-                onSelect(pos.lat, pos.lng);
+              if (item.position && item.position.lat && item.position.lng) {
+                onSelect(item.position.lat, item.position.lng);
+              } else {
+                fetch(`https://geocode.search.hereapi.com/v1/geocode?q=${encodeURIComponent(item.title)}&apiKey=${HERE_API_KEY}`)
+                  .then(r => r.json())
+                  .then(geoData => {
+                    if (geoData.items && geoData.items.length > 0) {
+                      const pos = geoData.items[0].position;
+                      onSelect(pos.lat, pos.lng);
+                    }
+                  })
+                  .catch(err => console.error("Geocoding fallback failed:", err));
               }
             };
             box.appendChild(div);
@@ -185,11 +281,10 @@
           box.style.display = 'none';
         }
       } catch (e) {
-        console.error("Autocomplete Error:", e);
+        console.error("Autocomplete fetch failed:", e);
       }
     });
 
-    // Close box when clicking outside
     document.addEventListener('click', (e) => {
       if (!input.contains(e.target) && !box.contains(e.target)) {
         box.style.display = 'none';
@@ -209,8 +304,11 @@
     calculateRouteAndFare();
   });
 
-  // 3. Current Location Button Handler (Geolocate + Reverse Geocode via HERE)
-  document.getElementById('loc-btn').addEventListener('click', () => {
+  // -------------------------------------------------------------
+  // Current Location Button
+  // -------------------------------------------------------------
+  document.getElementById('loc-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
     if (!navigator.geolocation) {
       alert("Geolocation is not supported by your browser.");
       return;
@@ -222,28 +320,16 @@
 
       originCoords = { lat, lng };
       originMarker.setLatLng([lat, lng]);
-
-      // Reverse Geocode using HERE API
-      try {
-        const revGeoUrl = `https://revgeocode.search.hereapi.com/v1/revgeocode?at=${lat},${lng}&apiKey=${HERE_API_KEY}`;
-        const res = await fetch(revGeoUrl);
-        const data = await res.json();
-        if (data.items && data.items.length > 0) {
-          document.getElementById('origin').value = data.items[0].title;
-        } else {
-          document.getElementById('origin').value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-        }
-      } catch (err) {
-        document.getElementById('origin').value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-      }
-
+      await updateAddressFromCoords('origin', lat, lng);
       calculateRouteAndFare();
-    }, (error) => {
-      alert("Unable to retrieve your location. Please check browser permissions.");
+    }, () => {
+      alert("Unable to retrieve location. Please check browser permissions.");
     });
   });
 
-  // 4. HERE Flexible Polyline Decoder
+  // -------------------------------------------------------------
+  // Flexible Polyline Decoder
+  // -------------------------------------------------------------
   function decodeFlexiblePolyline(encoded) {
     const DECODING_TABLE = [
       62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1,
@@ -283,7 +369,9 @@
     return coordinates;
   }
 
-  // 5. HERE Routing Engine & Fare Calculation
+  // -------------------------------------------------------------
+  // Route & Fare Calculation Engine
+  // -------------------------------------------------------------
   async function calculateRouteAndFare() {
     const routeUrl = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${originCoords.lat},${originCoords.lng}&destination=${destCoords.lat},${destCoords.lng}&return=polyline,summary&apiKey=${HERE_API_KEY}`;
 
@@ -297,11 +385,11 @@
       const distanceKm = section.summary.length / 1000;
       const durationMins = Math.ceil(section.summary.duration / 60);
 
-      // Render Polyline
       if (routeLayer) map.removeLayer(routeLayer);
       const lineCoords = decodeFlexiblePolyline(section.polyline);
       routeLayer = L.polyline(lineCoords, { color: '#8b5cf6', weight: 5 }).addTo(map);
-      map.fitBounds(routeLayer.getBounds(), { padding: [30, 30] });
+      
+      fitMapBounds();
 
       // Calculation Formula
       const baseFare = 5.00;
@@ -309,12 +397,12 @@
       const distanceFare = distanceKm * ratePerKm;
       const trafficAdjust = 3.00;
       const outOfZone = 0.03;
-      const tolls = 0.00; // Removed test toll logic
+      const tolls = 0.00;
 
       const rawTotal = baseFare + distanceFare + tolls + trafficAdjust + outOfZone;
-      const roundedTotal = Math.round(rawTotal * 2) / 2; // Round to nearest 0.50
+      const roundedTotal = Math.round(rawTotal * 2) / 2;
 
-      // Update UI Display
+      // DOM Updates
       document.getElementById('display-total').innerText = `RM ${Math.round(roundedTotal)}`;
       document.getElementById('display-distance').innerText = `${distanceKm.toFixed(1)} km`;
       document.getElementById('display-duration').innerText = `${durationMins} mins`;
@@ -331,7 +419,7 @@
     }
   }
 
-  // Initial Run on Load
+  // Initial Execution
   calculateRouteAndFare();
 </script>
 </body>
