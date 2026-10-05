@@ -75,7 +75,7 @@
       border: 1px solid #dfe1e6; 
       border-radius: 8px; 
       z-index: 99999; 
-      max-height: 220px; 
+      max-height: 200px; 
       overflow-y: auto; 
       box-shadow: 0 8px 20px rgba(0,0,0,0.18); 
       margin-top: 4px;
@@ -166,9 +166,10 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
+  // HERE API Key
   const HERE_API_KEY = "PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk";
 
-  // Default Coordinates
+  // Coordinates
   let originCoords = { lat: 3.1383, lng: 101.4280 };
   let destCoords = { lat: 3.0735, lng: 101.5385 };
 
@@ -183,7 +184,9 @@
   let destMarker = L.marker([destCoords.lat, destCoords.lng], { draggable: true }).addTo(map);
   let routeLayer = null;
 
-  // Drag Events
+  // -------------------------------------------------------------
+  // Marker Drag Events with HERE Reverse Geocoding
+  // -------------------------------------------------------------
   originMarker.on('dragend', async (e) => {
     const latLng = e.target.getLatLng();
     originCoords = { lat: latLng.lat, lng: latLng.lng };
@@ -200,7 +203,7 @@
 
   async function reverseGeocode(inputId, lat, lng) {
     try {
-      const url = `https://revgeocode.search.hereapi.com/v1/revgeocode?at=${lat},${lng}&in=countryCode:MYS&apiKey=${HERE_API_KEY}`;
+      const url = `https://revgeocode.search.hereapi.com/v1/revgeocode?at=${lat},${lng}&apiKey=${HERE_API_KEY}`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.items && data.items.length > 0) {
@@ -213,7 +216,9 @@
     }
   }
 
-  // Map Controls
+  // -------------------------------------------------------------
+  // Map Re-center Control
+  // -------------------------------------------------------------
   const RecenterControl = L.Control.extend({
     options: { position: 'topright' },
     onAdd: function () {
@@ -242,7 +247,9 @@
     }
   }
 
-  // HERE Autocomplete API restricted strictly to Malaysia (in=countryCode:MYS)
+  // -------------------------------------------------------------
+  // HERE Autocomplete API Handler (Malaysia Only: in=countryCode:MYS)
+  // -------------------------------------------------------------
   function setupAutocomplete(inputId, suggestionsId, onSelect) {
     const input = document.getElementById(inputId);
     const box = document.getElementById(suggestionsId);
@@ -255,8 +262,8 @@
       }
 
       try {
-        // Enforces country restriction to Malaysia (MYS) and biases towards Selangor/KL coordinates
-        const url = `https://autocomplete.search.hereapi.com/v1/autocomplete?q=${encodeURIComponent(query)}&in=countryCode:MYS&at=3.0738,101.5183&limit=5&apiKey=${HERE_API_KEY}`;
+        // Strict Malaysia filtering using in=countryCode:MYS
+        const url = `https://autocomplete.search.hereapi.com/v1/autocomplete?q=${encodeURIComponent(query)}&in=countryCode:MYS&at=3.1390,101.6869&limit=5&apiKey=${HERE_API_KEY}`;
         const res = await fetch(url);
         const data = await res.json();
 
@@ -321,7 +328,9 @@
     calculateRouteAndFare();
   });
 
+  // -------------------------------------------------------------
   // Current Location Action
+  // -------------------------------------------------------------
   document.getElementById('loc-btn').addEventListener('click', () => {
     if (!navigator.geolocation) return alert("Geolocation not supported.");
     
@@ -335,7 +344,9 @@
     }, () => alert("Could not fetch location permissions."));
   });
 
-  // Polyline Decoder
+  // -------------------------------------------------------------
+  // Flexible Polyline Decoder (HERE Routing v8)
+  // -------------------------------------------------------------
   function decodeFlexiblePolyline(encoded) {
     const DECODING_TABLE = [
       62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1,
@@ -375,7 +386,9 @@
     return coordinates;
   }
 
-  // HERE Routing Engine
+  // -------------------------------------------------------------
+  // HERE Routing v8 Engine with Toll Calculation
+  // -------------------------------------------------------------
   async function calculateRouteAndFare() {
     const routeUrl = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${originCoords.lat},${originCoords.lng}&destination=${destCoords.lat},${destCoords.lng}&return=polyline,summary,tolls&apiKey=${HERE_API_KEY}`;
 
@@ -390,6 +403,7 @@
       const distanceKm = section.summary.length / 1000;
       const durationMins = Math.ceil(section.summary.duration / 60);
 
+      // Extract Toll Fares dynamically from HERE API
       let tolls = 0.00;
       if (section.tolls && section.tolls.length > 0) {
         section.tolls.forEach(toll => {
@@ -403,6 +417,7 @@
         });
       }
 
+      // Draw Polyline
       if (routeLayer) map.removeLayer(routeLayer);
       const lineCoords = decodeFlexiblePolyline(section.polyline);
       routeLayer = L.polyline(lineCoords, { color: '#8b5cf6', weight: 5 }).addTo(map);
@@ -419,6 +434,7 @@
       const rawTotal = baseFare + distanceFare + tolls + trafficAdjust + outOfZone;
       const roundedTotal = Math.round(rawTotal * 2) / 2;
 
+      // Update UI
       document.getElementById('display-total').innerText = `RM ${Math.round(roundedTotal)}`;
       document.getElementById('display-distance').innerText = `${distanceKm.toFixed(1)} km`;
       document.getElementById('display-duration').innerText = `${durationMins} mins`;
@@ -435,7 +451,7 @@
     }
   }
 
-  // Run on load
+  // Initial Run
   calculateRouteAndFare();
 </script>
 </body>
