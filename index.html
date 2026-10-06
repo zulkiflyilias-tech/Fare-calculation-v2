@@ -323,6 +323,15 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
+    /* 
+     * CONFIGURATION: API KEYS AND PROXY ROUTING
+     * For production security, set USE_BACKEND_PROXY to true and point PROXY_ENDPOINT 
+     * to your backend endpoint (e.g., Cloudflare Worker or Node.js backend).
+     */
+    const USE_BACKEND_PROXY = false; 
+    const PROXY_ENDPOINT = "/api/here-proxy"; 
+    
+    // Fallback client keys (restricted in developer dashboard)
     const HERE_API_KEY = "PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk"; 
     const CARTO_API_KEY = "cb1_4b7o_1_924353e3834c5cbe57eef1e3";
 
@@ -395,7 +404,10 @@
                 updateMarker('pickup', pickupCoords);
                 map.setView([lat, lon], 14);
                 
-                const reverseGeocodeUrl = `https://revgeocode.search.hereapi.com/v1/revgeocode?at=${lat},${lon}&lang=en-US&apiKey=${HERE_API_KEY}`;
+                const reverseGeocodeUrl = USE_BACKEND_PROXY 
+                    ? `${PROXY_ENDPOINT}?action=revgeocode&lat=${lat}&lon=${lon}`
+                    : `https://revgeocode.search.hereapi.com/v1/revgeocode?at=${lat},${lon}&lang=en-US&apiKey=${HERE_API_KEY}`;
+                
                 fetch(reverseGeocodeUrl)
                     .then(res => res.json())
                     .then(data => {
@@ -434,6 +446,10 @@
     }
 
     function executeLocationSwap() {
+        // Hide suggest dropdowns upon execution
+        document.getElementById('pickup-suggestions').style.display = 'none';
+        document.getElementById('dropoff-suggestions').style.display = 'none';
+
         const pickupInput = document.getElementById('pickup');
         const dropoffInput = document.getElementById('dropoff');
         const tempText = pickupInput.value;
@@ -488,7 +504,10 @@
             }
 
             debounceTimeout = setTimeout(() => {
-                const url = `https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=3.1390,101.6869&in=countryCode:MYS&limit=5&apiKey=${HERE_API_KEY}`;
+                const url = USE_BACKEND_PROXY 
+                    ? `${PROXY_ENDPOINT}?action=autosuggest&q=${encodeURIComponent(query)}`
+                    : `https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=3.1390,101.6869&in=countryCode:MYS&limit=5&apiKey=${HERE_API_KEY}`;
+                
                 fetch(url)
                     .then(res => res.json())
                     .then(data => {
@@ -497,10 +516,13 @@
                             suggestionsBox.style.display = 'none';
                             return;
                         }
-                        suggestionsBox.style.display = 'block';
+                        
+                        let validItemCount = 0;
                         data.items.forEach(item => {
-                            if (!item.position && !item.access) return;
-                            const pos = item.position || (item.access && item.access[0]);
+                            // Filter out non-location items without coordinates
+                            if (!item.position && (!item.access || !item.access.length)) return;
+                            
+                            const pos = item.position || item.access[0];
                             const addressLabel = item.title || (item.address && item.address.label);
                             
                             const div = document.createElement('div');
@@ -513,7 +535,10 @@
                                 onSelect({ lat: pos.lat, lon: pos.lng });
                             });
                             suggestionsBox.appendChild(div);
+                            validItemCount++;
                         });
+
+                        suggestionsBox.style.display = validItemCount > 0 ? 'block' : 'none';
                     }).catch(err => console.error("Autocomplete Error:", err));
             }, 300);
         });
@@ -569,7 +594,7 @@
         const thirdDim = (header.value >> 4) & 7;
 
         if (thirdDim !== 0) {
-            idx = decodeUnsignedVarint(encoded, idx).index; // Skip third dimension precision header
+            idx = decodeUnsignedVarint(encoded, idx).index;
         }
 
         let lat = 0, lng = 0, thirdDimVal = 0;
@@ -602,8 +627,13 @@
         if(currentRouteTimeout) clearTimeout(currentRouteTimeout);
         
         currentRouteTimeout = setTimeout(() => {
-            const primaryUrl = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&return=summary,polyline,tolls&toll[vehicles]=car&currency=MYR&apiKey=${HERE_API_KEY}`;
-            const fallbackUrl = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&return=summary,polyline&apiKey=${HERE_API_KEY}`;
+            const primaryUrl = USE_BACKEND_PROXY
+                ? `${PROXY_ENDPOINT}?action=route&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&tolls=true`
+                : `https://router.hereapi.com/v8/routes?transportMode=car&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&return=summary,polyline,tolls&toll[vehicles]=car&currency=MYR&apiKey=${HERE_API_KEY}`;
+
+            const fallbackUrl = USE_BACKEND_PROXY
+                ? `${PROXY_ENDPOINT}?action=route&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&tolls=false`
+                : `https://router.hereapi.com/v8/routes?transportMode=car&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&return=summary,polyline&apiKey=${HERE_API_KEY}`;
 
             fetch(primaryUrl)
                 .then(res => {
@@ -647,10 +677,14 @@
                         color: '#8e24aa', weight: 5, opacity: 0.85 
                     }).addTo(map);
                     
-                    // Force Leaflet to recalculate map layout before fitting bounds
                     map.invalidateSize();
                     if (routeCoordinates.length > 0) {
-                        map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
+                        // Responsive fitBounds padding to handle mobile sheet panel overlay
+                        const isMobile = window.innerWidth < 768;
+                        map.fitBounds(routeLine.getBounds(), { 
+                            paddingTopLeft: [20, 20],
+                            paddingBottomRight: isMobile ? [20, 220] : [20, 20]
+                        });
                     }
 
                     processCalculations(distanceKm, durationMins, totalTollCost);
@@ -669,8 +703,12 @@
         return mins > 0 ? `${hours} hr ${mins} mins` : `${hours} hr`;
     }
 
+    /**
+     * Malaysian Standard Bank/Cash Rounding Mechanism (Pembundaran 5 Sen)
+     * Rounds value to the nearest RM 0.05 (5 cents)
+     */
     function roundToMalaysianCents(value) {
-        return Math.round(value * 10) / 10;
+        return Math.round(value * 20) / 20;
     }
 
     function processCalculations(distance, duration, tollCost) {
