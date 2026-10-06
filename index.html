@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rideshare MY - Professional Fare Estimator</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- HERE Maps JS API Core & UI CSS -->
+    <link rel="stylesheet" type="text/css" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css" />
     <style>
         body {
             margin: 0;
@@ -242,6 +243,12 @@
             }
         }
     </style>
+
+    <!-- HERE Maps JS API Core Modules -->
+    <script type="text/javascript" src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
+    <script type="text/javascript" src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
+    <script type="text/javascript" src="https://js.api.here.com/v3/3.1/mapsjs-ui.js"></script>
+    <script type="text/javascript" src="https://js.api.here.com/v3/3.1/mapsjs-mapevents.js"></script>
 </head>
 <body>
 
@@ -315,18 +322,36 @@
     </div>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script>
-    const map = L.map('map').setView([3.1390, 101.6869], 11);
+    const HERE_API_KEY = "PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk"; 
+
+    // Initialize HERE Platform & Engine
+    const platform = new H.service.Platform({
+        'apikey': HERE_API_KEY
+    });
     
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+    const defaultLayers = platform.createDefaultLayers();
 
-    const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImVlYzI5ZTA0OTM2YTRlZDNhNjk1NTcyNGQ1OTJmYmNjIiwiaCI6Im11cm11cjY0In0="; 
+    // Instantiate Map centered on Kuala Lumpur
+    const map = new H.Map(
+        document.getElementById('map'),
+        defaultLayers.vector.normal.map,
+        {
+            zoom: 11,
+            center: { lat: 3.1390, lng: 101.6869 }
+        }
+    );
 
-    let pickupMarker = null, dropoffMarker = null, routeLine = null;
+    // Responsive Map resize listener
+    window.addEventListener('resize', () => map.getViewPort().resize());
+
+    // Map Interactivity (Pan / Zoom controls)
+    const behavior = new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
+    const ui = H.ui.UI.createDefault(map, defaultLayers);
+
+    const router = platform.getRoutingService(null, 8);
+
+    let pickupMarker = null, dropoffMarker = null, routePolyline = null;
     let pickupCoords = null, dropoffCoords = null;
     let currentRouteTimeout = null;
 
@@ -336,7 +361,7 @@
         checkAndProcessRoute();
     }, () => {
         pickupCoords = null;
-        if (pickupMarker) { map.removeLayer(pickupMarker); pickupMarker = null; }
+        if (pickupMarker) { map.removeObject(pickupMarker); pickupMarker = null; }
         resetCalculationDisplay();
     });
 
@@ -346,7 +371,7 @@
         checkAndProcessRoute();
     }, () => {
         dropoffCoords = null;
-        if (dropoffMarker) { map.removeLayer(dropoffMarker); dropoffMarker = null; }
+        if (dropoffMarker) { map.removeObject(dropoffMarker); dropoffMarker = null; }
         resetCalculationDisplay();
     });
 
@@ -362,27 +387,29 @@
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 const lat = position.coords.latitude;
-                const lon = position.coords.longitude;
-                pickupCoords = { lat, lon };
+                const lng = position.coords.longitude;
+                pickupCoords = { lat, lng };
                 updateMarker('pickup', pickupCoords);
-                map.setView([lat, lon], 14);
+                map.setCenter({ lat, lng });
+                map.setZoom(14);
                 
-                const reverseGeocodeUrl = `https://photon.komoot.io/reverse?lon=${lon}&lat=${lat}`;
-                fetch(reverseGeocodeUrl)
+                // HERE Reverse Geocoding API
+                const revGeocodeUrl = `https://revgeocode.search.hereapi.com/v1/revgeocode?at=${lat},${lng}&lang=en-US&apiKey=${HERE_API_KEY}`;
+                fetch(revGeocodeUrl)
                     .then(res => res.json())
                     .then(data => {
                         btn.textContent = "🎯";
-                        if (data.features && data.features.length > 0) {
-                            document.getElementById('pickup').value = expandAddress(data.features[0].properties);
+                        if (data.items && data.items.length > 0) {
+                            document.getElementById('pickup').value = data.items[0].address.label;
                         } else {
-                            document.getElementById('pickup').value = `Current Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+                            document.getElementById('pickup').value = `Current Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
                         }
                         document.getElementById('clear-pickup').style.display = 'block';
                         checkAndProcessRoute();
                     })
                     .catch(() => {
                         btn.textContent = "🎯";
-                        document.getElementById('pickup').value = `Current Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+                        document.getElementById('pickup').value = `Current Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
                         document.getElementById('clear-pickup').style.display = 'block';
                         checkAndProcessRoute();
                     });
@@ -397,11 +424,13 @@
 
     function updateMarker(type, coords) {
         if (type === 'pickup') {
-            if (pickupMarker) map.removeLayer(pickupMarker);
-            pickupMarker = L.marker([coords.lat, coords.lon]).addTo(map);
+            if (pickupMarker) map.removeObject(pickupMarker);
+            pickupMarker = new H.map.Marker({ lat: coords.lat, lng: coords.lng });
+            map.addObject(pickupMarker);
         } else {
-            if (dropoffMarker) map.removeLayer(dropoffMarker);
-            dropoffMarker = L.marker([coords.lat, coords.lon]).addTo(map);
+            if (dropoffMarker) map.removeObject(dropoffMarker);
+            dropoffMarker = new H.map.Marker({ lat: coords.lat, lng: coords.lng });
+            map.addObject(dropoffMarker);
         }
     }
 
@@ -420,26 +449,16 @@
         document.getElementById('clear-dropoff').style.display = dropoffInput.value ? 'block' : 'none';
         
         if (pickupCoords) updateMarker('pickup', pickupCoords);
-        else if (pickupMarker) { map.removeLayer(pickupMarker); pickupMarker = null; }
+        else if (pickupMarker) { map.removeObject(pickupMarker); pickupMarker = null; }
         if (dropoffCoords) updateMarker('dropoff', dropoffCoords);
-        else if (dropoffMarker) { map.removeLayer(dropoffMarker); dropoffMarker = null; }
+        else if (dropoffMarker) { map.removeObject(dropoffMarker); dropoffMarker = null; }
         
         if (pickupCoords && dropoffCoords) checkAndProcessRoute();
         else resetCalculationDisplay();
     }
 
-    function expandAddress(props) {
-        const parts = [];
-        if (props.name) parts.push(props.name);
-        if (props.street) parts.push(props.street);
-        if (props.district) parts.push(props.district);
-        if (props.city || props.town) parts.push(props.city || props.town);
-        if (props.state) parts.push(props.state);
-        return parts.length > 0 ? parts.join(', ') : 'Target Location Coordinates';
-    }
-
     function resetCalculationDisplay() {
-        if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+        if (routePolyline) { map.removeObject(routePolyline); routePolyline = null; }
         document.getElementById('result-card').style.display = 'none';
         document.getElementById('error-msg').style.display = 'none';
     }
@@ -469,28 +488,30 @@
             }
 
             debounceTimeout = setTimeout(() => {
-                const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&bbox=99.6,0.8,119.5,7.4&limit=5`;
+                // HERE Autosuggest API (bound to Malaysia area - lat 4.2105, lng 101.9758)
+                const url = `https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=4.2105,101.9758&in=countryCode:MYS&limit=5&apiKey=${HERE_API_KEY}`;
+                
                 fetch(url)
                     .then(res => res.json())
                     .then(data => {
                         suggestionsBox.innerHTML = '';
-                        if(!data.features || data.features.length === 0) {
+                        if(!data.items || data.items.length === 0) {
                             suggestionsBox.style.display = 'none';
                             return;
                         }
                         suggestionsBox.style.display = 'block';
-                        data.features.forEach(feature => {
-                            const props = feature.properties;
-                            const detailedAddress = expandAddress(props);
+                        data.items.forEach(item => {
+                            if (!item.position) return; // Skip items missing coordinate positions
+                            
                             const div = document.createElement('div');
                             div.className = 'suggestion-item';
-                            div.textContent = detailedAddress;
+                            div.textContent = item.title + (item.address && item.address.label ? ` (${item.address.label})` : '');
+                            
                             div.addEventListener('click', () => {
-                                input.value = props.name || detailedAddress;
+                                input.value = item.title;
                                 suggestionsBox.innerHTML = '';
                                 suggestionsBox.style.display = 'none';
-                                const [lon, lat] = feature.geometry.coordinates;
-                                onSelect({ lat, lon });
+                                onSelect({ lat: item.position.lat, lng: item.position.lng });
                             });
                             suggestionsBox.appendChild(div);
                         });
@@ -514,70 +535,75 @@
         if(currentRouteTimeout) clearTimeout(currentRouteTimeout);
         
         currentRouteTimeout = setTimeout(() => {
-            const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${ORS_API_KEY}&start=${pickupCoords.lon},${pickupCoords.lat}&end=${dropoffCoords.lon},${dropoffCoords.lat}`;
+            const routingParameters = {
+                'routingMode': 'fast',
+                'transportMode': 'car',
+                'origin': `${pickupCoords.lat},${pickupCoords.lng}`,
+                'destination': `${dropoffCoords.lat},${dropoffCoords.lng}`,
+                'return': 'polyline,summary'
+            };
 
-            fetch(url)
-                .then(res => {
-                    if (!res.ok) throw new Error('API route payload evaluation drop.');
-                    return res.json();
-                })
-                .then(data => {
-                    if (!data.features || data.features.length === 0) {
-                        showError("No valid drivable geometry found matching those vectors.");
-                        return;
+            router.calculateRoute(routingParameters, (result) => {
+                if (result.routes.length === 0) {
+                    showError("No valid drivable geometry found matching those vectors.");
+                    return;
+                }
+
+                const route = result.routes[0];
+                const section = route.sections[0];
+                
+                const distanceKm = section.summary.length / 1000;
+                const baseDurationMins = section.summary.duration / 60;
+
+                const now = new Date();
+                const currentHour = now.getHours();
+                const isWeekend = (now.getDay() === 0 || now.getDay() === 6);
+
+                let trafficDelayFactor = 1.15; 
+                if (!isWeekend) {
+                    if ((currentHour >= 7 && currentHour <= 9) || (currentHour >= 17 && currentHour <= 19.5)) {
+                        trafficDelayFactor = 1.55; 
+                    } else if (currentHour >= 12 && currentHour <= 14) {
+                        trafficDelayFactor = 1.25; 
                     }
-
-                    const feature = data.features[0];
-                    const summary = feature.properties.summary;
-                    
-                    const distanceKm = summary.distance / 1000;
-                    const baseDurationMins = summary.duration / 60;
-
-                    const now = new Date();
-                    const currentHour = now.getHours();
-                    const isWeekend = (now.getDay() === 0 || now.getDay() === 6);
-
-                    let trafficDelayFactor = 1.15; 
-                    if (!isWeekend) {
-                        if ((currentHour >= 7 && currentHour <= 9) || (currentHour >= 17 && currentHour <= 19.5)) {
-                            trafficDelayFactor = 1.55; 
-                        } else if (currentHour >= 12 && currentHour <= 14) {
-                            trafficDelayFactor = 1.25; 
-                        }
-                    } else {
-                        if (currentHour >= 16 && currentHour <= 21) {
-                            trafficDelayFactor = 1.35; 
-                        }
+                } else {
+                    if (currentHour >= 16 && currentHour <= 21) {
+                        trafficDelayFactor = 1.35; 
                     }
+                }
 
-                    let distanceImpactModifier = 1.0;
-                    if (distanceKm <= 5) {
-                        distanceImpactModifier = 0.65;
-                    } else if (distanceKm <= 15) {
-                        distanceImpactModifier = 0.85;
-                    } else if (distanceKm > 100) {
-                        distanceImpactModifier = 0.35; 
-                    } else if (distanceKm > 50) {
-                        distanceImpactModifier = 0.60;
-                    }
+                let distanceImpactModifier = 1.0;
+                if (distanceKm <= 5) {
+                    distanceImpactModifier = 0.65;
+                } else if (distanceKm <= 15) {
+                    distanceImpactModifier = 0.85;
+                } else if (distanceKm > 100) {
+                    distanceImpactModifier = 0.35; 
+                } else if (distanceKm > 50) {
+                    distanceImpactModifier = 0.60;
+                }
 
-                    const localizedTrafficWeight = 1 + ((trafficDelayFactor - 1) * distanceImpactModifier);
-                    const correctedDurationMins = Math.max(1, Math.round(baseDurationMins * localizedTrafficWeight));
+                const localizedTrafficWeight = 1 + ((trafficDelayFactor - 1) * distanceImpactModifier);
+                const correctedDurationMins = Math.max(1, Math.round(baseDurationMins * localizedTrafficWeight));
 
-                    if (routeLine) map.removeLayer(routeLine);
-                    
-                    routeLine = L.geoJSON(feature.geometry, { 
-                        style: { color: '#8e24aa', weight: 5, opacity: 0.85 } 
-                    }).addTo(map);
-                    
-                    map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+                // Clear previous polyline
+                if (routePolyline) map.removeObject(routePolyline);
+                
+                // Parse Flexible Polyline from HERE API response
+                const linestring = H.geo.LineString.fromFlexiblePolyline(section.polyline);
 
-                    processCalculations(distanceKm, correctedDurationMins);
-                })
-                .catch(err => {
-                    console.error("ORS Infrastructure Error:", err);
-                    showError("API connectivity fault or quota restriction triggered.");
+                routePolyline = new H.map.Polyline(linestring, {
+                    style: { strokeColor: '#8e24aa', lineWidth: 5 }
                 });
+
+                map.addObject(routePolyline);
+                map.getViewModel().setLookAtData({ bounds: routePolyline.getBoundingBox() });
+
+                processCalculations(distanceKm, correctedDurationMins);
+            }, (error) => {
+                console.error("HERE Routing Service Error:", error);
+                showError("API connectivity fault or quota restriction triggered.");
+            });
         }, 250);
     }
 
