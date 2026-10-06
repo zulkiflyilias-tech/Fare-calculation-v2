@@ -325,7 +325,6 @@
 <script>
     const HERE_API_KEY = "PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk"; 
 
-    // Initialise Leaflet map using HERE Tile Server for clear rendering
     const map = L.map('map').setView([3.1390, 101.6869], 11);
     
     L.tileLayer(`https://maps.hereapi.com/v3/base/mc/{z}/{x}/{y}/png8?style=explore.day&apiKey=${HERE_API_KEY}`, {
@@ -469,7 +468,6 @@
             }
 
             debounceTimeout = setTimeout(() => {
-                // HERE Autosuggest API v8
                 const url = `https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=3.1390,101.6869&in=countryCode:MYS&limit=5&apiKey=${HERE_API_KEY}`;
                 fetch(url)
                     .then(res => res.json())
@@ -515,7 +513,6 @@
         });
     }
 
-    // Decoder for HERE Flexible Polyline string format
     function decodeFlexiblePolyline(encoded) {
         const DECODING_TABLE = [
             62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1,
@@ -576,12 +573,19 @@
         if(currentRouteTimeout) clearTimeout(currentRouteTimeout);
         
         currentRouteTimeout = setTimeout(() => {
-            // HERE Routing API v8 with real-time traffic and exact Toll parsing
-            const url = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&return=summary,polyline,tolls&departureTime=now&apiKey=${HERE_API_KEY}`;
+            // First attempt with full toll summary requesting
+            const primaryUrl = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&return=summary,polyline,tolls&toll[vehicles]=car&currency=MYR&apiKey=${HERE_API_KEY}`;
+            // Secondary fallback URL without toll objects if standard API tier restricts toll calculation queries
+            const fallbackUrl = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&return=summary,polyline&apiKey=${HERE_API_KEY}`;
 
-            fetch(url)
+            fetch(primaryUrl)
                 .then(res => {
-                    if (!res.ok) throw new Error('Failed to retrieve HERE route data.');
+                    if (!res.ok) {
+                        return fetch(fallbackUrl).then(fRes => {
+                            if (!fRes.ok) throw new Error('Routing request failed.');
+                            return fRes.json();
+                        });
+                    }
                     return res.json();
                 })
                 .then(data => {
@@ -597,13 +601,12 @@
                     const distanceKm = summary.length / 1000;
                     const durationMins = Math.round(summary.duration / 60);
 
-                    // Parse Toll Costs directly from HERE API response
                     let totalTollCost = 0;
                     if (section.tolls && section.tolls.length > 0) {
                         section.tolls.forEach(toll => {
                             if (toll.fares && toll.fares.length > 0) {
                                 toll.fares.forEach(fare => {
-                                    totalTollCost += (fare.price.value || 0);
+                                    totalTollCost += (fare.price ? fare.price.value : 0);
                                 });
                             }
                         });
@@ -624,7 +627,7 @@
                 })
                 .catch(err => {
                     console.error("HERE Routing Error:", err);
-                    showError("Routing API error or network connectivity issue.");
+                    showError("Unable to calculate route. Please try selecting locations again.");
                 });
         }, 250);
     }
