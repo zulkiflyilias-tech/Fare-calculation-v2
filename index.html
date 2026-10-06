@@ -1,10 +1,18 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Personal Navigation & Fare Calculator</title>
+  <title>FareNav - Google Maps Fare Estimator & Invoice Generator</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
   
+  <!-- FontAwesome & Google Fonts -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
   <!-- HERE Maps API Scripts & Styles -->
   <link rel="stylesheet" type="text/css" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css" />
   <script src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
@@ -13,243 +21,562 @@
   <script src="https://js.api.here.com/v3/3.1/mapsjs-mapevents.js"></script>
 
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    html, body { height: 100%; width: 100%; overflow: hidden; }
-    #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+    body { font-family: 'Inter', sans-serif; }
+    
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f1f1; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-    /* Floating Navigation Panel */
-    .nav-panel {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      z-index: 10;
-      width: 380px;
-      background: #ffffff;
-      border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
+    /* Print styles for Invoice */
+    @media print {
+      body * { visibility: hidden; }
+      #invoice-modal, #invoice-modal * { visibility: visible; }
+      #invoice-modal { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: white; padding: 0; }
+      .no-print { display: none !important; }
     }
-
-    .search-group { position: relative; display: flex; align-items: center; }
-    .search-icon { position: absolute; left: 12px; width: 12px; height: 12px; border-radius: 50%; z-index: 2; }
-    .pickup-icon { background: #1a73e8; }
-    .dropoff-icon { background: #ea4335; border-radius: 2px; }
-
-    .search-input {
-      width: 100%;
-      padding: 12px 36px 12px 34px;
-      border: 1px solid #e0e0e0;
-      border-radius: 8px;
-      font-size: 14px;
-      outline: none;
-      transition: border 0.2s;
-    }
-    .search-input:focus { border-color: #1a73e8; }
-
-    /* Reset Button inside Searchbar */
-    .reset-btn {
-      position: absolute;
-      right: 10px;
-      background: none;
-      border: none;
-      font-size: 16px;
-      color: #70757a;
-      cursor: pointer;
-      display: none;
-      padding: 4px;
-      line-height: 1;
-    }
-    .reset-btn:hover { color: #202124; }
-
-    /* Autocomplete Suggestions */
-    .suggestions-list {
-      position: absolute;
-      top: 100%;
-      left: 0;
-      right: 0;
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      margin-top: 4px;
-      max-height: 200px;
-      overflow-y: auto;
-      z-index: 20;
-      list-style: none;
-    }
-    .suggestions-list li {
-      padding: 10px 14px;
-      font-size: 13px;
-      cursor: pointer;
-      border-bottom: 1px solid #f0f0f0;
-    }
-    .suggestions-list li:hover { background: #f5f5f5; }
-
-    /* Fare Breakdown Card */
-    .fare-card {
-      background: #f8f9fa;
-      border-radius: 8px;
-      padding: 12px;
-      font-size: 13px;
-      color: #3c4043;
-      display: none;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .fare-row { display: flex; justify-content: space-between; }
-    .fare-total { font-weight: bold; font-size: 16px; color: #1a73e8; border-top: 1px solid #dadce0; padding-top: 6px; margin-top: 4px; }
   </style>
 </head>
-<body>
+<body class="bg-slate-100 h-screen overflow-hidden flex flex-col md:flex-row text-slate-800">
 
-  <div class="nav-panel">
-    <!-- Pickup Searchbar -->
-    <div class="search-group">
-      <span class="search-icon pickup-icon"></span>
-      <input type="text" id="pickup-input" class="search-input" placeholder="Choose starting point..." autocomplete="off">
-      <button class="reset-btn" id="reset-pickup" title="Clear pickup">✕</button>
-      <ul class="suggestions-list" id="pickup-suggestions"></ul>
+  <!-- Floating Sidebar Container -->
+  <aside class="relative z-20 w-full md:w-[450px] lg:w-[480px] bg-white h-full shadow-2xl flex flex-col justify-between overflow-hidden border-r border-slate-200">
+    
+    <!-- Top Header -->
+    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-900 text-white">
+      <div class="flex items-center gap-3">
+        <div class="bg-blue-600 p-2 rounded-lg text-white">
+          <i class="fa-solid font-bold fa-route text-lg"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-base tracking-wide flex items-center gap-2">
+            FareNav Malaysia
+            <span class="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-400/30 px-2 py-0.5 rounded-full uppercase">Klang Valley</span>
+          </h1>
+          <p class="text-xs text-slate-400">HERE Maps Navigation & Fare Estimator</p>
+        </div>
+      </div>
+      <div id="live-clock" class="text-xs font-mono text-slate-300 bg-slate-800 px-2.5 py-1 rounded border border-slate-700">--:--:--</div>
     </div>
 
-    <!-- Dropoff Searchbar -->
-    <div class="search-group">
-      <span class="search-icon dropoff-icon"></span>
-      <input type="text" id="dropoff-input" class="search-input" placeholder="Choose destination..." autocomplete="off">
-      <button class="reset-btn" id="reset-dropoff" title="Clear dropoff">✕</button>
-      <ul class="suggestions-list" id="dropoff-suggestions"></ul>
+    <!-- Scrollable Panel Body -->
+    <div class="flex-1 overflow-y-auto p-4 space-y-4">
+
+      <!-- Searchbar Group (Google Maps Style) -->
+      <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 shadow-inner relative space-y-3">
+        
+        <!-- Connecting visual line -->
+        <div class="absolute left-7 top-9 bottom-9 w-0.5 bg-dashed border-l-2 border-slate-300 z-0 pointer-events-none"></div>
+
+        <!-- Pickup Field -->
+        <div class="relative z-10 flex items-center bg-white rounded-lg border border-slate-200 shadow-sm focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition">
+          <div class="w-10 flex items-center justify-center text-blue-600">
+            <i class="fa-solid fa-circle-dot text-sm"></i>
+          </div>
+          <input type="text" id="pickup-input" class="w-full py-2.5 pr-8 text-sm outline-none bg-transparent" placeholder="Choose starting location..." autocomplete="off">
+          <button id="reset-pickup" class="hidden absolute right-2.5 text-slate-400 hover:text-slate-600 p-1" title="Clear pickup">
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+          <ul id="pickup-suggestions" class="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto z-30 hidden"></ul>
+        </div>
+
+        <!-- Dropoff Field -->
+        <div class="relative z-10 flex items-center bg-white rounded-lg border border-slate-200 shadow-sm focus-within:border-red-500 focus-within:ring-2 focus-within:ring-red-100 transition">
+          <div class="w-10 flex items-center justify-center text-red-500">
+            <i class="fa-solid fa-location-dot text-sm"></i>
+          </div>
+          <input type="text" id="dropoff-input" class="w-full py-2.5 pr-8 text-sm outline-none bg-transparent" placeholder="Choose destination..." autocomplete="off">
+          <button id="reset-dropoff" class="hidden absolute right-2.5 text-slate-400 hover:text-slate-600 p-1" title="Clear dropoff">
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+          <ul id="dropoff-suggestions" class="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto z-30 hidden"></ul>
+        </div>
+
+        <!-- Preset Quick Targets (Klang Valley Area) -->
+        <div class="pt-1 flex flex-wrap gap-1.5 text-xs text-slate-500 items-center">
+          <span class="font-medium text-[11px] text-slate-400">Presets:</span>
+          <button onclick="setPreset('dropoff', 'Port Klang, Selangor', 3.0000, 101.4000)" class="bg-white border border-slate-200 px-2 py-0.5 rounded hover:bg-blue-50 hover:text-blue-600 transition">Port Klang</button>
+          <button onclick="setPreset('dropoff', 'KL Sentral, Kuala Lumpur', 3.1337, 101.6861)" class="bg-white border border-slate-200 px-2 py-0.5 rounded hover:bg-blue-50 hover:text-blue-600 transition">KL Sentral</button>
+          <button onclick="setPreset('dropoff', 'KLIA Terminal 1, Sepang', 2.7549, 101.7047)" class="bg-white border border-slate-200 px-2 py-0.5 rounded hover:bg-blue-50 hover:text-blue-600 transition">KLIA</button>
+        </div>
+      </div>
+
+      <!-- Current Time Peak Mode Indicator -->
+      <div id="traffic-banner" class="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between text-xs text-blue-900">
+        <div class="flex items-center gap-2.5">
+          <span class="relative flex h-2.5 w-2.5">
+            <span id="traffic-ping" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+            <span id="traffic-dot" class="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-600"></span>
+          </span>
+          <div>
+            <div class="font-semibold" id="traffic-mode-name">Standard Off-Peak (1.15x)</div>
+            <div class="text-[11px] text-slate-500" id="traffic-mode-desc">Normal traffic conditions applied.</div>
+          </div>
+        </div>
+        <span class="font-mono text-xs font-bold text-blue-700 bg-white border border-blue-200 px-2 py-1 rounded shadow-sm" id="traffic-factor-tag">1.15x</span>
+      </div>
+
+      <!-- Live Estimate Summary Card -->
+      <div id="summary-card" class="hidden bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden transition-all">
+        <div class="bg-slate-900 text-white p-3.5 flex justify-between items-center">
+          <div>
+            <div class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Estimated Fare</div>
+            <div class="text-2xl font-bold text-emerald-400">RM <span id="summary-total">0.00</span></div>
+          </div>
+          <div class="text-right text-xs text-slate-300">
+            <div id="summary-distance"><i class="fa-solid fa-road text-slate-400 mr-1"></i>0.0 km</div>
+            <div id="summary-duration"><i class="fa-regular fa-clock text-slate-400 mr-1"></i>0 mins</div>
+          </div>
+        </div>
+
+        <!-- Quick Details Breakdown -->
+        <div class="p-3.5 space-y-2 text-xs divide-y divide-slate-100">
+          <div class="flex justify-between py-1">
+            <span class="text-slate-600">Base Fare (First 1 km included)</span>
+            <span class="font-medium text-slate-800">RM <span id="summary-base">5.00</span></span>
+          </div>
+          <div class="flex justify-between py-1 pt-2">
+            <span class="text-slate-600">Distance Fare (<span id="summary-chargeable-km">0</span> km @ RM1.25/km)</span>
+            <span class="font-medium text-slate-800">RM <span id="summary-dist-fare">0.00</span></span>
+          </div>
+          <div class="flex justify-between py-1 pt-2">
+            <span class="text-slate-600">Traffic Incentive (<span id="summary-adj-dur">0</span> mins @ RM0.20)</span>
+            <span class="font-medium text-slate-800">RM <span id="summary-incentive">0.00</span></span>
+          </div>
+          <div class="flex justify-between py-1 pt-2">
+            <span class="text-slate-600">Out-of-Zone Deadhead (>12km)</span>
+            <span class="font-medium text-slate-800">RM <span id="summary-surcharge">0.00</span></span>
+          </div>
+          <div class="flex justify-between py-1 pt-2">
+            <span class="text-slate-600">Estimated Highway Tolls</span>
+            <span class="font-medium text-amber-600">RM <span id="summary-tolls">0.00</span></span>
+          </div>
+        </div>
+
+        <!-- Action Bar -->
+        <div class="p-3 bg-slate-50 border-t border-slate-200 flex gap-2">
+          <button onclick="openInvoiceModal()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-3 rounded-lg flex items-center justify-center gap-2 text-xs transition shadow-sm">
+            <i class="fa-solid fa-receipt"></i> Full Itemized Invoice
+          </button>
+          <button onclick="copyFareSummary()" class="bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-medium py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 text-xs transition" title="Copy to Clipboard">
+            <i class="fa-solid fa-copy"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div id="empty-state" class="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center text-slate-400 space-y-2">
+        <i class="fa-solid fa-map-location-dot text-3xl text-slate-300"></i>
+        <p class="text-xs">Enter both pickup and dropoff points to compute live navigation route and fare breakdown.</p>
+      </div>
+
+      <!-- Formula Reference Accordion -->
+      <details class="bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 overflow-hidden">
+        <summary class="p-3 font-semibold text-slate-700 cursor-pointer flex justify-between items-center bg-slate-100/70 hover:bg-slate-100">
+          <span><i class="fa-solid fa-calculator text-blue-600 mr-1.5"></i> Fare Calculation Rules & Rates</span>
+          <i class="fa-solid fa-chevron-down text-[10px]"></i>
+        </summary>
+        <div class="p-3 space-y-2 border-t border-slate-200 bg-white">
+          <div class="grid grid-cols-2 gap-2 text-[11px]">
+            <div class="p-2 bg-slate-50 rounded border border-slate-100">
+              <span class="font-bold text-slate-700 block">Base Starting Charge</span>
+              RM 5.00 (Includes 1st km)
+            </div>
+            <div class="p-2 bg-slate-50 rounded border border-slate-100">
+              <span class="font-bold text-slate-700 block">Distance Rate</span>
+              RM 1.25 / km (> 1 km)
+            </div>
+            <div class="p-2 bg-slate-50 rounded border border-slate-100">
+              <span class="font-bold text-slate-700 block">Traffic Incentive</span>
+              RM 0.20 / min (RM 12/hr)
+            </div>
+            <div class="p-2 bg-slate-50 rounded border border-slate-100">
+              <span class="font-bold text-slate-700 block">Out-of-Zone Scale</span>
+              Up to 45% (> 12 km)
+            </div>
+          </div>
+          <div class="text-[10px] text-slate-400 italic pt-1">
+            * Durations are modified in real-time by peak-hour multipliers (1.15x – 1.55x). Long distance (>50km) attenuates peak delays.
+          </div>
+        </div>
+      </details>
+
     </div>
 
-    <!-- Fare & Route Breakdown -->
-    <div class="fare-card" id="fare-card">
-      <div class="fare-row"><span>Base Fare:</span><span>RM <span id="val-base">5.00</span></span></div>
-      <div class="fare-row"><span>Distance Fare (<span id="val-chargeable-km">0</span> km):</span><span>RM <span id="val-dist-fare">0.00</span></span></div>
-      <div class="fare-row"><span>Traffic Incentive (<span id="val-duration">0</span> min):</span><span>RM <span id="val-traffic-incentive">0.00</span></span></div>
-      <div class="fare-row"><span>Out-of-Zone Surcharge:</span><span>RM <span id="val-surcharge">0.00</span></span></div>
-      <div class="fare-row"><span>Estimated Toll Charges:</span><span>RM <span id="val-tolls">0.00</span></span></div>
-      <div class="fare-row fare-total"><span>Total Fare:</span><span>RM <span id="val-total">0.00</span></span></div>
+    <!-- Sidebar Footer -->
+    <div class="p-3 bg-slate-50 border-t border-slate-200 text-center text-[11px] text-slate-400">
+      Navigation & Fare System &bull; Klang Valley Engine
+    </div>
+  </aside>
+
+  <!-- Main Interactive Map Canvas -->
+  <main class="flex-1 h-full relative">
+    <div id="map" class="w-full h-full bg-slate-200"></div>
+
+    <!-- Floating Toast Notification -->
+    <div id="toast" class="hidden fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs px-4 py-2.5 rounded-lg shadow-xl flex items-center gap-2 border border-slate-700 transition-all transform">
+      <i class="fa-solid fa-check-circle text-emerald-400"></i>
+      <span id="toast-msg">Copied to clipboard!</span>
+    </div>
+  </main>
+
+  <!-- Printable Itemized Invoice / Fare Receipt Modal -->
+  <div id="invoice-modal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    
+    <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full border border-slate-200 overflow-hidden my-8">
+      
+      <!-- Modal Header Action Bar (No Print) -->
+      <div class="no-print bg-slate-100 px-6 py-3 border-b border-slate-200 flex justify-between items-center">
+        <span class="text-xs font-semibold text-slate-600 uppercase tracking-wider">Official Fare Receipt</span>
+        <div class="flex items-center gap-2">
+          <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-1.5 px-3 rounded-md transition flex items-center gap-1.5">
+            <i class="fa-solid fa-print"></i> Print / Save PDF
+          </button>
+          <button onclick="closeInvoiceModal()" class="text-slate-400 hover:text-slate-600 p-1 text-lg">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Printable Invoice Area -->
+      <div class="p-6 md:p-8 space-y-6 text-slate-800 bg-white" id="printable-receipt">
+        
+        <!-- Receipt Top Brand Header -->
+        <div class="flex justify-between items-start border-b border-slate-200 pb-6">
+          <div>
+            <div class="flex items-center gap-2 text-blue-600 font-bold text-xl">
+              <i class="fa-solid fa-taxi"></i> FareNav Transport
+            </div>
+            <p class="text-xs text-slate-500 mt-0.5">Klang Valley Fare Calculation Engine</p>
+            <p class="text-xs text-slate-400">License ID: MY-KV-889421</p>
+          </div>
+          <div class="text-right">
+            <span class="inline-block bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider mb-1">Calculated / Verified</span>
+            <div class="text-xs text-slate-500 font-mono" id="inv-num">INV-20261006-000</div>
+            <div class="text-xs text-slate-400" id="inv-date">Date: --</div>
+          </div>
+        </div>
+
+        <!-- Route Details Card -->
+        <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 text-xs space-y-2.5">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <span class="text-slate-400 text-[10px] uppercase font-bold block">Pickup Origin</span>
+              <span class="font-medium text-slate-800 block truncate" id="inv-pickup">--</span>
+            </div>
+            <div>
+              <span class="text-slate-400 text-[10px] uppercase font-bold block">Dropoff Destination</span>
+              <span class="font-medium text-slate-800 block truncate" id="inv-dropoff">--</span>
+            </div>
+          </div>
+          <div class="border-t border-slate-200 pt-2 grid grid-cols-3 gap-2 text-center">
+            <div>
+              <span class="text-slate-400 text-[10px] block">Distance</span>
+              <span class="font-bold text-slate-700" id="inv-dist">0 km</span>
+            </div>
+            <div>
+              <span class="text-slate-400 text-[10px] block">Est. Duration</span>
+              <span class="font-bold text-slate-700" id="inv-time">0 mins</span>
+            </div>
+            <div>
+              <span class="text-slate-400 text-[10px] block">Peak Factor</span>
+              <span class="font-bold text-blue-600" id="inv-peak">1.15x</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Line Item Breakdown Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead>
+              <tr class="border-b border-slate-200 text-slate-400 uppercase text-[10px] font-semibold">
+                <th class="py-2">Item Description</th>
+                <th class="py-2 text-center">Rate / Metric</th>
+                <th class="py-2 text-right">Amount (RM)</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-slate-700">
+              <tr>
+                <td class="py-2.5 font-medium">Base Fare (Includes 1st km)</td>
+                <td class="py-2.5 text-center text-slate-500">First 1.0 km</td>
+                <td class="py-2.5 text-right font-medium">5.00</td>
+              </tr>
+              <tr>
+                <td class="py-2.5">
+                  <span class="font-medium">Distance Charge</span>
+                  <span class="block text-[10px] text-slate-400">Total km minus 1 km base distance</span>
+                </td>
+                <td class="py-2.5 text-center text-slate-500"><span id="inv-line-chargeable-km">0.0</span> km @ RM1.25</td>
+                <td class="py-2.5 text-right font-medium" id="inv-line-dist-val">0.00</td>
+              </tr>
+              <tr>
+                <td class="py-2.5">
+                  <span class="font-medium">Traffic Duration Allowance</span>
+                  <span class="block text-[10px] text-slate-400">Base driving duration adjusted for traffic</span>
+                </td>
+                <td class="py-2.5 text-center text-slate-500"><span id="inv-line-time-min">0</span> mins @ RM0.20</td>
+                <td class="py-2.5 text-right font-medium" id="inv-line-time-val">0.00</td>
+              </tr>
+              <tr>
+                <td class="py-2.5">
+                  <span class="font-medium">Out-of-Zone Deadhead Surcharge</span>
+                  <span class="block text-[10px] text-slate-400">Scaled surcharge for trips > 12 km</span>
+                </td>
+                <td class="py-2.5 text-center text-slate-500"><span id="inv-line-surcharge-pct">0%</span> scale</td>
+                <td class="py-2.5 text-right font-medium" id="inv-line-surcharge-val">0.00</td>
+              </tr>
+              <tr>
+                <td class="py-2.5 font-medium text-amber-700">Highway Toll Charges</td>
+                <td class="py-2.5 text-center text-slate-500">HERE Toll API</td>
+                <td class="py-2.5 text-right font-medium text-amber-700" id="inv-line-tolls-val">0.00</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Invoice Totals Footer -->
+        <div class="border-t-2 border-slate-900 pt-4 space-y-2">
+          <div class="flex justify-between text-xs text-slate-600">
+            <span>Subtotal (Fares & Surcharges)</span>
+            <span class="font-medium">RM <span id="inv-subtotal">0.00</span></span>
+          </div>
+          <div class="flex justify-between text-xs text-slate-600">
+            <span>Highway Tolls</span>
+            <span class="font-medium">RM <span id="inv-tolls">0.00</span></span>
+          </div>
+          <div class="flex justify-between text-base font-bold text-slate-900 border-t border-slate-200 pt-2">
+            <span>Grand Total Due</span>
+            <span class="text-blue-600">RM <span id="inv-grand-total">0.00</span></span>
+          </div>
+        </div>
+
+        <!-- Receipt Footnote -->
+        <div class="text-[10px] text-slate-400 text-center border-t border-slate-100 pt-4">
+          Thank you for traveling with FareNav. This estimation is calculated based on standardized Malaysian Grab/E-Hailing fare algorithms and live HERE Maps API traffic telemetry.
+        </div>
+
+      </div>
+
     </div>
   </div>
 
-  <div id="map"></div>
-
   <script>
-    // Configuration & Key
+    // Config & Credentials
     const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
+    const KLANG_CENTER = { lat: 3.0449, lng: 101.4456 }; // Centered near Klang / Selangor
 
-    // State Variables
+    // App State
+    let map, platform, behavior, ui;
     let pickupCoords = null;
     let dropoffCoords = null;
     let pickupMarker = null;
     let dropoffMarker = null;
     let routePolyline = null;
+    let currentCalculationData = null;
 
-    // Initialize HERE Map Platform
-    const platform = new H.service.Platform({ apikey: HERE_API_KEY });
-    const defaultLayers = platform.createDefaultLayers();
-    const map = new H.Map(
-      document.getElementById('map'),
-      defaultLayers.vector.normal.map,
-      { zoom: 12, center: { lat: 3.1390, lng: 101.6869 } } // Default: Kuala Lumpur
-    );
+    window.onload = function() {
+      initClock();
+      initHEREMap();
+      setupSearchInputs();
+      updateTrafficBanner();
+    };
 
-    new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
-    H.ui.UI.createDefault(map, defaultLayers);
-
-    // Setup Search Inputs & Reset Logic
-    setupSearch('pickup', coords => { pickupCoords = coords; setMarker('pickup', coords); checkAndCalculateRoute(); });
-    setupSearch('dropoff', coords => { dropoffCoords = coords; setMarker('dropoff', coords); checkAndCalculateRoute(); });
-
-    function setupSearch(type, onSelect) {
-      const input = document.getElementById(`${type}-input`);
-      const resetBtn = document.getElementById(`reset-${type}`);
-      const suggestions = document.getElementById(`${type}-suggestions`);
-
-      input.addEventListener('input', async (e) => {
-        const query = e.target.value.trim();
-        resetBtn.style.display = query ? 'block' : 'none';
-
-        if (query.length < 3) { suggestions.innerHTML = ''; return; }
-
-        // HERE Autosuggest API Call
-        const url = `https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=3.1390,101.6869&apiKey=${HERE_API_KEY}`;
-        try {
-          const res = await fetch(url);
-          const data = await res.json();
-          renderSuggestions(data.items || [], suggestions, input, onSelect);
-        } catch (err) { console.error('Autosuggest Error:', err); }
-      });
-
-      resetBtn.addEventListener('click', () => {
-        input.value = '';
-        resetBtn.style.display = 'none';
-        suggestions.innerHTML = '';
-        if (type === 'pickup') {
-          pickupCoords = null;
-          if (pickupMarker) map.removeObject(pickupMarker);
-        } else {
-          dropoffCoords = null;
-          if (dropoffMarker) map.removeObject(dropoffMarker);
-        }
-        if (routePolyline) map.removeObject(routePolyline);
-        document.getElementById('fare-card').style.display = 'none';
-      });
+    function initClock() {
+      const clockElem = document.getElementById('live-clock');
+      setInterval(() => {
+        const now = new Date();
+        clockElem.textContent = now.toLocaleTimeString('en-GB');
+      }, 1000);
     }
 
-    function renderSuggestions(items, listElem, inputElem, onSelect) {
-      listElem.innerHTML = '';
-      items.filter(item => item.position).slice(0, 5).forEach(item => {
-        const li = document.createElement('li');
-        li.textContent = item.title;
-        li.addEventListener('click', () => {
-          inputElem.value = item.title;
-          listElem.innerHTML = '';
-          onSelect(item.position);
-        });
-        listElem.appendChild(li);
-      });
+    function initHEREMap() {
+      platform = new H.service.Platform({ apikey: HERE_API_KEY });
+      const defaultLayers = platform.createDefaultLayers();
+
+      map = new H.Map(
+        document.getElementById('map'),
+        defaultLayers.vector.normal.map,
+        { zoom: 12, center: KLANG_CENTER }
+      );
+
+      behavior = new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
+      ui = H.ui.UI.createDefault(map, defaultLayers);
+
+      window.addEventListener('resize', () => map.getViewPort().resize());
     }
 
-    function setMarker(type, coords) {
-      if (type === 'pickup') {
-        if (pickupMarker) map.removeObject(pickupMarker);
-        pickupMarker = new H.map.Marker(coords);
-        map.addObject(pickupMarker);
-      } else {
-        if (dropoffMarker) map.removeObject(dropoffMarker);
-        dropoffMarker = new H.map.Marker(coords);
-        map.addObject(dropoffMarker);
-      }
-      map.setCenter(coords);
-    }
-
-    // Traffic Multiplier Engine
     function getTrafficMultiplier(distanceKm) {
       const now = new Date();
       const day = now.getDay(); // 0 = Sun, 6 = Sat
       const hour = now.getHours() + now.getMinutes() / 60;
       const isWeekend = (day === 0 || day === 6);
 
-      let factor = 1.15; // Standard Off-Peak
+      let factor = 1.15; // Off-Peak Default
+      let modeName = "Standard Off-Peak (1.15x)";
+      let modeDesc = "Standard fluid traffic conditions.";
 
       if (!isWeekend) {
-        if ((hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19.5)) factor = 1.55; // Weekday Peak
-        else if (hour >= 12 && hour <= 14) factor = 1.25; // Midday
+        if ((hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19.5)) {
+          factor = 1.55;
+          modeName = "Weekday Peak Rush (1.55x)";
+          modeDesc = "Heavy commuter traffic congestion expected.";
+        } else if (hour >= 12 && hour <= 14) {
+          factor = 1.25;
+          modeName = "Weekday Midday Peak (1.25x)";
+          modeDesc = "Moderate lunch-hour traffic flow.";
+        }
       } else {
-        if (hour >= 16 && hour <= 21) factor = 1.35; // Weekend Peak
+        if (hour >= 16 && hour <= 21) {
+          factor = 1.35;
+          modeName = "Weekend Evening Peak (1.35x)";
+          modeDesc = "Shopping and leisure travel congestion.";
+        }
       }
 
-      // Distance Weighting: Scale down peak factor impact for longer journeys (> 50 km)
+      // Long Distance Attenuation: Scale down peak delay impact for trips > 50km
       if (distanceKm > 50) {
-        factor = 1 + (factor - 1) * Math.max(0.6, 1 - (distanceKm - 50) / 100);
+        const originalFactor = factor;
+        const attenuation = Math.max(0.6, 1 - (distanceKm - 50) / 100);
+        factor = 1 + (factor - 1) * attenuation;
+        modeDesc += ` (Highway scale attenuation applied: ${(attenuation * 100).toFixed(0)}%)`;
       }
 
-      return factor;
+      return { factor, modeName, modeDesc };
     }
 
-    // Route Calculation & Toll / Fare Estimation
-    async function checkAndCalculateRoute() {
+    function updateTrafficBanner() {
+      const { factor, modeName, modeDesc } = getTrafficMultiplier(0);
+      document.getElementById('traffic-mode-name').textContent = modeName;
+      document.getElementById('traffic-mode-desc').textContent = modeDesc;
+      document.getElementById('traffic-factor-tag').textContent = `${factor.toFixed(2)}x`;
+    }
+
+    function setupSearchInputs() {
+      bindAutosuggest('pickup', coords => {
+        pickupCoords = coords;
+        setMarker('pickup', coords);
+        calculateRoute();
+      });
+
+      bindAutosuggest('dropoff', coords => {
+        dropoffCoords = coords;
+        setMarker('dropoff', coords);
+        calculateRoute();
+      });
+    }
+
+    function bindAutosuggest(type, onSelect) {
+      const input = document.getElementById(`${type}-input`);
+      const resetBtn = document.getElementById(`reset-${type}`);
+      const suggestions = document.getElementById(`${type}-suggestions`);
+
+      input.addEventListener('input', async (e) => {
+        const query = e.target.value.trim();
+        resetBtn.classList.toggle('hidden', query.length === 0);
+
+        if (query.length < 3) {
+          suggestions.classList.add('hidden');
+          return;
+        }
+
+        // HERE Autosuggest API Search near Klang/Selangor
+        const url = `https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=${KLANG_CENTER.lat},${KLANG_CENTER.lng}&apiKey=${HERE_API_KEY}`;
+        
+        try {
+          const res = await fetch(url);
+          const data = await res.json();
+          renderSuggestions(data.items || [], suggestions, input, onSelect);
+        } catch (err) {
+          console.error("Autosuggest error:", err);
+        }
+      });
+
+      resetBtn.addEventListener('click', () => {
+        input.value = '';
+        resetBtn.classList.add('hidden');
+        suggestions.classList.add('hidden');
+        clearType(type);
+      });
+    }
+
+    function renderSuggestions(items, listElem, inputElem, onSelect) {
+      listElem.innerHTML = '';
+      const validItems = items.filter(item => item.position).slice(0, 5);
+
+      if (validItems.length === 0) {
+        listElem.classList.add('hidden');
+        return;
+      }
+
+      validItems.forEach(item => {
+        const li = document.createElement('li');
+        li.className = "px-3 py-2 text-xs hover:bg-slate-100 cursor-pointer border-b border-slate-100 flex items-center gap-2";
+        li.innerHTML = `<i class="fa-solid fa-location-pin text-slate-400"></i> <div><div class="font-medium text-slate-800">${item.title}</div><div class="text-[10px] text-slate-400">${item.address ? item.address.label : ''}</div></div>`;
+        
+        li.addEventListener('click', () => {
+          inputElem.value = item.title;
+          listElem.classList.add('hidden');
+          onSelect(item.position);
+        });
+        listElem.appendChild(li);
+      });
+
+      listElem.classList.remove('hidden');
+    }
+
+    function setPreset(type, name, lat, lng) {
+      const input = document.getElementById(`${type}-input`);
+      const resetBtn = document.getElementById(`reset-${type}`);
+      input.value = name;
+      resetBtn.classList.remove('hidden');
+
+      const coords = { lat, lng };
+      if (type === 'pickup') pickupCoords = coords;
+      else dropoffCoords = coords;
+
+      setMarker(type, coords);
+      calculateRoute();
+    }
+
+    function setMarker(type, coords) {
+      // SVG Custom Marker Icons
+      const pickupIconSvg = `<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="10" fill="#2563eb" stroke="#ffffff" stroke-width="3"/><circle cx="16" cy="16" r="4" fill="#ffffff"/></svg>`;
+      const dropoffIconSvg = `<svg width="32" height="40" viewBox="0 0 32 40" xmlns="http://www.w3.org/2000/svg"><path d="M16 0C7.16 0 0 7.16 0 16c0 12 16 24 16 24s16-12 16-24c0-8.84-7.16-16-16-16z" fill="#ef4444"/><circle cx="16" cy="16" r="6" fill="#ffffff"/></svg>`;
+
+      if (type === 'pickup') {
+        if (pickupMarker) map.removeObject(pickupMarker);
+        const icon = new H.map.Icon(pickupIconSvg, { anchor: { x: 16, y: 16 } });
+        pickupMarker = new H.map.Marker(coords, { icon });
+        map.addObject(pickupMarker);
+      } else {
+        if (dropoffMarker) map.removeObject(dropoffMarker);
+        const icon = new H.map.Icon(dropoffIconSvg, { anchor: { x: 16, y: 40 } });
+        dropoffMarker = new H.map.Marker(coords, { icon });
+        map.addObject(dropoffMarker);
+      }
+      map.setCenter(coords);
+    }
+
+    function clearType(type) {
+      if (type === 'pickup') {
+        pickupCoords = null;
+        if (pickupMarker) map.removeObject(pickupMarker);
+      } else {
+        dropoffCoords = null;
+        if (dropoffMarker) map.removeObject(dropoffMarker);
+      }
+
+      if (routePolyline) {
+        map.removeObject(routePolyline);
+        routePolyline = null;
+      }
+
+      document.getElementById('summary-card').classList.add('hidden');
+      document.getElementById('empty-state').classList.remove('hidden');
+    }
+
+    async function calculateRoute() {
       if (!pickupCoords || !dropoffCoords) return;
 
       const routerUrl = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${pickupCoords.lat},${pickupCoords.lng}&destination=${dropoffCoords.lat},${dropoffCoords.lng}&return=polyline,summary,tolls&apiKey=${HERE_API_KEY}`;
@@ -258,62 +585,168 @@
         const response = await fetch(routerUrl);
         const data = await response.json();
 
-        if (!data.routes.length) return;
+        if (!data.routes || data.routes.length === 0) return;
 
         const route = data.routes[0];
         const section = route.sections[0];
+
         const distanceKm = section.summary.length / 1000;
         const baseDurationMin = section.summary.duration / 60;
 
-        // Render Route on Map
+        // Render Polyline on Map
         if (routePolyline) map.removeObject(routePolyline);
         const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
-        routePolyline = new H.map.Polyline(lineString, { style: { strokeColor: '#1a73e8', lineWidth: 5 } });
+        routePolyline = new H.map.Polyline(lineString, {
+          style: { strokeColor: '#2563eb', lineWidth: 6 }
+        });
         map.addObject(routePolyline);
-        map.getViewModel().setLookAtData({ bounds: routePolyline.getBoundingBox() });
+        map.getViewModel().setLookAtData({ bounds: routePolyline.getBoundingBox(), margin: 50 });
 
-        // Calculate Toll Charges
+        // Calculate Highway Tolls from HERE API response
         let totalTolls = 0;
         if (section.tolls) {
           section.tolls.forEach(toll => {
-            toll.fares.forEach(fare => { totalTolls += (fare.price || 0); });
+            if (toll.fares) {
+              toll.fares.forEach(fare => {
+                totalTolls += (fare.price || 0);
+              });
+            }
           });
         }
 
-        // Apply Step 1 & Step 2 Formulas
-        const trafficFactor = getTrafficMultiplier(distanceKm);
-        const adjustedDurationMin = baseDurationMin * trafficFactor;
+        // Apply Formulas
+        const traffic = getTrafficMultiplier(distanceKm);
+        const adjustedDurationMin = baseDurationMin * traffic.factor;
 
         const baseFare = 5.00;
         const chargeableDist = Math.max(0, distanceKm - 1.0);
         const distanceFare = chargeableDist * 1.25;
         const trafficIncentive = adjustedDurationMin * 0.20;
 
-        // Out-of-Zone Scaling Surcharge
+        // Out-of-Zone Scaling Surcharge (> 12km)
         let surcharge = 0;
+        let surchargeRatio = 0;
         if (distanceKm > 12) {
-          const scalingRatio = Math.min(1, (distanceKm - 12) / 30);
-          surcharge = distanceFare * (0.45 * scalingRatio);
+          surchargeRatio = Math.min(1, (distanceKm - 12) / 30);
+          surcharge = distanceFare * (0.45 * surchargeRatio);
         }
 
-        const totalFare = baseFare + distanceFare + trafficIncentive + surcharge + totalTolls;
+        const subtotal = baseFare + distanceFare + trafficIncentive + surcharge;
+        const totalFare = subtotal + totalTolls;
 
-        // Update UI Breakdown
-        document.getElementById('val-base').textContent = baseFare.toFixed(2);
-        document.getElementById('val-chargeable-km').textContent = chargeableDist.toFixed(1);
-        document.getElementById('val-dist-fare').textContent = distanceFare.toFixed(2);
-        document.getElementById('val-duration').textContent = Math.round(adjustedDurationMin);
-        document.getElementById('val-traffic-incentive').textContent = trafficIncentive.toFixed(2);
-        document.getElementById('val-surcharge').textContent = surcharge.toFixed(2);
-        document.getElementById('val-tolls').textContent = totalTolls.toFixed(2);
-        document.getElementById('val-total').textContent = totalFare.toFixed(2);
-        document.getElementById('fare-card').style.display = 'flex';
+        // Store calculation object
+        currentCalculationData = {
+          pickupName: document.getElementById('pickup-input').value || 'Pickup Point',
+          dropoffName: document.getElementById('dropoff-input').value || 'Dropoff Point',
+          distanceKm,
+          baseDurationMin,
+          adjustedDurationMin,
+          peakFactor: traffic.factor,
+          baseFare,
+          chargeableDist,
+          distanceFare,
+          trafficIncentive,
+          surcharge,
+          surchargeRatio,
+          totalTolls,
+          subtotal,
+          totalFare
+        };
 
-      } catch (err) { console.error('Routing Error:', err); }
+        // Update UI
+        updateSummaryCard(currentCalculationData);
+
+      } catch (err) {
+        console.error("Routing calculation failed:", err);
+      }
     }
 
-    // Handle Window Resize
-    window.addEventListener('resize', () => map.getViewPort().resize());
+    function updateSummaryCard(d) {
+      document.getElementById('summary-total').textContent = d.totalFare.toFixed(2);
+      document.getElementById('summary-distance').innerHTML = `<i class="fa-solid fa-road text-slate-400 mr-1"></i>${d.distanceKm.toFixed(1)} km`;
+      document.getElementById('summary-duration').innerHTML = `<i class="fa-regular fa-clock text-slate-400 mr-1"></i>${Math.round(d.adjustedDurationMin)} mins`;
+
+      document.getElementById('summary-base').textContent = d.baseFare.toFixed(2);
+      document.getElementById('summary-chargeable-km').textContent = d.chargeableDist.toFixed(1);
+      document.getElementById('summary-dist-fare').textContent = d.distanceFare.toFixed(2);
+      document.getElementById('summary-adj-dur').textContent = Math.round(d.adjustedDurationMin);
+      document.getElementById('summary-incentive').textContent = d.trafficIncentive.toFixed(2);
+      document.getElementById('summary-surcharge').textContent = d.surcharge.toFixed(2);
+      document.getElementById('summary-tolls').textContent = d.totalTolls.toFixed(2);
+
+      document.getElementById('empty-state').classList.add('hidden');
+      document.getElementById('summary-card').classList.remove('hidden');
+    }
+
+    function openInvoiceModal() {
+      if (!currentCalculationData) return;
+      const d = currentCalculationData;
+
+      const now = new Date();
+      document.getElementById('inv-num').textContent = `INV-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${Math.floor(100 + Math.random()*900)}`;
+      document.getElementById('inv-date').textContent = `Date: ${now.toLocaleDateString('en-MY')} ${now.toLocaleTimeString('en-MY', {hour: '2-digit', minute:'2-digit'})}`;
+
+      document.getElementById('inv-pickup').textContent = d.pickupName;
+      document.getElementById('inv-dropoff').textContent = d.dropoffName;
+      document.getElementById('inv-dist').textContent = `${d.distanceKm.toFixed(1)} km`;
+      document.getElementById('inv-time').textContent = `${Math.round(d.adjustedDurationMin)} mins`;
+      document.getElementById('inv-peak').textContent = `${d.peakFactor.toFixed(2)}x`;
+
+      document.getElementById('inv-line-chargeable-km').textContent = d.chargeableDist.toFixed(1);
+      document.getElementById('inv-line-dist-val').textContent = d.distanceFare.toFixed(2);
+
+      document.getElementById('inv-line-time-min').textContent = Math.round(d.adjustedDurationMin);
+      document.getElementById('inv-line-time-val').textContent = d.trafficIncentive.toFixed(2);
+
+      document.getElementById('inv-line-surcharge-pct').textContent = `${(d.surchargeRatio * 45).toFixed(0)}%`;
+      document.getElementById('inv-line-surcharge-val').textContent = d.surcharge.toFixed(2);
+
+      document.getElementById('inv-line-tolls-val').textContent = d.totalTolls.toFixed(2);
+
+      document.getElementById('inv-subtotal').textContent = d.subtotal.toFixed(2);
+      document.getElementById('inv-tolls').textContent = d.totalTolls.toFixed(2);
+      document.getElementById('inv-grand-total').textContent = d.totalFare.toFixed(2);
+
+      document.getElementById('invoice-modal').classList.remove('hidden');
+    }
+
+    function closeInvoiceModal() {
+      document.getElementById('invoice-modal').classList.add('hidden');
+    }
+
+    function copyFareSummary() {
+      if (!currentCalculationData) return;
+      const d = currentCalculationData;
+
+      const text = `🚕 *FARENNAV RIDE FARE ESTIMATE* 🚕\n` +
+                   `📍 From: ${d.pickupName}\n` +
+                   `🏁 To: ${d.dropoffName}\n` +
+                   `📏 Distance: ${d.distanceKm.toFixed(1)} km | Time: ${Math.round(d.adjustedDurationMin)} mins\n\n` +
+                   `💵 Base Fare: RM ${d.baseFare.toFixed(2)}\n` +
+                   `🚗 Distance Charge: RM ${d.distanceFare.toFixed(2)}\n` +
+                   `⏳ Traffic Incentive: RM ${d.trafficIncentive.toFixed(2)}\n` +
+                   `⚠️ Out-of-Zone Surcharge: RM ${d.surcharge.toFixed(2)}\n` +
+                   `🛣️ Highway Tolls: RM ${d.totalTolls.toFixed(2)}\n` +
+                   `------------------------------\n` +
+                   `💰 *TOTAL FARE: RM ${d.totalFare.toFixed(2)}*`;
+
+      // Copy text to clipboard
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+
+      showToast("Fare summary copied to clipboard!");
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-msg').textContent = message;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 3000);
+    }
   </script>
 </body>
 </html>
