@@ -302,12 +302,13 @@
     const PROXY_ENDPOINT = "/api/here-proxy"; 
     const HERE_API_KEY = "PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk"; 
 
-    // Initialize Map
+    // Initialize Map centered on Klang/Kuala Lumpur
     const map = L.map('map').setView([3.1390, 101.6869], 11);
     
-    // OpenStreetMap Standard Basemap
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // High-reliability OSM mirror tile server
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
+        subdomains: ['a', 'b', 'c'],
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
@@ -402,6 +403,8 @@
     });
 
     function updateMarker(type, coords) {
+        if (!coords || isNaN(coords.lat) || isNaN(coords.lon)) return;
+        
         if (type === 'pickup') {
             if (pickupMarker) map.removeLayer(pickupMarker);
             pickupMarker = L.marker([coords.lat, coords.lon], { icon: pickupIcon }).addTo(map);
@@ -490,6 +493,12 @@
                             const pos = item.position || item.access[0];
                             const addressLabel = item.title || (item.address && item.address.label);
                             
+                            // Normalized coordinate mapping (fixes position.lng / position.lon mismatch)
+                            const latVal = pos.lat;
+                            const lonVal = pos.lng !== undefined ? pos.lng : pos.lon;
+
+                            if (latVal === undefined || lonVal === undefined) return;
+
                             const div = document.createElement('div');
                             div.className = 'suggestion-item';
                             div.textContent = addressLabel;
@@ -497,7 +506,7 @@
                                 input.value = addressLabel;
                                 suggestionsBox.innerHTML = '';
                                 suggestionsBox.style.display = 'none';
-                                onSelect({ lat: pos.lat, lon: pos.lng });
+                                onSelect({ lat: parseFloat(latVal), lon: parseFloat(lonVal) });
                             });
                             suggestionsBox.appendChild(div);
                             validItemCount++;
@@ -586,7 +595,8 @@
 
     function checkAndProcessRoute() {
         if (!pickupCoords || !dropoffCoords) return;
-        
+        if (isNaN(pickupCoords.lat) || isNaN(pickupCoords.lon) || isNaN(dropoffCoords.lat) || isNaN(dropoffCoords.lon)) return;
+
         document.getElementById('error-msg').style.display = 'none';
         if (currentRouteTimeout) clearTimeout(currentRouteTimeout);
         
@@ -650,11 +660,8 @@
                         
                         setTimeout(() => {
                             map.invalidateSize();
-                            const bounds = L.latLngBounds([
-                                [pickupCoords.lat, pickupCoords.lon],
-                                [dropoffCoords.lat, dropoffCoords.lon],
-                                ...routeCoordinates
-                            ]);
+                            // Create bounds exclusively from valid route points
+                            const bounds = L.latLngBounds(routeCoordinates);
                             map.fitBounds(bounds, { padding: [40, 40] });
                         }, 100);
                     }
