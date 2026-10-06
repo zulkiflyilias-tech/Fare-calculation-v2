@@ -308,6 +308,11 @@
                     <span id="calc-incentive">RM 0.00</span>
                 </div>
                 
+                <div class="detail-row" id="toll-fare-row">
+                    <span>Toll Charges</span>
+                    <span id="calc-toll-fare">RM 0.00</span>
+                </div>
+
                 <div class="detail-row" id="deadhead-km-row" style="display: none;">
                     <span>Out-of-Zone Surcharge</span>
                     <span id="calc-deadhead-km">RM 0.00</span>
@@ -332,7 +337,7 @@
     
     const defaultLayers = platform.createDefaultLayers();
 
-    // Instantiate Map centered on Kuala Lumpur
+    // Instantiate Map centered on Klang/Kuala Lumpur region
     const map = new H.Map(
         document.getElementById('map'),
         defaultLayers.vector.normal.map,
@@ -488,7 +493,7 @@
             }
 
             debounceTimeout = setTimeout(() => {
-                // HERE Autosuggest API (bound to Malaysia area - lat 4.2105, lng 101.9758)
+                // HERE Autosuggest API (bound to Malaysia area)
                 const url = `https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=4.2105,101.9758&in=countryCode:MYS&limit=5&apiKey=${HERE_API_KEY}`;
                 
                 fetch(url)
@@ -501,7 +506,7 @@
                         }
                         suggestionsBox.style.display = 'block';
                         data.items.forEach(item => {
-                            if (!item.position) return; // Skip items missing coordinate positions
+                            if (!item.position) return;
                             
                             const div = document.createElement('div');
                             div.className = 'suggestion-item';
@@ -535,12 +540,13 @@
         if(currentRouteTimeout) clearTimeout(currentRouteTimeout);
         
         currentRouteTimeout = setTimeout(() => {
+            // Request route details including 'tolls'
             const routingParameters = {
                 'routingMode': 'fast',
                 'transportMode': 'car',
                 'origin': `${pickupCoords.lat},${pickupCoords.lng}`,
                 'destination': `${dropoffCoords.lat},${dropoffCoords.lng}`,
-                'return': 'polyline,summary'
+                'return': 'polyline,summary,tolls'
             };
 
             router.calculateRoute(routingParameters, (result) => {
@@ -554,6 +560,25 @@
                 
                 const distanceKm = section.summary.length / 1000;
                 const baseDurationMins = section.summary.duration / 60;
+
+                // Extract Toll Cost from HERE API response if present
+                let calculatedTollFee = 0;
+                if (section.tolls && section.tolls.length > 0) {
+                    section.tolls.forEach(toll => {
+                        if (toll.fares && toll.fares.length > 0) {
+                            calculatedTollFee += parseFloat(toll.fares[0].price.value || 0);
+                        }
+                    });
+                } else if (section.summary.tollCosts && section.summary.tollCosts.length > 0) {
+                    section.summary.tollCosts.forEach(tc => {
+                        calculatedTollFee += parseFloat(tc.value || 0);
+                    });
+                } else {
+                    // Dynamic highway toll estimation heuristic for long highway routes (PLUS/NKVE/KESAS)
+                    if (distanceKm > 15) {
+                        calculatedTollFee = (distanceKm - 15) * 0.11; 
+                    }
+                }
 
                 const now = new Date();
                 const currentHour = now.getHours();
@@ -599,7 +624,7 @@
                 map.addObject(routePolyline);
                 map.getViewModel().setLookAtData({ bounds: routePolyline.getBoundingBox() });
 
-                processCalculations(distanceKm, correctedDurationMins);
+                processCalculations(distanceKm, correctedDurationMins, calculatedTollFee);
             }, (error) => {
                 console.error("HERE Routing Service Error:", error);
                 showError("API connectivity fault or quota restriction triggered.");
@@ -618,7 +643,7 @@
         return Math.round(value * 10) / 10;
     }
 
-    function processCalculations(distance, duration) {
+    function processCalculations(distance, duration, tollFee) {
         const baseFare = 5.00;
         const perKmRate = 1.25;
         
@@ -637,7 +662,7 @@
             document.getElementById('deadhead-km-row').style.display = 'none';
         }
 
-        const rawTotal = baseFare + rideDistanceFare + driverIncentive + deadheadCost;
+        const rawTotal = baseFare + rideDistanceFare + driverIncentive + tollFee + deadheadCost;
         const roundedTotal = Math.max(baseFare, roundToMalaysianCents(rawTotal));
         const finalDisplayedWholeFare = Math.round(roundedTotal);
 
@@ -648,6 +673,7 @@
         document.getElementById('calc-base-fare').textContent = `RM ${baseFare.toFixed(2)}`;
         document.getElementById('calc-ride-distance-rate').textContent = `RM ${rideDistanceFare.toFixed(2)}`;
         document.getElementById('calc-incentive').textContent = `RM ${driverIncentive.toFixed(2)}`;
+        document.getElementById('calc-toll-fare').textContent = `RM ${tollFee.toFixed(2)}`;
         document.getElementById('calc-deadhead-km').textContent = `RM ${deadheadCost.toFixed(2)}`;
         document.getElementById('calc-grand').textContent = `RM ${roundedTotal.toFixed(2)}`;
 
