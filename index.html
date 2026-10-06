@@ -507,7 +507,6 @@
         });
     }
 
-    // HERE Flexible Polyline Decoder
     function decodeFlexiblePolyline(encoded) {
         const DECODING_TABLE = [
             62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1,
@@ -569,11 +568,15 @@
         if(currentRouteTimeout) clearTimeout(currentRouteTimeout);
         
         currentRouteTimeout = setTimeout(() => {
-            const url = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&return=summary,polyline&apiKey=${HERE_API_KEY}`;
+            const url = `https://router.hereapi.com/v8/routes?transportMode=car&routingMode=fast&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&return=summary,polyline&apiKey=${HERE_API_KEY}`;
 
             fetch(url)
-                .then(res => {
-                    if (!res.ok) throw new Error('HERE API route payload evaluation drop.');
+                .then(async res => {
+                    if (!res.ok) {
+                        const errDetails = await res.json().catch(() => ({}));
+                        console.error("HERE API Response Error:", res.status, errDetails);
+                        throw new Error(`HERE API Status: ${res.status}`);
+                    }
                     return res.json();
                 })
                 .then(data => {
