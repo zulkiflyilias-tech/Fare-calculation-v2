@@ -28,7 +28,7 @@
             height: 35vh;
             width: 100%;
             z-index: 1;
-            background-color: #e5e3df;
+            background-color: #f2f2f2;
         }
         #search-panel {
             flex: 1;
@@ -305,11 +305,14 @@
     // Initialize Map centered on Selangor / Klang Valley
     const map = L.map('map').setView([3.0449, 101.4456], 12);
     
-    // High-performance Esri World Topo map (CARTO completely removed)
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+    // Open-access high reliability Humanitarian OpenStreetMap (No CARTO watermark, guaranteed rendering)
+    L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community'
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
+
+    // Force map recalculation on window load and layout changes
+    setTimeout(() => { map.invalidateSize(); }, 300);
 
     let pickupMarker = null, dropoffMarker = null, routeLine = null;
     let pickupCoords = null, dropoffCoords = null;
@@ -412,7 +415,6 @@
             dropoffMarker = L.marker([coords.lat, coords.lon], { icon: dropoffIcon }).addTo(map);
         }
         
-        // Auto-center map to valid active pins
         if (pickupCoords && dropoffCoords) {
             const bounds = L.latLngBounds([
                 [pickupCoords.lat, pickupCoords.lon],
@@ -502,8 +504,6 @@
                             if (!pos) return;
 
                             const addressLabel = item.title || (item.address && item.address.label);
-                            
-                            // Safe parsing for both position formats (lat/lng vs lat/lon)
                             const latVal = parseFloat(pos.lat);
                             const lonVal = parseFloat(pos.lng !== undefined ? pos.lng : pos.lon);
 
@@ -542,7 +542,6 @@
         });
     }
 
-    // Flexible Polyline Decoder
     function decodeFlexiblePolyline(encoded) {
         const DECODING_TABLE = [
             62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1,
@@ -599,7 +598,6 @@
                 idx = res.index;
             }
 
-            // Verify latitude and longitude are within standard geographical limits
             const finalLat = lat / factor;
             const finalLng = lng / factor;
             if (finalLat >= -90 && finalLat <= 90 && finalLng >= -180 && finalLng <= 180) {
@@ -676,12 +674,10 @@
                         
                         setTimeout(() => {
                             map.invalidateSize();
-                            // Lock bounds specifically around the route points
                             const bounds = L.latLngBounds(routeCoordinates);
                             map.fitBounds(bounds, { padding: [30, 30] });
                         }, 100);
                     } else {
-                        // Fallback zoom to pins if polyline decoding fails
                         const pinBounds = L.latLngBounds([
                             [pickupCoords.lat, pickupCoords.lon],
                             [dropoffCoords.lat, dropoffCoords.lon]
