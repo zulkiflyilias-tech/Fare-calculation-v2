@@ -323,23 +323,15 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-    /* 
-     * CONFIGURATION: API KEYS AND PROXY ROUTING
-     * For production security, set USE_BACKEND_PROXY to true and point PROXY_ENDPOINT 
-     * to your backend endpoint (e.g., Cloudflare Worker or Node.js backend).
-     */
     const USE_BACKEND_PROXY = false; 
     const PROXY_ENDPOINT = "/api/here-proxy"; 
-    
-    // Fallback client keys (restricted in developer dashboard)
     const HERE_API_KEY = "PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk"; 
-    const CARTO_API_KEY = "cb1_4b7o_1_924353e3834c5cbe57eef1e3";
 
     // Initialize Map
     const map = L.map('map').setView([3.1390, 101.6869], 11);
     
-    // CARTO Raster Tile Layer
-    L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${CARTO_API_KEY}`, {
+    // Fixed CARTO Voyager Tile Layer (removed invalid key parameter)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
         subdomains: 'abcd',
         maxZoom: 20
@@ -446,7 +438,6 @@
     }
 
     function executeLocationSwap() {
-        // Hide suggest dropdowns upon execution
         document.getElementById('pickup-suggestions').style.display = 'none';
         document.getElementById('dropoff-suggestions').style.display = 'none';
 
@@ -519,7 +510,6 @@
                         
                         let validItemCount = 0;
                         data.items.forEach(item => {
-                            // Filter out non-location items without coordinates
                             if (!item.position && (!item.access || !item.access.length)) return;
                             
                             const pos = item.position || item.access[0];
@@ -558,7 +548,6 @@
         });
     }
 
-    // Complete HERE Flexible Polyline Decoder handling 2D and 3D dimensions
     function decodeFlexiblePolyline(encoded) {
         const DECODING_TABLE = [
             62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1,
@@ -679,7 +668,6 @@
                     
                     map.invalidateSize();
                     if (routeCoordinates.length > 0) {
-                        // Responsive fitBounds padding to handle mobile sheet panel overlay
                         const isMobile = window.innerWidth < 768;
                         map.fitBounds(routeLine.getBounds(), { 
                             paddingTopLeft: [20, 20],
@@ -703,10 +691,6 @@
         return mins > 0 ? `${hours} hr ${mins} mins` : `${hours} hr`;
     }
 
-    /**
-     * Malaysian Standard Bank/Cash Rounding Mechanism (Pembundaran 5 Sen)
-     * Rounds value to the nearest RM 0.05 (5 cents)
-     */
     function roundToMalaysianCents(value) {
         return Math.round(value * 20) / 20;
     }
