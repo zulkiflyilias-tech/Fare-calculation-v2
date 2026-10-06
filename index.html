@@ -325,17 +325,21 @@
 <script>
     const HERE_API_KEY = "PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk"; 
 
+    // Initialize Map
     const map = L.map('map').setView([3.1390, 101.6869], 11);
     
-    L.tileLayer(`https://maps.hereapi.com/v3/base/mc/{z}/{x}/{y}/png8?style=explore.day&apiKey=${HERE_API_KEY}`, {
-        attribution: '&copy; HERE 2026 | Leaflet',
-        maxZoom: 19
+    // Fast, Reliable Tile Layer (CARTO Light - fully compatible with Leaflet without API key restrictions)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 20
     }).addTo(map);
 
     let pickupMarker = null, dropoffMarker = null, routeLine = null;
     let pickupCoords = null, dropoffCoords = null;
     let currentRouteTimeout = null;
 
+    // Ensure Leaflet resizes correctly after initial load
     setTimeout(() => { map.invalidateSize(); }, 300);
 
     setupAutocomplete('pickup', 'pickup-suggestions', 'clear-pickup', (coords) => {
@@ -573,9 +577,7 @@
         if(currentRouteTimeout) clearTimeout(currentRouteTimeout);
         
         currentRouteTimeout = setTimeout(() => {
-            // First attempt with full toll summary requesting
             const primaryUrl = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&return=summary,polyline,tolls&toll[vehicles]=car&currency=MYR&apiKey=${HERE_API_KEY}`;
-            // Secondary fallback URL without toll objects if standard API tier restricts toll calculation queries
             const fallbackUrl = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&return=summary,polyline&apiKey=${HERE_API_KEY}`;
 
             fetch(primaryUrl)
@@ -620,8 +622,9 @@
                         color: '#8e24aa', weight: 5, opacity: 0.85 
                     }).addTo(map);
                     
-                    map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+                    // Trigger map resize before fitting bounds to render tiles properly
                     map.invalidateSize();
+                    map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
 
                     processCalculations(distanceKm, durationMins, totalTollCost);
                 })
