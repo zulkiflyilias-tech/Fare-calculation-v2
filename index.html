@@ -10,9 +10,9 @@
   
   <!-- FontAwesome & Google Fonts -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- HERE Maps API Scripts & Styles -->
+  <!-- HERE Maps API -->
   <link rel="stylesheet" type="text/css" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css" />
   <script src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
   <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
@@ -20,13 +20,20 @@
   <script src="https://js.api.here.com/v3/3.1/mapsjs-mapevents.js"></script>
 
   <style>
-    body { 
+    body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background-color: #ffffff;
+      background-color: #f8fafc;
     }
+    
+    /* Hide scrollbars for clean UI */
+    ::-webkit-scrollbar { display: none; }
+    * { -ms-overflow-style: none; scrollbar-width: none; }
 
-    ::-webkit-scrollbar { width: 4px; }
-    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    /* Custom Input Focus Rings */
+    .input-field:focus-within {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+    }
 
     @media print {
       body * { visibility: hidden; }
@@ -36,170 +43,246 @@
     }
   </style>
 </head>
-<body class="bg-white min-h-screen flex flex-col text-slate-900 pb-12">
+<body class="bg-slate-100 min-h-screen flex flex-col items-center justify-start pb-10">
 
-  <!-- Map Section Header (Top Half) -->
-  <div class="relative w-full h-[32vh] bg-sky-200 border-b border-slate-200">
+  <!-- Top Map Container -->
+  <div class="w-full h-[40vh] min-h-[260px] relative bg-sky-200">
     <div id="map" class="w-full h-full"></div>
+    
+    <!-- Top Floating Header Pill -->
+    <div class="absolute top-3 left-4 right-4 z-10 flex justify-between items-center pointer-events-none">
+      <div class="bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full shadow-sm text-xs font-semibold text-slate-700 flex items-center gap-2 pointer-events-auto border border-slate-200/60">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        Klang Valley Navigation
+      </div>
+      <div id="live-clock" class="bg-slate-900/80 backdrop-blur-md text-white font-mono text-xs px-2.5 py-1 rounded-full shadow-sm pointer-events-auto">--:--:--</div>
+    </div>
   </div>
 
-  <!-- Main Container -->
-  <main class="w-full max-w-md mx-auto px-4 pt-4 flex-1 flex flex-col gap-4">
-
-    <!-- Title Header -->
-    <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Fare Estimator</h1>
-
-    <!-- Input Box Group -->
-    <div class="relative flex flex-col gap-2.5">
+  <!-- Floating Main Estimator Card Container -->
+  <main class="w-full max-w-md px-4 -mt-6 z-20 relative space-y-4">
+    
+    <div class="bg-white rounded-3xl shadow-xl border border-slate-100 p-5 space-y-4">
       
-      <!-- Pickup Input Field -->
-      <div class="relative flex items-center bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 shadow-sm focus-within:border-slate-400">
-        <input type="text" id="pickup-input" class="w-full text-sm font-medium text-slate-800 outline-none bg-transparent pr-12" placeholder="Starting location..." value="Jalan Teratai, 41050 Kapar, Selangor" autocomplete="off">
-        <div class="absolute right-3 flex items-center gap-2">
-          <button id="locate-me" class="text-red-500 hover:text-red-600 transition" title="Current Location">
-            <i class="fa-solid fa-bullseye text-base"></i>
-          </button>
-          <button id="reset-pickup" class="text-slate-300 hover:text-slate-500 text-xs">
-            <i class="fa-solid fa-xmark"></i>
-          </button>
-        </div>
-        <ul id="pickup-suggestions" class="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto z-30 hidden"></ul>
-      </div>
-
-      <!-- Direction Swap Floating Button -->
-      <button onclick="swapLocations()" class="absolute right-4 top-[38px] z-20 bg-white border border-slate-200 rounded-full w-8 h-8 shadow-md flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition active:scale-95">
-        <i class="fa-solid fa-arrow-down-up-lock text-xs"></i>
-      </button>
-
-      <!-- Dropoff Input Field -->
-      <div class="relative flex items-center bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 shadow-sm focus-within:border-slate-400">
-        <input type="text" id="dropoff-input" class="w-full text-sm font-medium text-slate-800 outline-none bg-transparent pr-8" placeholder="Destination location..." value="Giant-Shah Alam Stadium" autocomplete="off">
-        <button id="reset-dropoff" class="absolute right-3 text-slate-300 hover:text-slate-500 text-xs">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-        <ul id="dropoff-suggestions" class="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto z-30 hidden"></ul>
-      </div>
-
-    </div>
-
-    <!-- Dark Fare Card -->
-    <div id="summary-card" class="bg-[#18181b] text-white rounded-2xl p-5 shadow-xl space-y-4">
-      
-      <!-- Primary Fare Display -->
-      <div class="flex justify-between items-baseline">
-        <div class="text-3xl font-extrabold tracking-tight text-[#a855f7] flex items-baseline gap-1.5">
-          RM <span id="summary-total">34</span>
-        </div>
-        <div class="flex gap-4 text-xs font-semibold text-slate-200">
-          <span id="summary-distance">19.7 km</span>
-          <span id="summary-duration">29 mins</span>
-        </div>
-      </div>
-
-      <!-- Dashed Line Divider -->
-      <div class="border-b border-dashed border-zinc-700/80 w-full"></div>
-
-      <!-- Breakdown List -->
-      <div class="space-y-2.5 text-xs">
-        <div class="flex justify-between items-center">
-          <span class="text-zinc-400 font-medium">Base Fare</span>
-          <span class="font-semibold text-zinc-200">RM <span id="summary-base">5.00</span></span>
-        </div>
-        <div class="flex justify-between items-center">
-          <span class="text-zinc-400 font-medium">Distance Fare</span>
-          <span class="font-semibold text-zinc-200">RM <span id="summary-dist-fare">23.37</span></span>
-        </div>
-        <div class="flex justify-between items-center">
-          <span class="text-zinc-400 font-medium">Tolls (HERE Highway Rates)</span>
-          <span class="font-semibold text-zinc-200">RM <span id="summary-tolls">0.00</span></span>
-        </div>
-        <div class="flex justify-between items-center">
-          <span class="text-zinc-400 font-medium">Traffic Adjust & Incentive</span>
-          <span class="font-semibold text-zinc-200">RM <span id="summary-incentive">5.80</span></span>
-        </div>
-        <div class="flex justify-between items-center">
-          <span class="text-zinc-400 font-medium">Out-of-Zone Surcharge</span>
-          <span class="font-semibold text-zinc-200">RM <span id="summary-surcharge">0.24</span></span>
-        </div>
-      </div>
-
-      <!-- Bottom Action Buttons -->
-      <div class="pt-2 flex gap-2">
-        <button onclick="openInvoiceModal()" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-3 rounded-lg flex items-center justify-center gap-2 text-xs transition shadow-sm">
-          <i class="fa-solid fa-receipt"></i> Full Invoice
-        </button>
-        <button onclick="copyFareSummary()" class="bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-200 font-medium py-2 px-3 rounded-lg flex items-center justify-center text-xs transition" title="Copy Fare">
+      <!-- Title Header -->
+      <div class="flex items-center justify-between pt-1">
+        <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Fare Estimator</h1>
+        <button onclick="copyFareSummary()" id="copy-btn" class="hidden text-slate-400 hover:text-blue-600 transition p-1 text-sm" title="Copy Fare Breakdown">
           <i class="fa-solid fa-copy"></i>
         </button>
+      </div>
+
+      <!-- Search Inputs Group with Swap Button -->
+      <div class="relative space-y-2.5">
+        
+        <!-- Pickup Input -->
+        <div class="input-field relative flex items-center bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 transition-all">
+          <input type="text" id="pickup-input" class="w-full bg-transparent text-sm font-medium text-slate-800 outline-none pr-12 placeholder:text-slate-400" placeholder="Choose starting location..." autocomplete="off">
+          
+          <div class="absolute right-3 flex items-center gap-1.5">
+            <button id="reset-pickup" class="hidden text-slate-400 hover:text-slate-600 p-1" title="Clear pickup">
+              <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+            <span class="text-xs">🎯</span>
+          </div>
+          <ul id="pickup-suggestions" class="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto z-40 hidden"></ul>
+        </div>
+
+        <!-- Swap Button -->
+        <button onclick="swapLocations()" class="absolute right-4 top-[32px] z-30 bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-300 w-8 h-8 rounded-full shadow-md flex items-center justify-center transition-transform active:scale-95" title="Swap locations">
+          <i class="fa-solid fa-arrows-up-down text-xs"></i>
+        </button>
+
+        <!-- Dropoff Input -->
+        <div class="input-field relative flex items-center bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 transition-all">
+          <input type="text" id="dropoff-input" class="w-full bg-transparent text-sm font-medium text-slate-800 outline-none pr-12 placeholder:text-slate-400" placeholder="Choose destination..." autocomplete="off">
+          
+          <div class="absolute right-3 flex items-center gap-1.5">
+            <button id="reset-dropoff" class="hidden text-slate-400 hover:text-slate-600 p-1" title="Clear dropoff">
+              <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+          </div>
+          <ul id="dropoff-suggestions" class="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto z-40 hidden"></ul>
+        </div>
+
+        <!-- Preset Quick Buttons -->
+        <div class="pt-0.5 flex items-center gap-1.5 text-xs text-slate-400 overflow-x-auto whitespace-nowrap">
+          <span class="text-[11px] font-medium text-slate-400">Quick:</span>
+          <button onclick="setPreset('dropoff', 'Port Klang, Selangor', 3.0000, 101.4000)" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-1 rounded-full text-[11px] font-medium transition">Port Klang</button>
+          <button onclick="setPreset('dropoff', 'Giant-Shah Alam Stadium', 3.0782, 101.5458)" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-1 rounded-full text-[11px] font-medium transition">Giant Shah Alam</button>
+          <button onclick="setPreset('dropoff', 'KL Sentral, Kuala Lumpur', 3.1337, 101.6861)" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-1 rounded-full text-[11px] font-medium transition">KL Sentral</button>
+        </div>
+
+      </div>
+
+      <!-- Result Card (Dark Background like Screenshot) -->
+      <div id="summary-card" class="hidden bg-[#18181b] text-white rounded-2xl p-5 shadow-lg space-y-4">
+        
+        <!-- Big RM Display & Distance/Time Header -->
+        <div class="border-b border-zinc-800 pb-4">
+          <div class="flex justify-between items-baseline">
+            <div class="text-4xl font-black text-[#a78bfa] tracking-tight">
+              RM <span id="summary-total">0</span>
+            </div>
+          </div>
+          <div class="flex justify-between items-center text-xs font-semibold text-zinc-300 mt-2">
+            <span id="summary-distance">0.0 km</span>
+            <span id="summary-duration">0 mins</span>
+          </div>
+        </div>
+
+        <!-- Breakdown Itemized Lines -->
+        <div class="space-y-2.5 text-xs">
+          <div class="flex justify-between items-center text-zinc-400">
+            <span>Base Fare</span>
+            <span class="font-medium text-zinc-200">RM <span id="summary-base">5.00</span></span>
+          </div>
+          <div class="flex justify-between items-center text-zinc-400">
+            <span>Distance Fare</span>
+            <span class="font-medium text-zinc-200">RM <span id="summary-dist-fare">0.00</span></span>
+          </div>
+          <div class="flex justify-between items-center text-zinc-400">
+            <span>Tolls (HERE Highway Rates)</span>
+            <span class="font-medium text-zinc-200">RM <span id="summary-tolls">0.00</span></span>
+          </div>
+          <div class="flex justify-between items-center text-zinc-400">
+            <span>Traffic Adjust & Incentive</span>
+            <span class="font-medium text-zinc-200">RM <span id="summary-incentive">0.00</span></span>
+          </div>
+          <div class="flex justify-between items-center text-zinc-400">
+            <span>Out-of-Zone Surcharge</span>
+            <span class="font-medium text-zinc-200">RM <span id="summary-surcharge">0.00</span></span>
+          </div>
+        </div>
+
+        <!-- Modal Action Button -->
+        <div class="pt-2">
+          <button onclick="openInvoiceModal()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-sm">
+            <i class="fa-solid fa-file-invoice-dollar"></i> View Itemized Receipt / Print
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Empty State Indicator -->
+      <div id="empty-state" class="py-8 text-center text-slate-400 space-y-2 border-2 border-dashed border-slate-200 rounded-2xl">
+        <i class="fa-solid fa-map-location-dot text-3xl text-slate-300"></i>
+        <p class="text-xs font-medium">Select pickup & destination to view fare details.</p>
       </div>
 
     </div>
 
   </main>
 
-  <!-- Printable Invoice Modal -->
+  <!-- Toast Notification -->
+  <div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 border border-slate-700">
+    <i class="fa-solid fa-circle-check text-emerald-400"></i>
+    <span id="toast-msg">Copied!</span>
+  </div>
+
+  <!-- Printable Itemized Invoice Modal -->
   <div id="invoice-modal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full border border-slate-200 overflow-hidden my-auto">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden my-6">
       
-      <div class="no-print bg-slate-100 px-4 py-2.5 border-b border-slate-200 flex justify-between items-center">
-        <span class="text-xs font-semibold text-slate-600 uppercase">Fare Receipt</span>
+      <div class="no-print bg-slate-100 px-5 py-3 border-b border-slate-200 flex justify-between items-center">
+        <span class="text-xs font-bold text-slate-600 uppercase tracking-wider">Fare Receipt</span>
         <div class="flex items-center gap-2">
-          <button onclick="window.print()" class="bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium py-1 px-2.5 rounded transition">
-            Print
+          <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-1.5 px-3 rounded-lg transition flex items-center gap-1.5">
+            <i class="fa-solid fa-print"></i> Print
           </button>
-          <button onclick="closeInvoiceModal()" class="text-slate-400 hover:text-slate-600 px-1 text-base">
+          <button onclick="closeInvoiceModal()" class="text-slate-400 hover:text-slate-600 p-1 text-lg">
             <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
       </div>
 
-      <div class="p-5 space-y-4 text-slate-800 bg-white" id="printable-receipt">
-        <div class="border-b border-slate-200 pb-3">
-          <div class="font-bold text-lg text-purple-700">FareNav Transport</div>
-          <div class="text-[11px] text-slate-400" id="inv-date">Date: --</div>
-        </div>
-
-        <div class="text-xs space-y-1.5 bg-slate-50 p-3 rounded-lg border border-slate-100">
-          <div><span class="text-slate-400">From:</span> <span class="font-medium text-slate-800" id="inv-pickup">--</span></div>
-          <div><span class="text-slate-400">To:</span> <span class="font-medium text-slate-800" id="inv-dropoff">--</span></div>
-        </div>
-
-        <div class="text-xs divide-y divide-slate-100">
-          <div class="flex justify-between py-1.5"><span class="text-slate-500">Base Fare</span><span>RM 5.00</span></div>
-          <div class="flex justify-between py-1.5"><span class="text-slate-500">Distance Charge</span><span>RM <span id="inv-dist-val">0.00</span></span></div>
-          <div class="flex justify-between py-1.5"><span class="text-slate-500">Traffic Incentive</span><span>RM <span id="inv-time-val">0.00</span></span></div>
-          <div class="flex justify-between py-1.5"><span class="text-slate-500">Out-of-Zone Surcharge</span><span>RM <span id="inv-surcharge-val">0.00</span></span></div>
-          <div class="flex justify-between py-1.5"><span class="text-slate-500">Highway Tolls</span><span>RM <span id="inv-tolls-val">0.00</span></span></div>
-          <div class="flex justify-between py-2 font-bold text-sm text-slate-900 border-t border-slate-300">
-            <span>Total</span>
-            <span class="text-purple-600">RM <span id="inv-grand-total">0.00</span></span>
+      <div class="p-6 space-y-5 text-slate-800 bg-white" id="printable-receipt">
+        <div class="flex justify-between items-start border-b border-slate-200 pb-4">
+          <div>
+            <div class="font-bold text-lg text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-taxi text-blue-600"></i> FareNav
+            </div>
+            <p class="text-[11px] text-slate-400">Klang Valley Fare Calculation</p>
           </div>
+          <div class="text-right">
+            <div class="text-xs text-slate-500 font-mono" id="inv-num">INV-000</div>
+            <div class="text-[11px] text-slate-400" id="inv-date">--</div>
+          </div>
+        </div>
+
+        <div class="bg-slate-50 rounded-xl p-3 border border-slate-200 text-xs space-y-2">
+          <div>
+            <span class="text-slate-400 text-[10px] uppercase font-bold block">From</span>
+            <span class="font-semibold text-slate-800 truncate block" id="inv-pickup">--</span>
+          </div>
+          <div>
+            <span class="text-slate-400 text-[10px] uppercase font-bold block">To</span>
+            <span class="font-semibold text-slate-800 truncate block" id="inv-dropoff">--</span>
+          </div>
+        </div>
+
+        <div class="space-y-2 text-xs border-b border-slate-200 pb-4">
+          <div class="flex justify-between text-slate-600">
+            <span>Base Fare (Includes 1st km)</span>
+            <span class="font-semibold text-slate-800">RM <span id="inv-base">5.00</span></span>
+          </div>
+          <div class="flex justify-between text-slate-600">
+            <span>Distance Fare (<span id="inv-dist-km">0</span> km)</span>
+            <span class="font-semibold text-slate-800">RM <span id="inv-dist-val">0.00</span></span>
+          </div>
+          <div class="flex justify-between text-slate-600">
+            <span>Highway Tolls</span>
+            <span class="font-semibold text-slate-800">RM <span id="inv-tolls-val">0.00</span></span>
+          </div>
+          <div class="flex justify-between text-slate-600">
+            <span>Traffic Incentive (<span id="inv-dur">0</span> mins)</span>
+            <span class="font-semibold text-slate-800">RM <span id="inv-incentive-val">0.00</span></span>
+          </div>
+          <div class="flex justify-between text-slate-600">
+            <span>Out-of-Zone Surcharge</span>
+            <span class="font-semibold text-slate-800">RM <span id="inv-surcharge-val">0.00</span></span>
+          </div>
+        </div>
+
+        <div class="flex justify-between text-base font-extrabold text-slate-900 pt-1">
+          <span>Estimated Total</span>
+          <span class="text-indigo-600">RM <span id="inv-grand-total">0</span></span>
         </div>
       </div>
 
     </div>
   </div>
 
-  <!-- Toast Notification -->
-  <div id="toast" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs px-4 py-2 rounded-full shadow-xl flex items-center gap-2 transition-all">
-    <i class="fa-solid fa-check-circle text-purple-400"></i>
-    <span id="toast-msg">Copied!</span>
-  </div>
-
   <script>
+    // Configuration & State
     const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
     const KLANG_CENTER = { lat: 3.0449, lng: 101.4456 };
 
     let map, platform, behavior, ui;
-    let pickupCoords = { lat: 3.1390, lng: 101.3742 }; // Default approx Kapar
-    let dropoffCoords = { lat: 3.0782, lng: 101.5298 }; // Default approx Giant Shah Alam
-    let pickupMarker, dropoffMarker, routePolyline, currentCalculationData;
+    let pickupCoords = null;
+    let dropoffCoords = null;
+    let pickupMarker = null;
+    let dropoffMarker = null;
+    let routePolyline = null;
+    let currentCalculationData = null;
 
     window.onload = function() {
+      initClock();
       initHEREMap();
       setupSearchInputs();
-      calculateRoute();
+      
+      // Auto-populate default locations as shown in screenshot
+      setPreset('pickup', 'Jalan Teratai, 41050 Kapar, Selangor', 3.1386, 101.3736);
+      setPreset('dropoff', 'Giant-Shah Alam Stadium', 3.0782, 101.5458);
     };
+
+    function initClock() {
+      const clockElem = document.getElementById('live-clock');
+      setInterval(() => {
+        const now = new Date();
+        clockElem.textContent = now.toLocaleTimeString('en-GB');
+      }, 1000);
+    }
 
     function initHEREMap() {
       platform = new H.service.Platform({ apikey: HERE_API_KEY });
@@ -213,8 +296,29 @@
 
       behavior = new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
       ui = H.ui.UI.createDefault(map, defaultLayers);
-
       window.addEventListener('resize', () => map.getViewPort().resize());
+    }
+
+    function getTrafficMultiplier(distanceKm) {
+      const now = new Date();
+      const day = now.getDay();
+      const hour = now.getHours() + now.getMinutes() / 60;
+      const isWeekend = (day === 0 || day === 6);
+
+      let factor = 1.15;
+      if (!isWeekend) {
+        if ((hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19.5)) factor = 1.55;
+        else if (hour >= 12 && hour <= 14) factor = 1.25;
+      } else if (hour >= 16 && hour <= 21) {
+        factor = 1.35;
+      }
+
+      if (distanceKm > 50) {
+        const attenuation = Math.max(0.6, 1 - (distanceKm - 50) / 100);
+        factor = 1 + (factor - 1) * attenuation;
+      }
+
+      return factor;
     }
 
     function setupSearchInputs() {
@@ -233,10 +337,13 @@
 
     function bindAutosuggest(type, onSelect) {
       const input = document.getElementById(`${type}-input`);
+      const resetBtn = document.getElementById(`reset-${type}`);
       const suggestions = document.getElementById(`${type}-suggestions`);
 
       input.addEventListener('input', async (e) => {
         const query = e.target.value.trim();
+        resetBtn.classList.toggle('hidden', query.length === 0);
+
         if (query.length < 3) {
           suggestions.classList.add('hidden');
           return;
@@ -251,6 +358,13 @@
           console.error("Autosuggest error:", err);
         }
       });
+
+      resetBtn.addEventListener('click', () => {
+        input.value = '';
+        resetBtn.classList.add('hidden');
+        suggestions.classList.add('hidden');
+        clearType(type);
+      });
     }
 
     function renderSuggestions(items, listElem, inputElem, onSelect) {
@@ -264,12 +378,13 @@
 
       validItems.forEach(item => {
         const li = document.createElement('li');
-        li.className = "px-3 py-2 text-xs hover:bg-slate-100 cursor-pointer border-b border-slate-100 flex items-center gap-2";
-        li.innerHTML = `<i class="fa-solid fa-location-dot text-slate-400"></i> <div><div class="font-medium text-slate-800">${item.title}</div></div>`;
+        li.className = "px-3.5 py-2.5 text-xs hover:bg-slate-100 cursor-pointer border-b border-slate-100 flex items-center gap-2 transition";
+        li.innerHTML = `<i class="fa-solid fa-location-dot text-slate-400"></i> <div><div class="font-semibold text-slate-800">${item.title}</div><div class="text-[10px] text-slate-400">${item.address ? item.address.label : ''}</div></div>`;
         
         li.addEventListener('click', () => {
           inputElem.value = item.title;
           listElem.classList.add('hidden');
+          document.getElementById(`reset-${inputElem.id.split('-')[0]}`).classList.remove('hidden');
           onSelect(item.position);
         });
         listElem.appendChild(li);
@@ -278,31 +393,76 @@
       listElem.classList.remove('hidden');
     }
 
+    function setPreset(type, name, lat, lng) {
+      const input = document.getElementById(`${type}-input`);
+      const resetBtn = document.getElementById(`reset-${type}`);
+      input.value = name;
+      resetBtn.classList.remove('hidden');
+
+      const coords = { lat, lng };
+      if (type === 'pickup') pickupCoords = coords;
+      else dropoffCoords = coords;
+
+      setMarker(type, coords);
+      calculateRoute();
+    }
+
+    function setMarker(type, coords) {
+      const pickupIconSvg = `<svg width="28" height="28" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="10" fill="#2563eb" stroke="#ffffff" stroke-width="3"/><circle cx="16" cy="16" r="4" fill="#ffffff"/></svg>`;
+      const dropoffIconSvg = `<svg width="28" height="36" viewBox="0 0 32 40" xmlns="http://www.w3.org/2000/svg"><path d="M16 0C7.16 0 0 7.16 0 16c0 12 16 24 16 24s16-12 16-24c0-8.84-7.16-16-16-16z" fill="#ef4444"/><circle cx="16" cy="16" r="6" fill="#ffffff"/></svg>`;
+
+      if (type === 'pickup') {
+        if (pickupMarker) map.removeObject(pickupMarker);
+        const icon = new H.map.Icon(pickupIconSvg, { anchor: { x: 14, y: 14 } });
+        pickupMarker = new H.map.Marker(coords, { icon });
+        map.addObject(pickupMarker);
+      } else {
+        if (dropoffMarker) map.removeObject(dropoffMarker);
+        const icon = new H.map.Icon(dropoffIconSvg, { anchor: { x: 14, y: 36 } });
+        dropoffMarker = new H.map.Marker(coords, { icon });
+        map.addObject(dropoffMarker);
+      }
+      map.setCenter(coords);
+    }
+
     function swapLocations() {
-      const pInput = document.getElementById('pickup-input');
-      const dInput = document.getElementById('dropoff-input');
-      
-      const tempVal = pInput.value;
-      pInput.value = dInput.value;
-      dInput.value = tempVal;
+      const pickupInput = document.getElementById('pickup-input');
+      const dropoffInput = document.getElementById('dropoff-input');
+
+      const tempValue = pickupInput.value;
+      pickupInput.value = dropoffInput.value;
+      dropoffInput.value = tempValue;
 
       const tempCoords = pickupCoords;
       pickupCoords = dropoffCoords;
       dropoffCoords = tempCoords;
 
+      if (pickupCoords) setMarker('pickup', pickupCoords);
+      if (dropoffCoords) setMarker('dropoff', dropoffCoords);
+
+      document.getElementById('reset-pickup').classList.toggle('hidden', !pickupInput.value);
+      document.getElementById('reset-dropoff').classList.toggle('hidden', !dropoffInput.value);
+
       calculateRoute();
     }
 
-    function setMarker(type, coords) {
+    function clearType(type) {
       if (type === 'pickup') {
+        pickupCoords = null;
         if (pickupMarker) map.removeObject(pickupMarker);
-        pickupMarker = new H.map.Marker(coords);
-        map.addObject(pickupMarker);
       } else {
+        dropoffCoords = null;
         if (dropoffMarker) map.removeObject(dropoffMarker);
-        dropoffMarker = new H.map.Marker(coords);
-        map.addObject(dropoffMarker);
       }
+
+      if (routePolyline) {
+        map.removeObject(routePolyline);
+        routePolyline = null;
+      }
+
+      document.getElementById('summary-card').classList.add('hidden');
+      document.getElementById('copy-btn').classList.add('hidden');
+      document.getElementById('empty-state').classList.remove('hidden');
     }
 
     async function calculateRoute() {
@@ -320,48 +480,56 @@
         const section = route.sections[0];
 
         const distanceKm = section.summary.length / 1000;
-        const durationMin = section.summary.duration / 60;
+        const baseDurationMin = section.summary.duration / 60;
 
         if (routePolyline) map.removeObject(routePolyline);
         const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
         routePolyline = new H.map.Polyline(lineString, {
-          style: { strokeColor: '#a855f7', lineWidth: 5 }
+          style: { strokeColor: '#a78bfa', lineWidth: 6 }
         });
         map.addObject(routePolyline);
-        map.getViewModel().setLookAtData({ bounds: routePolyline.getBoundingBox(), margin: 30 });
+        map.getViewModel().setLookAtData({ bounds: routePolyline.getBoundingBox(), margin: 40 });
 
         let totalTolls = 0;
         if (section.tolls) {
           section.tolls.forEach(toll => {
             if (toll.fares) {
-              toll.fares.forEach(fare => totalTolls += (fare.price || 0));
+              toll.fares.forEach(fare => { totalTolls += (fare.price || 0); });
             }
           });
         }
 
+        const trafficFactor = getTrafficMultiplier(distanceKm);
+        const adjustedDurationMin = baseDurationMin * trafficFactor;
+
         const baseFare = 5.00;
         const chargeableDist = Math.max(0, distanceKm - 1.0);
         const distanceFare = chargeableDist * 1.25;
-        const trafficIncentive = durationMin * 0.20;
+        const trafficIncentive = adjustedDurationMin * 0.20;
 
         let surcharge = 0;
         if (distanceKm > 12) {
-          surcharge = distanceFare * (0.45 * Math.min(1, (distanceKm - 12) / 30));
+          const surchargeRatio = Math.min(1, (distanceKm - 12) / 30);
+          surcharge = distanceFare * (0.45 * surchargeRatio);
         }
 
-        const totalFare = Math.round(baseFare + distanceFare + trafficIncentive + surcharge + totalTolls);
+        const subtotal = baseFare + distanceFare + trafficIncentive + surcharge;
+        const totalFareExact = subtotal + totalTolls;
+        const totalFareRounded = Math.round(totalFareExact); // Exact RM 34 rounding matching screenshot
 
         currentCalculationData = {
-          pickupName: document.getElementById('pickup-input').value,
-          dropoffName: document.getElementById('dropoff-input').value,
+          pickupName: document.getElementById('pickup-input').value || 'Pickup',
+          dropoffName: document.getElementById('dropoff-input').value || 'Destination',
           distanceKm,
-          durationMin,
+          adjustedDurationMin,
           baseFare,
+          chargeableDist,
           distanceFare,
           trafficIncentive,
           surcharge,
           totalTolls,
-          totalFare
+          totalFareExact,
+          totalFareRounded
         };
 
         updateSummaryCard(currentCalculationData);
@@ -372,31 +540,39 @@
     }
 
     function updateSummaryCard(d) {
-      document.getElementById('summary-total').textContent = d.totalFare;
+      document.getElementById('summary-total').textContent = d.totalFareRounded;
       document.getElementById('summary-distance').textContent = `${d.distanceKm.toFixed(1)} km`;
-      document.getElementById('summary-duration').textContent = `${Math.round(d.durationMin)} mins`;
+      document.getElementById('summary-duration').textContent = `${Math.round(d.adjustedDurationMin)} mins`;
 
       document.getElementById('summary-base').textContent = d.baseFare.toFixed(2);
       document.getElementById('summary-dist-fare').textContent = d.distanceFare.toFixed(2);
       document.getElementById('summary-tolls').textContent = d.totalTolls.toFixed(2);
       document.getElementById('summary-incentive').textContent = d.trafficIncentive.toFixed(2);
       document.getElementById('summary-surcharge').textContent = d.surcharge.toFixed(2);
+
+      document.getElementById('empty-state').classList.add('hidden');
+      document.getElementById('summary-card').classList.remove('hidden');
+      document.getElementById('copy-btn').classList.remove('hidden');
     }
 
     function openInvoiceModal() {
       if (!currentCalculationData) return;
       const d = currentCalculationData;
-
       const now = new Date();
-      document.getElementById('inv-date').textContent = `Date: ${now.toLocaleDateString('en-MY')}`;
+
+      document.getElementById('inv-num').textContent = `INV-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${Math.floor(100+Math.random()*900)}`;
+      document.getElementById('inv-date').textContent = now.toLocaleDateString('en-MY');
+
       document.getElementById('inv-pickup').textContent = d.pickupName;
       document.getElementById('inv-dropoff').textContent = d.dropoffName;
-
+      document.getElementById('inv-base').textContent = d.baseFare.toFixed(2);
+      document.getElementById('inv-dist-km').textContent = d.chargeableDist.toFixed(1);
       document.getElementById('inv-dist-val').textContent = d.distanceFare.toFixed(2);
-      document.getElementById('inv-time-val').textContent = d.trafficIncentive.toFixed(2);
-      document.getElementById('inv-surcharge-val').textContent = d.surcharge.toFixed(2);
       document.getElementById('inv-tolls-val').textContent = d.totalTolls.toFixed(2);
-      document.getElementById('inv-grand-total').textContent = d.totalFare.toFixed(2);
+      document.getElementById('inv-dur').textContent = Math.round(d.adjustedDurationMin);
+      document.getElementById('inv-incentive-val').textContent = d.trafficIncentive.toFixed(2);
+      document.getElementById('inv-surcharge-val').textContent = d.surcharge.toFixed(2);
+      document.getElementById('inv-grand-total').textContent = d.totalFareRounded;
 
       document.getElementById('invoice-modal').classList.remove('hidden');
     }
@@ -408,15 +584,26 @@
     function copyFareSummary() {
       if (!currentCalculationData) return;
       const d = currentCalculationData;
-      const text = `Fare: RM ${d.totalFare} | ${d.pickupName} -> ${d.dropoffName} (${d.distanceKm.toFixed(1)} km)`;
-      
-      navigator.clipboard.writeText(text);
-      showToast("Fare copied to clipboard!");
+
+      const text = `🚕 *FARENNAV RIDE ESTIMATE*\n` +
+                   `📍 Start: ${d.pickupName}\n` +
+                   `🏁 Destination: ${d.dropoffName}\n` +
+                   `📏 ${d.distanceKm.toFixed(1)} km | ⏱️ ${Math.round(d.adjustedDurationMin)} mins\n\n` +
+                   `💰 Estimated Total: RM ${d.totalFareRounded}`;
+
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+
+      showToast("Copied to clipboard!");
     }
 
-    function showToast(msg) {
+    function showToast(message) {
       const toast = document.getElementById('toast');
-      document.getElementById('toast-msg').textContent = msg;
+      document.getElementById('toast-msg').textContent = message;
       toast.classList.remove('hidden');
       setTimeout(() => toast.classList.add('hidden'), 2500);
     }
