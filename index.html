@@ -2,691 +2,724 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rideshare MY - Professional Fare Estimator</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Private Sedan Fare - Malaysia Transparent Pricing</title>
     <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
         body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #f0f2f5;
             margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #f8f9fa;
+            padding: 20px;
+            color: #1a1a2e;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 24px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        h1 {
+            font-size: 24px;
+            margin: 0 0 4px 0;
+            color: #1a1a2e;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 13px;
+            margin-bottom: 20px;
+            border-left: 3px solid #00a896;
+            padding-left: 12px;
+        }
+
+        .fare-component {
+            background: #f8f9fa;
+            border-radius: 16px;
+            padding: 12px;
+            margin: 12px 0;
+        }
+
+        .component-line {
             display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden; 
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+            font-size: 14px;
+        }
+
+        .component-line.total {
+            border-bottom: none;
+            font-weight: 700;
+            font-size: 18px;
+            margin-top: 8px;
+            padding-top: 12px;
+            border-top: 2px solid #dee2e6;
+        }
+
+        .label {
+            color: #495057;
+        }
+
+        .value {
+            font-weight: 600;
             color: #212529;
         }
-        #container {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            position: relative;
-        }
-        #map {
-            height: 35vh;
-            width: 100%;
-            z-index: 1;
-        }
-        #search-panel {
-            flex: 1;
-            background: white;
-            padding: 16px;
-            box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
-            z-index: 10;
-            box-sizing: border-box;
-            border-top-left-radius: 16px;
-            border-top-right-radius: 16px;
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
-        }
-        .header-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-        h2 {
-            margin: 0;
-            font-size: 18px;
-            font-weight: 700;
-            color: #111;
-        }
-        
-        .routing-wrapper {
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-bottom: 10px;
-        }
-        .input-container {
-            position: relative;
-            display: flex;
-            align-items: center;
-        }
-        input {
-            width: 100%;
-            padding: 12px 64px 12px 12px;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
-            box-sizing: border-box;
-            background-color: #f9f9f9;
-            transition: all 0.2s ease;
-        }
-        #pickup {
-            padding-right: 88px;
-        }
-        input:focus {
-            outline: none;
-            border-color: #8e24aa;
-            background-color: #fff;
-            box-shadow: 0 0 0 2px rgba(142, 36, 170, 0.1);
-        }
-        
-        .action-group {
-            position: absolute;
-            right: 8px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            z-index: 5;
-        }
-        .icon-btn {
-            border: none;
-            background: none;
-            color: #757575;
-            font-size: 16px;
-            cursor: pointer;
-            padding: 6px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.2s;
-        }
-        .icon-btn:hover {
-            background-color: #f0f0f0;
-            color: #8e24aa;
-        }
-        .clear-btn {
-            display: none;
-            font-size: 18px;
-            color: #aaa;
-        }
-        
-        .swap-container {
-            position: absolute;
-            right: 48px;
-            top: 50%;
-            transform: translateY(-50%);
-            z-index: 15;
-        }
-        .swap-btn {
-            background: white;
-            border: 1px solid #e0e0e0;
-            color: #8e24aa;
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-            transition: all 0.2s ease;
-            font-size: 14px;
-        }
-        .swap-btn:hover {
-            transform: scale(1.1) translateY(-45%);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            background-color: #fcf5ff;
+
+        .total .value {
+            color: #00a896;
+            font-size: 22px;
         }
 
-        .suggestions {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: white;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            max-height: 200px; 
-            overflow-y: auto;
-            z-index: 1000;
-            box-shadow: 0 6px 16px rgba(0,0,0,0.1);
-            display: none;
-        }
-        .suggestion-item {
-            padding: 12px;
-            cursor: pointer;
-            font-size: 13px;
-            line-height: 1.4;
-            border-bottom: 1px solid #f5f5f5;
-        }
-        .suggestion-item:hover {
-            background-color: #f5f5f5;
-        }
-        
-        #result-card {
-            background: #1c1c1e;
-            color: white;
-            padding: 16px;
+        select, input {
+            width: 100%;
+            padding: 14px;
+            border: 1.5px solid #e9ecef;
             border-radius: 12px;
-            margin-top: 10px;
-            display: none;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.15);
-        }
-        .fare-header-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-        .fare-header {
-            font-size: 32px;
-            font-weight: 800;
-            color: #b388ff;
-        }
-        .fare-meta {
-            font-size: 13px;
-            color: #e5e5ea;
-            display: flex;
-            justify-content: space-between;
-            font-weight: 500;
-        }
-        #invoice-details {
-            margin-top: 12px;
-            border-top: 1px dashed #3a3a3c;
-            padding-top: 12px;
-            display: block;
-        }
-        .detail-row {
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-            color: #aeaeb2;
-            margin-bottom: 8px;
-        }
-        .detail-row.total-bold {
-            color: #fff;
-            font-weight: 600;
-            border-top: 1px solid #2c2c2e;
-            padding-top: 8px;
-            margin-bottom: 0;
-            font-size: 14px;
-        }
-        #error-msg {
-            color: #ff3b30;
-            font-size: 13px;
-            margin-top: 8px;
-            display: none;
-            font-weight: 500;
+            font-size: 15px;
+            margin: 8px 0 12px 0;
+            font-family: inherit;
+            background: white;
         }
 
-        @media(min-width: 768px) {
-            #container {
-                flex-direction: row-reverse;
-            }
-            #map {
-                height: 100%;
-                flex: 1;
-            }
-            #search-panel {
-                width: 380px;
-                height: 100%;
-                border-radius: 0;
-                box-shadow: -4px 0 20px rgba(0,0,0,0.05);
-            }
+        select:focus, input:focus {
+            outline: none;
+            border-color: #00a896;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 12px 0;
+        }
+
+        .checkbox-group input {
+            width: auto;
+            margin: 0;
+        }
+
+        button {
+            background: #00a896;
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 40px;
+            font-size: 18px;
+            font-weight: 600;
+            width: 100%;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin: 8px 0;
+        }
+
+        button:active {
+            transform: scale(0.98);
+            background: #00897b;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .traffic-smooth { background: #d4edda; color: #155724; }
+        .traffic-moderate { background: #fff3cd; color: #856404; }
+        .traffic-heavy { background: #ffe5b4; color: #b85c00; }
+        .traffic-severe { background: #f8d7da; color: #721c24; }
+
+        .peak-active { background: #ffeb3b20; border-left: 4px solid #ffc107; }
+        .zone-active { background: #e3f2fd; border-left: 4px solid #2196f3; }
+
+        hr { margin: 16px 0; border: none; border-top: 1px solid #e9ecef; }
+
+        .info-text {
+            font-size: 11px;
+            color: #6c757d;
+            text-align: center;
+            margin-top: 16px;
+        }
+
+        .location-detail {
+            font-size: 12px;
+            color: #00a896;
+            margin-top: 4px;
+            margin-bottom: 12px;
+            padding: 8px;
+            background: #e8f5e9;
+            border-radius: 8px;
+        }
+
+        @media (max-width: 480px) {
+            body { padding: 12px; }
+            .card { padding: 16px; }
         }
     </style>
 </head>
 <body>
+<div class="container">
+    <div class="card">
+        <h1>🚗 Malaysia Private Sedan</h1>
+        <div class="subtitle">Fixed rates • No surge • Geo-zones by state law</div>
 
-<div id="container">
-    <div id="map"></div>
-    
-    <div id="search-panel">
-        <div class="header-row">
-            <h2>Fare Estimator</h2>
+        <!-- Pickup Location -->
+        <label>📍 Pickup location (state + area)</label>
+        <select id="pickupState">
+            <option value="">Select state</option>
+            <option value="KL">Kuala Lumpur (Federal Territory)</option>
+            <option value="Putrajaya">Putrajaya</option>
+            <option value="Selangor">Selangor</option>
+            <option value="Penang">Penang</option>
+            <option value="Johor">Johor</option>
+            <option value="Perak">Perak</option>
+            <option value="Kedah">Kedah</option>
+            <option value="Perlis">Perlis</option>
+            <option value="Negeri Sembilan">Negeri Sembilan</option>
+            <option value="Melaka">Melaka</option>
+            <option value="Pahang">Pahang</option>
+            <option value="Terengganu">Terengganu</option>
+            <option value="Kelantan">Kelantan</option>
+            <option value="Sabah">Sabah</option>
+            <option value="Sarawak">Sarawak</option>
+            <option value="Labuan">Labuan</option>
+        </select>
+
+        <select id="pickupArea">
+            <option value="">Select area type</option>
+        </select>
+        <div id="pickupDetail" class="location-detail"></div>
+
+        <!-- Dropoff Location -->
+        <label>📍 Dropoff location (state + area)</label>
+        <select id="dropoffState">
+            <option value="">Select state</option>
+            <option value="KL">Kuala Lumpur (Federal Territory)</option>
+            <option value="Putrajaya">Putrajaya</option>
+            <option value="Selangor">Selangor</option>
+            <option value="Penang">Penang</option>
+            <option value="Johor">Johor</option>
+            <option value="Perak">Perak</option>
+            <option value="Kedah">Kedah</option>
+            <option value="Perlis">Perlis</option>
+            <option value="Negeri Sembilan">Negeri Sembilan</option>
+            <option value="Melaka">Melaka</option>
+            <option value="Pahang">Pahang</option>
+            <option value="Terengganu">Terengganu</option>
+            <option value="Kelantan">Kelantan</option>
+            <option value="Sabah">Sabah</option>
+            <option value="Sarawak">Sarawak</option>
+            <option value="Labuan">Labuan</option>
+        </select>
+
+        <select id="dropoffArea">
+            <option value="">Select area type</option>
+        </select>
+        <div id="dropoffDetail" class="location-detail"></div>
+
+        <!-- Trip Details -->
+        <label>📏 Distance (km)</label>
+        <input type="number" id="distance" value="15" step="0.5">
+
+        <label>⏱️ Trip time (minutes)</label>
+        <input type="number" id="timeMinutes" value="25" step="1">
+
+        <label>🚦 Traffic speed (km/h)</label>
+        <select id="trafficSpeed">
+            <option value="smooth">Smooth (>40 km/h)</option>
+            <option value="moderate">Moderate (25-40 km/h)</option>
+            <option value="heavy">Heavy (15-25 km/h)</option>
+            <option value="severe">Severe (&lt;15 km/h)</option>
+        </select>
+
+        <label>⏰ Peak hour multiplier</label>
+        <select id="peakMultiplier">
+            <option value="1.0">No peak (0%)</option>
+            <option value="1.15">Peak +15% (6:30-9:30 AM)</option>
+            <option value="1.20">Peak +20% (5:00-8:30 PM)</option>
+            <option value="1.25">Friday evening +25%</option>
+            <option value="1.30">Rain + peak +30%</option>
+        </select>
+
+        <div class="checkbox-group">
+            <input type="checkbox" id="includeTolls">
+            <label>🛣️ Include tolls/parking (+RM12)</label>
         </div>
-        
-        <div class="routing-wrapper">
-            <div class="input-container">
-                <input type="text" id="pickup" placeholder="Enter Pickup Location..." autocomplete="off" enterkeyhint="search">
-                <div class="action-group">
-                    <button class="icon-btn" id="current-loc-btn" title="Use current location">🎯</button>
-                    <button class="icon-btn clear-btn" id="clear-pickup">&times;</button>
-                </div>
-                <div id="pickup-suggestions" class="suggestions"></div>
-            </div>
-            
-            <div class="swap-container">
-                <button class="swap-btn" id="swap-locations-btn" title="Swap locations" onclick="executeLocationSwap()">⇅</button>
-            </div>
-            
-            <div class="input-container">
-                <input type="text" id="dropoff" placeholder="Enter Drop-off Location..." autocomplete="off" enterkeyhint="search">
-                <div class="action-group">
-                    <button class="icon-btn clear-btn" id="clear-dropoff">&times;</button>
-                </div>
-                <div id="dropoff-suggestions" class="suggestions"></div>
-            </div>
-        </div>
 
-        <div id="error-msg"></div>
+        <button onclick="calculateFare()">💰 Calculate Fare</button>
 
-        <div id="result-card">
-            <div class="fare-header-row">
-                <div id="total-fare" class="fare-header">RM --</div>
-            </div>
-            <div class="fare-meta">
-                <span id="fare-distance">0 km</span>
-                <span id="fare-duration">0 mins</span>
-            </div>
-            
-            <div id="invoice-details">
-                <div class="detail-row">
-                    <span>Base Fare</span>
-                    <span id="calc-base-fare">RM 5.00</span>
-                </div>
-                <div class="detail-row">
-                    <span>Distance Fare</span>
-                    <span id="calc-ride-distance-rate">RM 0.00</span>
-                </div>
-                <div class="detail-row">
-                    <span>Traffic Adjust & Incentive</span>
-                    <span id="calc-incentive">RM 0.00</span>
-                </div>
-                
-                <div class="detail-row" id="deadhead-km-row" style="display: none;">
-                    <span>Out-of-Zone Surcharge</span>
-                    <span id="calc-deadhead-km">RM 0.00</span>
-                </div>
+        <div id="results" style="margin-top: 20px;"></div>
+    </div>
 
-                <div class="detail-row total-bold">
-                    <span>Rounded Final Total</span>
-                    <span id="calc-grand" style="color: #b388ff;">RM 0.00</span>
-                </div>
-            </div>
+    <div class="card">
+        <div class="info-text">
+            ✅ Based on Malaysia DOSM & MCMC geotypes • Premium zones per state law<br>
+            Base RM8 • Distance RM1.40/km • Driver guarantee RM14/trip
         </div>
     </div>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script>
-    const map = L.map('map').setView([3.1390, 101.6869], 11);
+    // ============================================
+    // MALAYSIA ZONE DATABASE (Official classifications)
+    // Based on: DOSM Census, MCMC NFCP, State Property Laws
+    // ============================================
+
+    const MALAYSIA_ZONES = {
+        // Federal Territories
+        "KL": {
+            name: "Kuala Lumpur",
+            premiumZone: true,
+            premiumTier: "highest",
+            areaOptions: {
+                "dense_urban": { label: "Dense Urban - KLCC, Bukit Bintang, Mont Kiara, Bangsar", deadheadRisk: "low", zonePremium: 8 },
+                "standard": { label: "Standard - Other KL areas", deadheadRisk: "low", zonePremium: 5 }
+            }
+        },
+        "Putrajaya": {
+            name: "Putrajaya",
+            premiumZone: true,
+            premiumTier: "premium",
+            areaOptions: {
+                "dense_urban": { label: "Administrative core - All Putrajaya", deadheadRisk: "low", zonePremium: 5 }
+            }
+        },
+        "Labuan": {
+            name: "Labuan",
+            premiumZone: true,
+            premiumTier: "financial",
+            areaOptions: {
+                "dense_urban": { label: "Financial territory - Labuan town", deadheadRisk: "low", zonePremium: 4 },
+                "rural": { label: "Outer Labuan", deadheadRisk: "medium", zonePremium: 0 }
+            }
+        },
+        
+        // Selangor
+        "Selangor": {
+            name: "Selangor",
+            premiumZone: true,
+            premiumTier: "zone1",
+            areaOptions: {
+                "zone1": { label: "Zone 1 (Premium): Petaling, Gombak, Hulu Langat, Sepang, Klang", deadheadRisk: "low", zonePremium: 7 },
+                "zone2": { label: "Zone 2 (Mid-Premium): Kuala Selangor, Kuala Langat", deadheadRisk: "medium", zonePremium: 3 },
+                "zone3": { label: "Zone 3 (Standard): Hulu Selangor, Sabak Bernam", deadheadRisk: "high", zonePremium: 0 },
+                "rural": { label: "Rural - Deep inland Hulu Selangor", deadheadRisk: "high", zonePremium: 0 },
+                "very_remote": { label: "Very Remote - Sabak Bernam deep pockets", deadheadRisk: "very_high", zonePremium: 0 }
+            }
+        },
+        
+        // Penang
+        "Penang": {
+            name: "Penang",
+            premiumZone: true,
+            areaOptions: {
+                "island": { label: "Island Premium Zone: George Town, Batu Ferringhi, Bayan Lepas", deadheadRisk: "low", zonePremium: 6 },
+                "mainland": { label: "Mainland: Seberang Perai (North, Central, South)", deadheadRisk: "medium", zonePremium: 0 },
+                "rural": { label: "Rural: Balik Pulau, Kepala Batas", deadheadRisk: "medium", zonePremium: 0 }
+            }
+        },
+        
+        // Johor
+        "Johor": {
+            name: "Johor",
+            premiumZone: true,
+            areaOptions: {
+                "iskandar": { label: "Iskandar Malaysia Zone: Johor Bahru, Kulai, Pontian parts", deadheadRisk: "low", zonePremium: 6 },
+                "dense_urban": { label: "Dense Urban: JB metro, Tebrau, Skudai, Pasir Gudang, Muar, Batu Pahat", deadheadRisk: "low", zonePremium: 4 },
+                "rural": { label: "Rural: Segamat, Kota Tinggi, Mersing, Tangkak", deadheadRisk: "high", zonePremium: 0 },
+                "very_remote": { label: "Very Remote: Endau-Rompin, Mersing islands", deadheadRisk: "very_high", zonePremium: 0 }
+            }
+        },
+        
+        // Perak
+        "Perak": {
+            name: "Perak",
+            premiumZone: false,
+            areaOptions: {
+                "dense_urban": { label: "Dense Urban: Ipoh, Taiping, Seri Manjung, Teluk Intan", deadheadRisk: "medium", zonePremium: 3 },
+                "rural": { label: "Rural: Kuala Kangsar, Parit Buntar, Tapah, Kampar", deadheadRisk: "high", zonePremium: 0 },
+                "very_remote": { label: "Very Remote: Hulu Perak (Grik, Belum-Temenggor), Lenggong", deadheadRisk: "very_high", zonePremium: 0 }
+            }
+        },
+        
+        // Kedah
+        "Kedah": {
+            name: "Kedah",
+            premiumZone: true,
+            areaOptions: {
+                "langkawi": { label: "Langkawi Island (Premium Duty-Free Zone)", deadheadRisk: "high", zonePremium: 5 },
+                "dense_urban": { label: "Dense Urban: Alor Setar, Sungai Petani, Kulim", deadheadRisk: "medium", zonePremium: 0 },
+                "rural": { label: "Rural: Baling, Sik, Pendang, Yan, Padang Terap", deadheadRisk: "high", zonePremium: 0 },
+                "very_remote": { label: "Very Remote: Deep forests of Sik, Baling, Langkawi outer islands", deadheadRisk: "very_high", zonePremium: 0 }
+            }
+        },
+        
+        // Perlis
+        "Perlis": {
+            name: "Perlis",
+            premiumZone: false,
+            areaOptions: {
+                "dense_urban": { label: "Dense Urban: Kangar", deadheadRisk: "medium", zonePremium: 0 },
+                "rural": { label: "Rural: Arau", deadheadRisk: "high", zonePremium: 0 }
+            }
+        },
+        
+        // Negeri Sembilan
+        "Negeri Sembilan": {
+            name: "Negeri Sembilan",
+            premiumZone: false,
+            areaOptions: {
+                "dense_urban": { label: "Dense Urban: Seremban, Senawang, Nilai", deadheadRisk: "medium", zonePremium: 2 },
+                "rural": { label: "Rural: Rembau, Jelebu, Kuala Pilah, Port Dickson hinterlands", deadheadRisk: "high", zonePremium: 0 },
+                "very_remote": { label: "Very Remote: Deep Jelebu interior, Titiwangsa range", deadheadRisk: "very_high", zonePremium: 0 }
+            }
+        },
+        
+        // Melaka
+        "Melaka": {
+            name: "Melaka",
+            premiumZone: false,
+            areaOptions: {
+                "dense_urban": { label: "Dense Urban: Melaka City, Alor Gajah", deadheadRisk: "medium", zonePremium: 2 },
+                "rural": { label: "Rural: Jasin, rural hinterlands", deadheadRisk: "high", zonePremium: 0 }
+            }
+        },
+        
+        // Pahang
+        "Pahang": {
+            name: "Pahang",
+            premiumZone: false,
+            areaOptions: {
+                "dense_urban": { label: "Dense Urban: Kuantan, Temerloh, Bentong parts", deadheadRisk: "medium", zonePremium: 0 },
+                "rural": { label: "Rural: Pekan, Maran, Rompin, Raub, Jerantut, Lipis", deadheadRisk: "high", zonePremium: 0 },
+                "very_remote": { label: "Very Remote: Taman Negara, Cameron Highlands outposts, Muadzam Shah interior", deadheadRisk: "very_high", zonePremium: 0 }
+            }
+        },
+        
+        // Terengganu
+        "Terengganu": {
+            name: "Terengganu",
+            premiumZone: false,
+            areaOptions: {
+                "dense_urban": { label: "Dense Urban: Kuala Terengganu", deadheadRisk: "medium", zonePremium: 0 },
+                "rural": { label: "Rural: Besut, Marang, Dungun, Kemaman", deadheadRisk: "high", zonePremium: 0 },
+                "very_remote": { label: "Very Remote: Hulu Terengganu (Tasik Kenyir)", deadheadRisk: "very_high", zonePremium: 0 }
+            }
+        },
+        
+        // Kelantan
+        "Kelantan": {
+            name: "Kelantan",
+            premiumZone: false,
+            areaOptions: {
+                "dense_urban": { label: "Dense Urban: Kota Bharu, Kubang Kerian, Tanah Merah", deadheadRisk: "medium", zonePremium: 0 },
+                "rural": { label: "Rural: Pasir Mas, Tumpat, Bachok, Machang", deadheadRisk: "high", zonePremium: 0 },
+                "very_remote": { label: "Very Remote: Gua Musang, Jeli deep mountain settlements", deadheadRisk: "very_high", zonePremium: 0 }
+            }
+        },
+        
+        // Sabah
+        "Sabah": {
+            name: "Sabah",
+            premiumZone: false,
+            areaOptions: {
+                "dense_urban": { label: "Dense Urban: Kota Kinabalu, Sandakan, Tawau", deadheadRisk: "medium", zonePremium: 0 },
+                "rural": { label: "Rural: Penampang, Tuaran, Papar, Beaufort, Lahad Datu, Keningau", deadheadRisk: "high", zonePremium: 0 },
+                "very_remote": { label: "Very Remote: Kinabatangan, Nabawan, Pensiangan, Tongod, Ranau, Banggi Island", deadheadRisk: "very_high", zonePremium: 0 }
+            }
+        },
+        
+        // Sarawak
+        "Sarawak": {
+            name: "Sarawak",
+            premiumZone: false,
+            areaOptions: {
+                "dense_urban": { label: "Dense Urban: Kuching, Miri, Sibu, Bintulu", deadheadRisk: "medium", zonePremium: 0 },
+                "rural": { label: "Rural: Bau, Serian, Sri Aman, Sarikei, Mukah, Limbang, Lawas", deadheadRisk: "high", zonePremium: 0 },
+                "very_remote": { label: "Very Remote: Kapit, Belaga, Kanowit, Baram, Mulu National Park", deadheadRisk: "very_high", zonePremium: 0 }
+            }
+        }
+    };
+
+    // Deadhead risk multipliers
+    const DEADHEAD_MULTIPLIER = {
+        "low": 0.00,      // 0% - Dense urban
+        "medium": 0.25,   // 25% - Nearby interstate
+        "high": 0.45,     // 45% - Rural
+        "very_high": 0.70 // 70% - Very remote
+    };
+
+    const CONFIG = {
+        baseFare: 8.00,
+        baseDistanceRate: 1.40,
+        idleRatePerMin: 0.30,
+        trafficMultiplier: { smooth: 1.00, moderate: 1.10, heavy: 1.20, severe: 1.35 },
+        driverMinGuarantee: 14.00,
+        tollsEstimate: 12.00
+    };
+
+    // Populate area dropdowns based on state selection
+    function populateAreaDropdowns() {
+        const pickupState = document.getElementById('pickupState').value;
+        const dropoffState = document.getElementById('dropoffState').value;
+        
+        const pickupSelect = document.getElementById('pickupArea');
+        const dropoffSelect = document.getElementById('dropoffArea');
+        
+        if (pickupState && MALAYSIA_ZONES[pickupState]) {
+            const zones = MALAYSIA_ZONES[pickupState].areaOptions;
+            pickupSelect.innerHTML = '<option value="">Select area type</option>';
+            for (const [key, value] of Object.entries(zones)) {
+                pickupSelect.innerHTML += `<option value="${key}">${value.label}</option>`;
+            }
+        } else {
+            pickupSelect.innerHTML = '<option value="">Select area type</option>';
+        }
+        
+        if (dropoffState && MALAYSIA_ZONES[dropoffState]) {
+            const zones = MALAYSIA_ZONES[dropoffState].areaOptions;
+            dropoffSelect.innerHTML = '<option value="">Select area type</option>';
+            for (const [key, value] of Object.entries(zones)) {
+                dropoffSelect.innerHTML += `<option value="${key}">${value.label}</option>`;
+            }
+        } else {
+            dropoffSelect.innerHTML = '<option value="">Select area type</option>';
+        }
+        
+        updateLocationDetails();
+    }
     
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-
-    const HERE_API_KEY = "PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk"; 
-
-    let pickupMarker = null, dropoffMarker = null, routeLine = null;
-    let pickupCoords = null, dropoffCoords = null;
-    let currentRouteTimeout = null;
-
-    setupAutocomplete('pickup', 'pickup-suggestions', 'clear-pickup', (coords) => {
-        pickupCoords = coords;
-        updateMarker('pickup', coords);
-        checkAndProcessRoute();
-    }, () => {
-        pickupCoords = null;
-        if (pickupMarker) { map.removeLayer(pickupMarker); pickupMarker = null; }
-        resetCalculationDisplay();
-    });
-
-    setupAutocomplete('dropoff', 'dropoff-suggestions', 'clear-dropoff', (coords) => {
-        dropoffCoords = coords;
-        updateMarker('dropoff', coords);
-        checkAndProcessRoute();
-    }, () => {
-        dropoffCoords = null;
-        if (dropoffMarker) { map.removeLayer(dropoffMarker); dropoffMarker = null; }
-        resetCalculationDisplay();
-    });
-
-    document.getElementById('current-loc-btn').addEventListener('click', () => {
-        if (!navigator.geolocation) {
-            showError("Compass or location trace features are unsupported by this application shell.");
+    function updateLocationDetails() {
+        const pickupState = document.getElementById('pickupState').value;
+        const pickupArea = document.getElementById('pickupArea').value;
+        const dropoffState = document.getElementById('dropoffState').value;
+        const dropoffArea = document.getElementById('dropoffArea').value;
+        
+        const pickupDetail = document.getElementById('pickupDetail');
+        const dropoffDetail = document.getElementById('dropoffDetail');
+        
+        if (pickupState && pickupArea && MALAYSIA_ZONES[pickupState]) {
+            const area = MALAYSIA_ZONES[pickupState].areaOptions[pickupArea];
+            pickupDetail.innerHTML = `🏷️ Premium zone: ${area.zonePremium > 0 ? 'Yes (+RM' + area.zonePremium + ')' : 'No'} • Deadhead risk: ${area.deadheadRisk}`;
+        } else {
+            pickupDetail.innerHTML = '';
+        }
+        
+        if (dropoffState && dropoffArea && MALAYSIA_ZONES[dropoffState]) {
+            const area = MALAYSIA_ZONES[dropoffState].areaOptions[dropoffArea];
+            dropoffDetail.innerHTML = `🏷️ Premium zone: ${area.zonePremium > 0 ? 'Yes (+RM' + area.zonePremium + ')' : 'No'} • Deadhead risk: ${area.deadheadRisk}`;
+        } else {
+            dropoffDetail.innerHTML = '';
+        }
+    }
+    
+    function getAreaData(state, areaKey) {
+        if (!state || !areaKey || !MALAYSIA_ZONES[state]) return null;
+        return MALAYSIA_ZONES[state].areaOptions[areaKey] || null;
+    }
+    
+    function getDeadheadRisk(state, areaKey) {
+        const area = getAreaData(state, areaKey);
+        if (!area) return "medium";
+        return area.deadheadRisk;
+    }
+    
+    function getZonePremium(state, areaKey) {
+        const area = getAreaData(state, areaKey);
+        if (!area) return 0;
+        return area.zonePremium || 0;
+    }
+    
+    function calculateDeadheadRate(pickupRisk, dropoffRisk) {
+        const riskLevels = ["low", "medium", "high", "very_high"];
+        const riskValues = { "low": 0, "medium": 1, "high": 2, "very_high": 3 };
+        
+        const pickupVal = riskValues[pickupRisk] || 1;
+        const dropoffVal = riskValues[dropoffRisk] || 1;
+        
+        const maxRisk = Math.max(pickupVal, dropoffVal);
+        const riskLevel = riskLevels[maxRisk];
+        
+        return DEADHEAD_MULTIPLIER[riskLevel] || 0.25;
+    }
+    
+    function calculateFare() {
+        const pickupState = document.getElementById('pickupState').value;
+        const pickupArea = document.getElementById('pickupArea').value;
+        const dropoffState = document.getElementById('dropoffState').value;
+        const dropoffArea = document.getElementById('dropoffArea').value;
+        
+        if (!pickupState || !pickupArea || !dropoffState || !dropoffArea) {
+            document.getElementById('results').innerHTML = '<div class="fare-component" style="color: red;">⚠️ Please select both pickup and dropoff locations completely</div>';
             return;
         }
-        const btn = document.getElementById('current-loc-btn');
-        btn.textContent = "⏳";
-        document.getElementById('error-msg').style.display = 'none';
-
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const lat = position.coords.latitude;
-                const lon = position.coords.longitude;
-                pickupCoords = { lat, lon };
-                updateMarker('pickup', pickupCoords);
-                map.setView([lat, lon], 14);
-                
-                const reverseGeocodeUrl = `https://photon.komoot.io/reverse?lon=${lon}&lat=${lat}`;
-                fetch(reverseGeocodeUrl)
-                    .then(res => res.json())
-                    .then(data => {
-                        btn.textContent = "🎯";
-                        if (data.features && data.features.length > 0) {
-                            document.getElementById('pickup').value = expandAddress(data.features[0].properties);
-                        } else {
-                            document.getElementById('pickup').value = `Current Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
-                        }
-                        document.getElementById('clear-pickup').style.display = 'block';
-                        checkAndProcessRoute();
-                    })
-                    .catch(() => {
-                        btn.textContent = "🎯";
-                        document.getElementById('pickup').value = `Current Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
-                        document.getElementById('clear-pickup').style.display = 'block';
-                        checkAndProcessRoute();
-                    });
-            },
-            () => {
-                btn.textContent = "🎯";
-                showError("Unable to safely track user positioning metrics.");
-            },
-            { enableHighAccuracy: true, timeout: 8000 }
-        );
+        
+        let distance = parseFloat(document.getElementById('distance').value);
+        let timeMinutes = parseFloat(document.getElementById('timeMinutes').value);
+        let trafficSpeedType = document.getElementById('trafficSpeed').value;
+        let peakMultiplier = parseFloat(document.getElementById('peakMultiplier').value);
+        let includeTolls = document.getElementById('includeTolls').checked;
+        
+        if (isNaN(distance) || distance <= 0) distance = 1;
+        if (isNaN(timeMinutes) || timeMinutes <= 0) timeMinutes = 1;
+        
+        // Get zone data
+        const pickupRisk = getDeadheadRisk(pickupState, pickupArea);
+        const dropoffRisk = getDeadheadRisk(dropoffState, dropoffArea);
+        const pickupPremium = getZonePremium(pickupState, pickupArea);
+        const dropoffPremium = getZonePremium(dropoffState, dropoffArea);
+        
+        // Zone premium (higher of pickup or dropoff)
+        let zonePremium = Math.max(pickupPremium, dropoffPremium);
+        
+        // Deadhead rate
+        let deadheadRate = calculateDeadheadRate(pickupRisk, dropoffRisk);
+        
+        // Traffic adjustment
+        let trafficMultiplier = CONFIG.trafficMultiplier[trafficSpeedType];
+        let useTimeRate = (trafficSpeedType === 'severe');
+        
+        let effectiveDistanceRate = CONFIG.baseDistanceRate * trafficMultiplier;
+        let distanceFare = distance * effectiveDistanceRate;
+        
+        let timeFare = useTimeRate ? timeMinutes * CONFIG.idleRatePerMin : 0;
+        
+        let baseFare = CONFIG.baseFare;
+        let subtotal = baseFare + distanceFare + timeFare + zonePremium;
+        
+        let peakAmount = (baseFare + distanceFare + timeFare) * (peakMultiplier - 1);
+        let totalAfterPeak = subtotal + peakAmount;
+        
+        let deadheadFee = distance * CONFIG.baseDistanceRate * deadheadRate;
+        let tolls = includeTolls ? CONFIG.tollsEstimate : 0;
+        
+        let finalTotal = totalAfterPeak + deadheadFee + tolls;
+        
+        let driverGuaranteeAdjustment = 0;
+        if (finalTotal < CONFIG.driverMinGuarantee) {
+            driverGuaranteeAdjustment = CONFIG.driverMinGuarantee - finalTotal;
+            finalTotal = CONFIG.driverMinGuarantee;
+        }
+        
+        // Build results
+        let resultsHtml = `
+            <div class="fare-component">
+                <div class="component-line">
+                    <span class="label">📍 ${MALAYSIA_ZONES[pickupState]?.name} → ${MALAYSIA_ZONES[dropoffState]?.name}</span>
+                    <span class="value"></span>
+                </div>
+                <div class="component-line">
+                    <span class="label">🚗 Base fare</span>
+                    <span class="value">RM ${baseFare.toFixed(2)}</span>
+                </div>
+                <div class="component-line">
+                    <span class="label">📏 Distance (${distance} km × RM ${effectiveDistanceRate.toFixed(2)}/km)</span>
+                    <span class="value">RM ${distanceFare.toFixed(2)}</span>
+                </div>`;
+        
+        if (timeFare > 0) {
+            resultsHtml += `
+                <div class="component-line">
+                    <span class="label">⏱️ Time/idling (${timeMinutes} min × RM ${CONFIG.idleRatePerMin}/min)</span>
+                    <span class="value">RM ${timeFare.toFixed(2)}</span>
+                </div>`;
+        }
+        
+        let trafficClass = `traffic-${trafficSpeedType}`;
+        let trafficLabel = { smooth: 'Smooth >40km/h', moderate: 'Moderate 25-40km/h', heavy: 'Heavy 15-25km/h', severe: 'Severe <15km/h' }[trafficSpeedType];
+        
+        resultsHtml += `
+                <div class="component-line">
+                    <span class="label">🚦 Traffic (${trafficLabel})</span>
+                    <span class="value">${trafficMultiplier}x distance rate</span>
+                </div>`;
+        
+        if (zonePremium > 0) {
+            resultsHtml += `
+                <div class="component-line zone-active">
+                    <span class="label">🏙️ Zone premium (${MALAYSIA_ZONES[pickupState]?.name}/${MALAYSIA_ZONES[dropoffState]?.name})</span>
+                    <span class="value">+RM ${zonePremium.toFixed(2)}</span>
+                </div>`;
+        }
+        
+        if (peakMultiplier > 1.0) {
+            resultsHtml += `
+                <div class="component-line peak-active">
+                    <span class="label">⏰ Peak hour (${((peakMultiplier-1)*100).toFixed(0)}%)</span>
+                    <span class="value">+RM ${peakAmount.toFixed(2)}</span>
+                </div>`;
+        }
+        
+        if (deadheadFee > 0) {
+            let deadheadPercent = (deadheadRate * 100).toFixed(0);
+            resultsHtml += `
+                <div class="component-line">
+                    <span class="label">🔄 Deadhead recovery (${deadheadPercent}% - ${pickupRisk}/${dropoffRisk} risk)</span>
+                    <span class="value">RM ${deadheadFee.toFixed(2)}</span>
+                </div>`;
+        }
+        
+        if (tolls > 0) {
+            resultsHtml += `
+                <div class="component-line">
+                    <span class="label">🛣️ Tolls/parking</span>
+                    <span class="value">RM ${tolls.toFixed(2)}</span>
+                </div>`;
+        }
+        
+        if (driverGuaranteeAdjustment > 0) {
+            resultsHtml += `
+                <div class="component-line">
+                    <span class="label">⭐ Driver minimum guarantee</span>
+                    <span class="value">+RM ${driverGuaranteeAdjustment.toFixed(2)}</span>
+                </div>`;
+        }
+        
+        resultsHtml += `
+                <hr>
+                <div class="component-line total">
+                    <span class="label">💰 TOTAL FARE</span>
+                    <span class="value">RM ${finalTotal.toFixed(2)}</span>
+                </div>
+            </div>
+            <div class="info-text">
+                📋 Risk levels: Low(0%) • Medium(25%) • High(45%) • Very High(70%)<br>
+                🏷️ Premium zones per Malaysian state property & zoning laws
+            </div>`;
+        
+        document.getElementById('results').innerHTML = resultsHtml;
+    }
+    
+    // Event listeners
+    document.getElementById('pickupState').addEventListener('change', populateAreaDropdowns);
+    document.getElementById('dropoffState').addEventListener('change', populateAreaDropdowns);
+    document.getElementById('pickupArea').addEventListener('change', updateLocationDetails);
+    document.getElementById('dropoffArea').addEventListener('change', updateLocationDetails);
+    
+    ['distance', 'timeMinutes', 'trafficSpeed', 'peakMultiplier', 'includeTolls'].forEach(id => {
+        document.getElementById(id).addEventListener('input', calculateFare);
     });
-
-    function updateMarker(type, coords) {
-        if (type === 'pickup') {
-            if (pickupMarker) map.removeLayer(pickupMarker);
-            pickupMarker = L.marker([coords.lat, coords.lon]).addTo(map);
-        } else {
-            if (dropoffMarker) map.removeLayer(dropoffMarker);
-            dropoffMarker = L.marker([coords.lat, coords.lon]).addTo(map);
-        }
-    }
-
-    function executeLocationSwap() {
-        const pickupInput = document.getElementById('pickup');
-        const dropoffInput = document.getElementById('dropoff');
-        const tempText = pickupInput.value;
-        const tempCoords = pickupCoords;
-        
-        pickupInput.value = dropoffInput.value;
-        pickupCoords = dropoffCoords;
-        dropoffInput.value = tempText;
-        dropoffCoords = tempCoords;
-        
-        document.getElementById('clear-pickup').style.display = pickupInput.value ? 'block' : 'none';
-        document.getElementById('clear-dropoff').style.display = dropoffInput.value ? 'block' : 'none';
-        
-        if (pickupCoords) updateMarker('pickup', pickupCoords);
-        else if (pickupMarker) { map.removeLayer(pickupMarker); pickupMarker = null; }
-        if (dropoffCoords) updateMarker('dropoff', dropoffCoords);
-        else if (dropoffMarker) { map.removeLayer(dropoffMarker); dropoffMarker = null; }
-        
-        if (pickupCoords && dropoffCoords) checkAndProcessRoute();
-        else resetCalculationDisplay();
-    }
-
-    function expandAddress(props) {
-        const parts = [];
-        if (props.name) parts.push(props.name);
-        if (props.street) parts.push(props.street);
-        if (props.district) parts.push(props.district);
-        if (props.city || props.town) parts.push(props.city || props.town);
-        if (props.state) parts.push(props.state);
-        return parts.length > 0 ? parts.join(', ') : 'Target Location Coordinates';
-    }
-
-    function resetCalculationDisplay() {
-        if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
-        document.getElementById('result-card').style.display = 'none';
-        document.getElementById('error-msg').style.display = 'none';
-    }
-
-    function showError(msg) {
-        const errorDiv = document.getElementById('error-msg');
-        errorDiv.textContent = msg;
-        errorDiv.style.display = 'block';
-        document.getElementById('result-card').style.display = 'none';
-    }
-
-    function setupAutocomplete(inputId, suggestionsId, clearBtnId, onSelect, onClear) {
-        const input = document.getElementById(inputId);
-        const suggestionsBox = document.getElementById(suggestionsId);
-        const clearBtn = document.getElementById(clearBtnId);
-        let debounceTimeout;
-
-        input.addEventListener('input', () => {
-            clearTimeout(debounceTimeout);
-            const query = input.value.trim();
-            clearBtn.style.display = query.length > 0 ? 'block' : 'none';
-
-            if (query.length < 3) { 
-                suggestionsBox.innerHTML = ''; 
-                suggestionsBox.style.display = 'none';
-                return; 
-            }
-
-            debounceTimeout = setTimeout(() => {
-                const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&bbox=99.6,0.8,119.5,7.4&limit=5`;
-                fetch(url)
-                    .then(res => res.json())
-                    .then(data => {
-                        suggestionsBox.innerHTML = '';
-                        if(!data.features || data.features.length === 0) {
-                            suggestionsBox.style.display = 'none';
-                            return;
-                        }
-                        suggestionsBox.style.display = 'block';
-                        data.features.forEach(feature => {
-                            const props = feature.properties;
-                            const detailedAddress = expandAddress(props);
-                            const div = document.createElement('div');
-                            div.className = 'suggestion-item';
-                            div.textContent = detailedAddress;
-                            div.addEventListener('click', () => {
-                                input.value = props.name || detailedAddress;
-                                suggestionsBox.innerHTML = '';
-                                suggestionsBox.style.display = 'none';
-                                const [lon, lat] = feature.geometry.coordinates;
-                                onSelect({ lat, lon });
-                            });
-                            suggestionsBox.appendChild(div);
-                        });
-                    }).catch(err => console.error(err));
-            }, 350);
-        });
-
-        clearBtn.addEventListener('click', () => {
-            input.value = '';
-            clearBtn.style.display = 'none';
-            suggestionsBox.innerHTML = '';
-            suggestionsBox.style.display = 'none';
-            onClear();
-        });
-    }
-
-    function decodeFlexiblePolyline(encoded) {
-        const DECODING_TABLE = [
-            62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1,
-            -1, -1, -1, -1, -1, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
-            10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
-            -1, -1, -1, -1, -1, -1, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
-            36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51
-        ];
-
-        function decodeChar(char) {
-            return DECODING_TABLE[char.charCodeAt(0) - 45];
-        }
-
-        let index = 0;
-        const header = decodeChar(encoded[index++]);
-        const precision = header & 15;
-        const factor = Math.pow(10, precision);
-        const thirdDim = (header >> 4) & 7;
-
-        let lastLat = 0, lastLng = 0;
-        const res = [];
-
-        while (index < encoded.length) {
-            let result = 0, shift = 0, byte;
-            do {
-                byte = decodeChar(encoded[index++]);
-                result |= (byte & 31) << shift;
-                shift += 5;
-            } while (byte >= 32);
-
-            const deltaLat = (result & 1) ? ~(result >> 1) : (result >> 1);
-            lastLat += deltaLat;
-
-            result = 0; shift = 0;
-            do {
-                byte = decodeChar(encoded[index++]);
-                result |= (byte & 31) << shift;
-                shift += 5;
-            } while (byte >= 32);
-
-            const deltaLng = (result & 1) ? ~(result >> 1) : (result >> 1);
-            lastLng += deltaLng;
-
-            if (thirdDim !== 0) {
-                do {
-                    byte = decodeChar(encoded[index++]);
-                } while (byte >= 32);
-            }
-
-            res.push([lastLat / factor, lastLng / factor]);
-        }
-        return res;
-    }
-
-    function checkAndProcessRoute() {
-        if (!pickupCoords || !dropoffCoords) return;
-        
-        document.getElementById('error-msg').style.display = 'none';
-        if(currentRouteTimeout) clearTimeout(currentRouteTimeout);
-        
-        currentRouteTimeout = setTimeout(() => {
-            const url = `https://router.hereapi.com/v8/routes?transportMode=car&routingMode=fast&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&return=summary,polyline&apiKey=${HERE_API_KEY}`;
-
-            fetch(url)
-                .then(async res => {
-                    if (!res.ok) {
-                        const errDetails = await res.json().catch(() => ({}));
-                        console.error("HERE API Response Error:", res.status, errDetails);
-                        throw new Error(`HERE API Status: ${res.status}`);
-                    }
-                    return res.json();
-                })
-                .then(data => {
-                    if (!data.routes || data.routes.length === 0) {
-                        showError("No valid drivable geometry found matching those vectors.");
-                        return;
-                    }
-
-                    const route = data.routes[0];
-                    const section = route.sections[0];
-                    const summary = section.summary;
-                    
-                    const distanceKm = summary.length / 1000;
-                    const baseDurationMins = summary.duration / 60;
-
-                    const now = new Date();
-                    const currentHour = now.getHours();
-                    const isWeekend = (now.getDay() === 0 || now.getDay() === 6);
-
-                    let trafficDelayFactor = 1.15; 
-                    if (!isWeekend) {
-                        if ((currentHour >= 7 && currentHour <= 9) || (currentHour >= 17 && currentHour <= 19.5)) {
-                            trafficDelayFactor = 1.55; 
-                        } else if (currentHour >= 12 && currentHour <= 14) {
-                            trafficDelayFactor = 1.25; 
-                        }
-                    } else {
-                        if (currentHour >= 16 && currentHour <= 21) {
-                            trafficDelayFactor = 1.35; 
-                        }
-                    }
-
-                    let distanceImpactModifier = 1.0;
-                    if (distanceKm <= 5) {
-                        distanceImpactModifier = 0.65;
-                    } else if (distanceKm <= 15) {
-                        distanceImpactModifier = 0.85;
-                    } else if (distanceKm > 100) {
-                        distanceImpactModifier = 0.35; 
-                    } else if (distanceKm > 50) {
-                        distanceImpactModifier = 0.60;
-                    }
-
-                    const localizedTrafficWeight = 1 + ((trafficDelayFactor - 1) * distanceImpactModifier);
-                    const correctedDurationMins = Math.max(1, Math.round(baseDurationMins * localizedTrafficWeight));
-
-                    if (routeLine) map.removeLayer(routeLine);
-                    
-                    const coordinates = decodeFlexiblePolyline(section.polyline);
-                    routeLine = L.polyline(coordinates, { 
-                        color: '#8e24aa', weight: 5, opacity: 0.85 
-                    }).addTo(map);
-                    
-                    map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
-
-                    processCalculations(distanceKm, correctedDurationMins);
-                })
-                .catch(err => {
-                    console.error("HERE API Infrastructure Error:", err);
-                    showError("API connectivity fault or key restriction triggered.");
-                });
-        }, 250);
-    }
-
-    function formatDuration(totalMins) {
-        if (totalMins < 60) return `${totalMins} mins`;
-        const hours = Math.floor(totalMins / 60);
-        const mins = totalMins % 60;
-        return mins > 0 ? `${hours} hr ${mins} mins` : `${hours} hr`;
-    }
-
-    function roundToMalaysianCents(value) {
-        return Math.round(value * 10) / 10;
-    }
-
-    function processCalculations(distance, duration) {
-        const baseFare = 5.00;
-        const perKmRate = 1.25;
-        
-        const chargeableDistance = Math.max(0, distance - 1);
-        const rideDistanceFare = chargeableDistance * perKmRate;
-
-        const driverIncentive = (duration / 60) * 12.00;
-
-        let deadheadCost = 0;
-        if (distance > 12) {
-            const boundaryKm = Math.min(distance, 350);
-            const dynamicScalePct = ((boundaryKm - 12) / (350 - 12)) * 0.45;
-            deadheadCost = rideDistanceFare * dynamicScalePct;
-            document.getElementById('deadhead-km-row').style.display = 'flex';
-        } else {
-            document.getElementById('deadhead-km-row').style.display = 'none';
-        }
-
-        const rawTotal = baseFare + rideDistanceFare + driverIncentive + deadheadCost;
-        const roundedTotal = Math.max(baseFare, roundToMalaysianCents(rawTotal));
-        const finalDisplayedWholeFare = Math.round(roundedTotal);
-
-        document.getElementById('total-fare').textContent = `RM ${finalDisplayedWholeFare}`;
-        document.getElementById('fare-distance').textContent = `${distance.toFixed(1)} km`;
-        document.getElementById('fare-duration').textContent = formatDuration(duration);
-
-        document.getElementById('calc-base-fare').textContent = `RM ${baseFare.toFixed(2)}`;
-        document.getElementById('calc-ride-distance-rate').textContent = `RM ${rideDistanceFare.toFixed(2)}`;
-        document.getElementById('calc-incentive').textContent = `RM ${driverIncentive.toFixed(2)}`;
-        document.getElementById('calc-deadhead-km').textContent = `RM ${deadheadCost.toFixed(2)}`;
-        document.getElementById('calc-grand').textContent = `RM ${roundedTotal.toFixed(2)}`;
-
-        document.getElementById('result-card').style.display = 'block';
-    }
+    document.getElementById('pickupArea').addEventListener('change', calculateFare);
+    document.getElementById('dropoffArea').addEventListener('change', calculateFare);
+    
+    window.onload = function() {
+        populateAreaDropdowns();
+        calculateFare();
+    };
 </script>
 </body>
 </html>
