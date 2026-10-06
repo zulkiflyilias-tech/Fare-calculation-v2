@@ -3,178 +3,140 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Personal Navigation App</title>
+  <title>Personal Navigation & Fare Calculator</title>
   
-  <!-- HERE Maps API JS Modules -->
+  <!-- HERE Maps API Scripts & Styles -->
+  <link rel="stylesheet" type="text/css" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css" />
   <script src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
   <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
   <script src="https://js.api.here.com/v3/3.1/mapsjs-ui.js"></script>
   <script src="https://js.api.here.com/v3/3.1/mapsjs-mapevents.js"></script>
-  <link rel="stylesheet" type="text/css" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css" />
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     html, body { height: 100%; width: 100%; overflow: hidden; }
-    
-    #map-container { height: 100vh; width: 100vw; position: absolute; top: 0; left: 0; z-index: 1; }
+    #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
 
-    /* Floating UI Box */
-    .search-card {
+    /* Floating Navigation Panel */
+    .nav-panel {
       position: absolute;
-      top: 16px;
-      left: 16px;
+      top: 20px;
+      left: 20px;
       z-index: 10;
+      width: 380px;
       background: #ffffff;
       border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      width: 380px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
       padding: 16px;
       display: flex;
       flex-direction: column;
       gap: 12px;
     }
 
-    .input-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      position: relative;
-    }
+    .search-group { position: relative; display: flex; align-items: center; }
+    .search-icon { position: absolute; left: 12px; width: 12px; height: 12px; border-radius: 50%; z-index: 2; }
+    .pickup-icon { background: #1a73e8; }
+    .dropoff-icon { background: #ea4335; border-radius: 2px; }
 
-    .dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .dot-pickup { background-color: #007AFF; }
-    .dot-dropoff { background-color: #EA4335; }
-
-    .input-wrapper {
-      position: relative;
-      flex-grow: 1;
-    }
-
-    .input-wrapper input {
+    .search-input {
       width: 100%;
-      padding: 10px 12px;
-      border: 1px solid #E0E0E0;
+      padding: 12px 36px 12px 34px;
+      border: 1px solid #e0e0e0;
       border-radius: 8px;
       font-size: 14px;
       outline: none;
-      transition: border-color 0.2s;
+      transition: border 0.2s;
     }
+    .search-input:focus { border-color: #1a73e8; }
 
-    .input-wrapper input:focus {
-      border-color: #007AFF;
+    /* Reset Button inside Searchbar */
+    .reset-btn {
+      position: absolute;
+      right: 10px;
+      background: none;
+      border: none;
+      font-size: 16px;
+      color: #70757a;
+      cursor: pointer;
+      display: none;
+      padding: 4px;
+      line-height: 1;
     }
+    .reset-btn:hover { color: #202124; }
 
-    /* Autocomplete Dropdown */
+    /* Autocomplete Suggestions */
     .suggestions-list {
       position: absolute;
       top: 100%;
       left: 0;
       right: 0;
       background: #fff;
-      border: 1px solid #E0E0E0;
-      border-top: none;
-      border-radius: 0 0 8px 8px;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      margin-top: 4px;
       max-height: 200px;
       overflow-y: auto;
       z-index: 20;
-      display: none;
+      list-style: none;
     }
-
-    .suggestion-item {
-      padding: 10px 12px;
+    .suggestions-list li {
+      padding: 10px 14px;
       font-size: 13px;
       cursor: pointer;
-      border-bottom: 1px solid #F0F0F0;
+      border-bottom: 1px solid #f0f0f0;
     }
-    .suggestion-item:last-child { border-bottom: none; }
-    .suggestion-item:hover { background-color: #F5F5F5; }
+    .suggestions-list li:hover { background: #f5f5f5; }
 
-    .swap-btn {
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 6px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .swap-btn:hover { background: #F0F0F0; }
-
-    /* Summary Section */
-    .route-summary {
+    /* Fare Breakdown Card */
+    .fare-card {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 13px;
+      color: #3c4043;
       display: none;
-      padding-top: 8px;
-      border-top: 1px solid #E0E0E0;
-      font-size: 14px;
-      color: #333;
-      justify-content: space-between;
+      flex-direction: column;
+      gap: 6px;
     }
-    .route-summary span { font-weight: 600; color: #007AFF; }
+    .fare-row { display: flex; justify-content: space-between; }
+    .fare-total { font-weight: bold; font-size: 16px; color: #1a73e8; border-top: 1px solid #dadce0; padding-top: 6px; margin-top: 4px; }
   </style>
 </head>
 <body>
 
-  <div class="search-card">
-    <!-- Pickup Input -->
-    <div class="input-row">
-      <div class="dot dot-pickup"></div>
-      <div class="input-wrapper">
-        <input type="text" id="pickup" placeholder="Choose pickup location..." autocomplete="off">
-        <div id="pickup-suggestions" class="suggestions-list"></div>
-      </div>
-      <button class="swap-btn" id="swap-btn" title="Swap locations">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2">
-          <path d="M7 16V4M7 4L3 8M7 4L11 8M17 8V20M17 20L21 16M17 20L13 16"/>
-        </svg>
-      </button>
+  <div class="nav-panel">
+    <!-- Pickup Searchbar -->
+    <div class="search-group">
+      <span class="search-icon pickup-icon"></span>
+      <input type="text" id="pickup-input" class="search-input" placeholder="Choose starting point..." autocomplete="off">
+      <button class="reset-btn" id="reset-pickup" title="Clear pickup">✕</button>
+      <ul class="suggestions-list" id="pickup-suggestions"></ul>
     </div>
 
-    <!-- Dropoff Input -->
-    <div class="input-row">
-      <div class="dot dot-dropoff"></div>
-      <div class="input-wrapper">
-        <input type="text" id="dropoff" placeholder="Choose drop-off location..." autocomplete="off">
-        <div id="dropoff-suggestions" class="suggestions-list"></div>
-      </div>
+    <!-- Dropoff Searchbar -->
+    <div class="search-group">
+      <span class="search-icon dropoff-icon"></span>
+      <input type="text" id="dropoff-input" class="search-input" placeholder="Choose destination..." autocomplete="off">
+      <button class="reset-btn" id="reset-dropoff" title="Clear dropoff">✕</button>
+      <ul class="suggestions-list" id="dropoff-suggestions"></ul>
     </div>
 
-    <!-- Route Stats -->
-    <div id="route-summary" class="route-summary">
-      <div>Distance: <span id="summary-distance">-</span></div>
-      <div>Duration: <span id="summary-duration">-</span></div>
+    <!-- Fare & Route Breakdown -->
+    <div class="fare-card" id="fare-card">
+      <div class="fare-row"><span>Base Fare:</span><span>RM <span id="val-base">5.00</span></span></div>
+      <div class="fare-row"><span>Distance Fare (<span id="val-chargeable-km">0</span> km):</span><span>RM <span id="val-dist-fare">0.00</span></span></div>
+      <div class="fare-row"><span>Traffic Incentive (<span id="val-duration">0</span> min):</span><span>RM <span id="val-traffic-incentive">0.00</span></span></div>
+      <div class="fare-row"><span>Out-of-Zone Surcharge:</span><span>RM <span id="val-surcharge">0.00</span></span></div>
+      <div class="fare-row"><span>Estimated Toll Charges:</span><span>RM <span id="val-tolls">0.00</span></span></div>
+      <div class="fare-row fare-total"><span>Total Fare:</span><span>RM <span id="val-total">0.00</span></span></div>
     </div>
   </div>
 
-  <div id="map-container"></div>
+  <div id="map"></div>
 
   <script>
-    const API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
-
-    // 1. Initialize HERE Map
-    const platform = new H.service.Platform({ apikey: API_KEY });
-    const defaultLayers = platform.createDefaultLayers();
-
-    // Default center: Kuala Lumpur / Selangor region
-    const map = new H.Map(
-      document.getElementById('map-container'),
-      defaultLayers.vector.normal.map,
-      {
-        zoom: 12,
-        center: { lat: 3.1390, lng: 101.6869 },
-        pixelRatio: window.devicePixelRatio || 1
-      }
-    );
-
-    window.addEventListener('resize', () => map.getViewPort().resize());
-    const behavior = new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
-    const ui = H.ui.UI.createDefault(map, defaultLayers);
+    // Configuration & Key
+    const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
     // State Variables
     let pickupCoords = null;
@@ -183,77 +145,72 @@
     let dropoffMarker = null;
     let routePolyline = null;
 
-    // 2. Setup Autocomplete Logic
-    setupAutocomplete('pickup', 'pickup-suggestions', (coords, label) => {
-      pickupCoords = coords;
-      setMarker('pickup', coords);
-      calculateRoute();
-    });
+    // Initialize HERE Map Platform
+    const platform = new H.service.Platform({ apikey: HERE_API_KEY });
+    const defaultLayers = platform.createDefaultLayers();
+    const map = new H.Map(
+      document.getElementById('map'),
+      defaultLayers.vector.normal.map,
+      { zoom: 12, center: { lat: 3.1390, lng: 101.6869 } } // Default: Kuala Lumpur
+    );
 
-    setupAutocomplete('dropoff', 'dropoff-suggestions', (coords, label) => {
-      dropoffCoords = coords;
-      setMarker('dropoff', coords);
-      calculateRoute();
-    });
+    new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
+    H.ui.UI.createDefault(map, defaultLayers);
 
-    function setupAutocomplete(inputId, suggestionsId, onSelect) {
-      const input = document.getElementById(inputId);
-      const suggestionsBox = document.getElementById(suggestionsId);
-      let debounceTimer;
+    // Setup Search Inputs & Reset Logic
+    setupSearch('pickup', coords => { pickupCoords = coords; setMarker('pickup', coords); checkAndCalculateRoute(); });
+    setupSearch('dropoff', coords => { dropoffCoords = coords; setMarker('dropoff', coords); checkAndCalculateRoute(); });
 
-      input.addEventListener('input', (e) => {
-        clearTimeout(debounceTimer);
+    function setupSearch(type, onSelect) {
+      const input = document.getElementById(`${type}-input`);
+      const resetBtn = document.getElementById(`reset-${type}`);
+      const suggestions = document.getElementById(`${type}-suggestions`);
+
+      input.addEventListener('input', async (e) => {
         const query = e.target.value.trim();
+        resetBtn.style.display = query ? 'block' : 'none';
 
-        if (query.length < 3) {
-          suggestionsBox.style.display = 'none';
-          return;
-        }
+        if (query.length < 3) { suggestions.innerHTML = ''; return; }
 
-        debounceTimer = setTimeout(() => {
-          const mapCenter = map.getCenter();
-          const url = `https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=${mapCenter.lat},${mapCenter.lng}&apiKey=${API_KEY}`;
-
-          fetch(url)
-            .then(res => res.json())
-            .then(data => {
-              suggestionsBox.innerHTML = '';
-              const items = data.items.filter(item => item.position);
-
-              if (items.length === 0) {
-                suggestionsBox.style.display = 'none';
-                return;
-              }
-
-              items.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'suggestion-item';
-                div.textContent = item.title + (item.address?.label ? ` - ${item.address.label}` : '');
-                
-                div.addEventListener('click', () => {
-                  input.value = item.title;
-                  suggestionsBox.style.display = 'none';
-                  onSelect(item.position, item.title);
-                });
-
-                suggestionsBox.appendChild(div);
-              });
-
-              suggestionsBox.style.display = 'block';
-            })
-            .catch(err => console.error('Autosuggest Error:', err));
-        }, 300);
+        // HERE Autosuggest API Call
+        const url = `https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=3.1390,101.6869&apiKey=${HERE_API_KEY}`;
+        try {
+          const res = await fetch(url);
+          const data = await res.json();
+          renderSuggestions(data.items || [], suggestions, input, onSelect);
+        } catch (err) { console.error('Autosuggest Error:', err); }
       });
 
-      // Hide suggestions when clicking outside
-      document.addEventListener('click', (e) => {
-        if (!input.contains(e.target) && !suggestionsBox.contains(e.target)) {
-          suggestionsBox.style.display = 'none';
+      resetBtn.addEventListener('click', () => {
+        input.value = '';
+        resetBtn.style.display = 'none';
+        suggestions.innerHTML = '';
+        if (type === 'pickup') {
+          pickupCoords = null;
+          if (pickupMarker) map.removeObject(pickupMarker);
+        } else {
+          dropoffCoords = null;
+          if (dropoffMarker) map.removeObject(dropoffMarker);
         }
+        if (routePolyline) map.removeObject(routePolyline);
+        document.getElementById('fare-card').style.display = 'none';
       });
     }
 
-    // 3. Marker Handling
+    function renderSuggestions(items, listElem, inputElem, onSelect) {
+      listElem.innerHTML = '';
+      items.filter(item => item.position).slice(0, 5).forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = item.title;
+        li.addEventListener('click', () => {
+          inputElem.value = item.title;
+          listElem.innerHTML = '';
+          onSelect(item.position);
+        });
+        listElem.appendChild(li);
+      });
+    }
+
     function setMarker(type, coords) {
       if (type === 'pickup') {
         if (pickupMarker) map.removeObject(pickupMarker);
@@ -264,69 +221,99 @@
         dropoffMarker = new H.map.Marker(coords);
         map.addObject(dropoffMarker);
       }
+      map.setCenter(coords);
     }
 
-    // 4. Calculate and Draw Route
-    function calculateRoute() {
+    // Traffic Multiplier Engine
+    function getTrafficMultiplier(distanceKm) {
+      const now = new Date();
+      const day = now.getDay(); // 0 = Sun, 6 = Sat
+      const hour = now.getHours() + now.getMinutes() / 60;
+      const isWeekend = (day === 0 || day === 6);
+
+      let factor = 1.15; // Standard Off-Peak
+
+      if (!isWeekend) {
+        if ((hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19.5)) factor = 1.55; // Weekday Peak
+        else if (hour >= 12 && hour <= 14) factor = 1.25; // Midday
+      } else {
+        if (hour >= 16 && hour <= 21) factor = 1.35; // Weekend Peak
+      }
+
+      // Distance Weighting: Scale down peak factor impact for longer journeys (> 50 km)
+      if (distanceKm > 50) {
+        factor = 1 + (factor - 1) * Math.max(0.6, 1 - (distanceKm - 50) / 100);
+      }
+
+      return factor;
+    }
+
+    // Route Calculation & Toll / Fare Estimation
+    async function checkAndCalculateRoute() {
       if (!pickupCoords || !dropoffCoords) return;
 
-      const router = platform.getRoutingService(null, 8);
-      const routeParams = {
-        routingMode: 'fast',
-        transportMode: 'car',
-        origin: `${pickupCoords.lat},${pickupCoords.lng}`,
-        destination: `${dropoffCoords.lat},${dropoffCoords.lng}`,
-        return: 'polyline,summary'
-      };
+      const routerUrl = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${pickupCoords.lat},${pickupCoords.lng}&destination=${dropoffCoords.lat},${dropoffCoords.lng}&return=polyline,summary,tolls&apiKey=${HERE_API_KEY}`;
 
-      router.calculateRoute(routeParams, (result) => {
-        if (!result.routes.length) return;
+      try {
+        const response = await fetch(routerUrl);
+        const data = await response.json();
 
-        const section = result.routes[0].sections[0];
-        const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
+        if (!data.routes.length) return;
 
-        // Remove existing route line if present
+        const route = data.routes[0];
+        const section = route.sections[0];
+        const distanceKm = section.summary.length / 1000;
+        const baseDurationMin = section.summary.duration / 60;
+
+        // Render Route on Map
         if (routePolyline) map.removeObject(routePolyline);
-
-        routePolyline = new H.map.Polyline(lineString, {
-          style: { strokeColor: '#007AFF', lineWidth: 5 }
-        });
-
+        const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
+        routePolyline = new H.map.Polyline(lineString, { style: { strokeColor: '#1a73e8', lineWidth: 5 } });
         map.addObject(routePolyline);
-        map.getViewModel().setLookAtData({ bounds: routePolyline.getBoundingBox() }, true);
+        map.getViewModel().setLookAtData({ bounds: routePolyline.getBoundingBox() });
 
-        // Render Summary
-        const distanceKm = (section.summary.length / 1000).toFixed(1);
-        const durationMin = Math.round(section.summary.duration / 60);
+        // Calculate Toll Charges
+        let totalTolls = 0;
+        if (section.tolls) {
+          section.tolls.forEach(toll => {
+            toll.fares.forEach(fare => { totalTolls += (fare.price || 0); });
+          });
+        }
 
-        document.getElementById('summary-distance').textContent = `${distanceKm} km`;
-        document.getElementById('summary-duration').textContent = `${durationMin} mins`;
-        document.getElementById('route-summary').style.display = 'flex';
-      }, (error) => {
-        console.error('Routing Error:', error);
-      });
+        // Apply Step 1 & Step 2 Formulas
+        const trafficFactor = getTrafficMultiplier(distanceKm);
+        const adjustedDurationMin = baseDurationMin * trafficFactor;
+
+        const baseFare = 5.00;
+        const chargeableDist = Math.max(0, distanceKm - 1.0);
+        const distanceFare = chargeableDist * 1.25;
+        const trafficIncentive = adjustedDurationMin * 0.20;
+
+        // Out-of-Zone Scaling Surcharge
+        let surcharge = 0;
+        if (distanceKm > 12) {
+          const scalingRatio = Math.min(1, (distanceKm - 12) / 30);
+          surcharge = distanceFare * (0.45 * scalingRatio);
+        }
+
+        const totalFare = baseFare + distanceFare + trafficIncentive + surcharge + totalTolls;
+
+        // Update UI Breakdown
+        document.getElementById('val-base').textContent = baseFare.toFixed(2);
+        document.getElementById('val-chargeable-km').textContent = chargeableDist.toFixed(1);
+        document.getElementById('val-dist-fare').textContent = distanceFare.toFixed(2);
+        document.getElementById('val-duration').textContent = Math.round(adjustedDurationMin);
+        document.getElementById('val-traffic-incentive').textContent = trafficIncentive.toFixed(2);
+        document.getElementById('val-surcharge').textContent = surcharge.toFixed(2);
+        document.getElementById('val-tolls').textContent = totalTolls.toFixed(2);
+        document.getElementById('val-total').textContent = totalFare.toFixed(2);
+        document.getElementById('fare-card').style.display = 'flex';
+
+      } catch (err) { console.error('Routing Error:', err); }
     }
 
-    // 5. Swap Pickup & Drop-off Button
-    document.getElementById('swap-btn').addEventListener('click', () => {
-      const pickupInput = document.getElementById('pickup');
-      const dropoffInput = document.getElementById('dropoff');
-
-      // Swap Text
-      const tempText = pickupInput.value;
-      pickupInput.value = dropoffInput.value;
-      dropoffInput.value = tempText;
-
-      // Swap Coords
-      const tempCoords = pickupCoords;
-      pickupCoords = dropoffCoords;
-      dropoffCoords = tempCoords;
-
-      // Update Markers & Route
-      if (pickupCoords) setMarker('pickup', pickupCoords);
-      if (dropoffCoords) setMarker('dropoff', dropoffCoords);
-      calculateRoute();
-    });
+    // Handle Window Resize
+    window.addEventListener('resize', () => map.getViewPort().resize());
   </script>
 </body>
 </html>
