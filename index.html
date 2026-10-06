@@ -302,14 +302,14 @@
     const PROXY_ENDPOINT = "/api/here-proxy"; 
     const HERE_API_KEY = "PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk"; 
 
-    // Initialize Map centered on Klang/Kuala Lumpur
-    const map = L.map('map').setView([3.1390, 101.6869], 11);
+    // Initialize Map centered on Selangor / Klang Valley
+    const map = L.map('map').setView([3.0449, 101.4456], 12);
     
-    // High-reliability OSM mirror tile server
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Fast CartoDB Positron basemap layer
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         maxZoom: 19,
-        subdomains: ['a', 'b', 'c'],
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        subdomains: 'abcd',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
     }).addTo(map);
 
     let pickupMarker = null, dropoffMarker = null, routeLine = null;
@@ -403,7 +403,7 @@
     });
 
     function updateMarker(type, coords) {
-        if (!coords || isNaN(coords.lat) || isNaN(coords.lon)) return;
+        if (!coords || isNaN(coords.lat) || isNaN(coords.lon) || coords.lat === 0 || coords.lon === 0) return;
         
         if (type === 'pickup') {
             if (pickupMarker) map.removeLayer(pickupMarker);
@@ -411,6 +411,17 @@
         } else {
             if (dropoffMarker) map.removeLayer(dropoffMarker);
             dropoffMarker = L.marker([coords.lat, coords.lon], { icon: dropoffIcon }).addTo(map);
+        }
+        
+        // Auto-center map to valid active pins
+        if (pickupCoords && dropoffCoords) {
+            const bounds = L.latLngBounds([
+                [pickupCoords.lat, pickupCoords.lon],
+                [dropoffCoords.lat, dropoffCoords.lon]
+            ]);
+            map.fitBounds(bounds, { padding: [50, 50] });
+        } else {
+            map.setView([coords.lat, coords.lon], 13);
         }
     }
 
@@ -475,7 +486,7 @@
             debounceTimeout = setTimeout(() => {
                 const url = USE_BACKEND_PROXY 
                     ? `${PROXY_ENDPOINT}?action=autosuggest&q=${encodeURIComponent(query)}`
-                    : `https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=3.1390,101.6869&in=countryCode:MYS&limit=5&apiKey=${HERE_API_KEY}`;
+                    : `https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=3.0449,101.4456&in=countryCode:MYS&limit=5&apiKey=${HERE_API_KEY}`;
                 
                 fetch(url)
                     .then(res => res.json())
@@ -488,16 +499,16 @@
                         
                         let validItemCount = 0;
                         data.items.forEach(item => {
-                            if (!item.position && (!item.access || !item.access.length)) return;
-                            
-                            const pos = item.position || item.access[0];
+                            const pos = item.position || (item.access && item.access[0]);
+                            if (!pos) return;
+
                             const addressLabel = item.title || (item.address && item.address.label);
                             
-                            // Normalized coordinate mapping (fixes position.lng / position.lon mismatch)
-                            const latVal = pos.lat;
-                            const lonVal = pos.lng !== undefined ? pos.lng : pos.lon;
+                            // Safe parsing for both position formats (lat/lng vs lat/lon)
+                            const latVal = parseFloat(pos.lat);
+                            const lonVal = parseFloat(pos.lng !== undefined ? pos.lng : pos.lon);
 
-                            if (latVal === undefined || lonVal === undefined) return;
+                            if (isNaN(latVal) || isNaN(lonVal) || latVal === 0 || lonVal === 0) return;
 
                             const div = document.createElement('div');
                             div.className = 'suggestion-item';
@@ -506,7 +517,7 @@
                                 input.value = addressLabel;
                                 suggestionsBox.innerHTML = '';
                                 suggestionsBox.style.display = 'none';
-                                onSelect({ lat: parseFloat(latVal), lon: parseFloat(lonVal) });
+                                onSelect({ lat: latVal, lon: lonVal });
                             });
                             suggestionsBox.appendChild(div);
                             validItemCount++;
@@ -532,6 +543,7 @@
         });
     }
 
+    // Flexible Polyline Decoder
     function decodeFlexiblePolyline(encoded) {
         const DECODING_TABLE = [
             62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1,
@@ -588,7 +600,12 @@
                 idx = res.index;
             }
 
-            coordinates.push([lat / factor, lng / factor]);
+            // Verify latitude and longitude are within standard geographical limits
+            const finalLat = lat / factor;
+            const finalLng = lng / factor;
+            if (finalLat >= -90 && finalLat <= 90 && finalLng >= -180 && finalLng <= 180) {
+                coordinates.push([finalLat, finalLng]);
+            }
         }
         return coordinates;
     }
@@ -660,10 +677,17 @@
                         
                         setTimeout(() => {
                             map.invalidateSize();
-                            // Create bounds exclusively from valid route points
+                            // Lock bounds specifically around the route points
                             const bounds = L.latLngBounds(routeCoordinates);
-                            map.fitBounds(bounds, { padding: [40, 40] });
+                            map.fitBounds(bounds, { padding: [30, 30] });
                         }, 100);
+                    } else {
+                        // Fallback zoom to pins if polyline decoding fails
+                        const pinBounds = L.latLngBounds([
+                            [pickupCoords.lat, pickupCoords.lon],
+                            [dropoffCoords.lat, dropoffCoords.lon]
+                        ]);
+                        map.fitBounds(pinBounds, { padding: [40, 40] });
                     }
 
                     processCalculations(distanceKm, durationMins, totalTollCost);
