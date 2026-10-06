@@ -28,7 +28,7 @@
             height: 35vh;
             width: 100%;
             z-index: 1;
-            background-color: #f2f2f2;
+            background-color: #e5e3df;
         }
         #search-panel {
             flex: 1;
@@ -305,13 +305,20 @@
     // Initialize Map centered on Selangor / Klang Valley
     const map = L.map('map').setView([3.0449, 101.4456], 12);
     
-    // Open-access high reliability Humanitarian OpenStreetMap (No CARTO watermark, guaranteed rendering)
-    L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+    // Official primary OpenStreetMap tile server (Fast, reliable, standard)
+    const primaryTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
+        subdomains: ['a', 'b', 'c'],
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    // Force map recalculation on window load and layout changes
+    // Fallback tile URL if primary encounters network restrictions
+    primaryTileLayer.on('tileerror', function(error) {
+        console.warn("Tile load error, applying fallback source...", error);
+        error.tile.src = `https://a.basemaps.cartocdn.com/rastertiles/voyager/${error.coords.z}/${error.coords.x}/${error.coords.y}.png`;
+    });
+
+    // Force Leaflet frame re-render on initial load
     setTimeout(() => { map.invalidateSize(); }, 300);
 
     let pickupMarker = null, dropoffMarker = null, routeLine = null;
