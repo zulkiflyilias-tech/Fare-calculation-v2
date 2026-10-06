@@ -326,13 +326,14 @@
     const HERE_API_KEY = "PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk"; 
     const CARTO_API_KEY = "cb1_4b7o_1_924353e3834c5cbe57eef1e3";
 
-    // Initialize Map centered on Klang / Selangor
+    // Initialize Map
     const map = L.map('map').setView([3.1390, 101.6869], 11);
     
-    // Clean OpenStreetMap Tile Layer (Eliminates CARTO "REQUIRED API KEY" overlay completely)
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    // CARTO Raster Tile Layer with API Key
+    L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?api_key=${CARTO_API_KEY}`, {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 20
     }).addTo(map);
 
     let pickupMarker = null, dropoffMarker = null, routeLine = null;
@@ -458,6 +459,7 @@
         const suggestionsBox = document.getElementById(suggestionsId);
         const clearBtn = document.getElementById(clearBtnId);
         let debounceTimeout;
+        let activeController = null;
 
         input.addEventListener('input', () => {
             clearTimeout(debounceTimeout);
@@ -471,8 +473,11 @@
             }
 
             debounceTimeout = setTimeout(() => {
+                if (activeController) activeController.abort();
+                activeController = new AbortController();
+
                 const url = `https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=3.1390,101.6869&in=countryCode:MYS&limit=5&apiKey=${HERE_API_KEY}`;
-                fetch(url)
+                fetch(url, { signal: activeController.signal })
                     .then(res => res.json())
                     .then(data => {
                         suggestionsBox.innerHTML = '';
@@ -497,7 +502,11 @@
                             });
                             suggestionsBox.appendChild(div);
                         });
-                    }).catch(err => console.error("Autocomplete Error:", err));
+                    }).catch(err => {
+                        if (err.name !== 'AbortError') {
+                            console.error("Autocomplete Error:", err);
+                        }
+                    });
             }, 300);
         });
 
@@ -606,9 +615,7 @@
                     if (section.tolls && section.tolls.length > 0) {
                         section.tolls.forEach(toll => {
                             if (toll.fares && toll.fares.length > 0) {
-                                toll.fares.forEach(fare => {
-                                    totalTollCost += (fare.price ? fare.price.value : 0);
-                                });
+                                totalTollCost += (toll.fares[0].price ? toll.fares[0].price.value : 0);
                             }
                         });
                     }
@@ -621,8 +628,10 @@
                         color: '#8e24aa', weight: 5, opacity: 0.85 
                     }).addTo(map);
                     
-                    map.invalidateSize();
-                    map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+                    setTimeout(() => {
+                        map.invalidateSize();
+                        map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+                    }, 50);
 
                     processCalculations(distanceKm, durationMins, totalTollCost);
                 })
