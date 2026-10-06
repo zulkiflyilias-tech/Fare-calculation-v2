@@ -297,10 +297,6 @@
                     <span id="calc-ride-distance-rate">RM 0.00</span>
                 </div>
                 <div class="detail-row">
-                    <span id="toll-type-label">Tolls (HERE API)</span>
-                    <span id="calc-tolls">RM 0.00</span>
-                </div>
-                <div class="detail-row">
                     <span>Traffic Adjust & Incentive</span>
                     <span id="calc-incentive">RM 0.00</span>
                 </div>
@@ -566,27 +562,6 @@
         return res;
     }
 
-    function extractTollCostFromHEREResponse(section) {
-        let totalToll = 0;
-        let hasTolls = false;
-
-        // Extract tolls from HERE v8 toll structure
-        if (section.tolls && Array.isArray(section.tolls) && section.tolls.length > 0) {
-            hasTolls = true;
-            section.tolls.forEach(toll => {
-                if (toll.fares && Array.isArray(toll.fares)) {
-                    toll.fares.forEach(fare => {
-                        if (fare.price && fare.price.value) {
-                            totalToll += parseFloat(fare.price.value);
-                        }
-                    });
-                }
-            });
-        }
-
-        return { totalToll, hasTolls };
-    }
-
     function checkAndProcessRoute() {
         if (!pickupCoords || !dropoffCoords) return;
         
@@ -594,8 +569,7 @@
         if(currentRouteTimeout) clearTimeout(currentRouteTimeout);
         
         currentRouteTimeout = setTimeout(() => {
-            // Updated HERE API endpoint requesting tolls and toll system spans
-            const url = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&return=summary,polyline,tolls&spans=tollSystems,names&apiKey=${HERE_API_KEY}`;
+            const url = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&return=summary,polyline&apiKey=${HERE_API_KEY}`;
 
             fetch(url)
                 .then(res => {
@@ -614,9 +588,6 @@
                     
                     const distanceKm = summary.length / 1000;
                     const baseDurationMins = summary.duration / 60;
-
-                    // Extract toll data from HERE response
-                    const { totalToll, hasTolls } = extractTollCostFromHEREResponse(section);
 
                     const now = new Date();
                     const currentHour = now.getHours();
@@ -658,7 +629,7 @@
                     
                     map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
 
-                    processCalculations(distanceKm, correctedDurationMins, totalToll, hasTolls);
+                    processCalculations(distanceKm, correctedDurationMins);
                 })
                 .catch(err => {
                     console.error("HERE API Infrastructure Error:", err);
@@ -678,25 +649,12 @@
         return Math.round(value * 10) / 10;
     }
 
-    function processCalculations(distance, duration, tollAmount, hasTolls) {
+    function processCalculations(distance, duration) {
         const baseFare = 5.00;
         const perKmRate = 1.25;
         
         const chargeableDistance = Math.max(0, distance - 1);
         const rideDistanceFare = chargeableDistance * perKmRate;
-
-        // If HERE API returns 0 or missing toll values for a known toll road, fallback estimation logic kicks in
-        let finalTollCost = tollAmount;
-        let tollLabel = "Tolls (HERE API)";
-
-        if (finalTollCost === 0 && hasTolls) {
-            finalTollCost = distance <= 45 ? 2.50 : 3.50 + ((distance - 45) * 0.095);
-            tollLabel = "Tolls (Est. Fallback)";
-        } else if (finalTollCost > 0) {
-            tollLabel = "Tolls (Actual HERE Fare)";
-        }
-
-        document.getElementById('toll-type-label').textContent = tollLabel;
 
         const driverIncentive = (duration / 60) * 12.00;
 
@@ -710,7 +668,7 @@
             document.getElementById('deadhead-km-row').style.display = 'none';
         }
 
-        const rawTotal = baseFare + rideDistanceFare + finalTollCost + driverIncentive + deadheadCost;
+        const rawTotal = baseFare + rideDistanceFare + driverIncentive + deadheadCost;
         const roundedTotal = Math.max(baseFare, roundToMalaysianCents(rawTotal));
         const finalDisplayedWholeFare = Math.round(roundedTotal);
 
@@ -720,7 +678,6 @@
 
         document.getElementById('calc-base-fare').textContent = `RM ${baseFare.toFixed(2)}`;
         document.getElementById('calc-ride-distance-rate').textContent = `RM ${rideDistanceFare.toFixed(2)}`;
-        document.getElementById('calc-tolls').textContent = `RM ${finalTollCost.toFixed(2)}`;
         document.getElementById('calc-incentive').textContent = `RM ${driverIncentive.toFixed(2)}`;
         document.getElementById('calc-deadhead-km').textContent = `RM ${deadheadCost.toFixed(2)}`;
         document.getElementById('calc-grand').textContent = `RM ${roundedTotal.toFixed(2)}`;
