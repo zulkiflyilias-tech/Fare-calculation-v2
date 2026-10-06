@@ -295,27 +295,30 @@
             </div>
             
             <div id="invoice-details">
+                <!-- 1. Base Fare -->
                 <div class="detail-row">
                     <span>Base Fare</span>
                     <span id="calc-base-fare">RM 5.00</span>
                 </div>
+                <!-- 2. Distance Fare -->
                 <div class="detail-row">
                     <span>Distance Fare</span>
                     <span id="calc-ride-distance-rate">RM 0.00</span>
                 </div>
-                <div class="detail-row">
-                    <span>Traffic Adjust & Incentive</span>
-                    <span id="calc-incentive">RM 0.00</span>
-                </div>
-                
+                <!-- 3. Toll Charges -->
                 <div class="detail-row" id="toll-fare-row">
                     <span>Toll Charges</span>
                     <span id="calc-toll-fare">RM 0.00</span>
                 </div>
-
+                <!-- 4. Out-of-Zone Surcharge -->
                 <div class="detail-row" id="deadhead-km-row" style="display: none;">
                     <span>Out-of-Zone Surcharge</span>
                     <span id="calc-deadhead-km">RM 0.00</span>
+                </div>
+                <!-- 5. Traffic Adjust & Incentives -->
+                <div class="detail-row">
+                    <span>Traffic Adjust & Incentive</span>
+                    <span id="calc-incentive">RM 0.00</span>
                 </div>
 
                 <div class="detail-row total-bold">
@@ -540,7 +543,6 @@
         if(currentRouteTimeout) clearTimeout(currentRouteTimeout);
         
         currentRouteTimeout = setTimeout(() => {
-            // Request route details including 'tolls'
             const routingParameters = {
                 'routingMode': 'fast',
                 'transportMode': 'car',
@@ -574,7 +576,6 @@
                         calculatedTollFee += parseFloat(tc.value || 0);
                     });
                 } else {
-                    // Dynamic highway toll estimation heuristic for long highway routes (PLUS/NKVE/KESAS)
                     if (distanceKm > 15) {
                         calculatedTollFee = (distanceKm - 15) * 0.11; 
                     }
@@ -672,9 +673,9 @@
 
         document.getElementById('calc-base-fare').textContent = `RM ${baseFare.toFixed(2)}`;
         document.getElementById('calc-ride-distance-rate').textContent = `RM ${rideDistanceFare.toFixed(2)}`;
-        document.getElementById('calc-incentive').textContent = `RM ${driverIncentive.toFixed(2)}`;
         document.getElementById('calc-toll-fare').textContent = `RM ${tollFee.toFixed(2)}`;
         document.getElementById('calc-deadhead-km').textContent = `RM ${deadheadCost.toFixed(2)}`;
+        document.getElementById('calc-incentive').textContent = `RM ${driverIncentive.toFixed(2)}`;
         document.getElementById('calc-grand').textContent = `RM ${roundedTotal.toFixed(2)}`;
 
         document.getElementById('result-card').style.display = 'block';
