@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rideshare MY - Professional Fare Estimator</title>
+    <title>Rideshare MY - Fare Estimator & Toll System</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body {
@@ -27,6 +27,7 @@
             height: 35vh;
             width: 100%;
             z-index: 1;
+            background-color: #e5e3df;
         }
         #search-panel {
             flex: 1;
@@ -156,7 +157,7 @@
             max-height: 200px; 
             overflow-y: auto;
             z-index: 1000;
-            box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.15);
             display: none;
         }
         .suggestion-item {
@@ -297,6 +298,10 @@
                     <span id="calc-ride-distance-rate">RM 0.00</span>
                 </div>
                 <div class="detail-row">
+                    <span>Tolls (HERE Highway Rates)</span>
+                    <span id="calc-tolls">RM 0.00</span>
+                </div>
+                <div class="detail-row">
                     <span>Traffic Adjust & Incentive</span>
                     <span id="calc-incentive">RM 0.00</span>
                 </div>
@@ -318,17 +323,21 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
+    const HERE_API_KEY = "PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk"; 
+
+    // Initialise Leaflet map using HERE Tile Server for clear rendering
     const map = L.map('map').setView([3.1390, 101.6869], 11);
     
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
+    L.tileLayer(`https://maps.hereapi.com/v3/base/mc/{z}/{x}/{y}/png8?style=explore.day&apiKey=${HERE_API_KEY}`, {
+        attribution: '&copy; HERE 2026 | Leaflet',
+        maxZoom: 19
     }).addTo(map);
-
-    const HERE_API_KEY = "PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk"; 
 
     let pickupMarker = null, dropoffMarker = null, routeLine = null;
     let pickupCoords = null, dropoffCoords = null;
     let currentRouteTimeout = null;
+
+    setTimeout(() => { map.invalidateSize(); }, 300);
 
     setupAutocomplete('pickup', 'pickup-suggestions', 'clear-pickup', (coords) => {
         pickupCoords = coords;
@@ -352,7 +361,7 @@
 
     document.getElementById('current-loc-btn').addEventListener('click', () => {
         if (!navigator.geolocation) {
-            showError("Compass or location trace features are unsupported by this application shell.");
+            showError("Location tracing is unsupported by your browser.");
             return;
         }
         const btn = document.getElementById('current-loc-btn');
@@ -367,7 +376,6 @@
                 updateMarker('pickup', pickupCoords);
                 map.setView([lat, lon], 14);
                 
-                // HERE Reverse Geocoding API v8
                 const reverseGeocodeUrl = `https://revgeocode.search.hereapi.com/v1/revgeocode?at=${lat},${lon}&lang=en-US&apiKey=${HERE_API_KEY}`;
                 fetch(reverseGeocodeUrl)
                     .then(res => res.json())
@@ -390,7 +398,7 @@
             },
             () => {
                 btn.textContent = "🎯";
-                showError("Unable to safely track user positioning metrics.");
+                showError("Unable to access location positioning metrics.");
             },
             { enableHighAccuracy: true, timeout: 8000 }
         );
@@ -422,6 +430,7 @@
         
         if (pickupCoords) updateMarker('pickup', pickupCoords);
         else if (pickupMarker) { map.removeLayer(pickupMarker); pickupMarker = null; }
+        
         if (dropoffCoords) updateMarker('dropoff', dropoffCoords);
         else if (dropoffMarker) { map.removeLayer(dropoffMarker); dropoffMarker = null; }
         
@@ -460,8 +469,8 @@
             }
 
             debounceTimeout = setTimeout(() => {
-                // HERE Autocomplete Search API v8 (Restricted to Malaysia: MYS)
-                const url = `https://autocomplete.search.hereapi.com/v1/autocomplete?q=${encodeURIComponent(query)}&in=countryCode:MYS&limit=5&apiKey=${HERE_API_KEY}`;
+                // HERE Autosuggest API v8
+                const url = `https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=3.1390,101.6869&in=countryCode:MYS&limit=5&apiKey=${HERE_API_KEY}`;
                 fetch(url)
                     .then(res => res.json())
                     .then(data => {
@@ -472,29 +481,23 @@
                         }
                         suggestionsBox.style.display = 'block';
                         data.items.forEach(item => {
-                            const addressLabel = item.address ? item.address.label : item.title;
+                            if (!item.position && !item.access) return;
+                            const pos = item.position || (item.access && item.access[0]);
+                            const addressLabel = item.title || (item.address && item.address.label);
+                            
                             const div = document.createElement('div');
                             div.className = 'suggestion-item';
                             div.textContent = addressLabel;
                             div.addEventListener('click', () => {
-                                input.value = item.title || addressLabel;
+                                input.value = addressLabel;
                                 suggestionsBox.innerHTML = '';
                                 suggestionsBox.style.display = 'none';
-                                
-                                // Lookup coordinates using location ID or Geocode API
-                                fetch(`https://geocode.search.hereapi.com/v1/geocode?q=${encodeURIComponent(addressLabel)}&apiKey=${HERE_API_KEY}`)
-                                    .then(res => res.json())
-                                    .then(geoData => {
-                                        if (geoData.items && geoData.items.length > 0) {
-                                            const pos = geoData.items[0].position;
-                                            onSelect({ lat: pos.lat, lon: pos.lng });
-                                        }
-                                    });
+                                onSelect({ lat: pos.lat, lon: pos.lng });
                             });
                             suggestionsBox.appendChild(div);
                         });
-                    }).catch(err => console.error(err));
-            }, 350);
+                    }).catch(err => console.error("Autocomplete Error:", err));
+            }, 300);
         });
 
         clearBtn.addEventListener('click', () => {
@@ -504,9 +507,15 @@
             suggestionsBox.style.display = 'none';
             onClear();
         });
+
+        document.addEventListener('click', (e) => {
+            if (!input.contains(e.target) && !suggestionsBox.contains(e.target)) {
+                suggestionsBox.style.display = 'none';
+            }
+        });
     }
 
-    // Flexible decoder for HERE Flexible Polyline string
+    // Decoder for HERE Flexible Polyline string format
     function decodeFlexiblePolyline(encoded) {
         const DECODING_TABLE = [
             62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1,
@@ -539,7 +548,6 @@
         const precision = header.value & 15;
         const factor = Math.pow(10, precision);
         
-        // Skip third dimension header if present
         if ((header.value >> 4) & 7) {
             idx = decodeUnsignedVarint(encoded, idx).index;
         }
@@ -568,17 +576,17 @@
         if(currentRouteTimeout) clearTimeout(currentRouteTimeout);
         
         currentRouteTimeout = setTimeout(() => {
-            // HERE Routing API v8
-            const url = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&return=summary,polyline&apiKey=${HERE_API_KEY}`;
+            // HERE Routing API v8 with real-time traffic and exact Toll parsing
+            const url = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&return=summary,polyline,tolls&departureTime=now&apiKey=${HERE_API_KEY}`;
 
             fetch(url)
                 .then(res => {
-                    if (!res.ok) throw new Error('API route payload evaluation drop.');
+                    if (!res.ok) throw new Error('Failed to retrieve HERE route data.');
                     return res.json();
                 })
                 .then(data => {
                     if (!data.routes || data.routes.length === 0) {
-                        showError("No valid drivable geometry found matching those vectors.");
+                        showError("No valid drivable route found for selected points.");
                         return;
                     }
 
@@ -587,38 +595,19 @@
                     const summary = section.summary;
                     
                     const distanceKm = summary.length / 1000;
-                    const baseDurationMins = summary.duration / 60;
+                    const durationMins = Math.round(summary.duration / 60);
 
-                    const now = new Date();
-                    const currentHour = now.getHours();
-                    const isWeekend = (now.getDay() === 0 || now.getDay() === 6);
-
-                    let trafficDelayFactor = 1.15; 
-                    if (!isWeekend) {
-                        if ((currentHour >= 7 && currentHour <= 9) || (currentHour >= 17 && currentHour <= 19.5)) {
-                            trafficDelayFactor = 1.55; 
-                        } else if (currentHour >= 12 && currentHour <= 14) {
-                            trafficDelayFactor = 1.25; 
-                        }
-                    } else {
-                        if (currentHour >= 16 && currentHour <= 21) {
-                            trafficDelayFactor = 1.35; 
-                        }
+                    // Parse Toll Costs directly from HERE API response
+                    let totalTollCost = 0;
+                    if (section.tolls && section.tolls.length > 0) {
+                        section.tolls.forEach(toll => {
+                            if (toll.fares && toll.fares.length > 0) {
+                                toll.fares.forEach(fare => {
+                                    totalTollCost += (fare.price.value || 0);
+                                });
+                            }
+                        });
                     }
-
-                    let distanceImpactModifier = 1.0;
-                    if (distanceKm <= 5) {
-                        distanceImpactModifier = 0.65;
-                    } else if (distanceKm <= 15) {
-                        distanceImpactModifier = 0.85;
-                    } else if (distanceKm > 100) {
-                        distanceImpactModifier = 0.35; 
-                    } else if (distanceKm > 50) {
-                        distanceImpactModifier = 0.60;
-                    }
-
-                    const localizedTrafficWeight = 1 + ((trafficDelayFactor - 1) * distanceImpactModifier);
-                    const correctedDurationMins = Math.max(1, Math.round(baseDurationMins * localizedTrafficWeight));
 
                     if (routeLine) map.removeLayer(routeLine);
                     
@@ -629,12 +618,13 @@
                     }).addTo(map);
                     
                     map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+                    map.invalidateSize();
 
-                    processCalculations(distanceKm, correctedDurationMins);
+                    processCalculations(distanceKm, durationMins, totalTollCost);
                 })
                 .catch(err => {
-                    console.error("HERE Routing API Error:", err);
-                    showError("API connectivity fault or quota restriction triggered.");
+                    console.error("HERE Routing Error:", err);
+                    showError("Routing API error or network connectivity issue.");
                 });
         }, 250);
     }
@@ -650,7 +640,7 @@
         return Math.round(value * 10) / 10;
     }
 
-    function processCalculations(distance, duration) {
+    function processCalculations(distance, duration, tollCost) {
         const baseFare = 5.00;
         const perKmRate = 1.25;
         
@@ -669,7 +659,7 @@
             document.getElementById('deadhead-km-row').style.display = 'none';
         }
 
-        const rawTotal = baseFare + rideDistanceFare + driverIncentive + deadheadCost;
+        const rawTotal = baseFare + rideDistanceFare + tollCost + driverIncentive + deadheadCost;
         const roundedTotal = Math.max(baseFare, roundToMalaysianCents(rawTotal));
         const finalDisplayedWholeFare = Math.round(roundedTotal);
 
@@ -679,6 +669,7 @@
 
         document.getElementById('calc-base-fare').textContent = `RM ${baseFare.toFixed(2)}`;
         document.getElementById('calc-ride-distance-rate').textContent = `RM ${rideDistanceFare.toFixed(2)}`;
+        document.getElementById('calc-tolls').textContent = `RM ${tollCost.toFixed(2)}`;
         document.getElementById('calc-incentive').textContent = `RM ${driverIncentive.toFixed(2)}`;
         document.getElementById('calc-deadhead-km').textContent = `RM ${deadheadCost.toFixed(2)}`;
         document.getElementById('calc-grand').textContent = `RM ${roundedTotal.toFixed(2)}`;
