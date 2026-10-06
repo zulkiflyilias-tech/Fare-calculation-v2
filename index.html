@@ -305,7 +305,7 @@
     // Initialize Map
     const map = L.map('map').setView([3.1390, 101.6869], 11);
     
-    // CARTO Voyager Tile Layer (No key required for standard basemap)
+    // CARTO Voyager Tile Layer
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
         subdomains: 'abcd',
@@ -524,6 +524,7 @@
         });
     }
 
+    // Fixed Decoder guaranteeing [lat, lng] output array format for Leaflet
     function decodeFlexiblePolyline(encoded) {
         const DECODING_TABLE = [
             62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1,
@@ -634,17 +635,30 @@
                         });
                     }
 
-                    if (routeLine) map.removeLayer(routeLine);
+                    if (routeLine) {
+                        map.removeLayer(routeLine);
+                        routeLine = null;
+                    }
                     
                     const routeCoordinates = decodeFlexiblePolyline(section.polyline);
                     
-                    routeLine = L.polyline(routeCoordinates, { 
-                        color: '#8e24aa', weight: 5, opacity: 0.85 
-                    }).addTo(map);
-                    
-                    map.invalidateSize();
-                    if (routeCoordinates.length > 0) {
-                        map.fitBounds(routeLine.getBounds(), { padding: [30, 30] });
+                    if (routeCoordinates && routeCoordinates.length > 0) {
+                        routeLine = L.polyline(routeCoordinates, { 
+                            color: '#8e24aa', 
+                            weight: 5, 
+                            opacity: 0.85,
+                            lineJoin: 'round'
+                        }).addTo(map);
+                        
+                        setTimeout(() => {
+                            map.invalidateSize();
+                            const bounds = L.latLngBounds([
+                                [pickupCoords.lat, pickupCoords.lon],
+                                [dropoffCoords.lat, dropoffCoords.lon],
+                                ...routeCoordinates
+                            ]);
+                            map.fitBounds(bounds, { padding: [40, 40] });
+                        }, 100);
                     }
 
                     processCalculations(distanceKm, durationMins, totalTollCost);
