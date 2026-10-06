@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rideshare MY - Fare Estimator & Toll System</title>
+    <title>Rideshare MY - Professional Fare Estimator</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        * { box-sizing: border-box; }
         body {
             margin: 0;
             padding: 0;
@@ -28,7 +27,6 @@
             height: 35vh;
             width: 100%;
             z-index: 1;
-            background-color: #e5e3df;
         }
         #search-panel {
             flex: 1;
@@ -36,18 +34,26 @@
             padding: 16px;
             box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
             z-index: 10;
+            box-sizing: border-box;
             border-top-left-radius: 16px;
             border-top-right-radius: 16px;
             display: flex;
             flex-direction: column;
             overflow-y: auto;
         }
-        .header-row h2 {
-            margin: 0 0 12px 0;
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        h2 {
+            margin: 0;
             font-size: 18px;
             font-weight: 700;
             color: #111;
         }
+        
         .routing-wrapper {
             position: relative;
             display: flex;
@@ -66,22 +72,26 @@
             border: 1px solid #e0e0e0;
             border-radius: 8px;
             font-size: 14px;
+            box-sizing: border-box;
             background-color: #f9f9f9;
-            transition: border-color 0.2s, background-color 0.2s;
+            transition: all 0.2s ease;
         }
-        #pickup { padding-right: 88px; }
+        #pickup {
+            padding-right: 88px;
+        }
         input:focus {
             outline: none;
             border-color: #8e24aa;
             background-color: #fff;
             box-shadow: 0 0 0 2px rgba(142, 36, 170, 0.1);
         }
+        
         .action-group {
             position: absolute;
             right: 8px;
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 6px;
             z-index: 5;
         }
         .icon-btn {
@@ -95,6 +105,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            transition: background 0.2s;
         }
         .icon-btn:hover {
             background-color: #f0f0f0;
@@ -105,6 +116,7 @@
             font-size: 18px;
             color: #aaa;
         }
+        
         .swap-container {
             position: absolute;
             right: 48px;
@@ -124,13 +136,15 @@
             align-items: center;
             justify-content: center;
             box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-            transition: transform 0.2s;
+            transition: all 0.2s ease;
             font-size: 14px;
         }
         .swap-btn:hover {
-            transform: scale(1.1);
+            transform: scale(1.1) translateY(-45%);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
             background-color: #fcf5ff;
         }
+
         .suggestions {
             position: absolute;
             top: 100%;
@@ -142,7 +156,7 @@
             max-height: 200px; 
             overflow-y: auto;
             z-index: 1000;
-            box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.1);
             display: none;
         }
         .suggestion-item {
@@ -152,7 +166,10 @@
             line-height: 1.4;
             border-bottom: 1px solid #f5f5f5;
         }
-        .suggestion-item:hover { background-color: #f5f5f5; }
+        .suggestion-item:hover {
+            background-color: #f5f5f5;
+        }
+        
         #result-card {
             background: #1c1c1e;
             color: white;
@@ -184,6 +201,7 @@
             margin-top: 12px;
             border-top: 1px dashed #3a3a3c;
             padding-top: 12px;
+            display: block;
         }
         .detail-row {
             display: flex;
@@ -207,9 +225,15 @@
             display: none;
             font-weight: 500;
         }
+
         @media(min-width: 768px) {
-            #container { flex-direction: row-reverse; }
-            #map { height: 100%; flex: 1; }
+            #container {
+                flex-direction: row-reverse;
+            }
+            #map {
+                height: 100%;
+                flex: 1;
+            }
             #search-panel {
                 width: 380px;
                 height: 100%;
@@ -231,7 +255,7 @@
         
         <div class="routing-wrapper">
             <div class="input-container">
-                <input type="text" id="pickup" placeholder="Enter Pickup Location..." autocomplete="off">
+                <input type="text" id="pickup" placeholder="Enter Pickup Location..." autocomplete="off" enterkeyhint="search">
                 <div class="action-group">
                     <button class="icon-btn" id="current-loc-btn" title="Use current location">🎯</button>
                     <button class="icon-btn clear-btn" id="clear-pickup">&times;</button>
@@ -240,11 +264,11 @@
             </div>
             
             <div class="swap-container">
-                <button class="swap-btn" id="swap-locations-btn" title="Swap locations">⇅</button>
+                <button class="swap-btn" id="swap-locations-btn" title="Swap locations" onclick="executeLocationSwap()">⇅</button>
             </div>
             
             <div class="input-container">
-                <input type="text" id="dropoff" placeholder="Enter Drop-off Location..." autocomplete="off">
+                <input type="text" id="dropoff" placeholder="Enter Drop-off Location..." autocomplete="off" enterkeyhint="search">
                 <div class="action-group">
                     <button class="icon-btn clear-btn" id="clear-dropoff">&times;</button>
                 </div>
@@ -273,7 +297,7 @@
                     <span id="calc-ride-distance-rate">RM 0.00</span>
                 </div>
                 <div class="detail-row">
-                    <span>Tolls (HERE Highway Rates)</span>
+                    <span id="toll-type-label">Tolls (HERE API)</span>
                     <span id="calc-tolls">RM 0.00</span>
                 </div>
                 <div class="detail-row">
@@ -298,48 +322,17 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-    const USE_BACKEND_PROXY = false; 
-    const PROXY_ENDPOINT = "/api/here-proxy"; 
-    const HERE_API_KEY = "PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk"; 
-
-    // Initialize Map centered on Selangor / Klang Valley
-    const map = L.map('map').setView([3.0449, 101.4456], 12);
+    const map = L.map('map').setView([3.1390, 101.6869], 11);
     
-    // Official primary OpenStreetMap tile server (Fast, reliable, standard)
-    const primaryTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        subdomains: ['a', 'b', 'c'],
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // Fallback tile URL if primary encounters network restrictions
-    primaryTileLayer.on('tileerror', function(error) {
-        console.warn("Tile load error, applying fallback source...", error);
-        error.tile.src = `https://a.basemaps.cartocdn.com/rastertiles/voyager/${error.coords.z}/${error.coords.x}/${error.coords.y}.png`;
-    });
-
-    // Force Leaflet frame re-render on initial load
-    setTimeout(() => { map.invalidateSize(); }, 300);
+    const HERE_API_KEY = "PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk"; 
 
     let pickupMarker = null, dropoffMarker = null, routeLine = null;
     let pickupCoords = null, dropoffCoords = null;
     let currentRouteTimeout = null;
-
-    const pickupIcon = L.divIcon({
-        className: 'custom-pin-pickup',
-        html: `<div style="background-color:#2e7d32;width:14px;height:14px;border-radius:50%;border:3px solid white;box-shadow:0 0 5px rgba(0,0,0,0.4);"></div>`,
-        iconSize: [20, 20],
-        iconAnchor: [10, 10]
-    });
-
-    const dropoffIcon = L.divIcon({
-        className: 'custom-pin-dropoff',
-        html: `<div style="background-color:#c62828;width:14px;height:14px;border-radius:50%;border:3px solid white;box-shadow:0 0 5px rgba(0,0,0,0.4);"></div>`,
-        iconSize: [20, 20],
-        iconAnchor: [10, 10]
-    });
-
-    window.addEventListener('resize', () => map.invalidateSize());
 
     setupAutocomplete('pickup', 'pickup-suggestions', 'clear-pickup', (coords) => {
         pickupCoords = coords;
@@ -361,11 +354,9 @@
         resetCalculationDisplay();
     });
 
-    document.getElementById('swap-locations-btn').addEventListener('click', executeLocationSwap);
-
     document.getElementById('current-loc-btn').addEventListener('click', () => {
         if (!navigator.geolocation) {
-            showError("Location tracing is unsupported by your browser.");
+            showError("Compass or location trace features are unsupported by this application shell.");
             return;
         }
         const btn = document.getElementById('current-loc-btn');
@@ -380,16 +371,13 @@
                 updateMarker('pickup', pickupCoords);
                 map.setView([lat, lon], 14);
                 
-                const reverseGeocodeUrl = USE_BACKEND_PROXY 
-                    ? `${PROXY_ENDPOINT}?action=revgeocode&lat=${lat}&lon=${lon}`
-                    : `https://revgeocode.search.hereapi.com/v1/revgeocode?at=${lat},${lon}&lang=en-US&apiKey=${HERE_API_KEY}`;
-                
+                const reverseGeocodeUrl = `https://photon.komoot.io/reverse?lon=${lon}&lat=${lat}`;
                 fetch(reverseGeocodeUrl)
                     .then(res => res.json())
                     .then(data => {
                         btn.textContent = "🎯";
-                        if (data.items && data.items.length > 0) {
-                            document.getElementById('pickup').value = data.items[0].address.label || data.items[0].title;
+                        if (data.features && data.features.length > 0) {
+                            document.getElementById('pickup').value = expandAddress(data.features[0].properties);
                         } else {
                             document.getElementById('pickup').value = `Current Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
                         }
@@ -405,41 +393,25 @@
             },
             () => {
                 btn.textContent = "🎯";
-                showError("Unable to access location positioning metrics.");
+                showError("Unable to safely track user positioning metrics.");
             },
             { enableHighAccuracy: true, timeout: 8000 }
         );
     });
 
     function updateMarker(type, coords) {
-        if (!coords || isNaN(coords.lat) || isNaN(coords.lon) || coords.lat === 0 || coords.lon === 0) return;
-        
         if (type === 'pickup') {
             if (pickupMarker) map.removeLayer(pickupMarker);
-            pickupMarker = L.marker([coords.lat, coords.lon], { icon: pickupIcon }).addTo(map);
+            pickupMarker = L.marker([coords.lat, coords.lon]).addTo(map);
         } else {
             if (dropoffMarker) map.removeLayer(dropoffMarker);
-            dropoffMarker = L.marker([coords.lat, coords.lon], { icon: dropoffIcon }).addTo(map);
-        }
-        
-        if (pickupCoords && dropoffCoords) {
-            const bounds = L.latLngBounds([
-                [pickupCoords.lat, pickupCoords.lon],
-                [dropoffCoords.lat, dropoffCoords.lon]
-            ]);
-            map.fitBounds(bounds, { padding: [50, 50] });
-        } else {
-            map.setView([coords.lat, coords.lon], 13);
+            dropoffMarker = L.marker([coords.lat, coords.lon]).addTo(map);
         }
     }
 
     function executeLocationSwap() {
-        document.getElementById('pickup-suggestions').style.display = 'none';
-        document.getElementById('dropoff-suggestions').style.display = 'none';
-
         const pickupInput = document.getElementById('pickup');
         const dropoffInput = document.getElementById('dropoff');
-        
         const tempText = pickupInput.value;
         const tempCoords = pickupCoords;
         
@@ -453,12 +425,21 @@
         
         if (pickupCoords) updateMarker('pickup', pickupCoords);
         else if (pickupMarker) { map.removeLayer(pickupMarker); pickupMarker = null; }
-        
         if (dropoffCoords) updateMarker('dropoff', dropoffCoords);
         else if (dropoffMarker) { map.removeLayer(dropoffMarker); dropoffMarker = null; }
         
         if (pickupCoords && dropoffCoords) checkAndProcessRoute();
         else resetCalculationDisplay();
+    }
+
+    function expandAddress(props) {
+        const parts = [];
+        if (props.name) parts.push(props.name);
+        if (props.street) parts.push(props.street);
+        if (props.district) parts.push(props.district);
+        if (props.city || props.town) parts.push(props.city || props.town);
+        if (props.state) parts.push(props.state);
+        return parts.length > 0 ? parts.join(', ') : 'Target Location Coordinates';
     }
 
     function resetCalculationDisplay() {
@@ -478,10 +459,10 @@
         const input = document.getElementById(inputId);
         const suggestionsBox = document.getElementById(suggestionsId);
         const clearBtn = document.getElementById(clearBtnId);
-        let debounceTimeout = null;
+        let debounceTimeout;
 
         input.addEventListener('input', () => {
-            if (debounceTimeout) clearTimeout(debounceTimeout);
+            clearTimeout(debounceTimeout);
             const query = input.value.trim();
             clearBtn.style.display = query.length > 0 ? 'block' : 'none';
 
@@ -492,46 +473,33 @@
             }
 
             debounceTimeout = setTimeout(() => {
-                const url = USE_BACKEND_PROXY 
-                    ? `${PROXY_ENDPOINT}?action=autosuggest&q=${encodeURIComponent(query)}`
-                    : `https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=3.0449,101.4456&in=countryCode:MYS&limit=5&apiKey=${HERE_API_KEY}`;
-                
+                const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&bbox=99.6,0.8,119.5,7.4&limit=5`;
                 fetch(url)
                     .then(res => res.json())
                     .then(data => {
                         suggestionsBox.innerHTML = '';
-                        if (!data.items || data.items.length === 0) {
+                        if(!data.features || data.features.length === 0) {
                             suggestionsBox.style.display = 'none';
                             return;
                         }
-                        
-                        let validItemCount = 0;
-                        data.items.forEach(item => {
-                            const pos = item.position || (item.access && item.access[0]);
-                            if (!pos) return;
-
-                            const addressLabel = item.title || (item.address && item.address.label);
-                            const latVal = parseFloat(pos.lat);
-                            const lonVal = parseFloat(pos.lng !== undefined ? pos.lng : pos.lon);
-
-                            if (isNaN(latVal) || isNaN(lonVal) || latVal === 0 || lonVal === 0) return;
-
+                        suggestionsBox.style.display = 'block';
+                        data.features.forEach(feature => {
+                            const props = feature.properties;
+                            const detailedAddress = expandAddress(props);
                             const div = document.createElement('div');
                             div.className = 'suggestion-item';
-                            div.textContent = addressLabel;
+                            div.textContent = detailedAddress;
                             div.addEventListener('click', () => {
-                                input.value = addressLabel;
+                                input.value = props.name || detailedAddress;
                                 suggestionsBox.innerHTML = '';
                                 suggestionsBox.style.display = 'none';
-                                onSelect({ lat: latVal, lon: lonVal });
+                                const [lon, lat] = feature.geometry.coordinates;
+                                onSelect({ lat, lon });
                             });
                             suggestionsBox.appendChild(div);
-                            validItemCount++;
                         });
-
-                        suggestionsBox.style.display = validItemCount > 0 ? 'block' : 'none';
-                    }).catch(err => console.error("Autocomplete Error:", err));
-            }, 300);
+                    }).catch(err => console.error(err));
+            }, 350);
         });
 
         clearBtn.addEventListener('click', () => {
@@ -541,14 +509,9 @@
             suggestionsBox.style.display = 'none';
             onClear();
         });
-
-        document.addEventListener('click', (e) => {
-            if (!input.contains(e.target) && !suggestionsBox.contains(e.target)) {
-                suggestionsBox.style.display = 'none';
-            }
-        });
     }
 
+    // HERE Flexible Polyline Decoder
     function decodeFlexiblePolyline(encoded) {
         const DECODING_TABLE = [
             62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1,
@@ -558,91 +521,90 @@
             36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51
         ];
 
-        function decodeUnsignedVarint(str, index) {
+        function decodeChar(char) {
+            return DECODING_TABLE[char.charCodeAt(0) - 45];
+        }
+
+        let index = 0;
+        const header = decodeChar(encoded[index++]);
+        const precision = header & 15;
+        const factor = Math.pow(10, precision);
+        const thirdDim = (header >> 4) & 7;
+
+        let lastLat = 0, lastLng = 0;
+        const res = [];
+
+        while (index < encoded.length) {
             let result = 0, shift = 0, byte;
             do {
-                byte = DECODING_TABLE[str.charCodeAt(index++) - 45];
-                result |= (byte & 0x1F) << shift;
+                byte = decodeChar(encoded[index++]);
+                result |= (byte & 31) << shift;
                 shift += 5;
-            } while (byte >= 0x20);
-            return { value: result, index: index };
-        }
+            } while (byte >= 32);
 
-        function decodeSignedVarint(str, index) {
-            const res = decodeUnsignedVarint(str, index);
-            const num = res.value;
-            res.value = (num & 1) ? ~(num >> 1) : (num >> 1);
-            return res;
-        }
+            const deltaLat = (result & 1) ? ~(result >> 1) : (result >> 1);
+            lastLat += deltaLat;
 
-        let idx = 0;
-        const header = decodeUnsignedVarint(encoded, idx);
-        idx = header.index;
-        
-        const precision = header.value & 15;
-        const factor = Math.pow(10, precision);
-        const thirdDim = (header.value >> 4) & 7;
+            result = 0; shift = 0;
+            do {
+                byte = decodeChar(encoded[index++]);
+                result |= (byte & 31) << shift;
+                shift += 5;
+            } while (byte >= 32);
 
-        if (thirdDim !== 0) {
-            idx = decodeUnsignedVarint(encoded, idx).index;
-        }
-
-        let lat = 0, lng = 0, thirdDimVal = 0;
-        const coordinates = [];
-
-        while (idx < encoded.length) {
-            let res = decodeSignedVarint(encoded, idx);
-            lat += res.value;
-            idx = res.index;
-
-            res = decodeSignedVarint(encoded, idx);
-            lng += res.value;
-            idx = res.index;
+            const deltaLng = (result & 1) ? ~(result >> 1) : (result >> 1);
+            lastLng += deltaLng;
 
             if (thirdDim !== 0) {
-                res = decodeSignedVarint(encoded, idx);
-                thirdDimVal += res.value;
-                idx = res.index;
+                do {
+                    byte = decodeChar(encoded[index++]);
+                } while (byte >= 32);
             }
 
-            const finalLat = lat / factor;
-            const finalLng = lng / factor;
-            if (finalLat >= -90 && finalLat <= 90 && finalLng >= -180 && finalLng <= 180) {
-                coordinates.push([finalLat, finalLng]);
-            }
+            res.push([lastLat / factor, lastLng / factor]);
         }
-        return coordinates;
+        return res;
+    }
+
+    function extractTollCostFromHEREResponse(section) {
+        let totalToll = 0;
+        let hasTolls = false;
+
+        // Extract tolls from HERE v8 toll structure
+        if (section.tolls && Array.isArray(section.tolls) && section.tolls.length > 0) {
+            hasTolls = true;
+            section.tolls.forEach(toll => {
+                if (toll.fares && Array.isArray(toll.fares)) {
+                    toll.fares.forEach(fare => {
+                        if (fare.price && fare.price.value) {
+                            totalToll += parseFloat(fare.price.value);
+                        }
+                    });
+                }
+            });
+        }
+
+        return { totalToll, hasTolls };
     }
 
     function checkAndProcessRoute() {
         if (!pickupCoords || !dropoffCoords) return;
-        if (isNaN(pickupCoords.lat) || isNaN(pickupCoords.lon) || isNaN(dropoffCoords.lat) || isNaN(dropoffCoords.lon)) return;
-
+        
         document.getElementById('error-msg').style.display = 'none';
-        if (currentRouteTimeout) clearTimeout(currentRouteTimeout);
+        if(currentRouteTimeout) clearTimeout(currentRouteTimeout);
         
         currentRouteTimeout = setTimeout(() => {
-            const primaryUrl = USE_BACKEND_PROXY
-                ? `${PROXY_ENDPOINT}?action=route&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&tolls=true`
-                : `https://router.hereapi.com/v8/routes?transportMode=car&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&return=summary,polyline,tolls&toll[vehicles]=car&currency=MYR&apiKey=${HERE_API_KEY}`;
+            // Updated HERE API endpoint requesting tolls and toll system spans
+            const url = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&return=summary,polyline,tolls&spans=tollSystems,names&apiKey=${HERE_API_KEY}`;
 
-            const fallbackUrl = USE_BACKEND_PROXY
-                ? `${PROXY_ENDPOINT}?action=route&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&tolls=false`
-                : `https://router.hereapi.com/v8/routes?transportMode=car&origin=${pickupCoords.lat},${pickupCoords.lon}&destination=${dropoffCoords.lat},${dropoffCoords.lon}&return=summary,polyline&apiKey=${HERE_API_KEY}`;
-
-            fetch(primaryUrl)
+            fetch(url)
                 .then(res => {
-                    if (!res.ok) {
-                        return fetch(fallbackUrl).then(fRes => {
-                            if (!fRes.ok) throw new Error('Routing request failed.');
-                            return fRes.json();
-                        });
-                    }
+                    if (!res.ok) throw new Error('HERE API route payload evaluation drop.');
                     return res.json();
                 })
                 .then(data => {
                     if (!data.routes || data.routes.length === 0) {
-                        showError("No valid drivable route found for selected points.");
+                        showError("No valid drivable geometry found matching those vectors.");
                         return;
                     }
 
@@ -651,52 +613,56 @@
                     const summary = section.summary;
                     
                     const distanceKm = summary.length / 1000;
-                    const durationMins = Math.round(summary.duration / 60);
+                    const baseDurationMins = summary.duration / 60;
 
-                    let totalTollCost = 0;
-                    if (section.tolls && section.tolls.length > 0) {
-                        section.tolls.forEach(toll => {
-                            if (toll.fares && toll.fares.length > 0) {
-                                toll.fares.forEach(fare => {
-                                    totalTollCost += (fare.price ? fare.price.value : 0);
-                                });
-                            }
-                        });
-                    }
+                    // Extract toll data from HERE response
+                    const { totalToll, hasTolls } = extractTollCostFromHEREResponse(section);
 
-                    if (routeLine) {
-                        map.removeLayer(routeLine);
-                        routeLine = null;
-                    }
-                    
-                    const routeCoordinates = decodeFlexiblePolyline(section.polyline);
-                    
-                    if (routeCoordinates && routeCoordinates.length > 0) {
-                        routeLine = L.polyline(routeCoordinates, { 
-                            color: '#8e24aa', 
-                            weight: 5, 
-                            opacity: 0.85,
-                            lineJoin: 'round'
-                        }).addTo(map);
-                        
-                        setTimeout(() => {
-                            map.invalidateSize();
-                            const bounds = L.latLngBounds(routeCoordinates);
-                            map.fitBounds(bounds, { padding: [30, 30] });
-                        }, 100);
+                    const now = new Date();
+                    const currentHour = now.getHours();
+                    const isWeekend = (now.getDay() === 0 || now.getDay() === 6);
+
+                    let trafficDelayFactor = 1.15; 
+                    if (!isWeekend) {
+                        if ((currentHour >= 7 && currentHour <= 9) || (currentHour >= 17 && currentHour <= 19.5)) {
+                            trafficDelayFactor = 1.55; 
+                        } else if (currentHour >= 12 && currentHour <= 14) {
+                            trafficDelayFactor = 1.25; 
+                        }
                     } else {
-                        const pinBounds = L.latLngBounds([
-                            [pickupCoords.lat, pickupCoords.lon],
-                            [dropoffCoords.lat, dropoffCoords.lon]
-                        ]);
-                        map.fitBounds(pinBounds, { padding: [40, 40] });
+                        if (currentHour >= 16 && currentHour <= 21) {
+                            trafficDelayFactor = 1.35; 
+                        }
                     }
 
-                    processCalculations(distanceKm, durationMins, totalTollCost);
+                    let distanceImpactModifier = 1.0;
+                    if (distanceKm <= 5) {
+                        distanceImpactModifier = 0.65;
+                    } else if (distanceKm <= 15) {
+                        distanceImpactModifier = 0.85;
+                    } else if (distanceKm > 100) {
+                        distanceImpactModifier = 0.35; 
+                    } else if (distanceKm > 50) {
+                        distanceImpactModifier = 0.60;
+                    }
+
+                    const localizedTrafficWeight = 1 + ((trafficDelayFactor - 1) * distanceImpactModifier);
+                    const correctedDurationMins = Math.max(1, Math.round(baseDurationMins * localizedTrafficWeight));
+
+                    if (routeLine) map.removeLayer(routeLine);
+                    
+                    const coordinates = decodeFlexiblePolyline(section.polyline);
+                    routeLine = L.polyline(coordinates, { 
+                        color: '#8e24aa', weight: 5, opacity: 0.85 
+                    }).addTo(map);
+                    
+                    map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+
+                    processCalculations(distanceKm, correctedDurationMins, totalToll, hasTolls);
                 })
                 .catch(err => {
-                    console.error("HERE Routing Error:", err);
-                    showError("Unable to calculate route. Please try selecting locations again.");
+                    console.error("HERE API Infrastructure Error:", err);
+                    showError("API connectivity fault or key restriction triggered.");
                 });
         }, 250);
     }
@@ -709,15 +675,28 @@
     }
 
     function roundToMalaysianCents(value) {
-        return Math.round(value * 20) / 20;
+        return Math.round(value * 10) / 10;
     }
 
-    function processCalculations(distance, duration, tollCost) {
+    function processCalculations(distance, duration, tollAmount, hasTolls) {
         const baseFare = 5.00;
         const perKmRate = 1.25;
         
         const chargeableDistance = Math.max(0, distance - 1);
         const rideDistanceFare = chargeableDistance * perKmRate;
+
+        // If HERE API returns 0 or missing toll values for a known toll road, fallback estimation logic kicks in
+        let finalTollCost = tollAmount;
+        let tollLabel = "Tolls (HERE API)";
+
+        if (finalTollCost === 0 && hasTolls) {
+            finalTollCost = distance <= 45 ? 2.50 : 3.50 + ((distance - 45) * 0.095);
+            tollLabel = "Tolls (Est. Fallback)";
+        } else if (finalTollCost > 0) {
+            tollLabel = "Tolls (Actual HERE Fare)";
+        }
+
+        document.getElementById('toll-type-label').textContent = tollLabel;
 
         const driverIncentive = (duration / 60) * 12.00;
 
@@ -731,7 +710,7 @@
             document.getElementById('deadhead-km-row').style.display = 'none';
         }
 
-        const rawTotal = baseFare + rideDistanceFare + tollCost + driverIncentive + deadheadCost;
+        const rawTotal = baseFare + rideDistanceFare + finalTollCost + driverIncentive + deadheadCost;
         const roundedTotal = Math.max(baseFare, roundToMalaysianCents(rawTotal));
         const finalDisplayedWholeFare = Math.round(roundedTotal);
 
@@ -741,7 +720,7 @@
 
         document.getElementById('calc-base-fare').textContent = `RM ${baseFare.toFixed(2)}`;
         document.getElementById('calc-ride-distance-rate').textContent = `RM ${rideDistanceFare.toFixed(2)}`;
-        document.getElementById('calc-tolls').textContent = `RM ${tollCost.toFixed(2)}`;
+        document.getElementById('calc-tolls').textContent = `RM ${finalTollCost.toFixed(2)}`;
         document.getElementById('calc-incentive').textContent = `RM ${driverIncentive.toFixed(2)}`;
         document.getElementById('calc-deadhead-km').textContent = `RM ${deadheadCost.toFixed(2)}`;
         document.getElementById('calc-grand').textContent = `RM ${roundedTotal.toFixed(2)}`;
