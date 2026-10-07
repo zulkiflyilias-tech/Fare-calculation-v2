@@ -422,6 +422,7 @@
     let pickupMarker = null, dropoffMarker = null, routePolyline = null;
     let pickupCoords = null, dropoffCoords = null;
     let currentRouteTimeout = null;
+    let lastCalculatedMetrics = null;
 
     setupAutocomplete('pickup', 'pickup-suggestions', 'clear-pickup', (coords) => {
         pickupCoords = coords;
@@ -490,11 +491,18 @@
         );
     });
 
-    // Auto-recalculate triggers on option adjustments
+    // Immediate local recalculation on parameter input changes
     ['fuel-price', 'fuel-consumption', 'cross-state-toggle'].forEach(id => {
-        document.getElementById(id).addEventListener('change', () => {
-            if (pickupCoords && dropoffCoords) {
-                checkAndProcessRoute();
+        const el = document.getElementById(id);
+        const eventType = el.type === 'checkbox' ? 'change' : 'input';
+        
+        el.addEventListener(eventType, () => {
+            if (lastCalculatedMetrics) {
+                processCalculations(
+                    lastCalculatedMetrics.distance,
+                    lastCalculatedMetrics.duration,
+                    lastCalculatedMetrics.tollFee
+                );
             }
         });
     });
@@ -536,6 +544,7 @@
 
     function resetCalculationDisplay() {
         if (routePolyline) { map.removeObject(routePolyline); routePolyline = null; }
+        lastCalculatedMetrics = null;
         document.getElementById('result-card').style.display = 'none';
         document.getElementById('error-msg').style.display = 'none';
     }
@@ -694,6 +703,13 @@
                 map.addObject(routePolyline);
                 map.getViewModel().setLookAtData({ bounds: routePolyline.getBoundingBox() });
 
+                // Store calculated route metrics for local recalculation triggers
+                lastCalculatedMetrics = {
+                    distance: distanceKm,
+                    duration: correctedDurationMins,
+                    tollFee: calculatedTollFee
+                };
+
                 processCalculations(distanceKm, correctedDurationMins, calculatedTollFee);
             }, (error) => {
                 console.error("HERE Routing Service Error:", error);
@@ -757,8 +773,8 @@
             document.getElementById('state-fee-row').style.display = 'none';
         }
 
-        // --- 4. Grand Total Accumulation ---
-        const rawTotal = baseFare + rideDistanceFare + driverIncentive + tollFee + deadheadCost + crossStateFee;
+        // --- 4. Grand Total Accumulation (Including Fuel Contribution) ---
+        const rawTotal = baseFare + rideDistanceFare + driverIncentive + tollFee + deadheadCost + crossStateFee + calculatedFuelCost;
         const roundedTotal = Math.max(baseFare, roundToMalaysianCents(rawTotal));
         const finalDisplayedWholeFare = Math.round(roundedTotal);
 
