@@ -25,7 +25,7 @@
             position: relative;
         }
         #map {
-            height: 35vh;
+            height: 45vh;
             width: 100%;
             z-index: 1;
         }
@@ -171,40 +171,6 @@
             background-color: #f5f5f5;
         }
 
-        /* Config / Fuel / Long-Haul Panel */
-        .pricing-options {
-            margin-bottom: 10px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            background: #f1f3f5;
-            padding: 10px 12px;
-            border-radius: 10px;
-            border: 1px solid #e9ecef;
-        }
-        .option-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 12px;
-            color: #495057;
-            font-weight: 600;
-        }
-        .option-input {
-            width: 70px !important;
-            padding: 4px 6px !important;
-            font-size: 12px !important;
-            text-align: right;
-            border-radius: 6px !important;
-            border: 1px solid #ced4da !important;
-            background: #fff !important;
-        }
-        .option-checkbox {
-            width: 16px !important;
-            height: 16px !important;
-            cursor: pointer;
-        }
-
         #result-card {
             background: #1c1c1e;
             color: white;
@@ -317,22 +283,6 @@
             </div>
         </div>
 
-        <!-- Dynamic Fuel & Intercity Pricing Options -->
-        <div class="pricing-options">
-            <div class="option-row">
-                <label for="fuel-price">Fuel Price (RM/L):</label>
-                <input type="number" id="fuel-price" class="option-input" value="2.05" step="0.05" min="1.00">
-            </div>
-            <div class="option-row">
-                <label for="fuel-consumption">Consumption (L/100km):</label>
-                <input type="number" id="fuel-consumption" class="option-input" value="6.5" step="0.5" min="1.0">
-            </div>
-            <div class="option-row">
-                <label for="cross-state-toggle">Cross-State Allowance:</label>
-                <input type="checkbox" id="cross-state-toggle" class="option-checkbox">
-            </div>
-        </div>
-
         <div id="error-msg"></div>
 
         <div id="result-card">
@@ -360,7 +310,7 @@
                     <span>Toll Charges</span>
                     <span id="calc-toll-fare">RM 0.00</span>
                 </div>
-                <!-- 4. Out-of-Zone Surcharge (Tiered) -->
+                <!-- 4. Out-of-Zone Surcharge -->
                 <div class="detail-row" id="deadhead-km-row" style="display: none;">
                     <span>Out-of-Zone Surcharge</span>
                     <span id="calc-deadhead-km">RM 0.00</span>
@@ -369,16 +319,6 @@
                 <div class="detail-row">
                     <span>Traffic Adjust & Incentive</span>
                     <span id="calc-incentive">RM 0.00</span>
-                </div>
-                <!-- 6. Estimated Fuel Cost -->
-                <div class="detail-row" id="fuel-surcharge-row">
-                    <span>Fuel Cost Contribution</span>
-                    <span id="calc-fuel-cost">RM 0.00</span>
-                </div>
-                <!-- 7. Cross-State / Multi-Region Long-Haul Allowance -->
-                <div class="detail-row" id="state-fee-row" style="display: none;">
-                    <span>Cross-State Long-Haul Fee</span>
-                    <span id="calc-state-fee">RM 0.00</span>
                 </div>
 
                 <div class="detail-row total-bold">
@@ -422,7 +362,6 @@
     let pickupMarker = null, dropoffMarker = null, routePolyline = null;
     let pickupCoords = null, dropoffCoords = null;
     let currentRouteTimeout = null;
-    let lastCalculatedMetrics = null;
 
     setupAutocomplete('pickup', 'pickup-suggestions', 'clear-pickup', (coords) => {
         pickupCoords = coords;
@@ -491,22 +430,6 @@
         );
     });
 
-    // Immediate local recalculation on parameter input changes
-    ['fuel-price', 'fuel-consumption', 'cross-state-toggle'].forEach(id => {
-        const el = document.getElementById(id);
-        const eventType = el.type === 'checkbox' ? 'change' : 'input';
-        
-        el.addEventListener(eventType, () => {
-            if (lastCalculatedMetrics) {
-                processCalculations(
-                    lastCalculatedMetrics.distance,
-                    lastCalculatedMetrics.duration,
-                    lastCalculatedMetrics.tollFee
-                );
-            }
-        });
-    });
-
     function updateMarker(type, coords) {
         if (type === 'pickup') {
             if (pickupMarker) map.removeObject(pickupMarker);
@@ -544,7 +467,6 @@
 
     function resetCalculationDisplay() {
         if (routePolyline) { map.removeObject(routePolyline); routePolyline = null; }
-        lastCalculatedMetrics = null;
         document.getElementById('result-card').style.display = 'none';
         document.getElementById('error-msg').style.display = 'none';
     }
@@ -703,13 +625,6 @@
                 map.addObject(routePolyline);
                 map.getViewModel().setLookAtData({ bounds: routePolyline.getBoundingBox() });
 
-                // Store calculated route metrics for local recalculation triggers
-                lastCalculatedMetrics = {
-                    distance: distanceKm,
-                    duration: correctedDurationMins,
-                    tollFee: calculatedTollFee
-                };
-
                 processCalculations(distanceKm, correctedDurationMins, calculatedTollFee);
             }, (error) => {
                 console.error("HERE Routing Service Error:", error);
@@ -738,18 +653,12 @@
 
         const driverIncentive = (duration / 60) * 12.00;
 
-        // --- 1. Dynamic Fuel Price Calculation ---
-        const fuelPricePerLitre = parseFloat(document.getElementById('fuel-price').value) || 2.05;
-        const litresPer100Km = parseFloat(document.getElementById('fuel-consumption').value) || 6.5;
-        const totalLitres = (distance * litresPer100Km) / 100;
-        const calculatedFuelCost = totalLitres * fuelPricePerLitre;
-
-        // --- 2. Tiered Out-of-Zone Surcharge Logic ---
+        // Tiered Out-of-Zone Surcharge Logic
         let deadheadCost = 0;
         if (distance > 12 && distance <= 50) {
             deadheadCost = rideDistanceFare * 0.15; // Short Out-of-Zone (15%)
         } else if (distance > 50 && distance <= 250) {
-            deadheadCost = rideDistanceFare * 0.30; // Medium Cross-State (30%)
+            deadheadCost = rideDistanceFare * 0.30; // Medium Out-of-Zone (30%)
         } else if (distance > 250 && distance <= 500) {
             deadheadCost = rideDistanceFare * 0.45; // Long Haul (45%)
         } else if (distance > 500) {
@@ -758,23 +667,8 @@
 
         document.getElementById('deadhead-km-row').style.display = deadheadCost > 0 ? 'flex' : 'none';
 
-        // --- 3. Cross-State / Multi-Region Long-Haul Fee ---
-        let crossStateFee = 0;
-        const isCrossStateChecked = document.getElementById('cross-state-toggle').checked;
-
-        if (isCrossStateChecked || distance > 200) {
-            if (distance > 200) {
-                crossStateFee = 35.00 + ((distance - 200) * 0.10);
-            } else {
-                crossStateFee = 25.00; // Flat cross-border/state allowance
-            }
-            document.getElementById('state-fee-row').style.display = 'flex';
-        } else {
-            document.getElementById('state-fee-row').style.display = 'none';
-        }
-
-        // --- 4. Grand Total Accumulation (Including Fuel Contribution) ---
-        const rawTotal = baseFare + rideDistanceFare + driverIncentive + tollFee + deadheadCost + crossStateFee + calculatedFuelCost;
+        // Grand Total Calculation
+        const rawTotal = baseFare + rideDistanceFare + driverIncentive + tollFee + deadheadCost;
         const roundedTotal = Math.max(baseFare, roundToMalaysianCents(rawTotal));
         const finalDisplayedWholeFare = Math.round(roundedTotal);
 
@@ -787,8 +681,6 @@
         document.getElementById('calc-toll-fare').textContent = `RM ${tollFee.toFixed(2)}`;
         document.getElementById('calc-deadhead-km').textContent = `RM ${deadheadCost.toFixed(2)}`;
         document.getElementById('calc-incentive').textContent = `RM ${driverIncentive.toFixed(2)}`;
-        document.getElementById('calc-fuel-cost').textContent = `RM ${calculatedFuelCost.toFixed(2)}`;
-        document.getElementById('calc-state-fee').textContent = `RM ${crossStateFee.toFixed(2)}`;
         document.getElementById('calc-grand').textContent = `RM ${roundedTotal.toFixed(2)}`;
 
         document.getElementById('result-card').style.display = 'block';
