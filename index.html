@@ -191,6 +191,15 @@
             font-weight: 800;
             color: #b388ff;
         }
+        .surge-badge {
+            background-color: #ff9800;
+            color: #111;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 6px;
+            display: none;
+        }
         .fare-meta {
             font-size: 13px;
             color: #e5e5ea;
@@ -288,6 +297,7 @@
         <div id="result-card">
             <div class="fare-header-row">
                 <div id="total-fare" class="fare-header">RM --</div>
+                <div id="surge-tag" class="surge-badge">⚡ 1.0x Peak</div>
             </div>
             <div class="fare-meta">
                 <span id="fare-distance">0 km</span>
@@ -317,7 +327,7 @@
                 </div>
                 <!-- 5. Traffic Adjust & Incentives -->
                 <div class="detail-row">
-                    <span>Traffic Adjust & Incentive</span>
+                    <span>Traffic Adjust & Peak Surge</span>
                     <span id="calc-incentive">RM 0.00</span>
                 </div>
 
@@ -332,6 +342,19 @@
 
 <script>
     const HERE_API_KEY = "PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk"; 
+
+    // Configurable Pricing Parameters
+    const CONFIG = {
+        baseFare: 5.00,
+        perKmRate: 1.25,
+        perMinuteRate: 0.25, // RM 0.25/min (equivalent to RM 15.00/hour)
+        
+        // Surge Multipliers by Time
+        surgeWeekdayPeak: 1.40,  // 40% surge during rush hours
+        surgeWeekdayLunch: 1.15, // 15% surge during lunch hours
+        surgeWeekendPeak: 1.25,  // 25% surge during weekend busy hours
+        surgeOffPeak: 1.00       // Standard baseline rate
+    };
 
     // Initialize HERE Platform & Engine
     const platform = new H.service.Platform({
@@ -536,6 +559,29 @@
         });
     }
 
+    function getDynamicSurgeMultiplier() {
+        const now = new Date();
+        const currentHour = now.getHours() + (now.getMinutes() / 60);
+        const isWeekend = (now.getDay() === 0 || now.getDay() === 6);
+
+        if (!isWeekend) {
+            // Weekday Rush Hours: 7:00 AM - 9:00 AM & 5:00 PM - 7:30 PM
+            if ((currentHour >= 7 && currentHour <= 9) || (currentHour >= 17 && currentHour <= 19.5)) {
+                return CONFIG.surgeWeekdayPeak;
+            }
+            // Weekday Lunch Hour: 12:00 PM - 2:00 PM
+            if (currentHour >= 12 && currentHour <= 14) {
+                return CONFIG.surgeWeekdayLunch;
+            }
+        } else {
+            // Weekend Evening Rush: 4:00 PM - 9:00 PM
+            if (currentHour >= 16 && currentHour <= 21) {
+                return CONFIG.surgeWeekendPeak;
+            }
+        }
+        return CONFIG.surgeOffPeak;
+    }
+
     function checkAndProcessRoute() {
         if (!pickupCoords || !dropoffCoords) return;
         
@@ -645,14 +691,19 @@
     }
 
     function processCalculations(distance, duration, tollFee) {
-        const baseFare = 5.00;
-        const perKmRate = 1.25;
+        const surgeMultiplier = getDynamicSurgeMultiplier();
         
+        // 1. Base Fare
+        const baseFare = CONFIG.baseFare;
+
+        // 2. Distance Charge (Excludes 1st km baseline)
         const chargeableDistance = Math.max(0, distance - 1);
-        const rideDistanceFare = chargeableDistance * perKmRate;
+        const rideDistanceFare = chargeableDistance * CONFIG.perKmRate;
 
-        const driverIncentive = (duration / 60) * 12.00;
+        // 3. Time-Based Charge (Updated Per-Minute Rate)
+        const timeFare = duration * CONFIG.perMinuteRate;
 
+        // 4. Out-of-Zone / Long-Distance Surcharge
         let deadheadCost = 0;
         if (distance > 12) {
             const boundaryKm = Math.min(distance, 350);
@@ -663,10 +714,27 @@
             document.getElementById('deadhead-km-row').style.display = 'none';
         }
 
-        const rawTotal = baseFare + rideDistanceFare + driverIncentive + tollFee + deadheadCost;
+        // Subtotal before Surge & Tolls
+        const subtotal = baseFare + rideDistanceFare + timeFare + deadheadCost;
+        
+        // Apply Dynamic Surge to Subtotal
+        const surgedSubtotal = subtotal * surgeMultiplier;
+        
+        // Final Total includes Toll Charges (Tolls are not subject to surge)
+        const rawTotal = surgedSubtotal + tollFee;
         const roundedTotal = Math.max(baseFare, roundToMalaysianCents(rawTotal));
         const finalDisplayedWholeFare = Math.round(roundedTotal);
 
+        // Update Surge Tag Display
+        const surgeTag = document.getElementById('surge-tag');
+        if (surgeMultiplier > 1.0) {
+            surgeTag.textContent = `⚡ ${surgeMultiplier.toFixed(2)}x Peak`;
+            surgeTag.style.display = 'block';
+        } else {
+            surgeTag.style.display = 'none';
+        }
+
+        // Update UI Elements
         document.getElementById('total-fare').textContent = `RM ${finalDisplayedWholeFare}`;
         document.getElementById('fare-distance').textContent = `${distance.toFixed(1)} km`;
         document.getElementById('fare-duration').textContent = formatDuration(duration);
@@ -675,7 +743,11 @@
         document.getElementById('calc-ride-distance-rate').textContent = `RM ${rideDistanceFare.toFixed(2)}`;
         document.getElementById('calc-toll-fare').textContent = `RM ${tollFee.toFixed(2)}`;
         document.getElementById('calc-deadhead-km').textContent = `RM ${deadheadCost.toFixed(2)}`;
-        document.getElementById('calc-incentive').textContent = `RM ${driverIncentive.toFixed(2)}`;
+        
+        // Displays Time Charge + Surge Adjustment
+        const trafficAndSurgeAmount = (timeFare * surgeMultiplier) + ((subtotal - timeFare) * (surgeMultiplier - 1));
+        document.getElementById('calc-incentive').textContent = `RM ${trafficAndSurgeAmount.toFixed(2)}`;
+        
         document.getElementById('calc-grand').textContent = `RM ${roundedTotal.toFixed(2)}`;
 
         document.getElementById('result-card').style.display = 'block';
