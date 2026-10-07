@@ -170,7 +170,41 @@
         .suggestion-item:hover {
             background-color: #f5f5f5;
         }
-        
+
+        /* Config / Fuel / Long-Haul Panel */
+        .pricing-options {
+            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: #f1f3f5;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+        }
+        .option-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: #495057;
+            font-weight: 600;
+        }
+        .option-input {
+            width: 70px !important;
+            padding: 4px 6px !important;
+            font-size: 12px !important;
+            text-align: right;
+            border-radius: 6px !important;
+            border: 1px solid #ced4da !important;
+            background: #fff !important;
+        }
+        .option-checkbox {
+            width: 16px !important;
+            height: 16px !important;
+            cursor: pointer;
+        }
+
         #result-card {
             background: #1c1c1e;
             color: white;
@@ -190,15 +224,6 @@
             font-size: 32px;
             font-weight: 800;
             color: #b388ff;
-        }
-        .surge-badge {
-            background-color: #ff9800;
-            color: #111;
-            font-size: 12px;
-            font-weight: 700;
-            padding: 4px 8px;
-            border-radius: 6px;
-            display: none;
         }
         .fare-meta {
             font-size: 13px;
@@ -292,12 +317,27 @@
             </div>
         </div>
 
+        <!-- Dynamic Fuel & Intercity Pricing Options -->
+        <div class="pricing-options">
+            <div class="option-row">
+                <label for="fuel-price">Fuel Price (RM/L):</label>
+                <input type="number" id="fuel-price" class="option-input" value="2.05" step="0.05" min="1.00">
+            </div>
+            <div class="option-row">
+                <label for="fuel-consumption">Consumption (L/100km):</label>
+                <input type="number" id="fuel-consumption" class="option-input" value="6.5" step="0.5" min="1.0">
+            </div>
+            <div class="option-row">
+                <label for="cross-state-toggle">Cross-State Allowance:</label>
+                <input type="checkbox" id="cross-state-toggle" class="option-checkbox">
+            </div>
+        </div>
+
         <div id="error-msg"></div>
 
         <div id="result-card">
             <div class="fare-header-row">
                 <div id="total-fare" class="fare-header">RM --</div>
-                <div id="surge-tag" class="surge-badge">⚡ 1.0x Peak</div>
             </div>
             <div class="fare-meta">
                 <span id="fare-distance">0 km</span>
@@ -320,15 +360,25 @@
                     <span>Toll Charges</span>
                     <span id="calc-toll-fare">RM 0.00</span>
                 </div>
-                <!-- 4. Out-of-Zone Surcharge -->
+                <!-- 4. Out-of-Zone Surcharge (Tiered) -->
                 <div class="detail-row" id="deadhead-km-row" style="display: none;">
                     <span>Out-of-Zone Surcharge</span>
                     <span id="calc-deadhead-km">RM 0.00</span>
                 </div>
                 <!-- 5. Traffic Adjust & Incentives -->
                 <div class="detail-row">
-                    <span>Traffic Adjust & Peak Surge</span>
+                    <span>Traffic Adjust & Incentive</span>
                     <span id="calc-incentive">RM 0.00</span>
+                </div>
+                <!-- 6. Estimated Fuel Cost -->
+                <div class="detail-row" id="fuel-surcharge-row">
+                    <span>Fuel Cost Contribution</span>
+                    <span id="calc-fuel-cost">RM 0.00</span>
+                </div>
+                <!-- 7. Cross-State / Multi-Region Long-Haul Allowance -->
+                <div class="detail-row" id="state-fee-row" style="display: none;">
+                    <span>Cross-State Long-Haul Fee</span>
+                    <span id="calc-state-fee">RM 0.00</span>
                 </div>
 
                 <div class="detail-row total-bold">
@@ -342,19 +392,6 @@
 
 <script>
     const HERE_API_KEY = "PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk"; 
-
-    // Configurable Pricing Parameters
-    const CONFIG = {
-        baseFare: 5.00,
-        perKmRate: 1.25,
-        perMinuteRate: 0.25, // RM 0.25/min (equivalent to RM 15.00/hour)
-        
-        // Surge Multipliers by Time
-        surgeWeekdayPeak: 1.40,  // 40% surge during rush hours
-        surgeWeekdayLunch: 1.15, // 15% surge during lunch hours
-        surgeWeekendPeak: 1.25,  // 25% surge during weekend busy hours
-        surgeOffPeak: 1.00       // Standard baseline rate
-    };
 
     // Initialize HERE Platform & Engine
     const platform = new H.service.Platform({
@@ -451,6 +488,15 @@
             },
             { enableHighAccuracy: true, timeout: 8000 }
         );
+    });
+
+    // Auto-recalculate triggers on option adjustments
+    ['fuel-price', 'fuel-consumption', 'cross-state-toggle'].forEach(id => {
+        document.getElementById(id).addEventListener('change', () => {
+            if (pickupCoords && dropoffCoords) {
+                checkAndProcessRoute();
+            }
+        });
     });
 
     function updateMarker(type, coords) {
@@ -557,29 +603,6 @@
             suggestionsBox.style.display = 'none';
             onClear();
         });
-    }
-
-    function getDynamicSurgeMultiplier() {
-        const now = new Date();
-        const currentHour = now.getHours() + (now.getMinutes() / 60);
-        const isWeekend = (now.getDay() === 0 || now.getDay() === 6);
-
-        if (!isWeekend) {
-            // Weekday Rush Hours: 7:00 AM - 9:00 AM & 5:00 PM - 7:30 PM
-            if ((currentHour >= 7 && currentHour <= 9) || (currentHour >= 17 && currentHour <= 19.5)) {
-                return CONFIG.surgeWeekdayPeak;
-            }
-            // Weekday Lunch Hour: 12:00 PM - 2:00 PM
-            if (currentHour >= 12 && currentHour <= 14) {
-                return CONFIG.surgeWeekdayLunch;
-            }
-        } else {
-            // Weekend Evening Rush: 4:00 PM - 9:00 PM
-            if (currentHour >= 16 && currentHour <= 21) {
-                return CONFIG.surgeWeekendPeak;
-            }
-        }
-        return CONFIG.surgeOffPeak;
     }
 
     function checkAndProcessRoute() {
@@ -691,50 +714,54 @@
     }
 
     function processCalculations(distance, duration, tollFee) {
-        const surgeMultiplier = getDynamicSurgeMultiplier();
+        const baseFare = 5.00;
+        const perKmRate = 1.25;
         
-        // 1. Base Fare
-        const baseFare = CONFIG.baseFare;
-
-        // 2. Distance Charge (Excludes 1st km baseline)
         const chargeableDistance = Math.max(0, distance - 1);
-        const rideDistanceFare = chargeableDistance * CONFIG.perKmRate;
+        const rideDistanceFare = chargeableDistance * perKmRate;
 
-        // 3. Time-Based Charge (Updated Per-Minute Rate)
-        const timeFare = duration * CONFIG.perMinuteRate;
+        const driverIncentive = (duration / 60) * 12.00;
 
-        // 4. Out-of-Zone / Long-Distance Surcharge
+        // --- 1. Dynamic Fuel Price Calculation ---
+        const fuelPricePerLitre = parseFloat(document.getElementById('fuel-price').value) || 2.05;
+        const litresPer100Km = parseFloat(document.getElementById('fuel-consumption').value) || 6.5;
+        const totalLitres = (distance * litresPer100Km) / 100;
+        const calculatedFuelCost = totalLitres * fuelPricePerLitre;
+
+        // --- 2. Tiered Out-of-Zone Surcharge Logic ---
         let deadheadCost = 0;
-        if (distance > 12) {
-            const boundaryKm = Math.min(distance, 350);
-            const dynamicScalePct = ((boundaryKm - 12) / (350 - 12)) * 0.45;
-            deadheadCost = rideDistanceFare * dynamicScalePct;
-            document.getElementById('deadhead-km-row').style.display = 'flex';
-        } else {
-            document.getElementById('deadhead-km-row').style.display = 'none';
+        if (distance > 12 && distance <= 50) {
+            deadheadCost = rideDistanceFare * 0.15; // Short Out-of-Zone (15%)
+        } else if (distance > 50 && distance <= 250) {
+            deadheadCost = rideDistanceFare * 0.30; // Medium Cross-State (30%)
+        } else if (distance > 250 && distance <= 500) {
+            deadheadCost = rideDistanceFare * 0.45; // Long Haul (45%)
+        } else if (distance > 500) {
+            deadheadCost = rideDistanceFare * 0.65; // Ultra Long Haul (65%)
         }
 
-        // Subtotal before Surge & Tolls
-        const subtotal = baseFare + rideDistanceFare + timeFare + deadheadCost;
-        
-        // Apply Dynamic Surge to Subtotal
-        const surgedSubtotal = subtotal * surgeMultiplier;
-        
-        // Final Total includes Toll Charges (Tolls are not subject to surge)
-        const rawTotal = surgedSubtotal + tollFee;
+        document.getElementById('deadhead-km-row').style.display = deadheadCost > 0 ? 'flex' : 'none';
+
+        // --- 3. Cross-State / Multi-Region Long-Haul Fee ---
+        let crossStateFee = 0;
+        const isCrossStateChecked = document.getElementById('cross-state-toggle').checked;
+
+        if (isCrossStateChecked || distance > 200) {
+            if (distance > 200) {
+                crossStateFee = 35.00 + ((distance - 200) * 0.10);
+            } else {
+                crossStateFee = 25.00; // Flat cross-border/state allowance
+            }
+            document.getElementById('state-fee-row').style.display = 'flex';
+        } else {
+            document.getElementById('state-fee-row').style.display = 'none';
+        }
+
+        // --- 4. Grand Total Accumulation ---
+        const rawTotal = baseFare + rideDistanceFare + driverIncentive + tollFee + deadheadCost + crossStateFee;
         const roundedTotal = Math.max(baseFare, roundToMalaysianCents(rawTotal));
         const finalDisplayedWholeFare = Math.round(roundedTotal);
 
-        // Update Surge Tag Display
-        const surgeTag = document.getElementById('surge-tag');
-        if (surgeMultiplier > 1.0) {
-            surgeTag.textContent = `⚡ ${surgeMultiplier.toFixed(2)}x Peak`;
-            surgeTag.style.display = 'block';
-        } else {
-            surgeTag.style.display = 'none';
-        }
-
-        // Update UI Elements
         document.getElementById('total-fare').textContent = `RM ${finalDisplayedWholeFare}`;
         document.getElementById('fare-distance').textContent = `${distance.toFixed(1)} km`;
         document.getElementById('fare-duration').textContent = formatDuration(duration);
@@ -743,11 +770,9 @@
         document.getElementById('calc-ride-distance-rate').textContent = `RM ${rideDistanceFare.toFixed(2)}`;
         document.getElementById('calc-toll-fare').textContent = `RM ${tollFee.toFixed(2)}`;
         document.getElementById('calc-deadhead-km').textContent = `RM ${deadheadCost.toFixed(2)}`;
-        
-        // Displays Time Charge + Surge Adjustment
-        const trafficAndSurgeAmount = (timeFare * surgeMultiplier) + ((subtotal - timeFare) * (surgeMultiplier - 1));
-        document.getElementById('calc-incentive').textContent = `RM ${trafficAndSurgeAmount.toFixed(2)}`;
-        
+        document.getElementById('calc-incentive').textContent = `RM ${driverIncentive.toFixed(2)}`;
+        document.getElementById('calc-fuel-cost').textContent = `RM ${calculatedFuelCost.toFixed(2)}`;
+        document.getElementById('calc-state-fee').textContent = `RM ${crossStateFee.toFixed(2)}`;
         document.getElementById('calc-grand').textContent = `RM ${roundedTotal.toFixed(2)}`;
 
         document.getElementById('result-card').style.display = 'block';
