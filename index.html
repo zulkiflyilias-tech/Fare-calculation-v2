@@ -638,7 +638,6 @@
                 'return': 'polyline,summary,tolls'
             };
 
-            // Pass Avoid Tolls parameter if active
             if (avoidTolls) {
                 params['avoid[features]'] = 'tollRoad';
             }
@@ -653,17 +652,19 @@
                 const distanceKm = section.summary.length / 1000;
                 const baseDurationMins = section.summary.duration / 60;
 
-                // Consolidated Toll Fee Calculation
+                // Pure HERE.com API Toll Charge Extraction
                 let calculatedTollFee = 0;
                 if (!avoidTolls) {
                     if (section.tolls) {
                         section.tolls.forEach(t => {
-                            if (t.fares && t.fares[0]) calculatedTollFee += parseFloat(t.fares[0].price.value || 0);
+                            if (t.fares && t.fares[0]) {
+                                calculatedTollFee += parseFloat(t.fares[0].price.value || 0);
+                            }
                         });
                     } else if (section.summary.tollCosts) {
-                        section.summary.tollCosts.forEach(tc => calculatedTollFee += parseFloat(tc.value || 0));
-                    } else if (distanceKm > 15) {
-                        calculatedTollFee = (distanceKm - 15) * 0.11; 
+                        section.summary.tollCosts.forEach(tc => {
+                            calculatedTollFee += parseFloat(tc.value || 0);
+                        });
                     }
                 }
 
