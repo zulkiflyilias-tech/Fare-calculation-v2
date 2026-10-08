@@ -663,7 +663,6 @@
     }
 
     async function ensureStateInformation() {
-        // Fallback reverse geocoding to resolve state if autocomplete didn't return state property
         const promises = [];
         if (pickupCoords && !pickupState) {
             promises.push(
@@ -691,11 +690,13 @@
         currentRouteTimeout = setTimeout(async () => {
             await ensureStateInformation();
 
+            // Pass departureTime to trigger live real-time traffic speeds
             const params = {
                 'routingMode': activeRoutingMode,
                 'transportMode': 'car',
                 'origin': `${pickupCoords.lat},${pickupCoords.lng}`,
                 'destination': `${dropoffCoords.lat},${dropoffCoords.lng}`,
+                'departureTime': 'now', 
                 'return': 'polyline,summary,tolls'
             };
 
@@ -711,7 +712,14 @@
 
                 const section = result.routes[0].sections[0];
                 const distanceKm = section.summary.length / 1000;
-                const baseDurationMins = section.summary.duration / 60;
+                
+                // Live traffic duration in minutes
+                let liveTrafficDurationMins = section.summary.duration / 60;
+
+                // Add dynamic 15% long-haul buffer for trips > 150 km to account for single-carriageway/truck slowdowns
+                if (distanceKm > 150) {
+                    liveTrafficDurationMins *= 1.15;
+                }
 
                 // Toll extraction strictly from HERE API
                 let calculatedTollFee = 0;
@@ -733,7 +741,7 @@
                 map.addObject(routePolyline);
                 map.getViewModel().setLookAtData({ bounds: routePolyline.getBoundingBox() });
 
-                processCalculations(distanceKm, baseDurationMins, calculatedTollFee);
+                processCalculations(distanceKm, liveTrafficDurationMins, calculatedTollFee);
             }, (error) => {
                 console.error(error);
                 showError("Route calculation failed with selected preferences.");
