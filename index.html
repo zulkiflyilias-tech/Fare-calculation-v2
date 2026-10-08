@@ -185,7 +185,6 @@
             background-color: #f5f5f5;
         }
 
-        /* Mode & Option Controls */
         .route-controls {
             display: flex;
             flex-direction: column;
@@ -400,11 +399,15 @@
                     <span id="calc-toll-fare">RM 0.00</span>
                 </div>
                 <div class="detail-row" id="deadhead-km-row" style="display: none;">
-                    <span>Out-of-Zone Surcharge</span>
+                    <span>Inter-State Surcharge</span>
                     <span id="calc-deadhead-km">RM 0.00</span>
                 </div>
-                <div class="detail-row">
-                    <span>Traffic Adjust & Incentive</span>
+                <div class="detail-row" id="traffic-adjust-row" style="display: none;">
+                    <span>Traffic Adjustment (Busy Area)</span>
+                    <span id="calc-traffic-adjust">RM 0.00</span>
+                </div>
+                <div class="detail-row" id="incentive-row" style="display: none;">
+                    <span>Peak-Hour Incentive</span>
                     <span id="calc-incentive">RM 0.00</span>
                 </div>
 
@@ -439,20 +442,49 @@
 
     let pickupMarker = null, dropoffMarker = null, routePolyline = null;
     let pickupCoords = null, dropoffCoords = null;
+    let pickupState = '', dropoffState = '';
     let activeRoutingMode = 'fast'; 
     let avoidTolls = false;
     let currentRouteTimeout = null;
 
+    // Define Busiest Areas (Geofenced Congestion Zones)
+    const BUSY_ZONES = [
+        { lat: 3.1466, lng: 101.6958, radiusKm: 4.5 }, // KL City Centre / Bukit Bintang / KLCC
+        { lat: 3.1292, lng: 101.6713, radiusKm: 2.5 }, // Bangsar / Mid Valley
+        { lat: 3.1654, lng: 101.6521, radiusKm: 2.5 }, // Mont Kiara / Hartamas
+        { lat: 3.1073, lng: 101.6067, radiusKm: 3.0 }, // Subang Jaya / USJ Core
+        { lat: 3.1129, lng: 101.6231, radiusKm: 3.0 }  // Petaling Jaya SS15/Damansara
+    ];
+
+    function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371; // km
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function isLocationInBusyZone(coords) {
+        if (!coords) return false;
+        return BUSY_ZONES.some(zone => 
+            calculateHaversineDistance(coords.lat, coords.lng, zone.lat, zone.lng) <= zone.radiusKm
+        );
+    }
+
     // Set up Autocomplete Listeners
-    setupAutocomplete('pickup', 'pickup-suggestions', 'clear-pickup', (coords) => {
-        pickupCoords = coords;
-        updateMarker('pickup', coords);
+    setupAutocomplete('pickup', 'pickup-suggestions', 'clear-pickup', (item) => {
+        pickupCoords = { lat: item.position.lat, lng: item.position.lng };
+        pickupState = item.address && item.address.state ? item.address.state : '';
+        updateMarker('pickup', pickupCoords);
         checkAndProcessRoute();
     }, () => clearLocation('pickup'));
 
-    setupAutocomplete('dropoff', 'dropoff-suggestions', 'clear-dropoff', (coords) => {
-        dropoffCoords = coords;
-        updateMarker('dropoff', coords);
+    setupAutocomplete('dropoff', 'dropoff-suggestions', 'clear-dropoff', (item) => {
+        dropoffCoords = { lat: item.position.lat, lng: item.position.lng };
+        dropoffState = item.address && item.address.state ? item.address.state : '';
+        updateMarker('dropoff', dropoffCoords);
         checkAndProcessRoute();
     }, () => clearLocation('dropoff'));
 
@@ -478,8 +510,12 @@
                     .then(res => res.json())
                     .then(data => {
                         btn.textContent = "🎯";
-                        const label = (data.items && data.items.length > 0) ? data.items[0].address.label : `Current Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
-                        document.getElementById('pickup').value = label;
+                        if (data.items && data.items.length > 0) {
+                            document.getElementById('pickup').value = data.items[0].address.label;
+                            pickupState = data.items[0].address.state || '';
+                        } else {
+                            document.getElementById('pickup').value = `Current Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+                        }
                         document.getElementById('clear-pickup').style.display = 'block';
                         checkAndProcessRoute();
                     })
@@ -529,9 +565,11 @@
     function clearLocation(type) {
         if (type === 'pickup') {
             pickupCoords = null;
+            pickupState = '';
             if (pickupMarker) { map.removeObject(pickupMarker); pickupMarker = null; }
         } else {
             dropoffCoords = null;
+            dropoffState = '';
             if (dropoffMarker) { map.removeObject(dropoffMarker); dropoffMarker = null; }
         }
         resetCalculationDisplay();
@@ -543,6 +581,7 @@
         
         [pInput.value, dInput.value] = [dInput.value, pInput.value];
         [pickupCoords, dropoffCoords] = [dropoffCoords, pickupCoords];
+        [pickupState, dropoffState] = [dropoffState, pickupState];
         
         document.getElementById('clear-pickup').style.display = pInput.value ? 'block' : 'none';
         document.getElementById('clear-dropoff').style.display = dInput.value ? 'block' : 'none';
@@ -606,7 +645,7 @@
                                 input.value = item.title;
                                 suggestionsBox.innerHTML = '';
                                 suggestionsBox.style.display = 'none';
-                                onSelect({ lat: item.position.lat, lng: item.position.lng });
+                                onSelect(item);
                             });
                             suggestionsBox.appendChild(div);
                         });
@@ -623,13 +662,35 @@
         });
     }
 
+    async function ensureStateInformation() {
+        // Fallback reverse geocoding to resolve state if autocomplete didn't return state property
+        const promises = [];
+        if (pickupCoords && !pickupState) {
+            promises.push(
+                fetch(`https://revgeocode.search.hereapi.com/v1/revgeocode?at=${pickupCoords.lat},${pickupCoords.lng}&lang=en-US&apiKey=${HERE_API_KEY}`)
+                    .then(res => res.json())
+                    .then(data => { if (data.items?.[0]?.address?.state) pickupState = data.items[0].address.state; })
+            );
+        }
+        if (dropoffCoords && !dropoffState) {
+            promises.push(
+                fetch(`https://revgeocode.search.hereapi.com/v1/revgeocode?at=${dropoffCoords.lat},${dropoffCoords.lng}&lang=en-US&apiKey=${HERE_API_KEY}`)
+                    .then(res => res.json())
+                    .then(data => { if (data.items?.[0]?.address?.state) dropoffState = data.items[0].address.state; })
+            );
+        }
+        await Promise.all(promises);
+    }
+
     function checkAndProcessRoute() {
         if (!pickupCoords || !dropoffCoords) return;
         
         document.getElementById('error-msg').style.display = 'none';
         if (currentRouteTimeout) clearTimeout(currentRouteTimeout);
         
-        currentRouteTimeout = setTimeout(() => {
+        currentRouteTimeout = setTimeout(async () => {
+            await ensureStateInformation();
+
             const params = {
                 'routingMode': activeRoutingMode,
                 'transportMode': 'car',
@@ -652,41 +713,17 @@
                 const distanceKm = section.summary.length / 1000;
                 const baseDurationMins = section.summary.duration / 60;
 
-                // Pure HERE.com API Toll Charge Extraction
+                // Toll extraction strictly from HERE API
                 let calculatedTollFee = 0;
                 if (!avoidTolls) {
                     if (section.tolls) {
                         section.tolls.forEach(t => {
-                            if (t.fares && t.fares[0]) {
-                                calculatedTollFee += parseFloat(t.fares[0].price.value || 0);
-                            }
+                            if (t.fares && t.fares[0]) calculatedTollFee += parseFloat(t.fares[0].price.value || 0);
                         });
                     } else if (section.summary.tollCosts) {
-                        section.summary.tollCosts.forEach(tc => {
-                            calculatedTollFee += parseFloat(tc.value || 0);
-                        });
+                        section.summary.tollCosts.forEach(tc => calculatedTollFee += parseFloat(tc.value || 0));
                     }
                 }
-
-                // Dynamic Peak-Hour Traffic Adjustment
-                const now = new Date();
-                const hr = now.getHours();
-                const isWeekend = (now.getDay() === 0 || now.getDay() === 6);
-
-                let trafficFactor = 1.15; 
-                if (!isWeekend) {
-                    if ((hr >= 7 && hr <= 9) || (hr >= 17 && hr <= 19)) trafficFactor = 1.55;
-                    else if (hr >= 12 && hr <= 14) trafficFactor = 1.25;
-                } else if (hr >= 16 && hr <= 21) {
-                    trafficFactor = 1.35;
-                }
-
-                let distanceWeight = 1.0;
-                if (distanceKm <= 5) distanceWeight = 0.65;
-                else if (distanceKm <= 15) distanceWeight = 0.85;
-                else if (distanceKm > 50) distanceWeight = 0.60;
-
-                const correctedDurationMins = Math.max(1, Math.round(baseDurationMins * (1 + ((trafficFactor - 1) * distanceWeight))));
 
                 // Draw Polyline
                 if (routePolyline) map.removeObject(routePolyline);
@@ -696,7 +733,7 @@
                 map.addObject(routePolyline);
                 map.getViewModel().setLookAtData({ bounds: routePolyline.getBoundingBox() });
 
-                processCalculations(distanceKm, correctedDurationMins, calculatedTollFee);
+                processCalculations(distanceKm, baseDurationMins, calculatedTollFee);
             }, (error) => {
                 console.error(error);
                 showError("Route calculation failed with selected preferences.");
@@ -710,29 +747,57 @@
         
         const chargeableDistance = Math.max(0, distance - 1);
         const rideDistanceFare = chargeableDistance * perKmRate;
-        const driverIncentive = (duration / 60) * 12.00;
 
-        // Out-of-Zone Surcharge Logic
+        // 1. Inter-State Surcharge Rule: Applies ONLY for inter-state travel
         let deadheadCost = 0;
-        if (distance > 12 && distance <= 50) deadheadCost = rideDistanceFare * 0.15;
-        else if (distance > 50 && distance <= 250) deadheadCost = rideDistanceFare * 0.30;
-        else if (distance > 250 && distance <= 500) deadheadCost = rideDistanceFare * 0.45;
-        else if (distance > 500) deadheadCost = rideDistanceFare * 0.65;
+        const isInterstate = pickupState && dropoffState && (pickupState.toLowerCase().trim() !== dropoffState.toLowerCase().trim());
+        
+        if (isInterstate) {
+            if (distance > 12 && distance <= 50) deadheadCost = rideDistanceFare * 0.15;
+            else if (distance > 50 && distance <= 250) deadheadCost = rideDistanceFare * 0.30;
+            else if (distance > 250 && distance <= 500) deadheadCost = rideDistanceFare * 0.45;
+            else if (distance > 500) deadheadCost = rideDistanceFare * 0.65;
+        }
 
+        // 2. Traffic Adjust Rule: Applies ONLY in designated busy/congested areas
+        let trafficAdjustment = 0;
+        const inBusyZone = isLocationInBusyZone(pickupCoords) || isLocationInBusyZone(dropoffCoords);
+        if (inBusyZone) {
+            trafficAdjustment = rideDistanceFare * 0.20; // 20% congestion rate for high-density areas
+        }
+
+        // 3. Peak-Hour Incentive Rule: Applies ONLY during peak time hours
+        let driverIncentive = 0;
+        const now = new Date();
+        const hr = now.getHours();
+        const isWeekend = (now.getDay() === 0 || now.getDay() === 6);
+
+        const isPeakHour = !isWeekend 
+            ? ((hr >= 7 && hr <= 9) || (hr >= 17 && hr <= 19)) // Weekday morning/evening peaks
+            : (hr >= 16 && hr <= 21);                         // Weekend evening peaks
+
+        if (isPeakHour) {
+            driverIncentive = (duration / 60) * 12.00;
+        }
+
+        // Display conditional rows based on active rules
         document.getElementById('deadhead-km-row').style.display = deadheadCost > 0 ? 'flex' : 'none';
+        document.getElementById('traffic-adjust-row').style.display = trafficAdjustment > 0 ? 'flex' : 'none';
+        document.getElementById('incentive-row').style.display = driverIncentive > 0 ? 'flex' : 'none';
 
-        const rawTotal = baseFare + rideDistanceFare + driverIncentive + tollFee + deadheadCost;
+        const rawTotal = baseFare + rideDistanceFare + tollFee + deadheadCost + trafficAdjustment + driverIncentive;
         const roundedTotal = Math.max(baseFare, Math.round(rawTotal * 10) / 10);
 
         // Render Values
         document.getElementById('total-fare').textContent = `RM ${Math.round(roundedTotal)}`;
         document.getElementById('fare-distance').textContent = `${distance.toFixed(1)} km`;
-        document.getElementById('fare-duration').textContent = duration < 60 ? `${duration} mins` : `${Math.floor(duration / 60)} hr ${duration % 60} mins`;
+        document.getElementById('fare-duration').textContent = duration < 60 ? `${Math.round(duration)} mins` : `${Math.floor(duration / 60)} hr ${Math.round(duration % 60)} mins`;
 
         document.getElementById('calc-base-fare').textContent = `RM ${baseFare.toFixed(2)}`;
         document.getElementById('calc-ride-distance-rate').textContent = `RM ${rideDistanceFare.toFixed(2)}`;
         document.getElementById('calc-toll-fare').textContent = `RM ${tollFee.toFixed(2)}`;
         document.getElementById('calc-deadhead-km').textContent = `RM ${deadheadCost.toFixed(2)}`;
+        document.getElementById('calc-traffic-adjust').textContent = `RM ${trafficAdjustment.toFixed(2)}`;
         document.getElementById('calc-incentive').textContent = `RM ${driverIncentive.toFixed(2)}`;
         document.getElementById('calc-grand').textContent = `RM ${roundedTotal.toFixed(2)}`;
 
