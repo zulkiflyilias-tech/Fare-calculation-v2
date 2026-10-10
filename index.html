@@ -411,7 +411,7 @@
                     <span id="calc-incentive">RM 0.00</span>
                 </div>
                 <div class="detail-row" id="hill-surcharge-row" style="display: none;">
-                    <span>Highland / Hill Surcharge</span>
+                    <span>Highland Surcharge (Tiered)</span>
                     <span id="calc-hill-surcharge">RM 0.00</span>
                 </div>
 
@@ -815,11 +815,17 @@
             driverIncentive = (duration / 60) * 12.00;
         }
 
-        // 4. Highland / Hill Surcharge Rule: Applies to steep mountain destinations
+        // 4. Tiered Highland / Hill Surcharge Rule
         let hillSurcharge = 0;
         const isHighland = isLocationInHighlandZone(dropoffCoords) || destinationElevation > 800;
         if (isHighland) {
-            hillSurcharge = 15.00; // Flat RM 15.00 surcharge for hill climbs and engine wear
+            if (isPeakHour || duration > 75) {
+                hillSurcharge = 25.00; // Peak hours, severe congestion or prolonged climb
+            } else if (duration > 60 || trafficAdjustment > 0) {
+                hillSurcharge = 20.00; // Heavy traffic or prolonged uphill journey
+            } else {
+                hillSurcharge = 15.00; // Normal highway and uphill route
+            }
         }
 
         // Display conditional rows based on active rules
