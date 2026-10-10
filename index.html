@@ -410,6 +410,10 @@
                     <span>Peak-Hour Incentive</span>
                     <span id="calc-incentive">RM 0.00</span>
                 </div>
+                <div class="detail-row" id="hill-surcharge-row" style="display: none;">
+                    <span>Highland / Hill Surcharge</span>
+                    <span id="calc-hill-surcharge">RM 0.00</span>
+                </div>
 
                 <div class="detail-row total-bold">
                     <span>Rounded Final Total</span>
@@ -456,6 +460,13 @@
         { lat: 3.1129, lng: 101.6231, radiusKm: 3.0 }  // Petaling Jaya SS15/Damansara
     ];
 
+    // Define Major Highland Destination Zones
+    const HIGHLAND_ZONES = [
+        { lat: 3.4241, lng: 101.7933, radiusKm: 8.0, name: "Genting Highlands" },
+        { lat: 4.4715, lng: 101.3787, radiusKm: 10.0, name: "Cameron Highlands" },
+        { lat: 3.7155, lng: 101.7432, radiusKm: 5.0, name: "Fraser's Hill" }
+    ];
+
     function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
         const R = 6371; // km
         const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -469,6 +480,13 @@
     function isLocationInBusyZone(coords) {
         if (!coords) return false;
         return BUSY_ZONES.some(zone => 
+            calculateHaversineDistance(coords.lat, coords.lng, zone.lat, zone.lng) <= zone.radiusKm
+        );
+    }
+
+    function isLocationInHighlandZone(coords) {
+        if (!coords) return false;
+        return HIGHLAND_ZONES.some(zone => 
             calculateHaversineDistance(coords.lat, coords.lng, zone.lat, zone.lng) <= zone.radiusKm
         );
     }
@@ -690,14 +708,14 @@
         currentRouteTimeout = setTimeout(async () => {
             await ensureStateInformation();
 
-            // ISO 8601 string for departureTime
+            // ISO 8601 string for departureTime, including elevation return
             const params = {
                 'routingMode': activeRoutingMode,
                 'transportMode': 'car',
                 'origin': `${pickupCoords.lat},${pickupCoords.lng}`,
                 'destination': `${dropoffCoords.lat},${dropoffCoords.lng}`,
                 'departureTime': new Date().toISOString(),
-                'return': 'polyline,summary,tolls'
+                'return': 'polyline,summary,tolls,elevation'
             };
 
             if (avoidTolls) {
@@ -733,6 +751,15 @@
                     }
                 }
 
+                // Extract destination elevation from route response if available
+                let destinationElevation = 0;
+                if (section.elevation && section.elevation.features && section.elevation.features.length > 0) {
+                    const elevations = section.elevation.features.map(f => f.geometry.coordinates);
+                    if (elevations.length > 0) {
+                        destinationElevation = elevations[elevations.length - 1][2] || 0;
+                    }
+                }
+
                 // Draw Polyline
                 if (routePolyline) map.removeObject(routePolyline);
                 const linestring = H.geo.LineString.fromFlexiblePolyline(section.polyline);
@@ -741,7 +768,7 @@
                 map.addObject(routePolyline);
                 map.getViewModel().setLookAtData({ bounds: routePolyline.getBoundingBox() });
 
-                processCalculations(distanceKm, liveTrafficDurationMins, calculatedTollFee);
+                processCalculations(distanceKm, liveTrafficDurationMins, calculatedTollFee, destinationElevation);
             }, (error) => {
                 console.error("HERE Routing API Error:", error);
                 showError("Route calculation failed with selected preferences.");
@@ -749,7 +776,7 @@
         }, 200);
     }
 
-    function processCalculations(distance, duration, tollFee) {
+    function processCalculations(distance, duration, tollFee, destinationElevation) {
         const baseFare = 5.00;
         const perKmRate = 1.25;
         
@@ -788,12 +815,20 @@
             driverIncentive = (duration / 60) * 12.00;
         }
 
+        // 4. Highland / Hill Surcharge Rule: Applies to steep mountain destinations
+        let hillSurcharge = 0;
+        const isHighland = isLocationInHighlandZone(dropoffCoords) || destinationElevation > 800;
+        if (isHighland) {
+            hillSurcharge = 15.00; // Flat RM 15.00 surcharge for hill climbs and engine wear
+        }
+
         // Display conditional rows based on active rules
         document.getElementById('deadhead-km-row').style.display = deadheadCost > 0 ? 'flex' : 'none';
         document.getElementById('traffic-adjust-row').style.display = trafficAdjustment > 0 ? 'flex' : 'none';
         document.getElementById('incentive-row').style.display = driverIncentive > 0 ? 'flex' : 'none';
+        document.getElementById('hill-surcharge-row').style.display = hillSurcharge > 0 ? 'flex' : 'none';
 
-        const rawTotal = baseFare + rideDistanceFare + tollFee + deadheadCost + trafficAdjustment + driverIncentive;
+        const rawTotal = baseFare + rideDistanceFare + tollFee + deadheadCost + trafficAdjustment + driverIncentive + hillSurcharge;
         const roundedTotal = Math.max(baseFare, Math.round(rawTotal * 10) / 10);
 
         // Render Values
@@ -807,6 +842,7 @@
         document.getElementById('calc-deadhead-km').textContent = `RM ${deadheadCost.toFixed(2)}`;
         document.getElementById('calc-traffic-adjust').textContent = `RM ${trafficAdjustment.toFixed(2)}`;
         document.getElementById('calc-incentive').textContent = `RM ${driverIncentive.toFixed(2)}`;
+        document.getElementById('calc-hill-surcharge').textContent = `RM ${hillSurcharge.toFixed(2)}`;
         document.getElementById('calc-grand').textContent = `RM ${roundedTotal.toFixed(2)}`;
 
         document.getElementById('result-card').style.display = 'block';
