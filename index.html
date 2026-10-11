@@ -38,7 +38,7 @@
         }
 
         #map {
-            height: 45vh;
+            height: 42vh;
             width: 100%;
             z-index: 1;
         }
@@ -46,7 +46,7 @@
         #search-panel {
             flex: 1;
             background: white;
-            padding: 16px;
+            padding: 14px 16px;
             box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
             z-index: 10;
             box-sizing: border-box;
@@ -58,7 +58,7 @@
         }
 
         .header-row h2 {
-            margin: 0 0 12px 0;
+            margin: 0 0 10px 0;
             font-size: 18px;
             font-weight: 700;
         }
@@ -66,9 +66,9 @@
         .routing-wrapper {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 6px;
             position: relative;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
 
         .input-container {
@@ -79,7 +79,7 @@
 
         input {
             width: 100%;
-            padding: 12px 72px 12px 12px;
+            padding: 10px 72px 10px 12px;
             border: 1px solid var(--border-color);
             border-radius: 8px;
             font-size: 14px;
@@ -166,7 +166,7 @@
             background: white;
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            max-height: 200px; 
+            max-height: 180px; 
             overflow-y: auto;
             z-index: 1000;
             box-shadow: 0 6px 16px rgba(0,0,0,0.1);
@@ -174,7 +174,7 @@
         }
 
         .suggestion-item {
-            padding: 12px;
+            padding: 10px 12px;
             cursor: pointer;
             font-size: 13px;
             line-height: 1.4;
@@ -188,9 +188,9 @@
         .route-controls {
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            margin-top: 4px;
-            margin-bottom: 10px;
+            gap: 6px;
+            margin-top: 2px;
+            margin-bottom: 8px;
         }
 
         .route-mode-container {
@@ -200,7 +200,7 @@
 
         .mode-btn {
             flex: 1;
-            padding: 9px;
+            padding: 8px;
             border: 1px solid var(--border-color);
             border-radius: 8px;
             background-color: #fff;
@@ -222,7 +222,7 @@
         }
 
         .toggle-btn {
-            padding: 8px 12px;
+            padding: 7px 12px;
             border: 1px solid var(--border-color);
             border-radius: 8px;
             background-color: #fff;
@@ -246,9 +246,9 @@
         #result-card {
             background: var(--bg-dark);
             color: white;
-            padding: 16px;
+            padding: 14px;
             border-radius: 12px;
-            margin-top: 6px;
+            margin-top: 4px;
             display: none;
             box-shadow: 0 4px 14px rgba(0,0,0,0.15);
         }
@@ -257,27 +257,27 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 8px;
+            margin-bottom: 4px;
         }
 
         .fare-header {
-            font-size: 32px;
+            font-size: 28px;
             font-weight: 800;
             color: var(--primary-light);
         }
 
         .fare-meta {
-            font-size: 13px;
+            font-size: 12px;
             color: #e5e5ea;
             display: flex;
             justify-content: space-between;
             font-weight: 500;
+            margin-bottom: 8px;
         }
 
         #invoice-details {
-            margin-top: 12px;
             border-top: 1px dashed #3a3a3c;
-            padding-top: 12px;
+            padding-top: 10px;
         }
 
         .detail-row {
@@ -285,22 +285,22 @@
             justify-content: space-between;
             font-size: 12px;
             color: var(--text-muted);
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
 
         .detail-row.total-bold {
             color: #fff;
             font-weight: 600;
             border-top: 1px solid #2c2c2e;
-            padding-top: 8px;
+            padding-top: 6px;
             margin-bottom: 0;
-            font-size: 14px;
+            font-size: 13px;
         }
 
         #error-msg {
             color: #ff3b30;
             font-size: 13px;
-            margin-top: 8px;
+            margin-top: 6px;
             display: none;
             font-weight: 500;
         }
@@ -399,7 +399,7 @@
                     <span id="calc-toll-fare">RM 0.00</span>
                 </div>
                 <div class="detail-row" id="interstate-return-row" style="display: none;">
-                    <span>Interstate Return Risk Surcharge</span>
+                    <span>Interstate Return Surcharge</span>
                     <span id="calc-interstate-return">RM 0.00</span>
                 </div>
                 <div class="detail-row" id="traffic-adjust-row" style="display: none;">
@@ -450,6 +450,8 @@
     let activeRoutingMode = 'fast'; 
     let avoidTolls = false;
     let currentRouteTimeout = null;
+    let routeAbortController = null;
+    let autosuggestAbortController = null;
 
     // Define Tiered Busiest Congestion Zones
     const BUSY_ZONES = [
@@ -652,7 +654,12 @@
             }
 
             debounceTimeout = setTimeout(() => {
-                fetch(`https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=4.2105,101.9758&in=countryCode:MYS&limit=5&apiKey=${HERE_API_KEY}`)
+                if (autosuggestAbortController) autosuggestAbortController.abort();
+                autosuggestAbortController = new AbortController();
+
+                fetch(`https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=4.2105,101.9758&in=countryCode:MYS&limit=5&apiKey=${HERE_API_KEY}`, {
+                    signal: autosuggestAbortController.signal
+                })
                     .then(res => res.json())
                     .then(data => {
                         suggestionsBox.innerHTML = '';
@@ -675,7 +682,9 @@
                             });
                             suggestionsBox.appendChild(div);
                         });
-                    }).catch(console.error);
+                    }).catch(err => {
+                        if (err.name !== 'AbortError') console.error(err);
+                    });
             }, 300);
         });
 
@@ -712,9 +721,13 @@
         
         document.getElementById('error-msg').style.display = 'none';
         if (currentRouteTimeout) clearTimeout(currentRouteTimeout);
+        if (routeAbortController) routeAbortController.abort();
         
+        routeAbortController = new AbortController();
+
         currentRouteTimeout = setTimeout(async () => {
             await ensureStateInformation();
+            if (routeAbortController.signal.aborted) return;
 
             const params = {
                 'routingMode': activeRoutingMode,
@@ -730,6 +743,7 @@
             }
 
             router.calculateRoute(params, (result) => {
+                if (routeAbortController.signal.aborted) return;
                 if (!result.routes || result.routes.length === 0) {
                     showError("No valid route found matching selected routing preferences.");
                     return;
@@ -771,6 +785,7 @@
 
                 processCalculations(distanceKm, liveTrafficDurationMins, calculatedTollFee, destinationElevation);
             }, (error) => {
+                if (routeAbortController.signal.aborted) return;
                 console.error("HERE Routing API Error:", error);
                 showError("Route calculation failed with selected preferences.");
             });
@@ -804,7 +819,7 @@
             else if (distance > 500) interstateReturnCost = rideDistanceFare * 0.65;
         }
 
-        // Anti-Stacking Guardrail Rule: Bypasses interstate return fee if highland hill surcharge is active (e.g. Genting/Cameron)
+        // Anti-Stacking Guardrail Rule: Bypasses interstate return fee if highland hill surcharge is active
         if (isHighland) {
             interstateReturnCost = 0;
         }
