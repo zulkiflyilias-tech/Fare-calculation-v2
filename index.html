@@ -761,7 +761,6 @@
                 if (autosuggestAbortController) autosuggestAbortController.abort();
                 autosuggestAbortController = new AbortController();
 
-                // Removed rigid countryCode:MYS filter from API URL to allow broad company/factory name discovery, biased by local coords 'at'
                 fetch(`https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=3.1390,101.6869&limit=10&apiKey=${HERE_API_KEY}`, {
                     signal: autosuggestAbortController.signal
                 })
@@ -804,7 +803,6 @@
                         sortedItems.slice(0, 5).forEach(item => {
                             const div = document.createElement('div');
                             div.className = 'suggestion-item';
-                            // Show detailed address label similar to Google Maps style
                             const addressDetails = item.address && item.address.label ? ` - ${item.address.label}` : '';
                             div.textContent = item.title + addressDetails;
                             
@@ -1018,16 +1016,13 @@
             dropoff: document.getElementById('dropoff').value || "Drop-off Point",
             distance: distance.toFixed(1),
             duration: Math.round(duration),
-            baseFare: baseFare.toFixed(2),
-            distanceFare: rideDistanceFare.toFixed(2),
-            tolls: tollFee.toFixed(2),
             total: roundedTotal.toFixed(2)
         };
 
         document.getElementById('result-card').style.display = 'block';
     }
 
-    // Format Receipt to WhatsApp-friendly message
+    // Format Receipt to WhatsApp-friendly message (Grand Total + Toll Remarks)
     function copyReceiptToClipboard() {
         if (!lastCalculatedData) return;
 
@@ -1037,15 +1032,12 @@
             `🏁 *To:* ${lastCalculatedData.dropoff}\n` +
             `📏 *Distance:* ${lastCalculatedData.distance} km (${lastCalculatedData.duration} mins)\n` +
             `-----------------------------------\n` +
-            `• Base Fare: RM ${lastCalculatedData.baseFare}\n` +
-            `• Distance Fare: RM ${lastCalculatedData.distanceFare}\n` +
-            `• Tolls: RM ${lastCalculatedData.tolls}\n` +
-            `-----------------------------------\n` +
             `💰 *TOTAL FARE: RM ${lastCalculatedData.total}*\n` +
+            `_*(Fare include tolls)*_\n` +
             `-----------------------------------\n` +
-            `_Estimated fare generated via Rideshare MY_`;
+            `_Fare generated via Rideshare MY_`;
 
-        navigator.clipboard.writeText(text).text().then(() => {
+        navigator.clipboard.writeText(text).then(() => {
             const shareBtn = document.querySelector('.share-btn');
             const originalText = shareBtn.innerHTML;
             shareBtn.innerHTML = "✅ Receipt Copied!";
