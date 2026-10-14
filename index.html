@@ -761,18 +761,25 @@
                 if (autosuggestAbortController) autosuggestAbortController.abort();
                 autosuggestAbortController = new AbortController();
 
-                fetch(`https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=4.2105,101.9758&in=countryCode:MYS&limit=5&apiKey=${HERE_API_KEY}`, {
+                fetch(`https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=4.2105,101.9758&in=countryCode:MYS&limit=10&apiKey=${HERE_API_KEY}`, {
                     signal: autosuggestAbortController.signal
                 })
                     .then(res => res.json())
                     .then(data => {
                         suggestionsBox.innerHTML = '';
-                        if(!data.items || data.items.length === 0) {
+                        
+                        // Strict Client-Side Filter: Restrict to Malaysia only
+                        const malaysianItems = data.items ? data.items.filter(item => 
+                            item.address && (item.address.countryCode === 'MYS' || (item.address.label && item.address.label.includes('Malaysia')))
+                        ) : [];
+
+                        if(malaysianItems.length === 0) {
                             suggestionsBox.style.display = 'none';
                             return;
                         }
+                        
                         suggestionsBox.style.display = 'block';
-                        data.items.forEach(item => {
+                        malaysianItems.slice(0, 5).forEach(item => {
                             if (!item.position) return;
                             const div = document.createElement('div');
                             div.className = 'suggestion-item';
