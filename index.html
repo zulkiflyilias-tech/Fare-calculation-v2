@@ -761,26 +761,46 @@
                 if (autosuggestAbortController) autosuggestAbortController.abort();
                 autosuggestAbortController = new AbortController();
 
-                fetch(`https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=4.2105,101.9758&in=countryCode:MYS&limit=10&apiKey=${HERE_API_KEY}`, {
+                fetch(`https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=3.1390,101.6869&in=countryCode:MYS&limit=10&apiKey=${HERE_API_KEY}`, {
                     signal: autosuggestAbortController.signal
                 })
                     .then(res => res.json())
                     .then(data => {
                         suggestionsBox.innerHTML = '';
                         
-                        // Strict Client-Side Filter: Restrict to Malaysia only
-                        const malaysianItems = data.items ? data.items.filter(item => 
-                            item.address && (item.address.countryCode === 'MYS' || (item.address.label && item.address.label.includes('Malaysia')))
-                        ) : [];
+                        if (!data.items || data.items.length === 0) {
+                            suggestionsBox.style.display = 'none';
+                            return;
+                        }
 
-                        if(malaysianItems.length === 0) {
+                        // Separate and prioritize Malaysian addresses first
+                        const malaysianItems = [];
+                        const otherItems = [];
+
+                        data.items.forEach(item => {
+                            if (!item.position) return;
+                            const isMalaysia = item.address && (
+                                item.address.countryCode === 'MYS' || 
+                                (item.address.label && item.address.label.toLowerCase().includes('malaysia'))
+                            );
+
+                            if (isMalaysia) {
+                                malaysianItems.push(item);
+                            } else {
+                                otherItems.push(item);
+                            }
+                        });
+
+                        // Combine with Malaysia strictly prioritized on top
+                        const sortedItems = [...malaysianItems, ...otherItems];
+
+                        if (sortedItems.length === 0) {
                             suggestionsBox.style.display = 'none';
                             return;
                         }
                         
                         suggestionsBox.style.display = 'block';
-                        malaysianItems.slice(0, 5).forEach(item => {
-                            if (!item.position) return;
+                        sortedItems.slice(0, 5).forEach(item => {
                             const div = document.createElement('div');
                             div.className = 'suggestion-item';
                             div.textContent = item.title + (item.address && item.address.label ? ` (${item.address.label})` : '');
