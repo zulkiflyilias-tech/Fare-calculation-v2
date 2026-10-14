@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Rideshare MY - Fare Estimator</title>
     
     <!-- HERE Maps JS API CSS -->
@@ -16,6 +16,7 @@
             --border-color: #e0e0e0;
             --text-dark: #212529;
             --text-muted: #aeaeb2;
+            --whatsapp-green: #25D366;
         }
 
         body {
@@ -26,6 +27,7 @@
             display: flex;
             flex-direction: column;
             height: 100vh;
+            height: 100dvh;
             overflow: hidden; 
             color: var(--text-dark);
         }
@@ -38,7 +40,7 @@
         }
 
         #map {
-            height: 26vh; /* Reduced map display area to accommodate detail charges */
+            height: 24vh;
             width: 100%;
             z-index: 1;
         }
@@ -61,6 +63,38 @@
             margin: 0 0 8px 0;
             font-size: 18px;
             font-weight: 700;
+        }
+
+        /* Shortcuts Container */
+        .shortcuts-bar {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding-bottom: 6px;
+            margin-bottom: 6px;
+            scrollbar-width: none;
+        }
+        .shortcuts-bar::-webkit-scrollbar { display: none; }
+
+        .shortcut-chip {
+            white-space: nowrap;
+            background: #f0f0f3;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #444;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .shortcut-chip:hover {
+            background-color: #e8e0f0;
+            color: var(--primary);
+            border-color: var(--primary-light);
         }
 
         .routing-wrapper {
@@ -188,34 +222,34 @@
         .route-controls {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 6px;
             margin-top: 2px;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
         }
 
-        .route-mode-container {
+        .route-mode-container, .multiplier-container {
             display: flex;
-            gap: 8px;
+            gap: 6px;
         }
 
-        .mode-btn {
+        .mode-btn, .mult-btn {
             flex: 1;
-            padding: 6px;
+            padding: 6px 4px;
             border: 1px solid var(--border-color);
             border-radius: 8px;
             background-color: #fff;
             color: #555;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
+            gap: 4px;
             transition: all 0.2s ease;
         }
 
-        .mode-btn.active {
+        .mode-btn.active, .mult-btn.active {
             background-color: #f3e5f5;
             border-color: var(--primary);
             color: var(--primary);
@@ -272,7 +306,7 @@
             display: flex;
             justify-content: space-between;
             font-weight: 500;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
         }
 
         #invoice-details {
@@ -293,8 +327,29 @@
             font-weight: 600;
             border-top: 1px solid #2c2c2e;
             padding-top: 6px;
-            margin-bottom: 0;
+            margin-bottom: 10px;
             font-size: 13px;
+        }
+
+        .share-btn {
+            width: 100%;
+            background-color: var(--whatsapp-green);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: background 0.2s ease;
+        }
+
+        .share-btn:hover {
+            background-color: #1eb956;
         }
 
         #error-msg {
@@ -337,6 +392,15 @@
         <div class="header-row">
             <h2>Fare Estimator</h2>
         </div>
+
+        <!-- Quick Destinations Shortcuts Bar -->
+        <div class="shortcuts-bar">
+            <div class="shortcut-chip" onclick="applyShortcut('KLIA Terminal 1', 2.7456, 101.7072, 'Selangor')">✈️ KLIA T1</div>
+            <div class="shortcut-chip" onclick="applyShortcut('KL Sentral', 3.1342, 101.6861, 'Kuala Lumpur')">🚉 KL Sentral</div>
+            <div class="shortcut-chip" onclick="applyShortcut('Mid Valley Megamall', 3.1177, 101.6774, 'Kuala Lumpur')">🛍️ Mid Valley</div>
+            <div class="shortcut-chip" onclick="applyShortcut('Genting Highlands', 3.4241, 101.7933, 'Pahang')">⛰️ Genting</div>
+            <div class="shortcut-chip" onclick="applyShortcut('Shah Alam City Centre', 3.0738, 101.5183, 'Selangor')">🏛️ Shah Alam</div>
+        </div>
         
         <div class="routing-wrapper">
             <!-- Pickup Input -->
@@ -364,12 +428,21 @@
             </div>
         </div>
 
-        <!-- Route Controls -->
+        <!-- Route & Fare Controls -->
         <div class="route-controls">
+            <!-- Mode Selection -->
             <div class="route-mode-container">
                 <button class="mode-btn active" id="btn-mode-fast" onclick="setRoutingMode('fast')">⚡ Fastest Route</button>
                 <button class="mode-btn" id="btn-mode-short" onclick="setRoutingMode('short')">📏 Shortest Route</button>
             </div>
+
+            <!-- Custom Fare Multipliers -->
+            <div class="multiplier-container">
+                <button class="mult-btn active" id="mult-100" onclick="setMultiplier(1.0)">1.0x Normal</button>
+                <button class="mult-btn" id="mult-125" onclick="setMultiplier(1.25)">1.25x Night</button>
+                <button class="mult-btn" id="mult-150" onclick="setMultiplier(1.50)">1.50x Peak</button>
+            </div>
+
             <button class="toggle-btn" id="btn-avoid-tolls" onclick="toggleAvoidTolls()">🛑 Avoid Tolls</button>
         </div>
 
@@ -414,11 +487,18 @@
                     <span>Highland / Hill Surcharge</span>
                     <span id="calc-hill-surcharge">RM 0.00</span>
                 </div>
+                <div class="detail-row" id="multiplier-row" style="display: none;">
+                    <span>Custom Rate Multiplier</span>
+                    <span id="calc-multiplier">1.0x</span>
+                </div>
 
                 <div class="detail-row total-bold">
                     <span>Rounded Final Total</span>
                     <span id="calc-grand" style="color: var(--primary-light);">RM 0.00</span>
                 </div>
+
+                <!-- Copy Invoice Button -->
+                <button class="share-btn" onclick="copyReceiptToClipboard()">📋 Copy Receipt Breakdown</button>
             </div>
         </div>
     </div>
@@ -449,6 +529,8 @@
     let pickupState = '', dropoffState = '';
     let activeRoutingMode = 'fast'; 
     let avoidTolls = false;
+    let customMultiplier = 1.0;
+    let lastCalculatedData = null;
     let currentRouteTimeout = null;
     let routeAbortController = null;
     let autosuggestAbortController = null;
@@ -499,6 +581,27 @@
             }
         });
         return fee;
+    }
+
+    // Quick Destination Shortcut Handler
+    function applyShortcut(title, lat, lng, state) {
+        const dropoffInput = document.getElementById('dropoff');
+        dropoffInput.value = title;
+        dropoffCoords = { lat, lng };
+        dropoffState = state;
+        document.getElementById('clear-dropoff').style.display = 'block';
+        updateMarker('dropoff', dropoffCoords);
+        checkAndProcessRoute();
+    }
+
+    // Rate Multiplier Setter
+    function setMultiplier(val) {
+        customMultiplier = val;
+        document.getElementById('mult-100').classList.toggle('active', val === 1.0);
+        document.getElementById('mult-125').classList.toggle('active', val === 1.25);
+        document.getElementById('mult-150').classList.toggle('active', val === 1.50);
+
+        if (pickupCoords && dropoffCoords) checkAndProcessRoute();
     }
 
     // Set up Autocomplete Listeners
@@ -627,6 +730,7 @@
         if (routePolyline) { map.removeObject(routePolyline); routePolyline = null; }
         document.getElementById('result-card').style.display = 'none';
         document.getElementById('error-msg').style.display = 'none';
+        lastCalculatedData = null;
     }
 
     function showError(msg) {
@@ -799,7 +903,7 @@
         const chargeableDistance = Math.max(0, distance - 1);
         const rideDistanceFare = chargeableDistance * perKmRate;
 
-        // Highland / Hill Surcharge Check first
+        // Highland / Hill Surcharge Check
         let hillSurcharge = 0;
         const zoneHillFee = getHighlandZoneFee(dropoffCoords);
         const isHighland = zoneHillFee > 0 || destinationElevation > 800;
@@ -849,16 +953,21 @@
             driverIncentive = (duration / 60) * 12.00;
         }
 
+        // Apply Custom Rate Multiplier to subtotal before tolls
+        const subtotalFare = (baseFare + rideDistanceFare + interstateReturnCost + trafficAdjustment + driverIncentive + hillSurcharge) * customMultiplier;
+        const rawTotal = subtotalFare + tollFee;
+        
+        // Snap to 5 sen (0.05) rounding for realistic e-wallet / cash payment
+        const roundedTotal = Math.max(baseFare, Math.round(rawTotal * 20) / 20);
+
         // Display conditional rows based on active rules
         document.getElementById('interstate-return-row').style.display = interstateReturnCost > 0 ? 'flex' : 'none';
         document.getElementById('traffic-adjust-row').style.display = trafficAdjustment > 0 ? 'flex' : 'none';
         document.getElementById('incentive-row').style.display = driverIncentive > 0 ? 'flex' : 'none';
         document.getElementById('hill-surcharge-row').style.display = hillSurcharge > 0 ? 'flex' : 'none';
+        document.getElementById('multiplier-row').style.display = customMultiplier > 1.0 ? 'flex' : 'none';
 
-        const rawTotal = baseFare + rideDistanceFare + tollFee + interstateReturnCost + trafficAdjustment + driverIncentive + hillSurcharge;
-        const roundedTotal = Math.max(baseFare, Math.round(rawTotal * 10) / 10);
-
-        // Render Values
+        // Render UI Elements
         document.getElementById('total-fare').textContent = `RM ${Math.round(roundedTotal)}`;
         document.getElementById('fare-distance').textContent = `${distance.toFixed(1)} km`;
         document.getElementById('fare-duration').textContent = duration < 60 ? `${Math.round(duration)} mins` : `${Math.floor(duration / 60)} hr ${Math.round(duration % 60)} mins`;
@@ -870,9 +979,52 @@
         document.getElementById('calc-traffic-adjust').textContent = `RM ${trafficAdjustment.toFixed(2)}`;
         document.getElementById('calc-incentive').textContent = `RM ${driverIncentive.toFixed(2)}`;
         document.getElementById('calc-hill-surcharge').textContent = `RM ${hillSurcharge.toFixed(2)}`;
+        document.getElementById('calc-multiplier').textContent = `${customMultiplier.toFixed(2)}x`;
         document.getElementById('calc-grand').textContent = `RM ${roundedTotal.toFixed(2)}`;
 
+        // Save State for Receipt Generator
+        lastCalculatedData = {
+            pickup: document.getElementById('pickup').value || "Pickup Point",
+            dropoff: document.getElementById('dropoff').value || "Drop-off Point",
+            distance: distance.toFixed(1),
+            duration: Math.round(duration),
+            baseFare: baseFare.toFixed(2),
+            distanceFare: rideDistanceFare.toFixed(2),
+            tolls: tollFee.toFixed(2),
+            total: roundedTotal.toFixed(2)
+        };
+
         document.getElementById('result-card').style.display = 'block';
+    }
+
+    // Format Receipt to WhatsApp-friendly message
+    function copyReceiptToClipboard() {
+        if (!lastCalculatedData) return;
+
+        const text = `🚗 *TRIP FARE RECEIPT ESTIMATE*\n` +
+            `-----------------------------------\n` +
+            `📍 *From:* ${lastCalculatedData.pickup}\n` +
+            `🏁 *To:* ${lastCalculatedData.dropoff}\n` +
+            `📏 *Distance:* ${lastCalculatedData.distance} km (${lastCalculatedData.duration} mins)\n` +
+            `-----------------------------------\n` +
+            `• Base Fare: RM ${lastCalculatedData.baseFare}\n` +
+            `• Distance Fare: RM ${lastCalculatedData.distanceFare}\n` +
+            `• Tolls: RM ${lastCalculatedData.tolls}\n` +
+            `-----------------------------------\n` +
+            `💰 *TOTAL FARE: RM ${lastCalculatedData.total}*\n` +
+            `-----------------------------------\n` +
+            `_Estimated fare generated via Rideshare MY_`;
+
+        navigator.clipboard.writeText(text).then(() => {
+            const shareBtn = document.querySelector('.share-btn');
+            const originalText = shareBtn.innerHTML;
+            shareBtn.innerHTML = "✅ Receipt Copied!";
+            shareBtn.style.backgroundColor = "#1b5e20";
+            setTimeout(() => {
+                shareBtn.innerHTML = originalText;
+                shareBtn.style.backgroundColor = "var(--whatsapp-green)";
+            }, 2000);
+        }).catch(err => console.error("Could not copy receipt:", err));
     }
 </script>
 </body>
