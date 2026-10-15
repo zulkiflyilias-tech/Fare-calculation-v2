@@ -309,9 +309,25 @@
             margin-bottom: 8px;
         }
 
-        #invoice-details {
+        /* Collapsible details for driver personal view */
+        details {
             border-top: 1px dashed #3a3a3c;
             padding-top: 8px;
+            margin-top: 6px;
+        }
+
+        summary {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--primary-light);
+            cursor: pointer;
+            outline: none;
+            user-select: none;
+            margin-bottom: 6px;
+        }
+
+        summary:hover {
+            color: #d1c4e9;
         }
 
         .detail-row {
@@ -346,6 +362,7 @@
             justify-content: center;
             gap: 6px;
             transition: background 0.2s ease;
+            margin-top: 8px;
         }
 
         .share-btn:hover {
@@ -458,9 +475,11 @@
                 <span id="fare-duration">0 mins</span>
             </div>
             
-            <div id="invoice-details">
+            <!-- Collapsible Driver Details (Private Breakdown) -->
+            <details>
+                <summary>📊 Detailed Calculation (Driver View)</summary>
                 <div class="detail-row">
-                    <span>Base Fare</span>
+                    <span>Base Fare (incl. 1st km)</span>
                     <span id="calc-base-fare">RM 5.00</span>
                 </div>
                 <div class="detail-row">
@@ -493,13 +512,13 @@
                 </div>
 
                 <div class="detail-row total-bold">
-                    <span>Rounded Final Total</span>
+                    <span>Exact Calculated Total</span>
                     <span id="calc-grand" style="color: var(--primary-light);">RM 0.00</span>
                 </div>
+            </details>
 
-                <!-- Copy Invoice Button -->
-                <button class="share-btn" onclick="copyReceiptToClipboard()">📋 Copy Receipt Breakdown</button>
-            </div>
+            <!-- Copy Invoice Button -->
+            <button class="share-btn" onclick="copyReceiptToClipboard()">📋 Copy Receipt Breakdown</button>
         </div>
     </div>
 </div>
@@ -939,10 +958,10 @@
         }, 200);
     }
 
-    // Refactored Optimized Calculation Engine
+    // Refactored Optimized Calculation Engine with Updated Base/Distance Fares
     function processCalculations(distance, duration, tollFee, destinationElevation, section) {
-        const baseFare = 5.00;
-        const perKmRate = 1.25;
+        const baseFare = 5.00; // Includes the first 1.0 km
+        const perKmRate = 1.30; // Updated distance rate
         
         const rideDistanceFare = Math.max(0, distance - 1) * perKmRate;
 
@@ -960,7 +979,6 @@
         const isInterstate = pickupState && dropoffState && (pickupState.toLowerCase().trim() !== dropoffState.toLowerCase().trim());
         
         if (isInterstate && distance > 12) {
-            // Logarithmic smooth scale preventing cliff-edge jumps at exact km thresholds
             const surchargeRate = Math.min(0.65, 0.15 + (0.10 * Math.log2(distance / 12)));
             interstateReturnCost = (baseFare + rideDistanceFare) * surchargeRate;
         }
@@ -993,8 +1011,11 @@
         const subtotalBeforeTolls = variableFare + fixedSurcharges;
         const rawTotal = subtotalBeforeTolls + tollFee;
         
-        // Snap to 5 sen (0.05) rounding
-        const roundedTotal = Math.max(baseFare, Math.round(rawTotal * 20) / 20);
+        // Exact calculated total for driver breakdown
+        const exactTotal = Math.max(baseFare, Math.round(rawTotal * 100) / 100);
+        
+        // Customer view: Rounded final total without cents (nearest RM)
+        const customerTotal = Math.round(exactTotal);
 
         // Display conditional rows based on active rules
         document.getElementById('interstate-return-row').style.display = interstateReturnCost > 0 ? 'flex' : 'none';
@@ -1004,7 +1025,7 @@
         document.getElementById('multiplier-row').style.display = customMultiplier > 1.0 ? 'flex' : 'none';
 
         // Render UI Elements
-        document.getElementById('total-fare').textContent = `RM ${Math.round(roundedTotal)}`;
+        document.getElementById('total-fare').textContent = `RM ${customerTotal}`;
         document.getElementById('fare-distance').textContent = `${distance.toFixed(1)} km`;
         document.getElementById('fare-duration').textContent = duration < 60 ? `${Math.round(duration)} mins` : `${Math.floor(duration / 60)} hr ${Math.round(duration % 60)} mins`;
 
@@ -1016,21 +1037,21 @@
         document.getElementById('calc-incentive').textContent = `RM ${driverIncentive.toFixed(2)}`;
         document.getElementById('calc-hill-surcharge').textContent = `RM ${hillSurcharge.toFixed(2)}`;
         document.getElementById('calc-multiplier').textContent = `${customMultiplier.toFixed(2)}x`;
-        document.getElementById('calc-grand').textContent = `RM ${roundedTotal.toFixed(2)}`;
+        document.getElementById('calc-grand').textContent = `RM ${exactTotal.toFixed(2)}`;
 
-        // Save State for Receipt Generator
+        // Save State for Receipt Generator (using rounded customer total without cents)
         lastCalculatedData = {
             pickup: document.getElementById('pickup').value || "Pickup Point",
             dropoff: document.getElementById('dropoff').value || "Drop-off Point",
             distance: distance.toFixed(1),
             duration: Math.round(duration),
-            total: roundedTotal.toFixed(2)
+            total: customerTotal.toString()
         };
 
         document.getElementById('result-card').style.display = 'block';
     }
 
-    // Format Receipt to WhatsApp-friendly message
+    // Format Receipt to WhatsApp-friendly message (customer facing - no cents)
     function copyReceiptToClipboard() {
         if (!lastCalculatedData) return;
 
