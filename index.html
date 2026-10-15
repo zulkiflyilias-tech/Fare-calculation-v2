@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Fare Estimator (RM8 Minimum Engine)</title>
+    <title>Rideshare MY - Fare Estimator (Optimized Engine)</title>
     
     <!-- HERE Maps JS API CSS -->
     <link rel="stylesheet" type="text/css" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css" />
@@ -568,7 +568,7 @@
             try {
                 const linestring = H.geo.LineString.fromFlexiblePolyline(section.polyline);
                 const count = linestring.getPointCount();
-                const step = Math.max(1, Math.floor(count / 10));
+                const step = Math.max(1, Math.floor(count / 10)); // Sample ~10 points along path
                 for (let i = 0; i < count; i += step) {
                     const pt = linestring.extractPoint(i);
                     zones.forEach(zone => {
@@ -580,6 +580,7 @@
             } catch(e) { console.error("Polyline sampling error:", e); }
         }
 
+        // Fallback explicit endpoint checks
         [pickupCoords, dropoffCoords].forEach(coords => {
             if (!coords) return;
             zones.forEach(zone => {
@@ -603,6 +604,7 @@
         return fee;
     }
 
+    // Quick Destination Shortcut Handler
     function applyShortcut(title, lat, lng, state) {
         const dropoffInput = document.getElementById('dropoff');
         dropoffInput.value = title;
@@ -613,6 +615,7 @@
         checkAndProcessRoute();
     }
 
+    // Rate Multiplier Setter
     function setMultiplier(val) {
         customMultiplier = val;
         document.getElementById('mult-100').classList.toggle('active', val === 1.0);
@@ -622,6 +625,7 @@
         if (pickupCoords && dropoffCoords) checkAndProcessRoute();
     }
 
+    // Set up Autocomplete Listeners
     setupAutocomplete('pickup', 'pickup-suggestions', 'clear-pickup', (item) => {
         pickupCoords = { lat: item.position.lat, lng: item.position.lng };
         pickupState = item.address && item.address.state ? item.address.state : '';
@@ -636,6 +640,7 @@
         checkAndProcessRoute();
     }, () => clearLocation('dropoff'));
 
+    // Handle Current Location Geolocation
     document.getElementById('current-loc-btn').addEventListener('click', () => {
         if (!navigator.geolocation) {
             showError("Geolocation is not supported by your browser.");
@@ -934,17 +939,12 @@
         }, 200);
     }
 
-    // Refactored Optimized Calculation Engine with RM8 Minimum Fare Rule
+    // Refactored Optimized Calculation Engine
     function processCalculations(distance, duration, tollFee, destinationElevation, section) {
         const baseFare = 5.00;
         const perKmRate = 1.25;
         
-        let rideDistanceFare = Math.max(0, distance - 1) * perKmRate;
-
-        // Minimum Fare / Distance Fare Guardrail: If distance fare amount is less than RM 3, total minimum becomes RM 8
-        if (rideDistanceFare < 3.00) {
-            rideDistanceFare = 3.00; // Adjust distance component so base + distance = RM 8.00 minimum before other surcharges
-        }
+        const rideDistanceFare = Math.max(0, distance - 1) * perKmRate;
 
         // Highland / Hill Surcharge Check
         let hillSurcharge = 0;
@@ -960,6 +960,7 @@
         const isInterstate = pickupState && dropoffState && (pickupState.toLowerCase().trim() !== dropoffState.toLowerCase().trim());
         
         if (isInterstate && distance > 12) {
+            // Logarithmic smooth scale preventing cliff-edge jumps at exact km thresholds
             const surchargeRate = Math.min(0.65, 0.15 + (0.10 * Math.log2(distance / 12)));
             interstateReturnCost = (baseFare + rideDistanceFare) * surchargeRate;
         }
@@ -972,7 +973,7 @@
         // Route-Aware Corridor Traffic Detection via Polyline Sampling
         const trafficAdjustment = getRouteBusyZoneFee(section, BUSY_ZONES);
 
-        // Continuous Peak-Hour Time Surcharge Engine
+        // Continuous Peak-Hour Time Surcharge Engine (Floating-point hours)
         let driverIncentive = 0;
         const now = new Date();
         const hr = now.getHours() + (now.getMinutes() / 60);
@@ -986,14 +987,14 @@
             driverIncentive = (duration / 60) * 12.00;
         }
 
-        // Refined Order of Operations
+        // Refined Order of Operations: Multiplier applies to variable core fares only; flat fees kept separate
         const variableFare = (baseFare + rideDistanceFare + trafficAdjustment + driverIncentive) * customMultiplier;
         const fixedSurcharges = interstateReturnCost + hillSurcharge;
         const subtotalBeforeTolls = variableFare + fixedSurcharges;
         const rawTotal = subtotalBeforeTolls + tollFee;
         
-        // Snap to 5 sen (0.05) rounding, absolute minimum floor of RM 8.00
-        const roundedTotal = Math.max(8.00, Math.round(rawTotal * 20) / 20);
+        // Snap to 5 sen (0.05) rounding
+        const roundedTotal = Math.max(baseFare, Math.round(rawTotal * 20) / 20);
 
         // Display conditional rows based on active rules
         document.getElementById('interstate-return-row').style.display = interstateReturnCost > 0 ? 'flex' : 'none';
