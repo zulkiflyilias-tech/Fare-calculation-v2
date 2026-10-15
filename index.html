@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Fare Estimator</title>
+    <title>Rideshare MY - Fare Estimator (Optimized Engine)</title>
     
     <!-- HERE Maps JS API CSS -->
     <link rel="stylesheet" type="text/css" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css" />
@@ -561,14 +561,35 @@
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
-    function getHighestBusyZoneFee(coords) {
-        if (!coords) return 0;
+    // Route-Aware Corridor Traffic Detection via Polyline Sampling
+    function getRouteBusyZoneFee(section, zones) {
         let maxFee = 0;
-        BUSY_ZONES.forEach(zone => {
-            if (calculateHaversineDistance(coords.lat, coords.lng, zone.lat, zone.lng) <= zone.radiusKm) {
-                if (zone.fee > maxFee) maxFee = zone.fee;
-            }
+        if (section && section.polyline) {
+            try {
+                const linestring = H.geo.LineString.fromFlexiblePolyline(section.polyline);
+                const count = linestring.getPointCount();
+                const step = Math.max(1, Math.floor(count / 10)); // Sample ~10 points along path
+                for (let i = 0; i < count; i += step) {
+                    const pt = linestring.extractPoint(i);
+                    zones.forEach(zone => {
+                        if (calculateHaversineDistance(pt.lat, pt.lng, zone.lat, zone.lng) <= zone.radiusKm) {
+                            if (zone.fee > maxFee) maxFee = zone.fee;
+                        }
+                    });
+                }
+            } catch(e) { console.error("Polyline sampling error:", e); }
+        }
+
+        // Fallback explicit endpoint checks
+        [pickupCoords, dropoffCoords].forEach(coords => {
+            if (!coords) return;
+            zones.forEach(zone => {
+                if (calculateHaversineDistance(coords.lat, coords.lng, zone.lat, zone.lng) <= zone.radiusKm) {
+                    if (zone.fee > maxFee) maxFee = zone.fee;
+                }
+            });
         });
+
         return maxFee;
     }
 
@@ -773,7 +794,6 @@
                             return;
                         }
 
-                        // Separate and prioritize Malaysian addresses first
                         const malaysianItems = [];
                         const otherItems = [];
 
@@ -784,16 +804,11 @@
                                 (item.address.label && item.address.label.toLowerCase().includes('malaysia'))
                             );
 
-                            if (isMalaysia) {
-                                malaysianItems.push(item);
-                            } else {
-                                otherItems.push(item);
-                            }
+                            if (isMalaysia) malaysianItems.push(item);
+                            else otherItems.push(item);
                         });
 
-                        // Combine with Malaysia strictly prioritized on top
                         const sortedItems = [...malaysianItems, ...otherItems];
-
                         if (sortedItems.length === 0) {
                             suggestionsBox.style.display = 'none';
                             return;
@@ -915,7 +930,7 @@
                 map.addObject(routePolyline);
                 map.getViewModel().setLookAtData({ bounds: routePolyline.getBoundingBox() });
 
-                processCalculations(distanceKm, liveTrafficDurationMins, calculatedTollFee, destinationElevation);
+                processCalculations(distanceKm, liveTrafficDurationMins, calculatedTollFee, destinationElevation, section);
             }, (error) => {
                 if (routeAbortController.signal.aborted) return;
                 console.error("HERE Routing API Error:", error);
@@ -924,12 +939,12 @@
         }, 200);
     }
 
-    function processCalculations(distance, duration, tollFee, destinationElevation) {
+    // Refactored Optimized Calculation Engine
+    function processCalculations(distance, duration, tollFee, destinationElevation, section) {
         const baseFare = 5.00;
         const perKmRate = 1.25;
         
-        const chargeableDistance = Math.max(0, distance - 1);
-        const rideDistanceFare = chargeableDistance * perKmRate;
+        const rideDistanceFare = Math.max(0, distance - 1) * perKmRate;
 
         // Highland / Hill Surcharge Check
         let hillSurcharge = 0;
@@ -940,15 +955,14 @@
             hillSurcharge = zoneHillFee > 0 ? zoneHillFee : 15.00;
         }
 
-        // Interstate / Long-Distance Surcharge
+        // Smooth Continuous Interstate Return Surcharge
         let interstateReturnCost = 0;
         const isInterstate = pickupState && dropoffState && (pickupState.toLowerCase().trim() !== dropoffState.toLowerCase().trim());
         
-        if (isInterstate) {
-            if (distance > 12 && distance <= 50) interstateReturnCost = rideDistanceFare * 0.15;
-            else if (distance > 50 && distance <= 250) interstateReturnCost = rideDistanceFare * 0.30;
-            else if (distance > 250 && distance <= 500) interstateReturnCost = rideDistanceFare * 0.45;
-            else if (distance > 500) interstateReturnCost = rideDistanceFare * 0.65;
+        if (isInterstate && distance > 12) {
+            // Logarithmic smooth scale preventing cliff-edge jumps at exact km thresholds
+            const surchargeRate = Math.min(0.65, 0.15 + (0.10 * Math.log2(distance / 12)));
+            interstateReturnCost = (baseFare + rideDistanceFare) * surchargeRate;
         }
 
         // Anti-Stacking Guardrail Rule
@@ -956,36 +970,30 @@
             interstateReturnCost = 0;
         }
 
-        // Tiered Busy-Area Surcharge
-        let trafficAdjustment = 0;
-        const pickupBusyFee = getHighestBusyZoneFee(pickupCoords);
-        const dropoffBusyFee = getHighestBusyZoneFee(dropoffCoords);
+        // Route-Aware Corridor Traffic Detection via Polyline Sampling
+        const trafficAdjustment = getRouteBusyZoneFee(section, BUSY_ZONES);
 
-        if (pickupBusyFee > 0 && dropoffBusyFee > 0 && pickupCoords.lat === dropoffCoords.lat) {
-            trafficAdjustment = pickupBusyFee; 
-        } else {
-            trafficAdjustment = Math.max(pickupBusyFee, dropoffBusyFee); 
-        }
-
-        // Peak-Hour Incentive
+        // Continuous Peak-Hour Time Surcharge Engine (Floating-point hours)
         let driverIncentive = 0;
         const now = new Date();
-        const hr = now.getHours();
+        const hr = now.getHours() + (now.getMinutes() / 60);
         const isWeekend = (now.getDay() === 0 || now.getDay() === 6);
 
         const isPeakHour = !isWeekend 
-            ? ((hr >= 7 && hr <= 9) || (hr >= 17 && hr <= 19)) 
-            : (hr >= 16 && hr <= 21);                         
+            ? ((hr >= 7.0 && hr <= 9.5) || (hr >= 17.0 && hr <= 19.5)) 
+            : (hr >= 16.0 && hr <= 21.0);                         
 
         if (isPeakHour) {
             driverIncentive = (duration / 60) * 12.00;
         }
 
-        // Apply Custom Rate Multiplier to subtotal before tolls
-        const subtotalFare = (baseFare + rideDistanceFare + interstateReturnCost + trafficAdjustment + driverIncentive + hillSurcharge) * customMultiplier;
-        const rawTotal = subtotalFare + tollFee;
+        // Refined Order of Operations: Multiplier applies to variable core fares only; flat fees kept separate
+        const variableFare = (baseFare + rideDistanceFare + trafficAdjustment + driverIncentive) * customMultiplier;
+        const fixedSurcharges = interstateReturnCost + hillSurcharge;
+        const subtotalBeforeTolls = variableFare + fixedSurcharges;
+        const rawTotal = subtotalBeforeTolls + tollFee;
         
-        // Snap to 5 sen (0.05) rounding for realistic e-wallet / cash payment
+        // Snap to 5 sen (0.05) rounding
         const roundedTotal = Math.max(baseFare, Math.round(rawTotal * 20) / 20);
 
         // Display conditional rows based on active rules
@@ -1022,7 +1030,7 @@
         document.getElementById('result-card').style.display = 'block';
     }
 
-    // Format Receipt to WhatsApp-friendly message (Grand Total + Toll Remarks)
+    // Format Receipt to WhatsApp-friendly message
     function copyReceiptToClipboard() {
         if (!lastCalculatedData) return;
 
