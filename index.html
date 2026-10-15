@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rideshare MY - Fare Estimator (Optimized Engine)</title>
+    <title>Rideshare MY - Fare Estimator (RM8 Minimum Engine)</title>
     
     <!-- HERE Maps JS API CSS -->
     <link rel="stylesheet" type="text/css" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css" />
@@ -63,6 +63,38 @@
             margin: 0 0 8px 0;
             font-size: 18px;
             font-weight: 700;
+        }
+
+        /* Shortcuts Container */
+        .shortcuts-bar {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding-bottom: 6px;
+            margin-bottom: 6px;
+            scrollbar-width: none;
+        }
+        .shortcuts-bar::-webkit-scrollbar { display: none; }
+
+        .shortcut-chip {
+            white-space: nowrap;
+            background: #f0f0f3;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #444;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .shortcut-chip:hover {
+            background-color: #e8e0f0;
+            color: var(--primary);
+            border-color: var(--primary-light);
         }
 
         .routing-wrapper {
@@ -195,12 +227,12 @@
             margin-bottom: 8px;
         }
 
-        .route-mode-container {
+        .route-mode-container, .multiplier-container {
             display: flex;
             gap: 6px;
         }
 
-        .mode-btn {
+        .mode-btn, .mult-btn {
             flex: 1;
             padding: 6px 4px;
             border: 1px solid var(--border-color);
@@ -217,7 +249,7 @@
             transition: all 0.2s ease;
         }
 
-        .mode-btn.active {
+        .mode-btn.active, .mult-btn.active {
             background-color: #f3e5f5;
             border-color: var(--primary);
             color: var(--primary);
@@ -277,25 +309,9 @@
             margin-bottom: 8px;
         }
 
-        /* Collapsible details for driver personal view */
-        details {
+        #invoice-details {
             border-top: 1px dashed #3a3a3c;
             padding-top: 8px;
-            margin-top: 6px;
-        }
-
-        summary {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--primary-light);
-            cursor: pointer;
-            outline: none;
-            user-select: none;
-            margin-bottom: 6px;
-        }
-
-        summary:hover {
-            color: #d1c4e9;
         }
 
         .detail-row {
@@ -330,7 +346,6 @@
             justify-content: center;
             gap: 6px;
             transition: background 0.2s ease;
-            margin-top: 8px;
         }
 
         .share-btn:hover {
@@ -377,6 +392,15 @@
         <div class="header-row">
             <h2>Fare Estimator</h2>
         </div>
+
+        <!-- Quick Destinations Shortcuts Bar -->
+        <div class="shortcuts-bar">
+            <div class="shortcut-chip" onclick="applyShortcut('KLIA Terminal 1', 2.7456, 101.7072, 'Selangor')">✈️ KLIA T1</div>
+            <div class="shortcut-chip" onclick="applyShortcut('KL Sentral', 3.1342, 101.6861, 'Kuala Lumpur')">🚉 KL Sentral</div>
+            <div class="shortcut-chip" onclick="applyShortcut('Mid Valley Megamall', 3.1177, 101.6774, 'Kuala Lumpur')">🛍️ Mid Valley</div>
+            <div class="shortcut-chip" onclick="applyShortcut('Genting Highlands', 3.4241, 101.7933, 'Pahang')">⛰️ Genting</div>
+            <div class="shortcut-chip" onclick="applyShortcut('Shah Alam City Centre', 3.0738, 101.5183, 'Selangor')">🏛️ Shah Alam</div>
+        </div>
         
         <div class="routing-wrapper">
             <!-- Pickup Input -->
@@ -412,6 +436,13 @@
                 <button class="mode-btn" id="btn-mode-short" onclick="setRoutingMode('short')">📏 Shortest Route</button>
             </div>
 
+            <!-- Custom Fare Multipliers -->
+            <div class="multiplier-container">
+                <button class="mult-btn active" id="mult-100" onclick="setMultiplier(1.0)">1.0x Normal</button>
+                <button class="mult-btn" id="mult-125" onclick="setMultiplier(1.25)">1.25x Night</button>
+                <button class="mult-btn" id="mult-150" onclick="setMultiplier(1.50)">1.50x Peak</button>
+            </div>
+
             <button class="toggle-btn" id="btn-avoid-tolls" onclick="toggleAvoidTolls()">🛑 Avoid Tolls</button>
         </div>
 
@@ -427,11 +458,9 @@
                 <span id="fare-duration">0 mins</span>
             </div>
             
-            <!-- Collapsible Driver Details (Private Breakdown) -->
-            <details>
-                <summary>📊 Detailed Calculation (Driver View)</summary>
+            <div id="invoice-details">
                 <div class="detail-row">
-                    <span>Base Fare (incl. 1st km)</span>
+                    <span>Base Fare</span>
                     <span id="calc-base-fare">RM 5.00</span>
                 </div>
                 <div class="detail-row">
@@ -458,15 +487,19 @@
                     <span>Highland / Hill Surcharge</span>
                     <span id="calc-hill-surcharge">RM 0.00</span>
                 </div>
+                <div class="detail-row" id="multiplier-row" style="display: none;">
+                    <span>Custom Rate Multiplier</span>
+                    <span id="calc-multiplier">1.0x</span>
+                </div>
 
                 <div class="detail-row total-bold">
-                    <span>Exact Calculated Total</span>
+                    <span>Rounded Final Total</span>
                     <span id="calc-grand" style="color: var(--primary-light);">RM 0.00</span>
                 </div>
-            </details>
 
-            <!-- Copy Invoice Button -->
-            <button class="share-btn" onclick="copyReceiptToClipboard()">📋 Copy Receipt Breakdown</button>
+                <!-- Copy Invoice Button -->
+                <button class="share-btn" onclick="copyReceiptToClipboard()">📋 Copy Receipt Breakdown</button>
+            </div>
         </div>
     </div>
 </div>
@@ -496,6 +529,7 @@
     let pickupState = '', dropoffState = '';
     let activeRoutingMode = 'fast'; 
     let avoidTolls = false;
+    let customMultiplier = 1.0;
     let lastCalculatedData = null;
     let currentRouteTimeout = null;
     let routeAbortController = null;
@@ -534,7 +568,7 @@
             try {
                 const linestring = H.geo.LineString.fromFlexiblePolyline(section.polyline);
                 const count = linestring.getPointCount();
-                const step = Math.max(1, Math.floor(count / 10)); // Sample ~10 points along path
+                const step = Math.max(1, Math.floor(count / 10));
                 for (let i = 0; i < count; i += step) {
                     const pt = linestring.extractPoint(i);
                     zones.forEach(zone => {
@@ -546,7 +580,6 @@
             } catch(e) { console.error("Polyline sampling error:", e); }
         }
 
-        // Fallback explicit endpoint checks
         [pickupCoords, dropoffCoords].forEach(coords => {
             if (!coords) return;
             zones.forEach(zone => {
@@ -570,7 +603,25 @@
         return fee;
     }
 
-    // Set up Autocomplete Listeners
+    function applyShortcut(title, lat, lng, state) {
+        const dropoffInput = document.getElementById('dropoff');
+        dropoffInput.value = title;
+        dropoffCoords = { lat, lng };
+        dropoffState = state;
+        document.getElementById('clear-dropoff').style.display = 'block';
+        updateMarker('dropoff', dropoffCoords);
+        checkAndProcessRoute();
+    }
+
+    function setMultiplier(val) {
+        customMultiplier = val;
+        document.getElementById('mult-100').classList.toggle('active', val === 1.0);
+        document.getElementById('mult-125').classList.toggle('active', val === 1.25);
+        document.getElementById('mult-150').classList.toggle('active', val === 1.50);
+
+        if (pickupCoords && dropoffCoords) checkAndProcessRoute();
+    }
+
     setupAutocomplete('pickup', 'pickup-suggestions', 'clear-pickup', (item) => {
         pickupCoords = { lat: item.position.lat, lng: item.position.lng };
         pickupState = item.address && item.address.state ? item.address.state : '';
@@ -585,7 +636,6 @@
         checkAndProcessRoute();
     }, () => clearLocation('dropoff'));
 
-    // Handle Current Location Geolocation
     document.getElementById('current-loc-btn').addEventListener('click', () => {
         if (!navigator.geolocation) {
             showError("Geolocation is not supported by your browser.");
@@ -884,12 +934,17 @@
         }, 200);
     }
 
-    // Calculation Engine
+    // Refactored Optimized Calculation Engine with RM8 Minimum Fare Rule
     function processCalculations(distance, duration, tollFee, destinationElevation, section) {
-        const baseFare = 5.00; // Includes the first 1.0 km
-        const perKmRate = 1.30; // Distance rate
+        const baseFare = 5.00;
+        const perKmRate = 1.25;
         
-        const rideDistanceFare = Math.max(0, distance - 1) * perKmRate;
+        let rideDistanceFare = Math.max(0, distance - 1) * perKmRate;
+
+        // Minimum Fare / Distance Fare Guardrail: If distance fare amount is less than RM 3, total minimum becomes RM 8
+        if (rideDistanceFare < 3.00) {
+            rideDistanceFare = 3.00; // Adjust distance component so base + distance = RM 8.00 minimum before other surcharges
+        }
 
         // Highland / Hill Surcharge Check
         let hillSurcharge = 0;
@@ -917,7 +972,7 @@
         // Route-Aware Corridor Traffic Detection via Polyline Sampling
         const trafficAdjustment = getRouteBusyZoneFee(section, BUSY_ZONES);
 
-        // Continuous Peak-Hour Time Surcharge Engine (Floating-point hours)
+        // Continuous Peak-Hour Time Surcharge Engine
         let driverIncentive = 0;
         const now = new Date();
         const hr = now.getHours() + (now.getMinutes() / 60);
@@ -931,25 +986,24 @@
             driverIncentive = (duration / 60) * 12.00;
         }
 
-        const variableFare = baseFare + rideDistanceFare + trafficAdjustment + driverIncentive;
+        // Refined Order of Operations
+        const variableFare = (baseFare + rideDistanceFare + trafficAdjustment + driverIncentive) * customMultiplier;
         const fixedSurcharges = interstateReturnCost + hillSurcharge;
         const subtotalBeforeTolls = variableFare + fixedSurcharges;
         const rawTotal = subtotalBeforeTolls + tollFee;
         
-        // Exact calculated total for driver breakdown
-        const exactTotal = Math.max(baseFare, Math.round(rawTotal * 100) / 100);
-        
-        // Customer view: Rounded final total without cents (nearest RM)
-        const customerTotal = Math.round(exactTotal);
+        // Snap to 5 sen (0.05) rounding, absolute minimum floor of RM 8.00
+        const roundedTotal = Math.max(8.00, Math.round(rawTotal * 20) / 20);
 
         // Display conditional rows based on active rules
         document.getElementById('interstate-return-row').style.display = interstateReturnCost > 0 ? 'flex' : 'none';
         document.getElementById('traffic-adjust-row').style.display = trafficAdjustment > 0 ? 'flex' : 'none';
         document.getElementById('incentive-row').style.display = driverIncentive > 0 ? 'flex' : 'none';
         document.getElementById('hill-surcharge-row').style.display = hillSurcharge > 0 ? 'flex' : 'none';
+        document.getElementById('multiplier-row').style.display = customMultiplier > 1.0 ? 'flex' : 'none';
 
         // Render UI Elements
-        document.getElementById('total-fare').textContent = `RM ${customerTotal}`;
+        document.getElementById('total-fare').textContent = `RM ${Math.round(roundedTotal)}`;
         document.getElementById('fare-distance').textContent = `${distance.toFixed(1)} km`;
         document.getElementById('fare-duration').textContent = duration < 60 ? `${Math.round(duration)} mins` : `${Math.floor(duration / 60)} hr ${Math.round(duration % 60)} mins`;
 
@@ -960,21 +1014,22 @@
         document.getElementById('calc-traffic-adjust').textContent = `RM ${trafficAdjustment.toFixed(2)}`;
         document.getElementById('calc-incentive').textContent = `RM ${driverIncentive.toFixed(2)}`;
         document.getElementById('calc-hill-surcharge').textContent = `RM ${hillSurcharge.toFixed(2)}`;
-        document.getElementById('calc-grand').textContent = `RM ${exactTotal.toFixed(2)}`;
+        document.getElementById('calc-multiplier').textContent = `${customMultiplier.toFixed(2)}x`;
+        document.getElementById('calc-grand').textContent = `RM ${roundedTotal.toFixed(2)}`;
 
-        // Save State for Receipt Generator (using rounded customer total without cents)
+        // Save State for Receipt Generator
         lastCalculatedData = {
             pickup: document.getElementById('pickup').value || "Pickup Point",
             dropoff: document.getElementById('dropoff').value || "Drop-off Point",
             distance: distance.toFixed(1),
             duration: Math.round(duration),
-            total: customerTotal.toString()
+            total: roundedTotal.toFixed(2)
         };
 
         document.getElementById('result-card').style.display = 'block';
     }
 
-    // Format Receipt to WhatsApp-friendly message (customer facing - no cents)
+    // Format Receipt to WhatsApp-friendly message
     function copyReceiptToClipboard() {
         if (!lastCalculatedData) return;
 
