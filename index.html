@@ -280,6 +280,16 @@
             align-items: center;
         }
 
+        .admin-fee-row {
+            font-size: 12px;
+            color: #ff8a80;
+            font-weight: 500;
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
         .fare-meta {
             font-size: 12px;
             color: #e5e5ea;
@@ -433,6 +443,11 @@
             <div class="fare-header-row">
                 <div id="total-fare" class="fare-header">RM --</div>
             </div>
+            <!-- Platform Admin Fee Deduction -->
+            <div class="admin-fee-row">
+                <span>Platform Admin Fee (15% off Distance):</span>
+                <span id="admin-fee-display">-RM 0.00</span>
+            </div>
             <!-- Driver Net Income After 15% Distance Deduction -->
             <div class="driver-net-row">
                 <span>Driver Net Income (incl. Tolls):</span>
@@ -450,9 +465,13 @@
                     <span>Distance Fare (RM 1.30/km)</span>
                     <span id="calc-distance-fare">RM 0.00</span>
                 </div>
-                <div class="detail-row" style="color: #ff8a80;">
-                    <span>Platform Admin Fee (15% off Distance)</span>
-                    <span id="calc-deduction">RM 0.00</span>
+                <div class="detail-row" id="toll-fare-row">
+                    <span>Toll Charges</span>
+                    <span id="calc-toll-fare">RM 0.00</span>
+                </div>
+                <div class="detail-row" id="hill-surcharge-row" style="display: none;">
+                    <span>Hill Surcharge</span>
+                    <span id="calc-hill-surcharge">RM 0.00</span>
                 </div>
                 <div class="detail-row">
                     <span>Fuel Cost</span>
@@ -462,17 +481,9 @@
                     <span>Maintenance Cost (RM 0.13/km)</span>
                     <span id="calc-maint-cost">RM 0.00</span>
                 </div>
-                <div class="detail-row" id="toll-fare-row">
-                    <span>Toll Charges</span>
-                    <span id="calc-toll-fare">RM 0.00</span>
-                </div>
                 <div class="detail-row" id="return-trip-row" style="display: none;">
                     <span>Long-Haul Return Fuel & Toll</span>
                     <span id="calc-return-trip">RM 0.00</span>
-                </div>
-                <div class="detail-row" id="hill-surcharge-row" style="display: none;">
-                    <span>Hill Surcharge</span>
-                    <span id="calc-hill-surcharge">RM 0.00</span>
                 </div>
 
                 <div class="detail-row total-bold">
@@ -873,17 +884,17 @@
 
         // Render UI Elements
         document.getElementById('total-fare').textContent = `RM ${customerTotal}`;
+        document.getElementById('admin-fee-display').textContent = `-RM ${deduction15.toFixed(2)}`;
         document.getElementById('driver-net-fare').textContent = `RM ${driverNetIncome.toFixed(2)}`;
         document.getElementById('fare-distance').textContent = `${distance.toFixed(1)} km`;
         document.getElementById('fare-duration').textContent = duration < 60 ? `${Math.round(duration)} mins` : `${Math.floor(duration / 60)} hr ${Math.round(duration % 60)} mins`;
 
         document.getElementById('calc-distance-fare').textContent = `RM ${distanceFare.toFixed(2)}`;
-        document.getElementById('calc-deduction').textContent = `-RM ${deduction15.toFixed(2)}`;
+        document.getElementById('calc-toll-fare').textContent = `RM ${tollFee.toFixed(2)}`;
+        document.getElementById('calc-hill-surcharge').textContent = `RM ${hillSurcharge.toFixed(2)}`;
         document.getElementById('calc-fuel-cost').textContent = `RM ${fuelCost.toFixed(2)}`;
         document.getElementById('calc-maint-cost').textContent = `RM ${maintenanceCost.toFixed(2)}`;
-        document.getElementById('calc-toll-fare').textContent = `RM ${tollFee.toFixed(2)}`;
         document.getElementById('calc-return-trip').textContent = `RM ${returnTripCost.toFixed(2)}`;
-        document.getElementById('calc-hill-surcharge').textContent = `RM ${hillSurcharge.toFixed(2)}`;
         document.getElementById('calc-grand').textContent = `RM ${exactTotal.toFixed(2)}`;
 
         lastCalculatedData = {
