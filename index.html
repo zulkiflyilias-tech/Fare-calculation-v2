@@ -268,28 +268,6 @@
             color: var(--primary-light);
         }
 
-        .driver-net-row {
-            font-size: 13px;
-            color: #a5d6a7;
-            font-weight: 600;
-            margin-bottom: 6px;
-            padding-bottom: 6px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .admin-fee-row {
-            font-size: 12px;
-            color: #ff8a80;
-            font-weight: 500;
-            margin-bottom: 4px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
         .fare-meta {
             font-size: 12px;
             color: #e5e5ea;
@@ -331,6 +309,15 @@
             color: #fff;
             font-weight: 600;
             border-top: 1px solid #2c2c2e;
+            padding-top: 6px;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+
+        .detail-row.driver-net-highlight {
+            color: #a5d6a7;
+            font-weight: 700;
+            border-top: 1px solid rgba(255,255,255,0.1);
             padding-top: 6px;
             margin-bottom: 10px;
             font-size: 13px;
@@ -443,16 +430,6 @@
             <div class="fare-header-row">
                 <div id="total-fare" class="fare-header">RM --</div>
             </div>
-            <!-- Platform Admin Fee Deduction -->
-            <div class="admin-fee-row">
-                <span>Platform Admin Fee (15% off Distance):</span>
-                <span id="admin-fee-display">-RM 0.00</span>
-            </div>
-            <!-- Driver Net Income After 15% Distance Deduction -->
-            <div class="driver-net-row">
-                <span>Driver Net Income (incl. Tolls):</span>
-                <span id="driver-net-fare">RM --</span>
-            </div>
             <div class="fare-meta">
                 <span id="fare-distance">0 km</span>
                 <span id="fare-duration">0 mins</span>
@@ -489,6 +466,14 @@
                 <div class="detail-row total-bold">
                     <span>Exact Calculated Total</span>
                     <span id="calc-grand" style="color: var(--primary-light);">RM 0.00</span>
+                </div>
+                <div class="detail-row" style="color: #ff8a80;">
+                    <span>Platform Admin Fee (15% off Distance)</span>
+                    <span id="calc-deduction">-RM 0.00</span>
+                </div>
+                <div class="detail-row driver-net-highlight">
+                    <span>Driver Net Income (incl. Tolls)</span>
+                    <span id="driver-net-fare">RM 0.00</span>
                 </div>
             </details>
 
@@ -884,7 +869,7 @@
 
         // Render UI Elements
         document.getElementById('total-fare').textContent = `RM ${customerTotal}`;
-        document.getElementById('admin-fee-display').textContent = `-RM ${deduction15.toFixed(2)}`;
+        document.getElementById('calc-deduction').textContent = `-RM ${deduction15.toFixed(2)}`;
         document.getElementById('driver-net-fare').textContent = `RM ${driverNetIncome.toFixed(2)}`;
         document.getElementById('fare-distance').textContent = `${distance.toFixed(1)} km`;
         document.getElementById('fare-duration').textContent = duration < 60 ? `${Math.round(duration)} mins` : `${Math.floor(duration / 60)} hr ${Math.round(duration % 60)} mins`;
