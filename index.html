@@ -891,8 +891,7 @@
             dropoff: document.getElementById('dropoff').value || "Drop-off Point",
             distance: distance.toFixed(1),
             duration: Math.round(duration),
-            total: customerTotal.toString(),
-            driverNet: driverNetIncome.toFixed(2)
+            total: customerTotal.toString()
         };
 
         document.getElementById('result-card').style.display = 'block';
@@ -908,7 +907,6 @@
             `📏 *Distance:* ${lastCalculatedData.distance} km (${lastCalculatedData.duration} mins)\n` +
             `-----------------------------------\n` +
             `💰 *TOTAL FARE: RM ${lastCalculatedData.total}*\n` +
-            `👨‍✈️ *Driver Net Income: RM ${lastCalculatedData.driverNet}*\n` +
             `_*(Fare include tolls)*_\n` +
             `-----------------------------------\n` +
             `_Fare generated via Rideshare MY_`;
