@@ -817,8 +817,8 @@
         // 1. Distance Fare: RM1.30/km
         const distanceFare = distance * 1.30;
 
-        // 2. Fuel Cost: 6L / 100km @ RM4.50/L
-        const fuelCost = (distance / 100) * 6 * 4.50;
+        // 2. Fuel Cost: 6L / 100km @ RM2.50/L
+        const fuelCost = (distance / 100) * 6 * 2.50;
 
         // 3. Maintenance Cost: RM0.13/km
         const maintenanceCost = distance * 0.13;
@@ -828,9 +828,9 @@
         const isHighland = zoneHillFee > 0 || maxElevation > 800;
         const hillSurcharge = isHighland ? Math.max(25.00, zoneHillFee) : 0;
 
-        // 5. Long-haul Return Trip Fuel & Toll (>= 80km)
+        // 5. Long-haul Return Trip Fuel & Toll (>= 100km)
         let returnTripCost = 0;
-        if (distance >= 80) {
+        if (distance >= 100) {
             const returnFuelCost = fuelCost; // same distance back
             const returnTollCost = tollFee; // same toll back
             returnTripCost = returnFuelCost + returnTollCost;
