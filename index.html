@@ -268,6 +268,18 @@
             color: var(--primary-light);
         }
 
+        .driver-net-row {
+            font-size: 13px;
+            color: #a5d6a7;
+            font-weight: 600;
+            margin-bottom: 6px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
         .fare-meta {
             font-size: 12px;
             color: #e5e5ea;
@@ -421,6 +433,11 @@
             <div class="fare-header-row">
                 <div id="total-fare" class="fare-header">RM --</div>
             </div>
+            <!-- Driver Net Income After 15% Distance Deduction -->
+            <div class="driver-net-row">
+                <span>Driver Net Income (incl. Tolls):</span>
+                <span id="driver-net-fare">RM --</span>
+            </div>
             <div class="fare-meta">
                 <span id="fare-distance">0 km</span>
                 <span id="fare-duration">0 mins</span>
@@ -432,6 +449,10 @@
                 <div class="detail-row">
                     <span>Distance Fare (RM 1.30/km)</span>
                     <span id="calc-distance-fare">RM 0.00</span>
+                </div>
+                <div class="detail-row" style="color: #ff8a80;">
+                    <span>Platform Admin Fee (15% off Distance)</span>
+                    <span id="calc-deduction">RM 0.00</span>
                 </div>
                 <div class="detail-row">
                     <span>Fuel Cost</span>
@@ -817,6 +838,10 @@
         // 1. Distance Fare: RM1.30/km
         const distanceFare = distance * 1.30;
 
+        // 1b. 15% Driver Deduction from Distance Fare
+        const deduction15 = distanceFare * 0.15;
+        const netDistanceFare = distanceFare - deduction15;
+
         // 2. Fuel Cost: 6L / 100km @ RM2.50/L
         const fuelCost = (distance / 100) * 6 * 2.50;
 
@@ -842,16 +867,22 @@
         let exactTotal = Math.max(8.00, Math.round(rawTotal * 100) / 100);
         const customerTotal = Math.round(exactTotal);
 
+        // Driver Net Income calculation: Net Distance Fare + Tolls + Hill Surcharge - Fuel - Maintenance - Return Costs (if any)
+        // Or simplified: Customer Total - 15% Distance Deduction
+        const driverNetIncome = Math.round((customerTotal - deduction15) * 100) / 100;
+
         // Display conditional rows
         document.getElementById('return-trip-row').style.display = returnTripCost > 0 ? 'flex' : 'none';
         document.getElementById('hill-surcharge-row').style.display = hillSurcharge > 0 ? 'flex' : 'none';
 
         // Render UI Elements
         document.getElementById('total-fare').textContent = `RM ${customerTotal}`;
+        document.getElementById('driver-net-fare').textContent = `RM ${driverNetIncome.toFixed(2)}`;
         document.getElementById('fare-distance').textContent = `${distance.toFixed(1)} km`;
         document.getElementById('fare-duration').textContent = duration < 60 ? `${Math.round(duration)} mins` : `${Math.floor(duration / 60)} hr ${Math.round(duration % 60)} mins`;
 
         document.getElementById('calc-distance-fare').textContent = `RM ${distanceFare.toFixed(2)}`;
+        document.getElementById('calc-deduction').textContent = `-RM ${deduction15.toFixed(2)}`;
         document.getElementById('calc-fuel-cost').textContent = `RM ${fuelCost.toFixed(2)}`;
         document.getElementById('calc-maint-cost').textContent = `RM ${maintenanceCost.toFixed(2)}`;
         document.getElementById('calc-toll-fare').textContent = `RM ${tollFee.toFixed(2)}`;
@@ -864,7 +895,8 @@
             dropoff: document.getElementById('dropoff').value || "Drop-off Point",
             distance: distance.toFixed(1),
             duration: Math.round(duration),
-            total: customerTotal.toString()
+            total: customerTotal.toString(),
+            driverNet: driverNetIncome.toFixed(2)
         };
 
         document.getElementById('result-card').style.display = 'block';
@@ -876,10 +908,11 @@
         const text = `🚗 *TRIP FARE RECEIPT ESTIMATE*\n` +
             `-----------------------------------\n` +
             `📍 *From:* ${lastCalculatedData.pickup}\n` +
-            `🏁 *To:* ${lastCalculatedData.dropoff}\n` +
+            `🏁 *To:* ${lastCalculData.dropoff}\n` +
             `📏 *Distance:* ${lastCalculatedData.distance} km (${lastCalculatedData.duration} mins)\n` +
             `-----------------------------------\n` +
             `💰 *TOTAL FARE: RM ${lastCalculatedData.total}*\n` +
+            `👨‍✈️ *Driver Net Income: RM ${lastCalculatedData.driverNet}*\n` +
             `_*(Fare include tolls)*_\n` +
             `-----------------------------------\n` +
             `_Fare generated via Rideshare MY_`;
