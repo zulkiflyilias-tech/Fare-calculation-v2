@@ -277,7 +277,6 @@
             margin-bottom: 8px;
         }
 
-        /* Collapsible details for driver personal view */
         details {
             border-top: 1px dashed #3a3a3c;
             padding-top: 8px;
@@ -431,31 +430,27 @@
             <details>
                 <summary>📊 Detailed Calculation (Driver View)</summary>
                 <div class="detail-row">
-                    <span>Base Fare (incl. 1st km)</span>
-                    <span id="calc-base-fare">RM 5.00</span>
+                    <span>Distance Fare (RM 1.30/km)</span>
+                    <span id="calc-distance-fare">RM 0.00</span>
                 </div>
                 <div class="detail-row">
-                    <span>Distance Fare</span>
-                    <span id="calc-ride-distance-rate">RM 0.00</span>
+                    <span>Fuel Cost</span>
+                    <span id="calc-fuel-cost">RM 0.00</span>
+                </div>
+                <div class="detail-row">
+                    <span>Maintenance Cost (RM 0.13/km)</span>
+                    <span id="calc-maint-cost">RM 0.00</span>
                 </div>
                 <div class="detail-row" id="toll-fare-row">
                     <span>Toll Charges</span>
                     <span id="calc-toll-fare">RM 0.00</span>
                 </div>
-                <div class="detail-row" id="interstate-return-row" style="display: none;">
-                    <span>Interstate Return Surcharge</span>
-                    <span id="calc-interstate-return">RM 0.00</span>
-                </div>
-                <div class="detail-row" id="traffic-adjust-row" style="display: none;">
-                    <span>Busy-Area Congestion Surcharge</span>
-                    <span id="calc-traffic-adjust">RM 0.00</span>
-                </div>
-                <div class="detail-row" id="incentive-row" style="display: none;">
-                    <span>Peak-Hour Incentive</span>
-                    <span id="calc-incentive">RM 0.00</span>
+                <div class="detail-row" id="return-trip-row" style="display: none;">
+                    <span>Long-Haul Return Fuel & Toll</span>
+                    <span id="calc-return-trip">RM 0.00</span>
                 </div>
                 <div class="detail-row" id="hill-surcharge-row" style="display: none;">
-                    <span>Highland / Hill Surcharge</span>
+                    <span>Hill Surcharge</span>
                     <span id="calc-hill-surcharge">RM 0.00</span>
                 </div>
 
@@ -493,7 +488,6 @@
 
     let pickupMarker = null, dropoffMarker = null, routePolyline = null;
     let pickupCoords = null, dropoffCoords = null;
-    let pickupState = '', dropoffState = '';
     let activeRoutingMode = 'fast'; 
     let avoidTolls = false;
     let lastCalculatedData = null;
@@ -501,20 +495,11 @@
     let routeAbortController = null;
     let autosuggestAbortController = null;
 
-    // Define Tiered Busiest Congestion Zones
-    const BUSY_ZONES = [
-        { lat: 3.1466, lng: 101.6958, radiusKm: 3.5, tier: 'severe', fee: 8.00, name: "KLCC / Bukit Bintang Gridlock" },
-        { lat: 3.1292, lng: 101.6713, radiusKm: 2.5, tier: 'commercial', fee: 5.00, name: "Bangsar / Mid Valley" },
-        { lat: 3.1654, lng: 101.6521, radiusKm: 2.0, tier: 'commercial', fee: 5.00, name: "Mont Kiara / Hartamas" },
-        { lat: 3.1073, lng: 101.6067, radiusKm: 2.5, tier: 'standard', fee: 3.00, name: "Subang Jaya Core" },
-        { lat: 3.1129, lng: 101.6231, radiusKm: 2.5, tier: 'standard', fee: 3.00, name: "PJ SS15 / Damansara" }
-    ];
-
     // Define Major Highland Destination Zones
     const HIGHLAND_ZONES = [
         { lat: 3.4241, lng: 101.7933, radiusKm: 8.0, fee: 25.00, name: "Genting Highlands" },
         { lat: 4.4715, lng: 101.3787, radiusKm: 10.0, fee: 25.00, name: "Cameron Highlands" },
-        { lat: 3.7155, lng: 101.7432, radiusKm: 5.0, fee: 15.00, name: "Fraser's Hill" }
+        { lat: 3.7155, lng: 101.7432, radiusKm: 5.0, fee: 25.00, name: "Fraser's Hill" }
     ];
 
     function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
@@ -525,38 +510,6 @@
                   Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
                   Math.sin(dLon / 2) * Math.sin(dLon / 2);
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    }
-
-    // Route-Aware Corridor Traffic Detection via Polyline Sampling
-    function getRouteBusyZoneFee(section, zones) {
-        let maxFee = 0;
-        if (section && section.polyline) {
-            try {
-                const linestring = H.geo.LineString.fromFlexiblePolyline(section.polyline);
-                const count = linestring.getPointCount();
-                const step = Math.max(1, Math.floor(count / 10)); // Sample ~10 points along path
-                for (let i = 0; i < count; i += step) {
-                    const pt = linestring.extractPoint(i);
-                    zones.forEach(zone => {
-                        if (calculateHaversineDistance(pt.lat, pt.lng, zone.lat, zone.lng) <= zone.radiusKm) {
-                            if (zone.fee > maxFee) maxFee = zone.fee;
-                        }
-                    });
-                }
-            } catch(e) { console.error("Polyline sampling error:", e); }
-        }
-
-        // Fallback explicit endpoint checks
-        [pickupCoords, dropoffCoords].forEach(coords => {
-            if (!coords) return;
-            zones.forEach(zone => {
-                if (calculateHaversineDistance(coords.lat, coords.lng, zone.lat, zone.lng) <= zone.radiusKm) {
-                    if (zone.fee > maxFee) maxFee = zone.fee;
-                }
-            });
-        });
-
-        return maxFee;
     }
 
     function getHighlandZoneFee(coords) {
@@ -573,14 +526,12 @@
     // Set up Autocomplete Listeners
     setupAutocomplete('pickup', 'pickup-suggestions', 'clear-pickup', (item) => {
         pickupCoords = { lat: item.position.lat, lng: item.position.lng };
-        pickupState = item.address && item.address.state ? item.address.state : '';
         updateMarker('pickup', pickupCoords);
         checkAndProcessRoute();
     }, () => clearLocation('pickup'));
 
     setupAutocomplete('dropoff', 'dropoff-suggestions', 'clear-dropoff', (item) => {
         dropoffCoords = { lat: item.position.lat, lng: item.position.lng };
-        dropoffState = item.address && item.address.state ? item.address.state : '';
         updateMarker('dropoff', dropoffCoords);
         checkAndProcessRoute();
     }, () => clearLocation('dropoff'));
@@ -609,7 +560,6 @@
                         btn.textContent = "🎯";
                         if (data.items && data.items.length > 0) {
                             document.getElementById('pickup').value = data.items[0].address.label;
-                            pickupState = data.items[0].address.state || '';
                         } else {
                             document.getElementById('pickup').value = `Current Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
                         }
@@ -662,11 +612,9 @@
     function clearLocation(type) {
         if (type === 'pickup') {
             pickupCoords = null;
-            pickupState = '';
             if (pickupMarker) { map.removeObject(pickupMarker); pickupMarker = null; }
         } else {
             dropoffCoords = null;
-            dropoffState = '';
             if (dropoffMarker) { map.removeObject(dropoffMarker); dropoffMarker = null; }
         }
         resetCalculationDisplay();
@@ -678,7 +626,6 @@
         
         [pInput.value, dInput.value] = [dInput.value, pInput.value];
         [pickupCoords, dropoffCoords] = [dropoffCoords, pickupCoords];
-        [pickupState, dropoffState] = [dropoffState, pickupState];
         
         document.getElementById('clear-pickup').style.display = pInput.value ? 'block' : 'none';
         document.getElementById('clear-dropoff').style.display = dInput.value ? 'block' : 'none';
@@ -789,25 +736,6 @@
         });
     }
 
-    async function ensureStateInformation() {
-        const promises = [];
-        if (pickupCoords && !pickupState) {
-            promises.push(
-                fetch(`https://revgeocode.search.hereapi.com/v1/revgeocode?at=${pickupCoords.lat},${pickupCoords.lng}&lang=en-US&apiKey=${HERE_API_KEY}`)
-                    .then(res => res.json())
-                    .then(data => { if (data.items?.[0]?.address?.state) pickupState = data.items[0].address.state; })
-            );
-        }
-        if (dropoffCoords && !dropoffState) {
-            promises.push(
-                fetch(`https://revgeocode.search.hereapi.com/v1/revgeocode?at=${dropoffCoords.lat},${dropoffCoords.lng}&lang=en-US&apiKey=${HERE_API_KEY}`)
-                    .then(res => res.json())
-                    .then(data => { if (data.items?.[0]?.address?.state) dropoffState = data.items[0].address.state; })
-            );
-        }
-        await Promise.all(promises);
-    }
-
     function checkAndProcessRoute() {
         if (!pickupCoords || !dropoffCoords) return;
         
@@ -817,8 +745,7 @@
         
         routeAbortController = new AbortController();
 
-        currentRouteTimeout = setTimeout(async () => {
-            await ensureStateInformation();
+        currentRouteTimeout = setTimeout(() => {
             if (routeAbortController.signal.aborted) return;
 
             const params = {
@@ -843,12 +770,8 @@
 
                 const section = result.routes[0].sections[0];
                 const distanceKm = section.summary.length / 1000;
+                let durationMins = section.summary.duration / 60;
                 
-                let liveTrafficDurationMins = section.summary.duration / 60;
-                if (distanceKm > 150) {
-                    liveTrafficDurationMins *= 1.15;
-                }
-
                 let calculatedTollFee = 0;
                 if (!avoidTolls) {
                     if (section.tolls) {
@@ -875,7 +798,7 @@
                 map.addObject(routePolyline);
                 map.getViewModel().setLookAtData({ bounds: routePolyline.getBoundingBox() });
 
-                processCalculations(distanceKm, liveTrafficDurationMins, calculatedTollFee, destinationElevation, section);
+                processCalculations(distanceKm, durationMins, calculatedTollFee, destinationElevation);
             }, (error) => {
                 if (routeAbortController.signal.aborted) return;
                 console.error("HERE Routing API Error:", error);
@@ -884,71 +807,37 @@
         }, 200);
     }
 
-    // Refactored Calculation Engine with RM8 Minimum Floor
-    function processCalculations(distance, duration, tollFee, destinationElevation, section) {
-        const baseFare = 5.00; // Includes the first 1.0 km
-        const perKmRate = 1.30; // Distance rate
-        
-        const rideDistanceFare = Math.max(0, distance - 1) * perKmRate;
+    function processCalculations(distance, duration, tollFee, destinationElevation) {
+        // 1. Distance Fare: RM1.30/km
+        const distanceFare = distance * 1.30;
 
-        // Highland / Hill Surcharge Check
-        let hillSurcharge = 0;
+        // 2. Fuel Cost: 6L / 100km @ RM4.50/L
+        const fuelCost = (distance / 100) * 6 * 4.50;
+
+        // 3. Maintenance Cost: RM0.13/km
+        const maintenanceCost = distance * 0.13;
+
+        // 4. Hill Surcharge: RM25/trip (Genting / Highland zones or elevation > 800m)
         const zoneHillFee = getHighlandZoneFee(dropoffCoords);
         const isHighland = zoneHillFee > 0 || destinationElevation > 800;
+        const hillSurcharge = isHighland ? 25.00 : 0;
+
+        // 5. Long-haul Return Trip Fuel & Toll (>= 80km)
+        let returnTripCost = 0;
+        if (distance >= 80) {
+            const returnFuelCost = fuelCost; // same distance back
+            const returnTollCost = tollFee; // same toll back
+            returnTripCost = returnFuelCost + returnTollCost;
+        }
+
+        const rawTotal = distanceFare + fuelCost + maintenanceCost + tollFee + returnTripCost + hillSurcharge;
         
-        if (isHighland) {
-            hillSurcharge = zoneHillFee > 0 ? zoneHillFee : 15.00;
-        }
-
-        // Smooth Continuous Interstate Return Surcharge
-        let interstateReturnCost = 0;
-        const isInterstate = pickupState && dropoffState && (pickupState.toLowerCase().trim() !== dropoffState.toLowerCase().trim());
-        
-        if (isInterstate && distance > 12) {
-            const surchargeRate = Math.min(0.65, 0.15 + (0.10 * Math.log2(distance / 12)));
-            interstateReturnCost = (baseFare + rideDistanceFare) * surchargeRate;
-        }
-
-        // Anti-Stacking Guardrail Rule
-        if (isHighland) {
-            interstateReturnCost = 0;
-        }
-
-        // Route-Aware Corridor Traffic Detection via Polyline Sampling
-        const trafficAdjustment = getRouteBusyZoneFee(section, BUSY_ZONES);
-
-        // Continuous Peak-Hour Time Surcharge Engine (Floating-point hours)
-        let driverIncentive = 0;
-        const now = new Date();
-        const hr = now.getHours() + (now.getMinutes() / 60);
-        const isWeekend = (now.getDay() === 0 || now.getDay() === 6);
-
-        const isPeakHour = !isWeekend 
-            ? ((hr >= 7.0 && hr <= 9.5) || (hr >= 17.0 && hr <= 19.5)) 
-            : (hr >= 16.0 && hr <= 21.0);                         
-
-        if (isPeakHour) {
-            driverIncentive = (duration / 60) * 12.00;
-        }
-
-        const subtotalBeforeTolls = baseFare + rideDistanceFare + trafficAdjustment + driverIncentive + interstateReturnCost + hillSurcharge;
-        const rawTotal = subtotalBeforeTolls + tollFee;
-        
-        // Exact calculated total for driver breakdown
-        let exactTotal = Math.max(baseFare, Math.round(rawTotal * 100) / 100);
-        
-        // Apply minimum floor rule: Automatically adjust total fare to RM8.00 if below RM8.00
-        if (exactTotal < 8.00) {
-            exactTotal = 8.00;
-        }
-
-        // Customer view: Rounded final total without cents (nearest RM)
+        // Minimum Fare RM8 Rule
+        let exactTotal = Math.max(8.00, Math.round(rawTotal * 100) / 100);
         const customerTotal = Math.round(exactTotal);
 
-        // Display conditional rows based on active rules
-        document.getElementById('interstate-return-row').style.display = interstateReturnCost > 0 ? 'flex' : 'none';
-        document.getElementById('traffic-adjust-row').style.display = trafficAdjustment > 0 ? 'flex' : 'none';
-        document.getElementById('incentive-row').style.display = driverIncentive > 0 ? 'flex' : 'none';
+        // Display conditional rows
+        document.getElementById('return-trip-row').style.display = returnTripCost > 0 ? 'flex' : 'none';
         document.getElementById('hill-surcharge-row').style.display = hillSurcharge > 0 ? 'flex' : 'none';
 
         // Render UI Elements
@@ -956,16 +845,14 @@
         document.getElementById('fare-distance').textContent = `${distance.toFixed(1)} km`;
         document.getElementById('fare-duration').textContent = duration < 60 ? `${Math.round(duration)} mins` : `${Math.floor(duration / 60)} hr ${Math.round(duration % 60)} mins`;
 
-        document.getElementById('calc-base-fare').textContent = `RM ${baseFare.toFixed(2)}`;
-        document.getElementById('calc-ride-distance-rate').textContent = `RM ${rideDistanceFare.toFixed(2)}`;
+        document.getElementById('calc-distance-fare').textContent = `RM ${distanceFare.toFixed(2)}`;
+        document.getElementById('calc-fuel-cost').textContent = `RM ${fuelCost.toFixed(2)}`;
+        document.getElementById('calc-maint-cost').textContent = `RM ${maintenanceCost.toFixed(2)}`;
         document.getElementById('calc-toll-fare').textContent = `RM ${tollFee.toFixed(2)}`;
-        document.getElementById('calc-interstate-return').textContent = `RM ${interstateReturnCost.toFixed(2)}`;
-        document.getElementById('calc-traffic-adjust').textContent = `RM ${trafficAdjustment.toFixed(2)}`;
-        document.getElementById('calc-incentive').textContent = `RM ${driverIncentive.toFixed(2)}`;
+        document.getElementById('calc-return-trip').textContent = `RM ${returnTripCost.toFixed(2)}`;
         document.getElementById('calc-hill-surcharge').textContent = `RM ${hillSurcharge.toFixed(2)}`;
         document.getElementById('calc-grand').textContent = `RM ${exactTotal.toFixed(2)}`;
 
-        // Save State for Receipt Generator (using rounded customer total without cents)
         lastCalculatedData = {
             pickup: document.getElementById('pickup').value || "Pickup Point",
             dropoff: document.getElementById('dropoff').value || "Drop-off Point",
@@ -977,7 +864,6 @@
         document.getElementById('result-card').style.display = 'block';
     }
 
-    // Format Receipt to WhatsApp-friendly message (customer facing - no cents)
     function copyReceiptToClipboard() {
         if (!lastCalculatedData) return;
 
