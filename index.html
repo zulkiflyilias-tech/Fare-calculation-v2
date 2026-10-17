@@ -495,11 +495,12 @@
     let routeAbortController = null;
     let autosuggestAbortController = null;
 
-    // Define Major Highland Destination Zones
+    // Define Major Highland Destination Zones in Peninsular Malaysia
     const HIGHLAND_ZONES = [
-        { lat: 3.4241, lng: 101.7933, radiusKm: 8.0, fee: 25.00, name: "Genting Highlands" },
-        { lat: 4.4715, lng: 101.3787, radiusKm: 10.0, fee: 25.00, name: "Cameron Highlands" },
-        { lat: 3.7155, lng: 101.7432, radiusKm: 5.0, fee: 25.00, name: "Fraser's Hill" }
+        { lat: 3.4241, lng: 101.7933, radiusKm: 10.0, fee: 25.00, name: "Genting Highlands & Gohtong" },
+        { lat: 4.4715, lng: 101.3787, radiusKm: 22.0, fee: 25.00, name: "Cameron Highlands" }, // Expanded to cover Ringlet to Brinchang/Kea Farm
+        { lat: 3.7155, lng: 101.7432, radiusKm: 6.0,  fee: 25.00, name: "Fraser's Hill" },
+        { lat: 3.3533, lng: 101.8385, radiusKm: 8.0,  fee: 25.00, name: "Bukit Tinggi & Colmar Tropicale" }
     ];
 
     function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
@@ -512,15 +513,20 @@
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
-    function getHighlandZoneFee(coords) {
-        if (!coords) return 0;
-        let fee = 0;
-        HIGHLAND_ZONES.forEach(zone => {
-            if (calculateHaversineDistance(coords.lat, coords.lng, zone.lat, zone.lng) <= zone.radiusKm) {
-                if (zone.fee > fee) fee = zone.fee;
-            }
+    // Check bi-directionally: triggers surcharge if EITHER pickup or dropoff is in a highland zone
+    function getHighlandZoneFee(pickup, dropoff) {
+        let maxFee = 0;
+        const points = [pickup, dropoff].filter(Boolean);
+
+        points.forEach(coord => {
+            HIGHLAND_ZONES.forEach(zone => {
+                if (calculateHaversineDistance(coord.lat, coord.lng, zone.lat, zone.lng) <= zone.radiusKm) {
+                    if (zone.fee > maxFee) maxFee = zone.fee;
+                }
+            });
         });
-        return fee;
+
+        return maxFee;
     }
 
     // Set up Autocomplete Listeners
@@ -577,7 +583,7 @@
                 btn.textContent = "🎯";
                 showError("Unable to retrieve location coordinates.");
             },
-            { enableHighAccuracy: true, timeout: 8000 }
+            { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
         );
     });
 
@@ -783,12 +789,12 @@
                     }
                 }
 
-                let destinationElevation = 0;
+                let maxElevation = 0;
                 if (section.elevation && section.elevation.features && section.elevation.features.length > 0) {
                     const elevations = section.elevation.features.map(f => f.geometry.coordinates);
-                    if (elevations.length > 0) {
-                        destinationElevation = elevations[elevations.length - 1][2] || 0;
-                    }
+                    elevations.forEach(coord => {
+                        if (coord[2] && coord[2] > maxElevation) maxElevation = coord[2];
+                    });
                 }
 
                 if (routePolyline) map.removeObject(routePolyline);
@@ -798,7 +804,7 @@
                 map.addObject(routePolyline);
                 map.getViewModel().setLookAtData({ bounds: routePolyline.getBoundingBox() });
 
-                processCalculations(distanceKm, durationMins, calculatedTollFee, destinationElevation);
+                processCalculations(distanceKm, durationMins, calculatedTollFee, maxElevation);
             }, (error) => {
                 if (routeAbortController.signal.aborted) return;
                 console.error("HERE Routing API Error:", error);
@@ -807,7 +813,7 @@
         }, 200);
     }
 
-    function processCalculations(distance, duration, tollFee, destinationElevation) {
+    function processCalculations(distance, duration, tollFee, maxElevation) {
         // 1. Distance Fare: RM1.30/km
         const distanceFare = distance * 1.30;
 
@@ -817,10 +823,10 @@
         // 3. Maintenance Cost: RM0.13/km
         const maintenanceCost = distance * 0.13;
 
-        // 4. Hill Surcharge: RM25/trip (Genting / Highland zones or elevation > 800m)
-        const zoneHillFee = getHighlandZoneFee(dropoffCoords);
-        const isHighland = zoneHillFee > 0 || destinationElevation > 800;
-        const hillSurcharge = isHighland ? 25.00 : 0;
+        // 4. Hill Surcharge: Bi-directional zone check OR max elevation > 800m
+        const zoneHillFee = getHighlandZoneFee(pickupCoords, dropoffCoords);
+        const isHighland = zoneHillFee > 0 || maxElevation > 800;
+        const hillSurcharge = isHighland ? Math.max(25.00, zoneHillFee) : 0;
 
         // 5. Long-haul Return Trip Fuel & Toll (>= 80km)
         let returnTripCost = 0;
@@ -878,16 +884,38 @@
             `-----------------------------------\n` +
             `_Fare generated via Rideshare MY_`;
 
-        navigator.clipboard.writeText(text).then(() => {
-            const shareBtn = document.querySelector('.share-btn');
-            const originalText = shareBtn.innerHTML;
-            shareBtn.innerHTML = "✅ Receipt Copied!";
-            shareBtn.style.backgroundColor = "#1b5e20";
-            setTimeout(() => {
-                shareBtn.innerHTML = originalText;
-                shareBtn.style.backgroundColor = "var(--whatsapp-green)";
-            }, 2000);
-        }).catch(err => console.error("Could not copy receipt:", err));
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(showCopySuccess).catch(() => fallbackCopyText(text));
+        } else {
+            fallbackCopyText(text);
+        }
+    }
+
+    function fallbackCopyText(text) {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            const successful = document.execCommand('copy');
+            if (successful) showCopySuccess();
+        } catch (err) {
+            console.error('Copy fallback failed:', err);
+        }
+        document.body.removeChild(textArea);
+    }
+
+    function showCopySuccess() {
+        const shareBtn = document.querySelector('.share-btn');
+        const originalText = shareBtn.innerHTML;
+        shareBtn.innerHTML = "✅ Receipt Copied!";
+        shareBtn.style.backgroundColor = "#1b5e20";
+        setTimeout(() => {
+            shareBtn.innerHTML = originalText;
+            shareBtn.style.backgroundColor = "var(--whatsapp-green)";
+        }, 2000);
     }
 </script>
 </body>
