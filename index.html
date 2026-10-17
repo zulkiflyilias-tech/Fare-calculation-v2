@@ -482,7 +482,7 @@
             </details>
 
             <!-- Copy Invoice Button -->
-            <button class="share-btn" onclick="copyReceiptToClipboard()">📋 Copy Receipt Breakdown</button>
+            <button class="share-btn" id="share-btn" onclick="copyReceiptToClipboard()">📋 Copy Receipt Breakdown</button>
         </div>
     </div>
 </div>
@@ -519,7 +519,7 @@
     // Define Major Highland Destination Zones in Peninsular Malaysia
     const HIGHLAND_ZONES = [
         { lat: 3.4241, lng: 101.7933, radiusKm: 10.0, fee: 25.00, name: "Genting Highlands & Gohtong" },
-        { lat: 4.4715, lng: 101.3787, radiusKm: 22.0, fee: 25.00, name: "Cameron Highlands" }, // Expanded to cover Ringlet to Brinchang/Kea Farm
+        { lat: 4.4715, lng: 101.3787, radiusKm: 22.0, fee: 25.00, name: "Cameron Highlands" },
         { lat: 3.7155, lng: 101.7432, radiusKm: 6.0,  fee: 25.00, name: "Fraser's Hill" },
         { lat: 3.3533, lng: 101.8385, radiusKm: 8.0,  fee: 25.00, name: "Bukit Tinggi & Colmar Tropicale" }
     ];
@@ -534,7 +534,6 @@
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
-    // Check bi-directionally: triggers surcharge if EITHER pickup or dropoff is in a highland zone
     function getHighlandZoneFee(pickup, dropoff) {
         let maxFee = 0;
         const points = [pickup, dropoff].filter(Boolean);
@@ -550,7 +549,6 @@
         return maxFee;
     }
 
-    // Set up Autocomplete Listeners
     setupAutocomplete('pickup', 'pickup-suggestions', 'clear-pickup', (item) => {
         pickupCoords = { lat: item.position.lat, lng: item.position.lng };
         updateMarker('pickup', pickupCoords);
@@ -563,7 +561,6 @@
         checkAndProcessRoute();
     }, () => clearLocation('dropoff'));
 
-    // Handle Current Location Geolocation
     document.getElementById('current-loc-btn').addEventListener('click', () => {
         if (!navigator.geolocation) {
             showError("Geolocation is not supported by your browser.");
@@ -867,8 +864,7 @@
         let exactTotal = Math.max(8.00, Math.round(rawTotal * 100) / 100);
         const customerTotal = Math.round(exactTotal);
 
-        // Driver Net Income calculation: Net Distance Fare + Tolls + Hill Surcharge - Fuel - Maintenance - Return Costs (if any)
-        // Or simplified: Customer Total - 15% Distance Deduction
+        // Driver Net Income calculation: Customer Total - 15% Distance Deduction
         const driverNetIncome = Math.round((customerTotal - deduction15) * 100) / 100;
 
         // Display conditional rows
@@ -908,7 +904,7 @@
         const text = `🚗 *TRIP FARE RECEIPT ESTIMATE*\n` +
             `-----------------------------------\n` +
             `📍 *From:* ${lastCalculatedData.pickup}\n` +
-            `🏁 *To:* ${lastCalculData.dropoff}\n` +
+            `🏁 *To:* ${lastCalculatedData.dropoff}\n` +
             `📏 *Distance:* ${lastCalculatedData.distance} km (${lastCalculatedData.duration} mins)\n` +
             `-----------------------------------\n` +
             `💰 *TOTAL FARE: RM ${lastCalculatedData.total}*\n` +
@@ -917,8 +913,10 @@
             `-----------------------------------\n` +
             `_Fare generated via Rideshare MY_`;
 
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(showCopySuccess).catch(() => fallbackCopyText(text));
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text)
+                .then(() => showCopySuccess())
+                .catch(() => fallbackCopyText(text));
         } else {
             fallbackCopyText(text);
         }
@@ -928,6 +926,8 @@
         const textArea = document.createElement("textarea");
         textArea.value = text;
         textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
         document.body.appendChild(textArea);
         textArea.focus();
         textArea.select();
@@ -941,7 +941,7 @@
     }
 
     function showCopySuccess() {
-        const shareBtn = document.querySelector('.share-btn');
+        const shareBtn = document.getElementById('share-btn');
         const originalText = shareBtn.innerHTML;
         shareBtn.innerHTML = "✅ Receipt Copied!";
         shareBtn.style.backgroundColor = "#1b5e20";
