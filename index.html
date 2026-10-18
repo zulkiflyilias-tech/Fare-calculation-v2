@@ -450,17 +450,9 @@
                     <span>Hill Surcharge</span>
                     <span id="calc-hill-surcharge">RM 0.00</span>
                 </div>
-                <div class="detail-row">
-                    <span>Fuel Cost</span>
-                    <span id="calc-fuel-cost">RM 0.00</span>
-                </div>
-                <div class="detail-row">
-                    <span>Maintenance Cost (RM 0.13/km)</span>
-                    <span id="calc-maint-cost">RM 0.00</span>
-                </div>
-                <div class="detail-row" id="return-trip-row" style="display: none;">
-                    <span>Long-Haul Return Fuel & Toll</span>
-                    <span id="calc-return-trip">RM 0.00</span>
+                <div class="detail-row" id="long-haul-incentive-row" style="display: none;">
+                    <span>Long-Haul Driver Incentive (+25%)</span>
+                    <span id="calc-long-haul-incentive">RM 0.00</span>
                 </div>
 
                 <div class="detail-row total-bold">
@@ -833,28 +825,19 @@
 
         // 1b. 15% Driver Deduction from Distance Fare
         const deduction15 = distanceFare * 0.15;
-        const netDistanceFare = distanceFare - deduction15;
 
-        // 2. Fuel Cost: 6L / 100km @ RM2.50/L
-        const fuelCost = (distance / 100) * 6 * 2.50;
-
-        // 3. Maintenance Cost: RM0.13/km
-        const maintenanceCost = distance * 0.13;
-
-        // 4. Hill Surcharge: Bi-directional zone check OR max elevation > 800m
+        // 2. Hill Surcharge: Bi-directional zone check OR max elevation > 800m
         const zoneHillFee = getHighlandZoneFee(pickupCoords, dropoffCoords);
         const isHighland = zoneHillFee > 0 || maxElevation > 800;
         const hillSurcharge = isHighland ? Math.max(25.00, zoneHillFee) : 0;
 
-        // 5. Long-haul Return Trip Fuel & Toll (>= 100km)
-        let returnTripCost = 0;
+        // 3. Long-haul Driver Incentive (>= 100km): 25% from distance fare
+        let longHaulIncentive = 0;
         if (distance >= 100) {
-            const returnFuelCost = fuelCost; // same distance back
-            const returnTollCost = tollFee; // same toll back
-            returnTripCost = returnFuelCost + returnTollCost;
+            longHaulIncentive = distanceFare * 0.25;
         }
 
-        const rawTotal = distanceFare + fuelCost + maintenanceCost + tollFee + returnTripCost + hillSurcharge;
+        const rawTotal = distanceFare + tollFee + hillSurcharge + longHaulIncentive;
         
         // Minimum Fare RM8 Rule
         let exactTotal = Math.max(8.00, Math.round(rawTotal * 100) / 100);
@@ -864,7 +847,7 @@
         const driverNetIncome = Math.round((customerTotal - deduction15) * 100) / 100;
 
         // Display conditional rows
-        document.getElementById('return-trip-row').style.display = returnTripCost > 0 ? 'flex' : 'none';
+        document.getElementById('long-haul-incentive-row').style.display = longHaulIncentive > 0 ? 'flex' : 'none';
         document.getElementById('hill-surcharge-row').style.display = hillSurcharge > 0 ? 'flex' : 'none';
 
         // Render UI Elements
@@ -877,9 +860,7 @@
         document.getElementById('calc-distance-fare').textContent = `RM ${distanceFare.toFixed(2)}`;
         document.getElementById('calc-toll-fare').textContent = `RM ${tollFee.toFixed(2)}`;
         document.getElementById('calc-hill-surcharge').textContent = `RM ${hillSurcharge.toFixed(2)}`;
-        document.getElementById('calc-fuel-cost').textContent = `RM ${fuelCost.toFixed(2)}`;
-        document.getElementById('calc-maint-cost').textContent = `RM ${maintenanceCost.toFixed(2)}`;
-        document.getElementById('calc-return-trip').textContent = `RM ${returnTripCost.toFixed(2)}`;
+        document.getElementById('calc-long-haul-incentive').textContent = `RM ${longHaulIncentive.toFixed(2)}`;
         document.getElementById('calc-grand').textContent = `RM ${exactTotal.toFixed(2)}`;
 
         lastCalculatedData = {
