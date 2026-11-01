@@ -683,16 +683,16 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
   function receiptText(data) {
     const roundedFare = Math.round(data.customerTotal);
     return [
-      '🚗 TRIP FARE RECEIPT',
+      '🚗 *TRIP FARE RECEIPT*',
       '----------------------------------------',
-      `📍 From: ${data.pickup}`,
+      `📍 *From:* ${data.pickup}`,
       '',
-      `🏁 To: ${data.dropoff}`,
+      `🏁 *To:* ${data.dropoff}`,
       '',
-      `📏 Distance: ${data.distance.toFixed(1)} km (${formatDuration(data.duration)})`,
+      `📏 *Distance:* ${data.distance.toFixed(1)} km (${formatDuration(data.duration)})`,
       '----------------------------------------',
-      `💰 TOTAL FARE: RM ${roundedFare}`,
-      '(Fare include tolls)',
+      `💰 *TOTAL FARE: RM ${roundedFare}`*,
+      '*(Fare include tolls)*',
       '----------------------------------------',
       'Fare generated via Rideshare MY'
     ].join('\n');
