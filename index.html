@@ -680,15 +680,14 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     return `${hours} hr ${mins} mins`;
   }
   function receiptText(data) {
-    const roundedMins = Math.round(data.duration);
     return [
-      '🚗 TRIP FARE RECEIPT ESTIMATE',
+      '🚗 TRIP FARE RECEIPT',
       '----------------------------------------',
       `📍 From: ${data.pickup}`,
       `🏁 To: ${data.dropoff}`,
-      `📏 Distance: ${data.distance.toFixed(1)} km (${roundedMins} mins)`,
+      `📏 Distance: ${data.distance.toFixed(1)} km (${formatDuration(data.duration)})`,
       '----------------------------------------',
-      `💰 TOTAL FARE: RM ${data.customerTotal.toFixed(0)}`,
+      `💰 TOTAL FARE: ${money(data.customerTotal)}`,
       '(Fare include tolls)',
       '----------------------------------------',
       'Fare generated via Rideshare MY'
