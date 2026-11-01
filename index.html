@@ -170,9 +170,9 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
   const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
   const DEFAULT_SETTINGS = Object.freeze({
-    ratePerKm: 1.45,
-    minimumFare: 8.00,
-    urbanSurcharge: 3.00,
+    ratePerKm: 1.50,
+    minimumFare: 10.00,
+    urbanSurcharge: 5.00,
     hillSurcharge: 25.00,
     longHaulTriggerKm: 100,
     longHaulPercent: 20,
@@ -602,7 +602,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
       if (!section.polyline) return;
       const lineString = window.H && H.geo && typeof H.geo.LineString.fromFlexiblePolyline === 'function'
         ? H.geo.LineString.fromFlexiblePolyline(section.polyline)
-        : new H.geo.LineString(); // fallback safety
+        : new H.geo.LineString();
       const line=new H.map.Polyline(lineString,{style:{strokeColor:'#8e24aa',lineWidth:5}});
       routePolylines.push(line); group.addObject(line);
     });
