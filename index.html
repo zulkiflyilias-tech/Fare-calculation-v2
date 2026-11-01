@@ -348,7 +348,6 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
       const tollCosts=section.summary && section.summary.tollCosts;
       if (Array.isArray(tollCosts) && tollCosts.length) {
         found=true;
-        // Use summary tollCosts only when no itemised toll fares were supplied for this section.
         if (!tolls.length) tollCosts.forEach(cost => {
           const amount=Number(cost.value);
           if (Number.isFinite(amount)) total+=amount;
@@ -419,7 +418,6 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     input.addEventListener('input',() => {
       const query=input.value.trim();
       updateInputClearButton(type);
-      // Text no longer matches the previously selected coordinates: invalidate them immediately.
       if (type==='pickup') { pickupCoords=null; pickupItem=null; clearMarker('pickup'); }
       else { dropoffCoords=null; dropoffItem=null; clearMarker('dropoff'); }
       invalidateRoute(true);
@@ -498,7 +496,6 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
         map.setCenter(point); map.setZoom(14);
         if (pickupCoords && dropoffCoords) calculateRoute();
       } catch(error) {
-        // Coordinates remain usable even if reverse geocoding fails.
         invalidateRoute(true);
         pickupCoords=point; pickupItem=null;
         $('pickup').value=`Current Location (${point.lat.toFixed(5)}, ${point.lng.toFixed(5)})`;
@@ -566,7 +563,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
       if (avoidTolls) params['avoid[features]']='tollRoad';
 
       router.calculateRoute(params,result=>{
-        if (requestId!==routeRequestId) return; // Ignore stale responses.
+        if (requestId!==routeRequestId) return;
         setLoading(false);
         if (!result || !Array.isArray(result.routes) || !result.routes.length) {
           showError('No route found for the selected locations and preferences.');
@@ -632,6 +629,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     if (!(unit>0)) return Math.round(value*100)/100;
     return Math.round(value/unit)*unit;
   }
+
   function processCalculations(routeData) {
     const distanceFare=routeData.distance*settings.ratePerKm;
     const urban=getUrbanAssessment(pickupCoords,dropoffCoords,pickupItem,dropoffItem);
@@ -644,7 +642,10 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     const rawTotal=distanceFare+urbanSurcharge+routeData.tollFee+hillSurcharge+longHaulIncentive;
     const exactTotal=Math.max(settings.minimumFare,Math.round(rawTotal*100)/100);
     const customerTotal=roundToUnit(exactTotal,settings.roundingUnit);
-    const adminDeduction=settings.adminPercent>0?Math.max(settings.adminMinimum,customerTotal*settings.adminPercent/100):0;
+    
+    // MODIFIED: Calculate admin deduction solely from distance fare
+    const adminDeduction=settings.adminPercent>0?Math.max(settings.adminMinimum,distanceFare*settings.adminPercent/100):0;
+    
     const driverFareEarnings=Math.max(0,customerTotal-routeData.tollFee-adminDeduction);
     const driverAmountAfterDeduction=Math.max(0,customerTotal-adminDeduction);
 
