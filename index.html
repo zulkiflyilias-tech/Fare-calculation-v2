@@ -69,6 +69,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
 <script src="https://js.api.here.com/v3/3.1/mapsjs-ui.js"></script>
 <script src="https://js.api.here.com/v3/3.1/mapsjs-mapevents.js"></script>
+<script src="https://js.api.here.com/v3/3.1/mapsjs-flexpolyline.js"></script>
 </head>
 <body>
 <div id="container">
@@ -599,7 +600,9 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     const group=new H.map.Group();
     sections.forEach(section=>{
       if (!section.polyline) return;
-      const lineString=H.geo.LineString.fromFlexiblePolyline(section.polyline);
+      const lineString = window.H && H.geo && typeof H.geo.LineString.fromFlexiblePolyline === 'function'
+        ? H.geo.LineString.fromFlexiblePolyline(section.polyline)
+        : new H.geo.LineString(); // fallback safety
       const line=new H.map.Polyline(lineString,{style:{strokeColor:'#8e24aa',lineWidth:5}});
       routePolylines.push(line); group.addObject(line);
     });
