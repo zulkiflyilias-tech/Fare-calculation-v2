@@ -169,11 +169,10 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 
   const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
-  // Updated defaults optimized for urban gridlock & peak coverage
   const DEFAULT_SETTINGS = Object.freeze({
-    ratePerKm: 1.50,         // Elevated to RM1.50/km for city crawling & high wear
-    minimumFare: 10.00,       // Higher RM10.00 floor for micro-trips in heavy traffic
-    urbanSurcharge: 5.00,    // Recommended RM5.00 urban/POI surge for KL Golden Triangle & major hubs
+    ratePerKm: 1.50,
+    minimumFare: 10.00,
+    urbanSurcharge: 5.00,
     hillSurcharge: 25.00,
     longHaulTriggerKm: 100,
     longHaulPercent: 20,
@@ -688,6 +687,10 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     const roundedFare = Math.round(data.customerTotal);
     return [
       '🚗 *TRIP FARE RECEIPT*',
+      '----------------------------------------',
+      '*Assigned Driver:* Zulkifly Bin Ilias (Malay Driver)',
+      '*Vehicle:* Perodua Bezza 1.0G (White)',
+      '*Plate:* QS9529Y',
       '----------------------------------------',
       `📍 *From:* ${data.pickup}`,
       '',
