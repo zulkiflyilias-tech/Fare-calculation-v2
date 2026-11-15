@@ -328,17 +328,17 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     return max;
   }
 
-  // Updated extractTolls with payment method deduplication and MYR currency enforcement
+  // Updated extractTolls with robust name extraction from tollSystem/name/description/system
   function extractTolls(sections) {
     let total = 0;
     let found = false;
     const plazas = [];
 
-    sections.forEach(section => {
+    sections.forEach((section, sIdx) => {
       const tolls = Array.isArray(section.tolls) ? section.tolls : [];
       if (tolls.length) found = true;
 
-      tolls.forEach(toll => {
+      tolls.forEach((toll, tIdx) => {
         const fares = Array.isArray(toll.fares) ? toll.fares : [];
         if (!fares.length) return;
 
@@ -353,8 +353,13 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
         const amount = Number(selectedFare?.price?.value);
         if (Number.isFinite(amount)) {
           total += amount;
-          const plazaName = toll.tollSystem?.name || toll.name || 'Toll Plaza';
-          plazas.push({ name: plazaName, amount });
+          
+          // Resolve unique descriptive name
+          let name = toll.tollSystem?.name || toll.name || toll.description || toll.id;
+          if (!name || name === 'Toll Plaza' || name.startsWith('Toll')) {
+            name = `Toll Point ${sIdx + 1}-${tIdx + 1}`;
+          }
+          plazas.push({ name, amount });
         }
       });
 
@@ -366,7 +371,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
           const amount = Number(myrCost?.value);
           if (Number.isFinite(amount)) {
             total += amount;
-            plazas.push({ name: 'Route Toll Cost Summary', amount });
+            plazas.push({ name: `Section ${sIdx + 1} Toll Cost`, amount });
           }
         }
       }
@@ -571,7 +576,6 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     setLoading(true); clearError(); setRouteStatus('Requesting route…');
     routeDebounce=setTimeout(()=>{
       if (requestId!==routeRequestId) return;
-      // Updated params with currency: 'MYR' and vehicle[axleCount]: 2
       const params={
         routingMode:activeRoutingMode,
         transportMode:'car',
@@ -690,7 +694,6 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     $('calc-customer-total').textContent=money(customerTotal);
     $('calc-deduction').textContent=`-${money(adminDeduction)}`;
 
-    // Display toll plaza debugging breakdown if available
     const tollBreakdownEl = $('toll-breakdown-container');
     if (routeData.tollPlazas && routeData.tollPlazas.length > 0) {
       tollBreakdownEl.innerHTML = '<b>Detected Toll Plazas:</b><br>' + routeData.tollPlazas.map(p => `• ${p.name}: ${money(p.amount)}`).join('<br>');
