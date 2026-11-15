@@ -328,17 +328,17 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     return max;
   }
 
-  // Updated extractTolls with robust name extraction from tollSystem/name/description/system
+  // Updated extractTolls: Groups tolls by system/highway and provides clean itemized labels with deduplication
   function extractTolls(sections) {
     let total = 0;
     let found = false;
-    const plazas = [];
+    const plazaMap = new Map();
 
     sections.forEach((section, sIdx) => {
       const tolls = Array.isArray(section.tolls) ? section.tolls : [];
       if (tolls.length) found = true;
 
-      tolls.forEach((toll, tIdx) => {
+      tolls.forEach((toll) => {
         const fares = Array.isArray(toll.fares) ? toll.fares : [];
         if (!fares.length) return;
 
@@ -353,13 +353,27 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
         const amount = Number(selectedFare?.price?.value);
         if (Number.isFinite(amount)) {
           total += amount;
-          
-          // Resolve unique descriptive name
-          let name = toll.tollSystem?.name || toll.name || toll.description || toll.id;
-          if (!name || name === 'Toll Plaza' || name.startsWith('Toll')) {
-            name = `Toll Point ${sIdx + 1}-${tIdx + 1}`;
+
+          // Extract system or highway grouping name
+          let systemName = '';
+          if (typeof toll.tollSystem === 'string') {
+            systemName = toll.tollSystem;
+          } else if (toll.tollSystem && typeof toll.tollSystem === 'object') {
+            systemName = toll.tollSystem.name || toll.tollSystem.id || '';
           }
-          plazas.push({ name, amount });
+          if (!systemName) systemName = toll.name || toll.description || '';
+
+          // Clean up generic system names
+          if (!systemName || systemName === 'Toll Plaza' || systemName.toLowerCase().startsWith('toll')) {
+            systemName = `Highway Toll Gantry ${sIdx + 1}`;
+          }
+
+          // Accumulate if the exact same system appears across segments
+          if (plazaMap.has(systemName)) {
+            plazaMap.set(systemName, plazaMap.get(systemName) + amount);
+          } else {
+            plazaMap.set(systemName, amount);
+          }
         }
       });
 
@@ -371,11 +385,16 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
           const amount = Number(myrCost?.value);
           if (Number.isFinite(amount)) {
             total += amount;
-            plazas.push({ name: `Section ${sIdx + 1} Toll Cost`, amount });
+            plazaMap.set(`Section ${sIdx + 1} Toll Summary`, amount);
           }
         }
       }
     });
+
+    const plazas = Array.from(plazaMap.entries()).map(([name, amount]) => ({
+      name,
+      amount: Math.round(amount * 100) / 100
+    }));
 
     return { amount: Math.round(total * 100) / 100, available: found, plazas };
   }
@@ -696,7 +715,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 
     const tollBreakdownEl = $('toll-breakdown-container');
     if (routeData.tollPlazas && routeData.tollPlazas.length > 0) {
-      tollBreakdownEl.innerHTML = '<b>Detected Toll Plazas:</b><br>' + routeData.tollPlazas.map(p => `• ${p.name}: ${money(p.amount)}`).join('<br>');
+      tollBreakdownEl.innerHTML = '<b>Itemized Toll Breakdown:</b><br>' + routeData.tollPlazas.map(p => `• ${p.name}: ${money(p.amount)}`).join('<br>');
       tollBreakdownEl.style.display = 'block';
     } else {
       tollBreakdownEl.style.display = 'none';
