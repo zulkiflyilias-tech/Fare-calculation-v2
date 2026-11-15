@@ -121,6 +121,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
         <div class="detail-row"><span id="distance-fare-label">Distance fare</span><span id="calc-distance-fare">RM 0.00</span></div>
         <div class="detail-row" id="urban-surcharge-row" style="display:none"><span id="urban-surcharge-label">Urban / POI surcharge</span><span id="calc-urban-surcharge">RM 0.00</span></div>
         <div class="detail-row" id="toll-fare-row"><span>Toll charges</span><span id="calc-toll-fare">RM 0.00</span></div>
+        <div id="toll-breakdown-container" class="small-muted" style="margin:2px 0 6px 12px; display:none;"></div>
         <div class="detail-row" id="hill-surcharge-row" style="display:none"><span>Highland / hill surcharge</span><span id="calc-hill-surcharge">RM 0.00</span></div>
         <div class="detail-row" id="long-haul-incentive-row" style="display:none"><span>Long-haul Incentives</span><span id="calc-long-haul-incentive">RM 0.00</span></div>
         <div class="detail-row total-bold"><span>Exact calculated total</span><span id="calc-grand" style="color:var(--primary-light)">RM 0.00</span></div>
@@ -326,29 +327,54 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     if (Array.isArray(features)) features.forEach(feature => walk(feature.geometry && feature.geometry.coordinates));
     return max;
   }
+
+  // Updated extractTolls with payment method deduplication and MYR currency enforcement
   function extractTolls(sections) {
-    let total=0, found=false;
+    let total = 0;
+    let found = false;
+    const plazas = [];
+
     sections.forEach(section => {
-      const tolls=Array.isArray(section.tolls)?section.tolls:[];
-      if (tolls.length) found=true;
+      const tolls = Array.isArray(section.tolls) ? section.tolls : [];
+      if (tolls.length) found = true;
+
       tolls.forEach(toll => {
-        const fares=Array.isArray(toll.fares)?toll.fares:[];
-        fares.forEach(fare => {
-          const amount=Number(fare.price && fare.price.value);
-          if (Number.isFinite(amount)) total+=amount;
-        });
+        const fares = Array.isArray(toll.fares) ? toll.fares : [];
+        if (!fares.length) return;
+
+        const myrFares = fares.filter(f => !f.price?.currency || f.price.currency === 'MYR');
+        const pool = myrFares.length ? myrFares : fares;
+
+        const selectedFare =
+          pool.find(f => Array.isArray(f.paymentMethods) && f.paymentMethods.includes('transponder')) ||
+          pool.find(f => Array.isArray(f.paymentMethods) && f.paymentMethods.includes('pass')) ||
+          pool[0];
+
+        const amount = Number(selectedFare?.price?.value);
+        if (Number.isFinite(amount)) {
+          total += amount;
+          const plazaName = toll.tollSystem?.name || toll.name || 'Toll Plaza';
+          plazas.push({ name: plazaName, amount });
+        }
       });
-      const tollCosts=section.summary && section.summary.tollCosts;
-      if (Array.isArray(tollCosts) && tollCosts.length) {
-        found=true;
-        if (!tolls.length) tollCosts.forEach(cost => {
-          const amount=Number(cost.value);
-          if (Number.isFinite(amount)) total+=amount;
-        });
+
+      if (!tolls.length) {
+        const tollCosts = section.summary && section.summary.tollCosts;
+        if (Array.isArray(tollCosts) && tollCosts.length) {
+          found = true;
+          const myrCost = tollCosts.find(c => !c.currency || c.currency === 'MYR') || tollCosts[0];
+          const amount = Number(myrCost?.value);
+          if (Number.isFinite(amount)) {
+            total += amount;
+            plazas.push({ name: 'Route Toll Cost Summary', amount });
+          }
+        }
       }
     });
-    return {amount:Math.round(total*100)/100,available:found};
+
+    return { amount: Math.round(total * 100) / 100, available: found, plazas };
   }
+
   function clearRouteObjects() {
     routePolylines.forEach(line => { try { map.removeObject(line); } catch (_) {} });
     routePolylines=[];
@@ -545,12 +571,15 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     setLoading(true); clearError(); setRouteStatus('Requesting route…');
     routeDebounce=setTimeout(()=>{
       if (requestId!==routeRequestId) return;
+      // Updated params with currency: 'MYR' and vehicle[axleCount]: 2
       const params={
         routingMode:activeRoutingMode,
         transportMode:'car',
         origin:`${pickupCoords.lat},${pickupCoords.lng}`,
         destination:`${dropoffCoords.lat},${dropoffCoords.lng}`,
         departureTime:'any',
+        currency:'MYR',
+        'vehicle[axleCount]':2,
         return:'polyline,summary,tolls,elevation'
       };
       if (avoidTolls) params['avoid[features]']='tollRoad';
@@ -614,7 +643,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 
     const calculation=processCalculations({
       distance:distanceKm,duration:durationMins,tollFee,tollSource,tollAvailable:tollInfo.available,
-      maxElevation,sectionsCount:sections.length
+      tollPlazas:tollInfo.plazas,maxElevation,sectionsCount:sections.length
     });
     latestCalculation=calculation;
     setRouteStatus(`Route calculated · ${sections.length} route section${sections.length===1?'':'s'} · ${activeRoutingMode==='fast'?'Fastest':'Shortest'}`);
@@ -661,6 +690,15 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     $('calc-customer-total').textContent=money(customerTotal);
     $('calc-deduction').textContent=`-${money(adminDeduction)}`;
 
+    // Display toll plaza debugging breakdown if available
+    const tollBreakdownEl = $('toll-breakdown-container');
+    if (routeData.tollPlazas && routeData.tollPlazas.length > 0) {
+      tollBreakdownEl.innerHTML = '<b>Detected Toll Plazas:</b><br>' + routeData.tollPlazas.map(p => `• ${p.name}: ${money(p.amount)}`).join('<br>');
+      tollBreakdownEl.style.display = 'block';
+    } else {
+      tollBreakdownEl.style.display = 'none';
+    }
+
     let tollLabel=routeData.tollSource;
     if (!routeData.tollAvailable && routeData.tollSource==='HERE did not return toll data' && !avoidTolls && $('manual-toll').value.trim()==='') {
       tollLabel='Toll data unavailable — verify manually';
@@ -673,6 +711,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
       distance:routeData.distance,duration:routeData.duration,
       distanceFare,urbanSurcharge,urbanLabel:urban.label,
       tollFee:routeData.tollFee,tollSource:routeData.tollSource,tollAvailable:routeData.tollAvailable,
+      tollPlazas:routeData.tollPlazas,
       hillSurcharge,longHaulIncentive,exactTotal,customerTotal,adminDeduction,
       date:new Date().toISOString(),routingMode:activeRoutingMode,avoidTolls
     };
