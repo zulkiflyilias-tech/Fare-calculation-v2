@@ -328,25 +328,24 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     return max;
   }
 
-  // Rectified extractTolls: Extracts exactly one unique Class 1 (car) fare per toll system/gantry without repeating macro systems
+  // Deep-scan extractTolls: Unpacks nested toll systems, toll names, and itemized sub-nodes correctly for Class 1 (car)
   function extractTolls(sections) {
     let total = 0;
     let found = false;
     const plazaMap = new Map();
 
-    sections.forEach((section) => {
+    sections.forEach((section, sIdx) => {
       const tolls = Array.isArray(section.tolls) ? section.tolls : [];
       if (tolls.length) found = true;
 
-      tolls.forEach((toll) => {
+      tolls.forEach((toll, tIdx) => {
         const fares = Array.isArray(toll.fares) ? toll.fares : [];
         if (!fares.length) return;
 
-        // Filter strictly for MYR currency
         const myrFares = fares.filter(f => !f.price?.currency || f.price.currency === 'MYR');
         const pool = myrFares.length ? myrFares : fares;
 
-        // Select single electronic/transponder rate for Class 1 Car (avoiding duplicate cash/pass tiers)
+        // Select exact Class 1 Electronic / Transponder / TNG fare
         const selectedFare =
           pool.find(f => Array.isArray(f.paymentMethods) && f.paymentMethods.includes('transponder')) ||
           pool.find(f => Array.isArray(f.paymentMethods) && f.paymentMethods.includes('pass')) ||
@@ -354,12 +353,25 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 
         const amount = Number(selectedFare?.price?.value);
         if (Number.isFinite(amount) && amount > 0) {
-          let name = toll.tollSystem?.name || toll.name || toll.description;
-          if (!name || name.includes('MALAYSIAN HIGHWAY')) {
-            name = 'Class 1 Electronic Toll Rate';
+          // Deep-scan for actual toll plaza / system name
+          let plazaName = 
+            (toll.tollSystem && typeof toll.tollSystem === 'object' ? toll.tollSystem.name : null) ||
+            toll.tollSystemName ||
+            toll.name ||
+            toll.description ||
+            (selectedFare && selectedFare.description) ||
+            null;
+
+          if (!plazaName || plazaName.toUpperCase().includes('MALAYSIAN HIGHWAY') || plazaName === 'Toll Plaza') {
+            plazaName = `Highway Toll Gantry ${sIdx + 1}-${tIdx + 1}`;
           }
-          // Avoid duplicate entries of the exact same fee node
-          plazaMap.set(name, amount);
+
+          // Accumulate uniquely or group by name
+          if (plazaMap.has(plazaName)) {
+            plazaMap.set(plazaName, plazaMap.get(plazaName) + amount);
+          } else {
+            plazaMap.set(plazaName, amount);
+          }
         }
       });
 
@@ -370,18 +382,17 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
           const myrCost = tollCosts.find(c => !c.currency || c.currency === 'MYR') || tollCosts[0];
           const amount = Number(myrCost?.value);
           if (Number.isFinite(amount) && amount > 0) {
-            plazaMap.set('Class 1 Route Toll Summary', amount);
+            plazaMap.set(`Class 1 Route Toll Summary ${sIdx + 1}`, amount);
           }
         }
       }
     });
 
-    let plazas = Array.from(plazaMap.entries()).map(([name, amount]) => ({
+    const plazas = Array.from(plazaMap.entries()).map(([name, amount]) => ({
       name,
       amount: Math.round(amount * 100) / 100
     }));
 
-    // If multiple entries resolve to the exact same total sum or aggregate, simplify to single clear row
     total = plazas.reduce((sum, p) => sum + p.amount, 0);
 
     return { amount: Math.round(total * 100) / 100, available: found, plazas };
@@ -703,7 +714,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 
     const tollBreakdownEl = $('toll-breakdown-container');
     if (routeData.tollPlazas && routeData.tollPlazas.length > 0) {
-      tollBreakdownEl.innerHTML = '<b>Class 1 Toll Details:</b><br>' + routeData.tollPlazas.map(p => `• ${p.name}: ${money(p.amount)}`).join('<br>');
+      tollBreakdownEl.innerHTML = '<b>Class 1 Toll Plazas:</b><br>' + routeData.tollPlazas.map(p => `• ${p.name}: ${money(p.amount)}`).join('<br>');
       tollBreakdownEl.style.display = 'block';
     } else {
       tollBreakdownEl.style.display = 'none';
