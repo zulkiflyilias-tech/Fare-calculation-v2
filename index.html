@@ -348,7 +348,6 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     const u = name.toUpperCase();
 
     // 1. Closed-System Expressways (PLUS E1/E2, NKVE E1, ELITE E6, LEKAS E21, SKVE E26)
-    // Only normalize un-paired maximum-penalty spikes where HERE charges full end-to-end rate on a short hop
     if (u.includes('NKVE') || u.includes('PLUS') || u.includes('NORTH-SOUTH')) {
       const maxExpectedForDistance = Math.max(4.50, routeDistanceKm * 0.16);
       if (amount > maxExpectedForDistance) {
@@ -363,9 +362,9 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
       }
     } else if (u.includes('LEKAS') || u.includes('KAJANG-SEREMBAN')) {
       if (u.includes('AMPANGAN')) {
-        amount = 2.30; // Open barrier plaza at Ampangan
+        amount = 2.30;
       } else if (amount > 7.80) {
-        amount = 7.80; // Full Kajang–Setul closed cap
+        amount = 7.80;
       }
     } else if (u.includes('SKVE')) {
       if (amount > 9.50) amount = 4.80;
@@ -414,6 +413,8 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
       amount = 3.00;
     } else if (u.includes('KL-KARAK') || u.includes('KARAK') || u.includes('GOMBAK') || u.includes('BENTONG')) {
       amount = u.includes('BENTONG') ? 3.50 : 6.00;
+    } else if (u.includes('GENTING') || u.includes('GOHTONG')) {
+      amount = 5.00;
     } else if (u.includes('SEREMBAN-PORT DICKSON') || u.includes('MAMBAU') || u.includes('LUKUT')) {
       amount = u.includes('LUKUT') ? 0.65 : 2.62;
     } else if (u.includes('PENANG BRIDGE') || u.includes('JAMBATAN PULAU PINANG') || u.includes('JAMBATAN KEDUA') || u.includes('BATU KAWAN')) {
@@ -435,6 +436,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 
     const routeText = `${pickupLabel} ${dropoffLabel}`.toLowerCase();
     const isMeruKlang = /meru|kapar|klang|setia alam|bukit raja/.test(routeText);
+    const isGenting = /genting|gpo|premium outlet|gohtong|skyavenue|awana|chin swee/.test(routeText);
     const isSeremban = /seremban|ampangan|tuanku jaafar|smt|senawang/.test(routeText);
     const isPuchong = /puchong|bandar puteri|kinrara|puchong prima|puchong utama/.test(routeText);
     const isKualaSelangor = /kuala selangor|lotus.*kuala selangor|ijok|bestari jaya|tanjong karang|sekinchan/.test(routeText);
@@ -449,8 +451,50 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     const updated = [...plazas];
     let normalized = false;
 
+    // 0. Meru / Klang <-> Genting Highlands / Genting Premium Outlets (GPO)
+    // Route: GCE (Elmina/Lagong RM 1.75) + LATAR (Templer/Kuang RM 2.50) + KL-Karak (Gombak RM 6.00) + Genting Road Charge (Gohtong Jaya RM 5.00) = RM 15.25
+    if (isMeruKlang && isGenting && distanceKm >= 70) {
+      const hasGce = updated.some(p => /gce|guthrie|elmina|lagong/i.test(p.name) || Math.abs(p.amount - 1.75) < 0.05);
+      const hasLatar = updated.some(p => /latar|templer|kuang/i.test(p.name) || Math.abs(p.amount - 2.50) < 0.05);
+      const hasGombak = updated.some(p => /gombak|karak/i.test(p.name) || Math.abs(p.amount - 6.00) < 0.05);
+      const hasGentingEntry = updated.some(p => /genting|gohtong/i.test(p.name) || Math.abs(p.amount - 5.00) < 0.05);
+
+      if (!hasGce && !hasLatar && !hasGombak) {
+        updated.length = 0;
+        updated.push({ name: 'GCE Plaza (Elmina / Lagong - TollGuru Reconciled)', amount: 1.75 });
+        updated.push({ name: 'LATAR Plaza (Kuang / Taman Rimba Templer - TollGuru Reconciled)', amount: 2.50 });
+        updated.push({ name: 'KL–Karak Expressway (Gombak Plaza)', amount: 6.00 });
+        updated.push({ name: 'Genting Highlands Road Charge (Gohtong Jaya)', amount: 5.00 });
+        normalized = true;
+      } else {
+        if (!hasGce && updated.some(p => /latar/i.test(p.name))) {
+          updated.unshift({ name: 'GCE Plaza (Elmina / Lagong - TollGuru Reconciled)', amount: 1.75 });
+          normalized = true;
+        }
+        if (!hasGombak) {
+          updated.push({ name: 'KL–Karak Expressway (Gombak Plaza)', amount: 6.00 });
+          normalized = true;
+        }
+        if (!hasGentingEntry) {
+          updated.push({ name: 'Genting Highlands Road Charge (Gohtong Jaya)', amount: 5.00 });
+          normalized = true;
+        }
+      }
+    } else if (isGenting && distanceKm >= 35) {
+      // Any other KL / Selangor origin to Genting Highlands (ensures Gombak + Gohtong Jaya entry charge)
+      const hasGombak = updated.some(p => /gombak|karak/i.test(p.name) || Math.abs(p.amount - 6.00) < 0.05);
+      const hasGentingEntry = updated.some(p => /genting|gohtong/i.test(p.name) || Math.abs(p.amount - 5.00) < 0.05);
+      if (!hasGombak) {
+        updated.push({ name: 'KL–Karak Expressway (Gombak Plaza)', amount: 6.00 });
+        normalized = true;
+      }
+      if (!hasGentingEntry) {
+        updated.push({ name: 'Genting Highlands Road Charge (Gohtong Jaya)', amount: 5.00 });
+        normalized = true;
+      }
+    }
+
     // 1. Meru / Klang <-> Seremban / SMT Tuanku Jaafar corridor (NKVE + ELITE + PLUS E2)
-    // TollGuru Class 1 closed-system total: Setia Alam / Bukit Raja -> Seremban (~RM 11.40 - RM 12.40)
     if (isMeruKlang && isSeremban && distanceKm >= 75) {
       const currentTotal = updated.reduce((s, p) => s + p.amount, 0);
       if (currentTotal < 9.50) {
