@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
-<title>Rideshare MY - Personal Edition v2.3</title>
+<title>Rideshare MY - Personal Edition v2.4</title>
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 <style>
 :root{--primary:#8e24aa;--primary-light:#b388ff;--bg-dark:#1c1c1e;--border:#e0e0e0;--text:#212529;--muted:#aeaeb2;--green:#25D366;--danger:#c62828}
@@ -350,21 +350,22 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     const u = name.toUpperCase();
 
     // Closed-System Expressways (PLUS E1/E2, NKVE, ELITE, LEKAS)
-    if (u.includes('NKVE') || u.includes('PLUS') || u.includes('NORTH-SOUTH')) {
+    if (u.includes('NKVE') || u.includes('PLUS') || u.includes('NORTH-SOUTH') || u.includes('E2')) {
       const maxDist = Math.max(4.50, routeDistanceKm * 0.16);
-      if (amount > maxDist) {
-        amount = routeDistanceKm > 0 ? Math.max(1.64, Math.min(amount, routeDistanceKm * 0.115)) : 1.64;
+      if (amount > maxDist || (routeDistanceKm >= 80 && routeDistanceKm <= 120 && (amount < 7.00 || amount > 13.00))) {
+        // Calibrate Klang/Meru <-> Seremban / Senawang / SMT Tuanku Jaafar exact TollGuru closed-system average (~RM9.27 to RM11.22)
+        amount = routeDistanceKm > 0 ? Math.max(5.50, Math.min(amount, routeDistanceKm * 0.115)) : 9.27;
         if (!u.includes('TOLLGURU')) name += ' (TollGuru Reconciled)';
       }
-    } else if (u.includes('ELITE')) {
+    } else if (u.includes('ELITE') || u.includes('E5')) {
       const maxElite = Math.max(6.50, routeDistanceKm * 0.16);
       if (amount > maxElite) {
         amount = routeDistanceKm > 0 ? Math.max(3.28, Math.min(amount, routeDistanceKm * 0.12)) : 3.28;
         if (!u.includes('TOLLGURU')) name += ' (TollGuru Reconciled)';
       }
-    } else if (u.includes('LEKAS') || u.includes('KAJANG-SEREMBAN')) {
+    } else if (u.includes('LEKAS') || u.includes('KAJANG-SEREMBAN') || u.includes('E7')) {
       if (u.includes('AMPANGAN')) amount = 2.30;
-      else if (amount > 7.80) amount = 7.80;
+      else if (amount > 11.00) amount = 10.90;
     } else if (u.includes('SKVE')) {
       if (amount > 9.50) amount = 4.80;
     }
@@ -428,8 +429,8 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 
     const routeText = `${pickupLabel} ${dropoffLabel}`.toLowerCase();
     const isMeruKlang = /meru|kapar|klang|setia alam|bukit raja/.test(routeText);
+    const isSeremban = /seremban|senawang|ampangan|tuanku jaafar|tuanku ja'afar|senggarang|rembau/.test(routeText);
     const isGenting = /genting|gpo|premium outlet|gohtong|skyavenue|awana/.test(routeText);
-    const isSeremban = /seremban|ampangan|tuanku jaafar|senawang/.test(routeText);
     const isPuchong = /puchong|bandar puteri|kinrara/.test(routeText);
     const isKualaSelangor = /kuala selangor|lotus.*kuala selangor|ijok|bestari jaya|tanjong karang/.test(routeText);
     const isKlia = /klia|sepang|airport/.test(routeText);
@@ -442,7 +443,17 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     const updated = [...plazas];
     let normalized = false;
 
-    // TollGuru Corridor Rule 0: Meru/Klang <-> Genting Highlands (GCE + LATAR + Gombak + Gohtong)
+    // TollGuru Corridor Rule 0: Meru/Klang <-> Seremban / SMT Tuanku Jaafar (NKVE + PLUS E2 Closed System)
+    if (isMeruKlang && isSeremban && distanceKm >= 80) {
+      const total = updated.reduce((s, p) => s + p.amount, 0);
+      if (total < 8.50 || total > 14.00) {
+        updated.length = 0;
+        updated.push({ name: 'NKVE / PLUS Closed System (Setia Alam/Bukit Raja – Senawang/Seremban, TollGuru Engine)', amount: 9.27 });
+        normalized = true;
+      }
+    }
+
+    // TollGuru Corridor Rule 1: Meru/Klang <-> Genting Highlands (GCE + LATAR + Gombak + Gohtong)
     if (isMeruKlang && isGenting && distanceKm >= 70) {
       const hasGce = updated.some(p => /gce|guthrie|elmina/i.test(p.name) || Math.abs(p.amount - 1.75) < 0.05);
       const hasLatar = updated.some(p => /latar|kuang/i.test(p.name) || Math.abs(p.amount - 2.50) < 0.05);
@@ -461,16 +472,6 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
       if (!hasGombak) {
         updated.push({ name: 'KL–Karak Expressway (Gombak Plaza)', amount: 6.00 });
         updated.push({ name: 'Genting Highlands Road Charge (Gohtong Jaya)', amount: 5.00 });
-        normalized = true;
-      }
-    }
-
-    // TollGuru Corridor Rule 1: Meru/Klang <-> Seremban
-    if (isMeruKlang && isSeremban && distanceKm >= 75) {
-      const total = updated.reduce((s, p) => s + p.amount, 0);
-      if (total < 9.50) {
-        updated.length = 0;
-        updated.push({ name: 'NKVE / ELITE / PLUS Closed System (TollGuru Corridor Engine)', amount: 12.10 });
         normalized = true;
       }
     }
@@ -515,7 +516,6 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     const plazaList = [];
 
     sections.forEach((section, sIdx) => {
-      // 1. Check TollGuru/HERE standard toll object structures
       const tolls = Array.isArray(section.tolls) ? section.tolls : [];
       if (tolls.length) found = true;
 
@@ -526,7 +526,6 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
         const myrFares = fares.filter(f => !f.price?.currency || f.price.currency === 'MYR');
         const pool = myrFares.length ? myrFares : fares;
 
-        // TollGuru cost tier resolution (tag -> pass -> cash -> first)
         const selectedFare =
           pool.find(f => Array.isArray(f.paymentMethods) && f.paymentMethods.includes('transponder')) ||
           pool.find(f => Array.isArray(f.paymentMethods) && (f.paymentMethods.includes('tag') || f.paymentMethods.includes('pass'))) ||
@@ -544,7 +543,6 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
         plazaList.push({ name: normalized.name, amount: normalized.amount, lat, lng });
       });
 
-      // 2. Check TollGuru summary tollCosts / tollSystems format
       const tollCosts = section.summary && section.summary.tollCosts;
       if (Array.isArray(tollCosts) && tollCosts.length) {
         found = true;
@@ -557,7 +555,6 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
       }
     });
 
-    // Deduplication by spatial proximity or name similarity
     const uniquePlazas = [];
     plazaList.forEach(item => {
       const idx = uniquePlazas.findIndex(p => {
