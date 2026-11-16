@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
-<title>Rideshare MY - Personal Edition v2.1</title>
+<title>Rideshare MY - Personal Edition v2.2</title>
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 <style>
 :root{--primary:#8e24aa;--primary-light:#b388ff;--bg-dark:#1c1c1e;--border:#e0e0e0;--text:#212529;--muted:#aeaeb2;--green:#25D366;--danger:#c62828}
@@ -75,7 +75,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 <div id="container">
   <div id="map" aria-label="Route map"></div>
   <main id="search-panel">
-    <div class="header-row"><h2>Fare Estimator</h2><span id="app-version-label" class="version">PERSONAL EDITION v2.1</span></div>
+    <div class="header-row"><h2>Fare Estimator</h2><span id="app-version-label" class="version">PERSONAL EDITION v2.2</span></div>
 
     <div class="routing-wrapper">
       <div class="input-container">
@@ -168,7 +168,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.1';
+  const APP_VERSION = '2.2';
   const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
   const DEFAULT_SETTINGS = Object.freeze({
@@ -335,7 +335,105 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     return max;
   }
 
-  // TollGuru-Aligned extractTolls: Normalizes closed-system spikes and deduplicates adjacent nodes
+  // Enhanced Malaysian Open-Plaza & Closed-Segment Normalization
+  function normalizeMalaysianTollPlaza(plazaName, rawAmount, sIdx, tIdx) {
+    let name = plazaName;
+    let amount = rawAmount;
+
+    if (!name || name.toUpperCase().includes('MALAYSIAN HIGHWAY') || name === 'Toll Plaza') {
+      name = `Highway Toll Gantry ${sIdx + 1}-${tIdx + 1}`;
+    }
+
+    const u = name.toUpperCase();
+
+    // Closed-system un-paired max spikes (NKVE / PLUS)
+    if ((u.includes('NKVE') || u.includes('PLUS') || u.includes('NORTH-SOUTH')) && amount > 4.50) {
+      amount = 1.64;
+      if (!u.includes('NORMALIZED')) name += ' (Normalized Closed Segment)';
+    }
+
+    // Gazetted Class 1 Open-System Rates (Malaysia)
+    if (u.includes('LDP') || u.includes('DAMANSARA-PUCHONG') || u.includes('PUCHONG') || u.includes('SUNWAY') || u.includes('PETALING JAYA')) {
+      amount = 2.10;
+    } else if (u.includes('LATAR') || u.includes('KUALA SELANGOR') || u.includes('IJOK') || u.includes('KUANG') || u.includes('TEMPLER')) {
+      if (amount > 2.50 || amount < 2.00) amount = 2.50;
+    } else if (u.includes('GCE') || u.includes('GUTHRIE') || u.includes('BUKIT JELUTONG') || u.includes('ELMINA') || u.includes('LAGONG')) {
+      amount = 1.75;
+    } else if (u.includes('KESAS') || u.includes('SHAH ALAM EXPRESSWAY') || u.includes('KEMUNING') || u.includes('AWAN BESAR')) {
+      amount = 2.00;
+    } else if (u.includes('NPE') || u.includes('NEW PANTAI') || u.includes('PJS')) {
+      amount = 2.30;
+    } else if (u.includes('SPRINT') || u.includes('DAMANSARA') || u.includes('KIARA') || u.includes('PANTAI')) {
+      if (amount > 3.00) amount = 2.00;
+    } else if (u.includes('MEX') || u.includes('MAJU EXPRESSWAY') || u.includes('SALAK SOUTH') || u.includes('PUTRAJAYA')) {
+      amount = 3.50;
+    } else if (u.includes('DUKE') || u.includes('DUTA-ULU KELANG')) {
+      amount = 2.50;
+    } else if (u.includes('DASH') || u.includes('DAMANSARA-SHAH ALAM')) {
+      amount = 2.30;
+    } else if (u.includes('SUKE') || u.includes('SUNGAI BESI-ULU KELANG')) {
+      amount = 2.30;
+    } else if (u.includes('ELITE') && amount > 6.50) {
+      amount = 3.28;
+    } else if (u.includes('SKVE') && amount > 5.00) {
+      amount = 2.40;
+    }
+
+    return { name, amount: Math.round(amount * 100) / 100 };
+  }
+
+  // Corridor-Level Toll Reconciliation: Captures missing intermediate open plazas (e.g., LDP + GCE + LATAR)
+  function applyCorridorTollRules(plazas, pickupLabel, dropoffLabel, distanceKm, routingMode) {
+    if (avoidTolls || routingMode === 'short') return { plazas, normalized: false };
+
+    const routeText = `${pickupLabel} ${dropoffLabel}`.toLowerCase();
+    const isPuchong = /puchong|bandar puteri|kinrara|puchong prima|puchong utama/.test(routeText);
+    const isKualaSelangor = /kuala selangor|lotus.*kuala selangor|ijok|bestari jaya|tanjong karang|sekinchan/.test(routeText);
+    const isKlangKapar = /klang|kapar|meru|setia alam/.test(routeText);
+    const isKlia = /klia|sepang|airport/.test(routeText);
+
+    const updated = [...plazas];
+    let normalized = false;
+
+    // Puchong <-> Kuala Selangor corridor (via LDP + GCE + LATAR)
+    if (isPuchong && isKualaSelangor && distanceKm >= 65) {
+      const hasLdp = updated.some(p => /ldp|puchong|petaling jaya|sunway/i.test(p.name) || Math.abs(p.amount - 2.10) < 0.05);
+      const hasGce = updated.some(p => /gce|guthrie|elmina|jelutong/i.test(p.name) || Math.abs(p.amount - 1.75) < 0.05);
+      const hasLatar = updated.some(p => /latar|gantry|ijok|kuang|kuala selangor/i.test(p.name) || Math.abs(p.amount - 2.50) < 0.05);
+
+      // HERE often omits LDP/GCE open plazas and returns only 1 LATAR gantry (RM 2.50)
+      if (!hasLdp) {
+        updated.unshift({ name: 'LDP Plaza (Petaling Jaya / Puchong - Normalized)', amount: 2.10 });
+        normalized = true;
+      }
+      if (!hasGce && distanceKm >= 70) {
+        updated.push({ name: 'GCE Plaza (Bukit Jelutong / Elmina - Normalized)', amount: 1.75 });
+        normalized = true;
+      }
+      if (!hasLatar) {
+        updated.push({ name: 'LATAR Plaza (Ijok / Kuang - Normalized)', amount: 2.50 });
+        normalized = true;
+      }
+    }
+
+    // Puchong <-> Klang/Kapar corridor (via LDP / KESAS / ELITE)
+    if (isPuchong && isKlangKapar && updated.length === 0 && distanceKm >= 30) {
+      updated.push({ name: 'LDP / KESAS Corridor Estimate (Normalized)', amount: 2.10 });
+      normalized = true;
+    }
+
+    // Klang/Kapar <-> KLIA corridor (via ELITE / KESAS)
+    if (isKlangKapar && isKlia && updated.length <= 1 && distanceKm >= 55) {
+      const hasKesas = updated.some(p => /kesas/i.test(p.name) || Math.abs(p.amount - 2.00) < 0.05);
+      if (!hasKesas) {
+        updated.unshift({ name: 'KESAS Plaza (Normalized)', amount: 2.00 });
+        normalized = true;
+      }
+    }
+
+    return { plazas: updated, normalized };
+  }
+
   function extractTolls(sections) {
     let total = 0;
     let found = false;
@@ -357,13 +455,13 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
           pool.find(f => Array.isArray(f.paymentMethods) && f.paymentMethods.includes('pass')) ||
           pool[0];
 
-        let amount = Number(selectedFare?.price?.value);
-        if (!Number.isFinite(amount) || amount <= 0) return;
+        const rawAmount = Number(selectedFare?.price?.value);
+        if (!Number.isFinite(rawAmount) || rawAmount <= 0) return;
 
         const lat = toll.position?.lat || toll.lat || section.departure?.place?.location?.lat || null;
         const lng = toll.position?.lng || toll.lng || section.departure?.place?.location?.lng || null;
 
-        let plazaName = 
+        const rawName =
           (toll.tollSystem && typeof toll.tollSystem === 'object' ? toll.tollSystem.name : null) ||
           toll.tollSystemName ||
           toll.name ||
@@ -371,28 +469,8 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
           (selectedFare && selectedFare.description) ||
           null;
 
-        if (!plazaName || plazaName.toUpperCase().includes('MALAYSIAN HIGHWAY') || plazaName === 'Toll Plaza') {
-          plazaName = `Highway Toll Gantry ${sIdx + 1}-${tIdx + 1}`;
-        }
-
-        const nameUpper = plazaName.toUpperCase();
-
-        // Normalize Closed-System Spikes (e.g., NKVE/PLUS un-paired max defaults)
-        if ((nameUpper.includes('NKVE') || nameUpper.includes('PLUS') || nameUpper.includes('HIGHWAY')) && amount > 4.50) {
-          amount = 1.64; 
-          plazaName += ' (Normalized Closed Segment)';
-        }
-
-        // Normalize Standard Malaysian Open Plazas to Official Gazetted Class 1 Rates
-        if (nameUpper.includes('LDP') || nameUpper.includes('PCH') || amount === 2.10) {
-          amount = 2.10;
-        } else if (nameUpper.includes('LATAR') && amount > 2.50) {
-          amount = 2.50;
-        } else if (nameUpper.includes('GCE') || nameUpper.includes('GUTHRIE')) {
-          amount = 1.75;
-        }
-
-        plazaList.push({ name: plazaName, amount, lat, lng });
+        const normalized = normalizeMalaysianTollPlaza(rawName, rawAmount, sIdx, tIdx);
+        plazaList.push({ name: normalized.name, amount: normalized.amount, lat, lng });
       });
 
       if (!tolls.length) {
@@ -400,7 +478,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
         if (Array.isArray(tollCosts) && tollCosts.length) {
           found = true;
           const myrCost = tollCosts.find(c => !c.currency || c.currency === 'MYR') || tollCosts[0];
-          let amount = Number(myrCost?.value);
+          const amount = Number(myrCost?.value);
           if (Number.isFinite(amount) && amount > 0) {
             plazaList.push({ name: `Class 1 Route Toll Summary ${sIdx + 1}`, amount, lat: null, lng: null });
           }
@@ -676,8 +754,19 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     if (!(distanceKm>0) || !Number.isFinite(durationMins)) throw new Error('Invalid route summary.');
 
     const tollInfo=extractTolls(sections);
+    const pickupText=$('pickup').value.trim();
+    const dropoffText=$('dropoff').value.trim();
+    const corridorResult=applyCorridorTollRules(tollInfo.plazas,pickupText,dropoffText,distanceKm,activeRoutingMode);
+    const finalPlazas=corridorResult.plazas;
+    const normalizedTollAmount=Math.round(finalPlazas.reduce((sum,p)=>sum+p.amount,0)*100)/100;
+    const tollAvailable=tollInfo.available || corridorResult.normalized;
+
     const manualValue=$('manual-toll').value.trim();
-    let tollFee=tollInfo.amount, tollSource=tollInfo.available?'HERE estimate':'HERE did not return toll data';
+    let tollFee=normalizedTollAmount;
+    let tollSource=corridorResult.normalized
+      ? 'HERE + MY Corridor Normalized'
+      : (tollInfo.available ? 'HERE estimate' : 'HERE did not return toll data');
+
     if (manualValue!=='') {
       const parsed=Number(manualValue);
       if (!Number.isFinite(parsed)||parsed<0) { showError('Manual toll override must be a valid amount of RM0 or more.'); return; }
@@ -705,8 +794,9 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     }
 
     const calculation=processCalculations({
-      distance:distanceKm,duration:durationMins,tollFee,tollSource,tollAvailable:tollInfo.available,
-      tollPlazas:tollInfo.plazas,maxElevation,sectionsCount:sections.length
+      distance:distanceKm,duration:durationMins,tollFee,tollSource,tollAvailable,
+      tollPlazas:manualValue!=='' || avoidTolls ? [] : finalPlazas,
+      maxElevation,sectionsCount:sections.length
     });
     latestCalculation=calculation;
     setRouteStatus(`Route calculated · ${sections.length} route section${sections.length===1?'':'s'} · ${activeRoutingMode==='fast'?'Fastest':'Shortest'}`);
