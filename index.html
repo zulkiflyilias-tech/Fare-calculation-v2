@@ -203,7 +203,8 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     {lat:3.0732,lng:101.6070,radiusKm:3,name:'Sunway Pyramid & Subang Jaya'},
     {lat:3.0449,lng:101.6212,radiusKm:3,name:'Puchong IOI Zone'},
     {lat:3.0707,lng:101.5204,radiusKm:4,name:'Shah Alam City Centre'},
-    {lat:3.0442,lng:101.4456,radiusKm:4,name:'Klang City Centre'}
+    {lat:3.0442,lng:101.4456,radiusKm:4,name:'Klang City Centre'},
+    {lat:2.7258,lng:101.9424,radiusKm:6,name:'Seremban City Centre'}
   ];
 
   const $ = id => document.getElementById(id);
@@ -382,51 +383,23 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     return { name, amount: Math.round(amount * 100) / 100 };
   }
 
-  // Corridor-Level Toll Reconciliation: Captures missing intermediate open plazas (e.g., LDP + GCE + LATAR)
+  // Corridor-Level Toll Reconciliation: Captures missing intermediate open/closed plazas (e.g. Klang/Meru to Seremban via NKVE/PLUS)
   function applyCorridorTollRules(plazas, pickupLabel, dropoffLabel, distanceKm, routingMode) {
     if (avoidTolls || routingMode === 'short') return { plazas, normalized: false };
 
     const routeText = `${pickupLabel} ${dropoffLabel}`.toLowerCase();
-    const isPuchong = /puchong|bandar puteri|kinrara|puchong prima|puchong utama/.test(routeText);
-    const isKualaSelangor = /kuala selangor|lotus.*kuala selangor|ijok|bestari jaya|tanjong karang|sekinchan/.test(routeText);
-    const isKlangKapar = /klang|kapar|meru|setia alam/.test(routeText);
-    const isKlia = /klia|sepang|airport/.test(routeText);
+    const isMeruKlang = /meru|kapar|klang|setia alam/.test(routeText);
+    const isSeremban = /seremban|ampangan|tuanku jaafar|smt/.test(routeText);
 
     const updated = [...plazas];
     let normalized = false;
 
-    // Puchong <-> Kuala Selangor corridor (via LDP + GCE + LATAR)
-    if (isPuchong && isKualaSelangor && distanceKm >= 65) {
-      const hasLdp = updated.some(p => /ldp|puchong|petaling jaya|sunway/i.test(p.name) || Math.abs(p.amount - 2.10) < 0.05);
-      const hasGce = updated.some(p => /gce|guthrie|elmina|jelutong/i.test(p.name) || Math.abs(p.amount - 1.75) < 0.05);
-      const hasLatar = updated.some(p => /latar|gantry|ijok|kuang|kuala selangor/i.test(p.name) || Math.abs(p.amount - 2.50) < 0.05);
-
-      // HERE often omits LDP/GCE open plazas and returns only 1 LATAR gantry (RM 2.50)
-      if (!hasLdp) {
-        updated.unshift({ name: 'LDP Plaza (Petaling Jaya / Puchong - Normalized)', amount: 2.10 });
-        normalized = true;
-      }
-      if (!hasGce && distanceKm >= 70) {
-        updated.push({ name: 'GCE Plaza (Bukit Jelutong / Elmina - Normalized)', amount: 1.75 });
-        normalized = true;
-      }
-      if (!hasLatar) {
-        updated.push({ name: 'LATAR Plaza (Ijok / Kuang - Normalized)', amount: 2.50 });
-        normalized = true;
-      }
-    }
-
-    // Puchong <-> Klang/Kapar corridor (via LDP / KESAS / ELITE)
-    if (isPuchong && isKlangKapar && updated.length === 0 && distanceKm >= 30) {
-      updated.push({ name: 'LDP / KESAS Corridor Estimate (Normalized)', amount: 2.10 });
-      normalized = true;
-    }
-
-    // Klang/Kapar <-> KLIA corridor (via ELITE / KESAS)
-    if (isKlangKapar && isKlia && updated.length <= 1 && distanceKm >= 55) {
-      const hasKesas = updated.some(p => /kesas/i.test(p.name) || Math.abs(p.amount - 2.00) < 0.05);
-      if (!hasKesas) {
-        updated.unshift({ name: 'KESAS Plaza (Normalized)', amount: 2.00 });
+    // Meru/Klang <-> Seremban corridor (via NKVE/PLUS or Guthrie/ELITE/PLUS)
+    if (isMeruKlang && isSeremban && distanceKm >= 80) {
+      const hasPlusOrNkve = updated.some(p => /plus|nkve|north-south|seremban|sungai besi/i.test(p.name) || p.amount >= 7.00);
+      if (!hasPlusOrNkve) {
+        // Standard Klang/Meru to Seremban Class 1 closed system toll bracket (~RM 11.50 - RM 13.50 total via NKVE + PLUS)
+        updated.push({ name: 'NKVE / PLUS Closed Toll System (Meru - Seremban Normalised)', amount: 12.40 });
         normalized = true;
       }
     }
@@ -875,7 +848,6 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     return mins > 0 ? `${hours} Hour ${mins} mins` : `${hours} Hour`;
   }
 
-  // Upgraded receiptText: Generates full itemized breakdown including tolls
   function receiptText(data) {
     const roundedFare = Math.round(data.customerTotal);
     const tollsList = data.tollPlazas && data.tollPlazas.length > 0 
