@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
-<title>Rideshare MY - Personal Edition v2.2</title>
+<title>Rideshare MY - Personal Edition v2.3</title>
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 <style>
 :root{--primary:#8e24aa;--primary-light:#b388ff;--bg-dark:#1c1c1e;--border:#e0e0e0;--text:#212529;--muted:#aeaeb2;--green:#25D366;--danger:#c62828}
@@ -49,7 +49,7 @@ input,select{font:inherit}
 .fare-status{font-size:10px;color:#c5cae9;margin-bottom:6px}
 details{border-top:1px dashed #3a3a3c;padding-top:8px;margin-top:7px}
 summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer;outline:none;user-select:none;margin-bottom:7px}
-.detail-row{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--muted);margin-bottom:6px}
+.detail-row{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:#aeaeb2;margin-bottom:6px}
 .detail-row span:last-child{text-align:right;white-space:nowrap}
 .detail-row.total-bold{color:#fff;font-weight:700;border-top:1px solid #3a3a3c;padding-top:7px;font-size:13px}
 .share-btn{width:100%;background:var(--green);color:#fff;border:0;padding:11px;border-radius:8px;font-size:13px;font-weight:750;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;margin-top:9px}
@@ -75,7 +75,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 <div id="container">
   <div id="map" aria-label="Route map"></div>
   <main id="search-panel">
-    <div class="header-row"><h2>Fare Estimator</h2><span id="app-version-label" class="version">PERSONAL EDITION v2.2</span></div>
+    <div class="header-row"><h2>Fare Estimator</h2><span id="app-version-label" class="version">PERSONAL EDITION v2.3</span></div>
 
     <div class="routing-wrapper">
       <div class="input-container">
@@ -168,7 +168,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 (() => {
   'use strict';
 
-  const APP_VERSION = '2.2';
+  const APP_VERSION = '2.3';
   const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
   const DEFAULT_SETTINGS = Object.freeze({
@@ -452,7 +452,6 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     let normalized = false;
 
     // 0. Meru / Klang <-> Genting Highlands / Genting Premium Outlets (GPO)
-    // Route: GCE (Elmina/Lagong RM 1.75) + LATAR (Templer/Kuang RM 2.50) + KL-Karak (Gombak RM 6.00) + Genting Road Charge (Gohtong Jaya RM 5.00) = RM 15.25
     if (isMeruKlang && isGenting && distanceKm >= 70) {
       const hasGce = updated.some(p => /gce|guthrie|elmina|lagong/i.test(p.name) || Math.abs(p.amount - 1.75) < 0.05);
       const hasLatar = updated.some(p => /latar|templer|kuang/i.test(p.name) || Math.abs(p.amount - 2.50) < 0.05);
@@ -481,7 +480,6 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
         }
       }
     } else if (isGenting && distanceKm >= 35) {
-      // Any other KL / Selangor origin to Genting Highlands (ensures Gombak + Gohtong Jaya entry charge)
       const hasGombak = updated.some(p => /gombak|karak/i.test(p.name) || Math.abs(p.amount - 6.00) < 0.05);
       const hasGentingEntry = updated.some(p => /genting|gohtong/i.test(p.name) || Math.abs(p.amount - 5.00) < 0.05);
       if (!hasGombak) {
@@ -541,7 +539,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
       }
     }
 
-    // 5. Long-Distance Intercity PLUS / LPT1 Corridors (if HERE drops closed-system fare)
+    // 5. Long-Distance Intercity PLUS / LPT1 Corridors
     if ((isKl || isMeruKlang) && isIpoh && distanceKm >= 170) {
       const currentTotal = updated.reduce((s, p) => s + p.amount, 0);
       if (currentTotal < 15.00) {
