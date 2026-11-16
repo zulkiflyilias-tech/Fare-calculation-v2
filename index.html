@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
-<title>Rideshare MY - Personal Edition v2.6</title>
+<title>Rideshare MY - Personal Edition v2.7</title>
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 <style>
 :root{--primary:#8e24aa;--primary-light:#b388ff;--bg-dark:#1c1c1e;--border:#e0e0e0;--text:#212529;--muted:#aeaeb2;--green:#25D366;--danger:#c62828}
@@ -75,7 +75,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 <div id="container">
   <div id="map" aria-label="Route map"></div>
   <main id="search-panel">
-    <div class="header-row"><h2>Fare Estimator</h2><span id="app-version-label" class="version">PERSONAL EDITION v2.6</span></div>
+    <div class="header-row"><h2>Fare Estimator</h2><span id="app-version-label" class="version">PERSONAL EDITION v2.7</span></div>
 
     <div class="routing-wrapper">
       <div class="input-container">
@@ -102,12 +102,12 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
       <button class="toggle-btn" id="btn-avoid-tolls" type="button">🛑 Avoid Tolls: OFF</button>
       <label class="toll-adjust">
         <span>Manual toll override (RM, optional)</span>
-        <input id="manual-toll" type="number" min="0" step="0.10" inputmode="decimal" placeholder="Use TollGuru estimate">
+        <input id="manual-toll" type="number" min="0" step="0.10" inputmode="decimal" placeholder="Use TollGuru API">
       </label>
-      <div class="small-muted">Leave blank to use TollGuru & HERE toll reconciliation. Enter RM0.00 to explicitly override tolls as zero.</div>
+      <div class="small-muted">Leave blank to fetch official TollGuru API toll charges. Enter RM0.00 to explicitly override tolls as zero.</div>
     </div>
 
-    <div id="loading-msg">Calculating route and fare…</div>
+    <div id="loading-msg">Calculating route and TollGuru tolls…</div>
     <div id="error-msg" role="alert"></div>
     <div id="route-status" class="status-line"></div>
 
@@ -144,6 +144,9 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
         <label class="setting-field">Vehicle Plate
           <input class="setting-input" id="setting-plate" type="text" placeholder="e.g. QS9529Y">
         </label>
+        <label class="setting-field">TollGuru API Key
+          <input class="setting-input" id="setting-tollguru-key" type="password" placeholder="Enter TollGuru API Key">
+        </label>
         <label class="setting-field">Distance rate (RM/km)<input class="setting-input" id="setting-rate" type="number" min="0" step="0.01"></label>
         <label class="setting-field">Minimum fare (RM)<input class="setting-input" id="setting-minimum" type="number" min="0" step="0.50"></label>
         <label class="setting-field">Urban / POI surcharge (RM)<input class="setting-input" id="setting-urban" type="number" min="0" step="0.50"></label>
@@ -161,7 +164,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
         <button id="save-settings-btn" type="button">Save settings</button>
         <button id="reset-settings-btn" type="button">Restore defaults</button>
       </div>
-      <p class="small-muted">Settings are stored on this device only. Default optional admin deduction is 0% because this edition is intended for private personal use.</p>
+      <p class="small-muted">Settings are stored on this device only. Provide your TollGuru API key to fetch toll calculations.</p>
     </details>
 
     <details id="history-panel">
@@ -169,7 +172,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
       <div id="history-list">No saved trips yet.</div>
       <div class="history-actions"><button id="export-history-btn" type="button">Export history (CSV)</button><button id="clear-history-btn" type="button">Clear history</button></div>
     </details>
-    <p class="small-muted">Estimates are indicative. Confirm toll amounts and final fare before accepting a trip. Requires internet access for HERE Maps, search and routing.</p>
+    <p class="small-muted">Estimates are indicative. Confirm toll amounts and final fare before accepting a trip. Requires internet access for HERE Maps, search and TollGuru APIs.</p>
   </main>
 </div>
 
@@ -177,26 +180,20 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 (() => {
   'use strict';
 
-  // Automatic Version Control System
-  const APP_BUILD = 6;
+  const APP_BUILD = 7;
   const APP_VERSION = `2.${APP_BUILD}`;
   const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
   const VEHICLE_PROFILES = Object.freeze({
-    bezza: {
-      label: 'Perodua Bezza 1.0G (White)',
-      defaultPlate: 'QS9529Y'
-    },
-    saga: {
-      label: 'Proton Saga 1.3L VVT',
-      defaultPlate: ''
-    }
+    bezza: { label: 'Perodua Bezza 1.0G (White)', defaultPlate: 'QS9529Y' },
+    saga: { label: 'Proton Saga 1.3L VVT', defaultPlate: '' }
   });
 
   const DEFAULT_SETTINGS = Object.freeze({
     vehicleId: 'bezza',
     bezzaPlate: 'QS9529Y',
     sagaPlate: '',
+    tollguruApiKey: '',
     ratePerKm: 1.50,
     minimumFare: 10.00,
     urbanSurcharge: 5.00,
@@ -209,8 +206,8 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     roundingUnit: 1
   });
 
-  const SETTINGS_KEY = 'rideshareMY.personal.v2.settings';
-  const HISTORY_KEY = 'rideshareMY.personal.v2.history';
+  const SETTINGS_KEY = 'rideshareMY.personal.v27.settings';
+  const HISTORY_KEY = 'rideshareMY.personal.v27.history';
 
   const HIGHLAND_ZONES = [
     {lat:3.4241,lng:101.7933,radiusKm:10,name:'Genting Highlands & Gohtong'},
@@ -262,11 +259,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     const plate = id === 'saga'
       ? (settings.sagaPlate || '').trim().toUpperCase()
       : (settings.bezzaPlate || profile.defaultPlate).trim().toUpperCase();
-    return {
-      id,
-      name: profile.label,
-      plate: plate || 'Not specified'
-    };
+    return { id, name: profile.label, plate: plate || 'Not specified' };
   }
 
   function loadSettings() {
@@ -289,6 +282,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     try { localStorage.setItem(HISTORY_KEY,JSON.stringify(history)); }
     catch (_) { showError('Unable to save trip history. Device storage may be full.'); }
   }
+
   function readSettingsForm() {
     const fields = {
       ratePerKm:'setting-rate',minimumFare:'setting-minimum',urbanSurcharge:'setting-urban',
@@ -299,7 +293,8 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     const next = {
       vehicleId: $('setting-vehicle').value === 'saga' ? 'saga' : 'bezza',
       bezzaPlate: settings.bezzaPlate,
-      sagaPlate: settings.sagaPlate
+      sagaPlate: settings.sagaPlate,
+      tollguruApiKey: $('setting-tollguru-key').value.trim()
     };
     const enteredPlate = $('setting-plate').value.trim().toUpperCase();
     if (next.vehicleId === 'saga') {
@@ -316,10 +311,12 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     next.roundingUnit = Number($('setting-rounding').value);
     return next;
   }
+
   function populateSettingsForm() {
     const vId = VEHICLE_PROFILES[settings.vehicleId] ? settings.vehicleId : 'bezza';
     $('setting-vehicle').value = vId;
     $('setting-plate').value = vId === 'saga' ? (settings.sagaPlate || '') : (settings.bezzaPlate || VEHICLE_PROFILES.bezza.defaultPlate);
+    $('setting-tollguru-key').value = settings.tollguruApiKey || '';
     $('setting-rate').value = settings.ratePerKm;
     $('setting-minimum').value = settings.minimumFare;
     $('setting-urban').value = settings.urbanSurcharge;
@@ -388,267 +385,60 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
   }
 
   // ==========================================
-  // TOLLGURU-ALIGNED APP ENGINE & RECONCILIATION
+  // TOLLGURU API INTEGRATION
   // ==========================================
-  function normalizeTollGuruPlaza(plazaName, rawAmount, sIdx, tIdx, routeDistanceKm = 0) {
-    let name = plazaName;
-    let amount = rawAmount;
-
-    if (!name || name.toUpperCase().includes('TOLL PLAZA') || name === 'Toll Plaza') {
-      name = `TollGuru Plaza Gantry ${sIdx + 1}-${tIdx + 1}`;
+  async function fetchTollGuruTolls(polylineString, distanceKm) {
+    if (avoidTolls) return { amount: 0, plazas: [], source: 'Toll avoidance selected', available: true };
+    if (!settings.tollguruApiKey) {
+      return { amount: 0, plazas: [], source: 'TollGuru API key missing (enter in settings)', available: false };
     }
 
-    const u = name.toUpperCase();
-
-    // Closed-System Expressways (PLUS E1/E2, NKVE, ELITE, LEKAS)
-    if (u.includes('NKVE') || u.includes('PLUS') || u.includes('NORTH-SOUTH') || u.includes('E2')) {
-      const maxDist = Math.max(4.50, routeDistanceKm * 0.16);
-      if (amount > maxDist || (routeDistanceKm >= 80 && routeDistanceKm <= 120 && (amount < 7.00 || amount > 13.00))) {
-        amount = routeDistanceKm > 0 ? Math.max(5.50, Math.min(amount, routeDistanceKm * 0.115)) : 9.27;
-        if (!u.includes('TOLLGURU')) name += ' (TollGuru Reconciled)';
-      }
-    } else if (u.includes('ELITE') || u.includes('E5')) {
-      const maxElite = Math.max(6.50, routeDistanceKm * 0.16);
-      if (amount > maxElite) {
-        amount = routeDistanceKm > 0 ? Math.max(3.28, Math.min(amount, routeDistanceKm * 0.12)) : 3.28;
-        if (!u.includes('TOLLGURU')) name += ' (TollGuru Reconciled)';
-      }
-    } else if (u.includes('LEKAS') || u.includes('KAJANG-SEREMBAN') || u.includes('E7')) {
-      if (u.includes('AMPANGAN')) amount = 2.30;
-      else if (amount > 11.00) amount = 10.90;
-    } else if (u.includes('SKVE')) {
-      if (amount > 9.50) amount = 4.80;
-    }
-
-    // Official Malaysian Class 1 Open Tolls (TollGuru Database Standards)
-    if (u.includes('LDP') || u.includes('DAMANSARA-PUCHONG') || u.includes('PENCHALA') || u.includes('PUCHONG') || u.includes('SUNWAY')) {
-      amount = 2.10;
-    } else if (u.includes('LATAR') || u.includes('KUALA SELANGOR') || u.includes('IJOK') || u.includes('KUANG')) {
-      if (u.includes('KUNDANG')) amount = 1.30;
-      else if (u.includes('ECO GRANDEUR')) amount = 1.15;
-      else amount = 2.50;
-    } else if (u.includes('GCE') || u.includes('GUTHRIE') || u.includes('BUKIT JELUTONG') || u.includes('ELMINA')) {
-      amount = 1.75;
-    } else if (u.includes('KESAS') || u.includes('SHAH ALAM EXPRESSWAY') || u.includes('KEMUNING')) {
-      amount = 2.00;
-    } else if (u.includes('NPE') || u.includes('NEW PANTAI')) {
-      amount = u.includes('PJS 2') ? 1.00 : 2.30;
-    } else if (u.includes('SPRINT') || u.includes('BUKIT KIARA')) {
-      if (u.includes('BUKIT KIARA')) amount = 3.00;
-      else if (u.includes('PANTAI')) amount = 2.50;
-      else amount = 2.00;
-    } else if (u.includes('MEX') || u.includes('MAJU EXPRESSWAY')) {
-      if (u.includes('PUTRAJAYA')) amount = 3.50;
-      else if (u.includes('SERI KEMBANGAN')) amount = 2.20;
-      else amount = 2.00;
-    } else if (u.includes('DUKE') || u.includes('DUTA-ULU KELANG')) {
-      amount = 2.50;
-    } else if (u.includes('DASH') || u.includes('DAMANSARA-SHAH ALAM')) {
-      amount = 2.30;
-    } else if (u.includes('SUKE') || u.includes('SUNGAI BESI-ULU KELANG')) {
-      amount = 2.30;
-    } else if (u.includes('AKLEH')) {
-      amount = 2.13;
-    } else if (u.includes('BESRAYA')) {
-      amount = 1.85;
-    } else if (u.includes('SILK')) {
-      amount = 1.66;
-    } else if (u.includes('GRAND SAGA') || u.includes('CHERAS-KAJANG')) {
-      amount = 1.30;
-    } else if (u.includes('LKSA')) {
-      amount = u.includes('ALAM IMPIAN') ? 0.83 : 1.56;
-    } else if (u.includes('SPE') || u.includes('SETIAWANGSA-PANTAI')) {
-      amount = 3.50;
-    } else if (u.includes('SMART')) {
-      amount = 3.00;
-    } else if (u.includes('KL-KARAK') || u.includes('GOMBAK') || u.includes('BENTONG')) {
-      amount = u.includes('BENTONG') ? 3.50 : 6.00;
-    } else if (u.includes('PENANG BRIDGE') || u.includes('JAMBATAN')) {
-      amount = 5.74;
-    } else if (u.includes('BKE') || u.includes('BUTTERWORTH-KULIM')) {
-      amount = 1.31;
-    } else if (u.includes('LINKEDUA') || u.includes('SECOND LINK')) {
-      amount = 6.14;
-    }
-
-    return { name, amount: Math.round(amount * 100) / 100 };
-  }
-
-  function applyTollGuruCorridorRules(plazas, pickupLabel, dropoffLabel, distanceKm, routingMode) {
-    if (avoidTolls || routingMode === 'short') return { plazas, normalized: false };
-
-    const routeText = `${pickupLabel} ${dropoffLabel}`.toLowerCase();
-    const isMeruKlang = /meru|kapar|klang|setia alam|bukit raja/.test(routeText);
-    const isSeremban = /seremban|senawang|ampangan|tuanku jaafar|tuanku ja'afar|senggarang|rembau/.test(routeText);
-    const isGenting = /genting|gpo|premium outlet|gohtong|skyavenue|awana/.test(routeText);
-    const isPuchong = /puchong|bandar puteri|kinrara/.test(routeText);
-    const isKualaSelangor = /kuala selangor|lotus.*kuala selangor|ijok|bestari jaya|tanjong karang/.test(routeText);
-    const isKl = /kuala lumpur|kl sentral|bukit bintang|klcc|jalan duta|sungai besi|cheras|ampang/.test(routeText);
-    const isIpoh = /ipoh|simpang pulai/.test(routeText);
-    const isPenang = /penang|pulau pinang|butterworth|juru/.test(routeText);
-    const isJb = /johor bahru|\bjb\b|skudai|senai/.test(routeText);
-    
-    // Melaka & Alor Gajah Corridor Flags
-    const isMelaka = /melaka|malacca|ayer keroh|alor gajah|lendu|simpang ampat|masjid tanah|tampin|pedas/.test(routeText);
-    const isAlorGajahNorth = /alor gajah|lendu|simpang ampat|masjid tanah|tampin|pedas/.test(routeText);
-
-    const updated = [...plazas];
-    let normalized = false;
-
-    // TollGuru Corridor Rule 0: Meru/Klang <-> Seremban / SMT Tuanku Jaafar (NKVE + PLUS E2 Closed System)
-    if (isMeruKlang && isSeremban && distanceKm >= 80) {
-      const total = updated.reduce((s, p) => s + p.amount, 0);
-      if (total < 8.50 || total > 14.00) {
-        updated.length = 0;
-        updated.push({ name: 'NKVE / PLUS Closed System (Setia Alam/Bukit Raja – Senawang/Seremban, TollGuru App Engine)', amount: 9.27 });
-        normalized = true;
-      }
-    }
-
-    // TollGuru Corridor Rule 1: Klang/Meru/KL <-> Alor Gajah / Melaka (NKVE + ELITE + PLUS E2 Closed System)
-    if ((isKl || isMeruKlang) && isMelaka && distanceKm >= 105 && distanceKm <= 175) {
-      const currentTotal = updated.reduce((s, p) => s + p.amount, 0);
-      const expectedToll = isAlorGajahNorth ? 14.51 : 16.20;
-      const plazaLabel = isAlorGajahNorth
-        ? 'PLUS Closed System (Setia Alam/NKVE – Simpang Ampat, TollGuru App Engine)'
-        : 'PLUS Closed System (Setia Alam/NKVE – Ayer Keroh, TollGuru App Engine)';
-
-      if (Math.abs(currentTotal - expectedToll) > 2.50 || updated.length === 0) {
-        updated.length = 0;
-        updated.push({ name: plazaLabel, amount: expectedToll });
-        normalized = true;
-      }
-    }
-
-    // TollGuru Corridor Rule 2: Meru/Klang <-> Genting Highlands (GCE + LATAR + Gombak + Gohtong)
-    if (isMeruKlang && isGenting && distanceKm >= 70) {
-      const hasGce = updated.some(p => /gce|guthrie|elmina/i.test(p.name) || Math.abs(p.amount - 1.75) < 0.05);
-      const hasLatar = updated.some(p => /latar|kuang/i.test(p.name) || Math.abs(p.amount - 2.50) < 0.05);
-      const hasGombak = updated.some(p => /gombak|karak/i.test(p.name) || Math.abs(p.amount - 6.00) < 0.05);
-
-      if (!hasGce && !hasLatar && !hasGombak) {
-        updated.length = 0;
-        updated.push({ name: 'GCE Plaza (Elmina / Lagong - TollGuru App Engine)', amount: 1.75 });
-        updated.push({ name: 'LATAR Plaza (Kuang / Templer - TollGuru App Engine)', amount: 2.50 });
-        updated.push({ name: 'KL–Karak Expressway (Gombak Plaza)', amount: 6.00 });
-        updated.push({ name: 'Genting Highlands Road Charge (Gohtong Jaya)', amount: 5.00 });
-        normalized = true;
-      }
-    } else if (isGenting && distanceKm >= 35) {
-      const hasGombak = updated.some(p => /gombak|karak/i.test(p.name));
-      if (!hasGombak) {
-        updated.push({ name: 'KL–Karak Expressway (Gombak Plaza)', amount: 6.00 });
-        updated.push({ name: 'Genting Highlands Road Charge (Gohtong Jaya)', amount: 5.00 });
-        normalized = true;
-      }
-    }
-
-    // TollGuru Corridor Rule 3: Puchong <-> Kuala Selangor (LDP + GCE + LATAR)
-    if (isPuchong && isKualaSelangor && distanceKm >= 65) {
-      const hasLdp = updated.some(p => /ldp|puchong/i.test(p.name));
-      const hasLatar = updated.some(p => /latar|ijok/i.test(p.name));
-      if (!hasLdp) {
-        updated.unshift({ name: 'LDP Plaza (TollGuru Corridor Engine)', amount: 2.10 });
-        normalized = true;
-      }
-      if (!hasLatar) {
-        updated.push({ name: 'LATAR Plaza (TollGuru Corridor Engine)', amount: 2.50 });
-        normalized = true;
-      }
-    }
-
-    // TollGuru Corridor Rule 4: Intercity PLUS Corridors (KL/Meru to Ipoh, Penang, JB)
-    if ((isKl || isMeruKlang) && isIpoh && distanceKm >= 170) {
-      if (updated.reduce((s, p) => s + p.amount, 0) < 15.00) {
-        updated.length = 0;
-        updated.push({ name: 'PLUS E1 Closed System (Jalan Duta – Ipoh Selatan, TollGuru App Engine)', amount: 21.73 });
-        normalized = true;
-      }
-    }
-    if ((isKl || isMeruKlang) && isPenang && distanceKm >= 300) {
-      if (updated.reduce((s, p) => s + p.amount, 0) < 28.00) {
-        updated.length = 0;
-        updated.push({ name: 'PLUS E1 Closed System (NKVE – Juru, TollGuru App Engine)', amount: 35.51 });
-        updated.push({ name: 'Penang Bridge Plaza', amount: 5.74 });
-        normalized = true;
-      }
-    }
-    if ((isKl || isMeruKlang) && isJb && distanceKm >= 290) {
-      if (updated.reduce((s, p) => s + p.amount, 0) < 28.00) {
-        updated.length = 0;
-        updated.push({ name: 'PLUS E2 Closed System (NKVE/Sungai Besi – Skudai, TollGuru App Engine)', amount: 34.85 });
-        normalized = true;
-      }
-    }
-
-    return { plazas: updated, normalized };
-  }
-
-  function extractTolls(sections, routeDistanceKm = 0) {
-    let total = 0;
-    let found = false;
-    const plazaList = [];
-
-    sections.forEach((section, sIdx) => {
-      const tolls = Array.isArray(section.tolls) ? section.tolls : [];
-      if (tolls.length) found = true;
-
-      tolls.forEach((toll, tIdx) => {
-        const fares = Array.isArray(toll.fares) ? toll.fares : [];
-        if (!fares.length) return;
-
-        const myrFares = fares.filter(f => !f.price?.currency || f.price.currency === 'MYR');
-        const pool = myrFares.length ? myrFares : fares;
-
-        const selectedFare =
-          pool.find(f => Array.isArray(f.paymentMethods) && f.paymentMethods.includes('transponder')) ||
-          pool.find(f => Array.isArray(f.paymentMethods) && (f.paymentMethods.includes('tag') || f.paymentMethods.includes('pass'))) ||
-          pool.find(f => f.tag !== undefined || f.cash !== undefined) ||
-          pool[0];
-
-        let rawAmount = Number(selectedFare?.price?.value ?? selectedFare?.tag ?? selectedFare?.cash ?? selectedFare?.amount);
-        if (!Number.isFinite(rawAmount) || rawAmount <= 0) return;
-
-        const lat = toll.position?.lat || toll.lat || null;
-        const lng = toll.position?.lng || toll.lng || null;
-        const rawName = toll.tollSystemName || toll.name || selectedFare?.description || `Toll Plaza ${sIdx + 1}`;
-
-        const normalized = normalizeTollGuruPlaza(rawName, rawAmount, sIdx, tIdx, routeDistanceKm);
-        plazaList.push({ name: normalized.name, amount: normalized.amount, lat, lng });
-      });
-
-      const tollCosts = section.summary && section.summary.tollCosts;
-      if (Array.isArray(tollCosts) && tollCosts.length) {
-        found = true;
-        tollCosts.forEach((tc, tcIdx) => {
-          const amt = Number(tc.value ?? tc.amount ?? 0);
-          if (amt > 0) {
-            plazaList.push({ name: tc.name || `TollGuru Summary Cost ${sIdx + 1}-${tcIdx + 1}`, amount: amt, lat: null, lng: null });
+    try {
+      const response = await fetch('https://apis.tollguru.com/v2/calc/polylines', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': settings.tollguruApiKey
+        },
+        body: JSON.stringify({
+          polyline: polylineString,
+          vehicle: {
+            type: '2AxlesCar'
           }
-        });
-      }
-    });
-
-    const uniquePlazas = [];
-    plazaList.forEach(item => {
-      const idx = uniquePlazas.findIndex(p => {
-        if (p.name.trim().toLowerCase() === item.name.trim().toLowerCase()) return true;
-        if (p.lat !== null && p.lng !== null && item.lat !== null && item.lng !== null) {
-          return (Math.abs(p.lat - item.lat) + Math.abs(p.lng - item.lng)) < 0.005;
-        }
-        return false;
+        })
       });
-      if (idx >= 0) {
-        if (item.amount > uniquePlazas[idx].amount) uniquePlazas[idx] = item;
-      } else {
-        uniquePlazas.push(item);
+
+      if (!response.ok) {
+        throw new Error(`TollGuru API error: HTTP ${response.status}`);
       }
-    });
 
-    const plazas = uniquePlazas.map(p => ({ name: p.name, amount: Math.round(p.amount * 100) / 100 }));
-    total = plazas.reduce((sum, p) => sum + p.amount, 0);
+      const data = await response.json();
+      const routeData = data.route || {};
+      const costs = routeData.costs || {};
+      const cashCost = Number(costs.cash || 0);
+      const tagCost = Number(costs.tag || costs.fastag || cashCost);
+      const totalToll = Number.isFinite(tagCost) ? tagCost : cashCost;
 
-    return { amount: Math.round(total * 100) / 100, available: found, plazas };
+      const tollsList = [];
+      const summaryTolls = Array.isArray(routeData.tolls) ? routeData.tolls : [];
+      summaryTolls.forEach((t, idx) => {
+        const name = t.name || t.plaza || `Toll Plaza ${idx + 1}`;
+        const amt = Number(t.tagCost || t.cashCost || t.cost || 0);
+        if (amt > 0) {
+          tollsList.push({ name, amount: Math.round(amt * 100) / 100 });
+        }
+      });
+
+      return {
+        amount: Math.round(totalToll * 100) / 100,
+        plazas: tollsList,
+        source: 'TollGuru API',
+        available: true
+      };
+    } catch (err) {
+      console.error('TollGuru API fetch failed:', err);
+      return { amount: 0, plazas: [], source: 'TollGuru API request failed', available: false };
+    }
   }
 
   function clearRouteObjects() {
@@ -844,7 +634,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 
     invalidateRoute(true);
     const requestId=routeRequestId;
-    setLoading(true); clearError(); setRouteStatus('Requesting TollGuru App-powered route…');
+    setLoading(true); clearError(); setRouteStatus('Requesting route and TollGuru tolls…');
     routeDebounce=setTimeout(()=>{
       if (requestId!==routeRequestId) return;
       const params={
@@ -854,86 +644,90 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
         destination:`${dropoffCoords.lat},${dropoffCoords.lng}`,
         departureTime:'any',
         currency:'MYR',
-        'vehicle[axleCount]':2,
-        return:'polyline,summary,tolls,elevation'
+        return:'polyline,summary,elevation'
       };
       if (avoidTolls) params['avoid[features]']='tollRoad';
 
-      router.calculateRoute(params,result=>{
+      router.calculateRoute(params,async result=>{
         if (requestId!==routeRequestId) return;
-        setLoading(false);
         if (!result || !Array.isArray(result.routes) || !result.routes.length) {
+          setLoading(false);
           showError('No route found for the selected locations and preferences.');
           return;
         }
-        try { handleRouteResult(result.routes[0],requestId); }
-        catch(error) { console.error(error); showError('The route was returned, but its details could not be processed.'); }
+        try {
+          const route = result.routes[0];
+          const sections = Array.isArray(route.sections)?route.sections:[];
+          if (!sections.length) throw new Error('Route has no sections.');
+          
+          const distanceMeters = sections.reduce((sum,s)=>sum+Number(s.summary && s.summary.length||0),0);
+          const durationSeconds = sections.reduce((sum,s)=>sum+Number(s.summary && s.summary.duration||0),0);
+          const distanceKm = distanceMeters/1000;
+          const durationMins = durationSeconds/60;
+          if (!(distanceKm>0) || !Number.isFinite(durationMins)) throw new Error('Invalid route summary.');
+
+          // Extract first polyline or combine section polylines for TollGuru API
+          const polylineString = sections[0] && sections[0].polyline ? sections[0].polyline : '';
+          const tollInfo = await fetchTollGuruTolls(polylineString, distanceKm);
+
+          const manualValue = $('manual-toll').value.trim();
+          let tollFee = tollInfo.amount;
+          let tollSource = tollInfo.source;
+
+          if (manualValue !== '') {
+            const parsed = Number(manualValue);
+            if (!Number.isFinite(parsed) || parsed < 0) {
+              setLoading(false);
+              showError('Manual toll override must be a valid amount of RM0 or more.');
+              return;
+            }
+            tollFee = parsed;
+            tollSource = 'Manual override';
+          }
+
+          let maxElevation = 0;
+          sections.forEach(section => { maxElevation = Math.max(maxElevation, extractElevation(section)); });
+          clearRouteObjects();
+          const group = new H.map.Group();
+          sections.forEach(section => {
+            if (!section.polyline) return;
+            const lineString = window.H && H.geo && typeof H.geo.LineString.fromFlexiblePolyline === 'function'
+              ? H.geo.LineString.fromFlexiblePolyline(section.polyline)
+              : new H.geo.LineString();
+            const line = new H.map.Polyline(lineString, { style: { strokeColor: '#8e24aa', lineWidth: 5 } });
+            routePolylines.push(line); group.addObject(line);
+          });
+          if (routePolylines.length) {
+            map.addObjects(routePolylines);
+            const bounds = group.getBoundingBox();
+            if (bounds) map.getViewModel().setLookAtData({ bounds, padding: 30 });
+          }
+
+          setLoading(false);
+          const calculation = processCalculations({
+            distance: distanceKm,
+            duration: durationMins,
+            tollFee,
+            tollSource,
+            tollAvailable: tollInfo.available,
+            tollPlazas: manualValue !== '' || avoidTolls ? [] : tollInfo.plazas,
+            maxElevation,
+            sectionsCount: sections.length
+          });
+          latestCalculation = calculation;
+          setRouteStatus(`Route calculated · ${sections.length} route section${sections.length===1?'':'s'} · ${activeRoutingMode==='fast'?'Fastest':'Shortest'}`);
+        } catch(error) {
+          setLoading(false);
+          console.error(error);
+          showError(error.message || 'The route was returned, but its details could not be processed.');
+        }
       },error=>{
         if (requestId!==routeRequestId) return;
         setLoading(false);
-        console.error('TollGuru App/HERE routing error:',error);
+        console.error('HERE routing error:',error);
         showError('Route calculation failed. Check your connection, API key permissions and route settings.');
       });
     },180);
-  }
-
-  function handleRouteResult(route,requestId) {
-    if (requestId!==routeRequestId) return;
-    const sections=Array.isArray(route.sections)?route.sections:[];
-    if (!sections.length) throw new Error('Route has no sections.');
-    const distanceMeters=sections.reduce((sum,s)=>sum+Number(s.summary && s.summary.length||0),0);
-    const durationSeconds=sections.reduce((sum,s)=>sum+Number(s.summary && s.summary.duration||0),0);
-    const distanceKm=distanceMeters/1000;
-    const durationMins=durationSeconds/60;
-    if (!(distanceKm>0) || !Number.isFinite(durationMins)) throw new Error('Invalid route summary.');
-
-    const tollInfo=extractTolls(sections, distanceKm);
-    const pickupText=$('pickup').value.trim();
-    const dropoffText=$('dropoff').value.trim();
-    const corridorResult=applyTollGuruCorridorRules(tollInfo.plazas,pickupText,dropoffText,distanceKm,activeRoutingMode);
-    const finalPlazas=corridorResult.plazas;
-    const normalizedTollAmount=Math.round(finalPlazas.reduce((sum,p)=>sum+p.amount,0)*100)/100;
-    const tollAvailable=tollInfo.available || corridorResult.normalized;
-
-    const manualValue=$('manual-toll').value.trim();
-    let tollFee=normalizedTollAmount;
-    let tollSource=corridorResult.normalized
-      ? 'TollGuru App & HERE Reconciled'
-      : (tollInfo.available ? 'TollGuru App Engine (Plaza-Level)' : 'Toll data not returned');
-
-    if (manualValue!=='') {
-      const parsed=Number(manualValue);
-      if (!Number.isFinite(parsed)||parsed<0) { showError('Manual toll override must be a valid amount of RM0 or more.'); return; }
-      tollFee=parsed; tollSource='Manual override';
-    } else if (avoidTolls) {
-      tollFee=0; tollSource='Toll avoidance selected';
-    }
-
-    let maxElevation=0;
-    sections.forEach(section=>{maxElevation=Math.max(maxElevation,extractElevation(section));});
-    clearRouteObjects();
-    const group=new H.map.Group();
-    sections.forEach(section=>{
-      if (!section.polyline) return;
-      const lineString = window.H && H.geo && typeof H.geo.LineString.fromFlexiblePolyline === 'function'
-        ? H.geo.LineString.fromFlexiblePolyline(section.polyline)
-        : new H.geo.LineString();
-      const line=new H.map.Polyline(lineString,{style:{strokeColor:'#8e24aa',lineWidth:5}});
-      routePolylines.push(line); group.addObject(line);
-    });
-    if (routePolylines.length) {
-      map.addObjects(routePolylines);
-      const bounds=group.getBoundingBox();
-      if (bounds) map.getViewModel().setLookAtData({bounds, padding:30});
-    }
-
-    const calculation=processCalculations({
-      distance:distanceKm,duration:durationMins,tollFee,tollSource,tollAvailable,
-      tollPlazas:manualValue!=='' || avoidTolls ? [] : finalPlazas,
-      maxElevation,sectionsCount:sections.length
-    });
-    latestCalculation=calculation;
-    setRouteStatus(`Route calculated · ${sections.length} route section${sections.length===1?'':'s'} · ${activeRoutingMode==='fast'?'Fastest':'Shortest'}`);
   }
 
   function roundToUnit(value,unit) {
@@ -980,17 +774,13 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 
     const tollBreakdownEl = $('toll-breakdown-container');
     if (routeData.tollPlazas && routeData.tollPlazas.length > 0) {
-      tollBreakdownEl.innerHTML = '<b>TollGuru App Plaza Breakdown:</b><br>' + routeData.tollPlazas.map(p => `• ${p.name}: ${money(p.amount)}`).join('<br>');
+      tollBreakdownEl.innerHTML = '<b>TollGuru Plaza Breakdown:</b><br>' + routeData.tollPlazas.map(p => `• ${p.name}: ${money(p.amount)}`).join('<br>');
       tollBreakdownEl.style.display = 'block';
     } else {
       tollBreakdownEl.style.display = 'none';
     }
 
-    let tollLabel=routeData.tollSource;
-    if (!routeData.tollAvailable && routeData.tollSource==='Toll data not returned' && !avoidTolls && $('manual-toll').value.trim()==='') {
-      tollLabel='Toll data unavailable — verify manually';
-    }
-    $('fare-status').textContent=`Vehicle: ${vehicle.name} · Tolls: ${tollLabel}`;
+    $('fare-status').textContent=`Vehicle: ${vehicle.name} · Tolls: ${routeData.tollSource}`;
 
     $('result-card').style.display='block';
     return {
@@ -1004,6 +794,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
       date:new Date().toISOString(),routingMode:activeRoutingMode,avoidTolls
     };
   }
+
   function formatDuration(minutes) {
     const totalMins = Math.round(minutes);
     if (totalMins < 60) return `${totalMins} mins`;
@@ -1019,7 +810,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 
     const tollsList = data.tollPlazas && data.tollPlazas.length > 0 
       ? data.tollPlazas.map(p => `• ${p.name}: RM ${p.amount.toFixed(2)}`).join('\n')
-      : `• Included Tolls: RM ${Number(data.tollFee).toFixed(2)}`;
+      : `• Toll Fees: RM ${Number(data.tollFee).toFixed(2)}`;
 
     return [
       '🚗 *TRIP FARE RECEIPT*',
@@ -1039,13 +830,13 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
       data.urbanSurcharge > 0 ? `• Urban Surcharge: RM ${data.urbanSurcharge.toFixed(2)}` : '',
       data.hillSurcharge > 0 ? `• Highland Surcharge: RM ${data.hillSurcharge.toFixed(2)}` : '',
       data.longHaulIncentive > 0 ? `• Long-haul Incentive: RM ${data.longHaulIncentive.toFixed(2)}` : '',
-      '--- TollGuru App Plazas ---',
+      '--- Tolls ---',
       tollsList,
       '----------------------------------------',
       `💰 *TOTAL FARE: RM ${roundedFare}*`,
       '*(Exact calculated total: RM ' + data.exactTotal.toFixed(2) + ')*',
       '----------------------------------------',
-      `Fare generated via Rideshare MY v${APP_VERSION} (TollGuru App Engine)`
+      `Fare generated via Rideshare MY v${APP_VERSION} (TollGuru API)`
     ].filter(Boolean).join('\n');
   }
 
@@ -1061,6 +852,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     area.remove();
     if (!copied) throw new Error('Clipboard access was blocked by the browser.');
   }
+
   async function copyReceipt() {
     if (!latestCalculation) return;
     const button=$('share-btn'), original=button.textContent;
@@ -1070,6 +862,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
       setTimeout(()=>button.textContent=original,1800);
     } catch(error) { showError(`Unable to copy receipt: ${error.message}`); }
   }
+
   function saveCurrentTrip() {
     if (!latestCalculation) return;
     history.unshift({...latestCalculation,id:`${Date.now()}`});
@@ -1079,6 +872,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     button.textContent='Saved to history';
     setTimeout(()=>button.textContent=original,1600);
   }
+
   function renderHistory() {
     const list=$('history-list');
     if (!history.length) { list.textContent='No saved trips yet.'; return; }
@@ -1096,6 +890,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
       row.append(heading,detail,stamp); list.appendChild(row);
     });
   }
+
   function exportHistoryCsv() {
     if (!history.length) { showError('There are no saved trips to export.'); return; }
     const columns=['date','vehicle','plate','pickup','dropoff','distance','duration','distanceFare','urbanSurcharge','tollFee','hillSurcharge','longHaulIncentive','exactTotal','customerTotal','adminDeduction'];
