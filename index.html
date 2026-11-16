@@ -75,7 +75,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 <div id="container">
   <div id="map" aria-label="Route map"></div>
   <main id="search-panel">
-    <div class="header-row"><h2>Fare Estimator</h2><span class="version">PERSONAL EDITION v2.0</span></div>
+    <div class="header-row"><h2>Fare Estimator</h2><span id="app-version-label" class="version">PERSONAL EDITION v2.1</span></div>
 
     <div class="routing-wrapper">
       <div class="input-container">
@@ -168,6 +168,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 (() => {
   'use strict';
 
+  const APP_VERSION = '2.1';
   const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
   const DEFAULT_SETTINGS = Object.freeze({
@@ -222,6 +223,12 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     pickup:{controller:null,sequence:0,timer:null},
     dropoff:{controller:null,sequence:0,timer:null}
   };
+
+  function syncVersionDisplay() {
+    document.title = `Rideshare MY - Personal Edition v${APP_VERSION}`;
+    const versionBadge = $('app-version-label');
+    if (versionBadge) versionBadge.textContent = `PERSONAL EDITION v${APP_VERSION}`;
+  }
 
   function loadSettings() {
     try {
@@ -915,6 +922,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
   }
 
   function boot() {
+    syncVersionDisplay();
     populateSettingsForm();
     renderHistory();
     bindEvents();
