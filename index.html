@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare MY - Personal Edition v2.2</title>
+<title>Rideshare MY - Personal Edition v2.3</title>
 
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 
@@ -527,7 +526,7 @@ summary {
 
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v2.2</span>
+      <span class="version">PERSONAL EDITION v2.3</span>
     </div>
 
     <!-- LOCATION INPUTS -->
@@ -814,9 +813,6 @@ summary {
    1. CONFIGURATION
 ========================================================= */
 
-// Replace with a newly generated and restricted HERE API key.
-// Do not reuse the key previously exposed in the shared script.
-
 const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
 const DEFAULT_SETTINGS = Object.freeze({
@@ -834,14 +830,16 @@ const DEFAULT_SETTINGS = Object.freeze({
 
 const ADMIN_FLAT_THRESHOLD = 8;
 
-const SETTINGS_KEY = 'rideshareMY.personal.v2.2.settings';
+const SETTINGS_KEY = 'rideshareMY.personal.v2.3.settings';
 const LEGACY_SETTINGS_KEYS = [
+  'rideshareMY.personal.v2.2.settings',
   'rideshareMY.personal.v2.1.settings',
   'rideshareMY.personal.v2.settings'
 ];
 
-const HISTORY_KEY = 'rideshareMY.personal.v2.2.history';
+const HISTORY_KEY = 'rideshareMY.personal.v2.3.history';
 const LEGACY_HISTORY_KEYS = [
+  'rideshareMY.personal.v2.2.history',
   'rideshareMY.personal.v2.history'
 ];
 
@@ -1314,9 +1312,6 @@ function isRelevantPoi(item) {
     .join(' ')
     .toLowerCase();
 
-  // Exclude generic hotels, hospitals and universities.
-  // Only major transport, retail and event destinations trigger this rule.
-
   return /airport|shopping.?mall|shopping.?centre|shopping.?center|railway.?station|train.?station|bus.?station|convention.?centre|convention.?center|stadium|terminal/.test(text);
 }
 
@@ -1710,7 +1705,7 @@ function setupAutocomplete(type) {
 }
 
 /* =========================================================
-   9. GPS AND REVERSE GEOCODING
+   9. GPS AND REVERSE GEOCODING (Enhanced with 12s timeout)
 ========================================================= */
 
 async function reverseGeocode(lat,lng) {
@@ -1747,6 +1742,7 @@ function requestCurrentLocation() {
   button.disabled = true;
 
   clearError();
+  setRouteStatus('Acquiring high-accuracy GPS position...');
 
   navigator.geolocation.getCurrentPosition(
     async position => {
@@ -1804,21 +1800,22 @@ function requestCurrentLocation() {
       button.disabled = false;
 
       const messages = {
-        1:'Location permission was denied.',
+        1:'Location permission was denied. Please enable location services.',
         2:'Current location is unavailable.',
-        3:'Location request timed out.'
+        3:'Location request timed out. Try moving near a window or check device GPS.'
       };
 
       showError(
         messages[error.code] ||
         'Unable to retrieve current location.'
       );
+      setRouteStatus('');
     },
 
     {
       enableHighAccuracy:true,
-      timeout:15000,
-      maximumAge:60000
+      timeout:12000,
+      maximumAge:30000
     }
   );
 }
@@ -1900,15 +1897,6 @@ function toggleAvoidTolls() {
    11. TOLL EXTRACTION — CONSERVATIVE VALIDATION
 ========================================================= */
 
-// HERE can return multiple fare alternatives.
-// Without a confirmed applicable vehicle/payment category,
-// selecting the cheapest alternative is unsafe.
-//
-// This version automatically accepts a toll amount only when
-// the available alternatives resolve to one unique MYR amount.
-//
-// Ambiguous or incomplete amounts require manual verification.
-
 function readTollAmount(entry) {
   if (!entry || typeof entry !== 'object') {
     return null;
@@ -1961,10 +1949,6 @@ function extractTolls(sections) {
         ? section.summary.tollCosts
         : [];
 
-    // Prefer itemised toll information when present.
-    // Never add section summary amounts on top of itemised
-    // records because that risks double counting.
-
     if (tolls.length) {
       recordsDetected = true;
 
@@ -2015,9 +1999,6 @@ function extractTolls(sections) {
 
       return;
     }
-
-    // Summary toll costs are used only when itemised
-    // toll records are absent from this section.
 
     if (costs.length) {
       recordsDetected = true;
@@ -2242,13 +2223,6 @@ function handleRouteResult(route,requestId) {
     manualOverride = true;
   }
 
-  // IMPORTANT:
-  // Avoid Tolls is a routing preference, not proof that
-  // the returned route has zero tolls.
-  //
-  // The returned toll amount is retained.
-  // If HERE still reports tolls, they remain chargeable.
-
   clearRouteObjects();
 
   const group = new H.map.Group();
@@ -2298,15 +2272,15 @@ function handleRouteResult(route,requestId) {
     tollUnsupportedCurrency:tollInfo.unsupportedCurrency,
     manualOverride,
     sectionsCount:sections.length,
-    avoidTollsRequested:avoidTollSnapshot
+    avoidTollsRequested:avoidTolls
   });
 
   latestCalculation = calculation;
 
   setRouteStatus(
     `Route calculated · ${sections.length} section(s) · ` +
-    `${routingMode === 'fast' ? 'Fastest' : 'Shortest'}` +
-    `${avoidTollSnapshot ? ' · Avoid tolls requested' : ''}`
+    `${activeRoutingMode === 'fast' ? 'Fastest' : 'Shortest'}` +
+    `${avoidTolls ? ' · Avoid tolls requested' : ''}`
   );
 }
 
@@ -2326,13 +2300,9 @@ function roundToUnit(value,unit) {
 
 function processCalculations(routeData) {
 
-  // A. Distance fare
-
   const distanceFare = roundMoney(
     routeData.distance * settings.ratePerKm
   );
-
-  // B. Urban / POI surcharge
 
   const urban = getUrbanAssessment(
     pickupCoords,
@@ -2345,10 +2315,6 @@ function processCalculations(routeData) {
     ? roundMoney(settings.urbanSurcharge)
     : 0;
 
-  // C. Highland surcharge
-  // Destination-zone classification only.
-  // Elevation alone never triggers this surcharge.
-
   const highlandZone = getHighlandZone(
     pickupCoords,
     dropoffCoords
@@ -2359,8 +2325,6 @@ function processCalculations(routeData) {
   const hillSurcharge = hillApplies
     ? roundMoney(settings.hillSurcharge)
     : 0;
-
-  // D. Long-haul / return contribution
 
   const longHaulApplies =
     settings.longHaulTriggerKm > 0 &&
@@ -2375,17 +2339,12 @@ function processCalculations(routeData) {
       )
     : 0;
 
-  // E. Transport subtotal
-
   const transportSubtotal = roundMoney(
     distanceFare +
     urbanSurcharge +
     hillSurcharge +
     longHaulIncentive
   );
-
-  // F. Minimum transport fare
-  // Toll charges are excluded from the minimum.
 
   const transportFare = roundMoney(
     Math.max(
@@ -2394,13 +2353,9 @@ function processCalculations(routeData) {
     )
   );
 
-  // G. Exact total
-
   const exactTotal = roundMoney(
     transportFare + routeData.tollFee
   );
-
-  // H. Customer quotation
 
   const customerTotal = roundMoney(
     roundToUnit(
@@ -2408,10 +2363,6 @@ function processCalculations(routeData) {
       settings.roundingUnit
     )
   );
-
-  // I. Admin commission
-  // Flat commission below the fixed RM8 threshold.
-  // Otherwise use percentage of transport fare.
 
   const usesFlatCommission =
     transportSubtotal < ADMIN_FLAT_THRESHOLD;
@@ -2422,26 +2373,17 @@ function processCalculations(routeData) {
         transportFare * settings.adminPercent / 100
       );
 
-  // J. Driver transport earnings excluding tolls
-
   const driverFareEarnings = roundMoney(
     Math.max(0,transportFare-adminDeduction)
   );
-
-  // K. Driver collection after commission.
-  // Includes toll reimbursement and quotation-rounding difference.
 
   const driverAmountAfterDeduction = roundMoney(
     Math.max(0,customerTotal-adminDeduction)
   );
 
-  // L. Rounding difference
-
   const roundingAdjustment = roundMoney(
     customerTotal-exactTotal
   );
-
-  // M. Display
 
   $('urban-surcharge-row').style.display =
     urbanSurcharge > 0 ? 'flex' : 'none';
@@ -2503,8 +2445,6 @@ function processCalculations(routeData) {
   $('driver-net-fare').textContent =
     money(driverAmountAfterDeduction);
 
-  // N. Toll status and warnings
-
   const warnings = [];
 
   if (!routeData.tollVerified) {
@@ -2563,7 +2503,7 @@ function processCalculations(routeData) {
   $('result-card').style.display = 'block';
 
   return {
-    version:'2.2',
+    version:'2.3',
 
     pickup:$('pickup').value.trim(),
     dropoff:$('dropoff').value.trim(),
@@ -2639,7 +2579,7 @@ function formatDuration(minutes) {
 
 function receiptText(data) {
   return [
-    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v2.2',
+    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v2.3',
     '------------------------------------------------',
     `From: ${data.pickup}`,
     `To: ${data.dropoff}`,
@@ -2672,7 +2612,7 @@ function receiptText(data) {
     'Tolls are reimbursement, not driver profit.',
     'Driver earnings exclude fuel, maintenance, depreciation and other operating costs.',
     'Estimate only. Verify tolls and final fare before travel.',
-    'Generated by Rideshare MY Personal Edition v2.2'
+    'Generated by Rideshare MY Personal Edition v2.3'
   ].join('\n');
 }
 
@@ -2681,9 +2621,6 @@ function receiptText(data) {
 ========================================================= */
 
 async function copyText(text) {
-
-  // Modern Clipboard API
-
   if (navigator.clipboard && window.isSecureContext) {
     try {
       await navigator.clipboard.writeText(text);
@@ -2692,8 +2629,6 @@ async function copyText(text) {
       console.warn('Modern clipboard failed; trying fallback.',error);
     }
   }
-
-  // Fallback for older browsers and restricted environments.
 
   const area = document.createElement('textarea');
 
@@ -2839,9 +2774,6 @@ function renderHistory() {
 function safeCsvValue(value) {
   let text = String(value ?? '');
 
-  // Escape spreadsheet formula injection for untrusted text.
-  // Numeric values remain ordinary numeric fields.
-
   if (/^[\s\u0000-\u001f]*[=+\-@]/.test(text)) {
     text = "'" + text;
   }
@@ -2918,13 +2850,11 @@ function exportHistoryCsv() {
   const a = document.createElement('a');
 
   a.href = url;
-  a.download = 'rideshare-my-trip-history-v2.2.csv';
+  a.download = 'rideshare-my-trip-history-v2.3.csv';
 
   document.body.appendChild(a);
   a.click();
   a.remove();
-
-  // Delay revocation to allow mobile browsers to begin the download.
 
   setTimeout(() => {
     URL.revokeObjectURL(url);
@@ -3124,8 +3054,6 @@ function bindEvents() {
     clearTripHistory
   );
 
-  // Close suggestions when clicking outside the input area.
-
   document.addEventListener('click',event => {
     ['pickup','dropoff'].forEach(type => {
       const box = $(`${type}-suggestions`);
@@ -3156,7 +3084,7 @@ function boot() {
 
   if (!isApiKeyConfigured()) {
     setRouteStatus(
-      'Setup required: replace PASTE_NEW_RESTRICTED_HERE_API_KEY in the script.'
+      'Setup required: replace HERE_API_KEY with your valid key.'
     );
   }
 }
