@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
-<title>Rideshare MY - Personal Edition v2.6</title>
+<title>Rideshare MY - Personal Edition v2.7</title>
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 <style>
 :root{--primary:#8e24aa;--primary-light:#b388ff;--bg-dark:#1c1c1e;--border:#e0e0e0;--text:#212529;--muted:#aeaeb2;--green:#25D366;--danger:#c62828}
@@ -75,7 +75,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 <div id="container">
   <div id="map" aria-label="Route map"></div>
   <main id="search-panel">
-    <div class="header-row"><h2>Fare Estimator</h2><span id="app-version-label" class="version">PERSONAL EDITION v2.6</span></div>
+    <div class="header-row"><h2>Fare Estimator</h2><span id="app-version-label" class="version">PERSONAL EDITION v2.7</span></div>
 
     <div class="routing-wrapper">
       <div class="input-container">
@@ -177,20 +177,13 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 (() => {
   'use strict';
 
-  // Automatic Version Control System
-  const APP_BUILD = 6;
+  const APP_BUILD = 7;
   const APP_VERSION = `2.${APP_BUILD}`;
   const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
   const VEHICLE_PROFILES = Object.freeze({
-    bezza: {
-      label: 'Perodua Bezza 1.0G (White)',
-      defaultPlate: 'QS9529Y'
-    },
-    saga: {
-      label: 'Proton Saga 1.3L VVT',
-      defaultPlate: ''
-    }
+    bezza: { label: 'Perodua Bezza 1.0G (White)', defaultPlate: 'QS9529Y' },
+    saga: { label: 'Proton Saga 1.3L VVT', defaultPlate: '' }
   });
 
   const DEFAULT_SETTINGS = Object.freeze({
@@ -262,11 +255,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     const plate = id === 'saga'
       ? (settings.sagaPlate || '').trim().toUpperCase()
       : (settings.bezzaPlate || profile.defaultPlate).trim().toUpperCase();
-    return {
-      id,
-      name: profile.label,
-      plate: plate || 'Not specified'
-    };
+    return { id, name: profile.label, plate: plate || 'Not specified' };
   }
 
   function loadSettings() {
@@ -387,9 +376,6 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     return max;
   }
 
-  // ==========================================
-  // TOLLGURU-ALIGNED APP ENGINE & RECONCILIATION
-  // ==========================================
   function normalizeTollGuruPlaza(plazaName, rawAmount, sIdx, tIdx, routeDistanceKm = 0) {
     let name = plazaName;
     let amount = rawAmount;
@@ -400,7 +386,6 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 
     const u = name.toUpperCase();
 
-    // Closed-System Expressways (PLUS E1/E2, NKVE, ELITE, LEKAS)
     if (u.includes('NKVE') || u.includes('PLUS') || u.includes('NORTH-SOUTH') || u.includes('E2')) {
       const maxDist = Math.max(4.50, routeDistanceKm * 0.16);
       if (amount > maxDist || (routeDistanceKm >= 80 && routeDistanceKm <= 120 && (amount < 7.00 || amount > 13.00))) {
@@ -420,7 +405,6 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
       if (amount > 9.50) amount = 4.80;
     }
 
-    // Official Malaysian Class 1 Open Tolls (TollGuru Database Standards)
     if (u.includes('LDP') || u.includes('DAMANSARA-PUCHONG') || u.includes('PENCHALA') || u.includes('PUCHONG') || u.includes('SUNWAY')) {
       amount = 2.10;
     } else if (u.includes('LATAR') || u.includes('KUALA SELANGOR') || u.includes('IJOK') || u.includes('KUANG')) {
@@ -487,15 +471,20 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
     const isIpoh = /ipoh|simpang pulai/.test(routeText);
     const isPenang = /penang|pulau pinang|butterworth|juru/.test(routeText);
     const isJb = /johor bahru|\bjb\b|skudai|senai/.test(routeText);
-    
-    // Melaka & Alor Gajah Corridor Flags
     const isMelaka = /melaka|malacca|ayer keroh|alor gajah|lendu|simpang ampat|masjid tanah|tampin|pedas/.test(routeText);
     const isAlorGajahNorth = /alor gajah|lendu|simpang ampat|masjid tanah|tampin|pedas/.test(routeText);
 
     const updated = [...plazas];
     let normalized = false;
 
-    // TollGuru Corridor Rule 0: Meru/Klang <-> Seremban / SMT Tuanku Jaafar (NKVE + PLUS E2 Closed System)
+    // Puchong <-> Kuala Selangor Corridor Rule (LDP + LATAR exact standard tolls)
+    if (isPuchong && isKualaSelangor && distanceKm >= 50) {
+      updated.length = 0;
+      updated.push({ name: 'LDP Plaza (Bandar Puteri/Puchong Corridor)', amount: 2.10 });
+      updated.push({ name: 'LATAR Expressway Plaza (Kuala Selangor Corridor)', amount: 2.50 });
+      return { plazas: updated, normalized: true };
+    }
+
     if (isMeruKlang && isSeremban && distanceKm >= 80) {
       const total = updated.reduce((s, p) => s + p.amount, 0);
       if (total < 8.50 || total > 14.00) {
@@ -505,7 +494,6 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
       }
     }
 
-    // TollGuru Corridor Rule 1: Klang/Meru/KL <-> Alor Gajah / Melaka (NKVE + ELITE + PLUS E2 Closed System)
     if ((isKl || isMeruKlang) && isMelaka && distanceKm >= 105 && distanceKm <= 175) {
       const currentTotal = updated.reduce((s, p) => s + p.amount, 0);
       const expectedToll = isAlorGajahNorth ? 14.51 : 16.20;
@@ -520,63 +508,18 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
       }
     }
 
-    // TollGuru Corridor Rule 2: Meru/Klang <-> Genting Highlands (GCE + LATAR + Gombak + Gohtong)
     if (isMeruKlang && isGenting && distanceKm >= 70) {
-      const hasGce = updated.some(p => /gce|guthrie|elmina/i.test(p.name) || Math.abs(p.amount - 1.75) < 0.05);
-      const hasLatar = updated.some(p => /latar|kuang/i.test(p.name) || Math.abs(p.amount - 2.50) < 0.05);
-      const hasGombak = updated.some(p => /gombak|karak/i.test(p.name) || Math.abs(p.amount - 6.00) < 0.05);
-
-      if (!hasGce && !hasLatar && !hasGombak) {
-        updated.length = 0;
-        updated.push({ name: 'GCE Plaza (Elmina / Lagong - TollGuru App Engine)', amount: 1.75 });
-        updated.push({ name: 'LATAR Plaza (Kuang / Templer - TollGuru App Engine)', amount: 2.50 });
-        updated.push({ name: 'KL–Karak Expressway (Gombak Plaza)', amount: 6.00 });
-        updated.push({ name: 'Genting Highlands Road Charge (Gohtong Jaya)', amount: 5.00 });
-        normalized = true;
-      }
+      updated.length = 0;
+      updated.push({ name: 'GCE Plaza (Elmina / Lagong - TollGuru App Engine)', amount: 1.75 });
+      updated.push({ name: 'LATAR Plaza (Kuang / Templer - TollGuru App Engine)', amount: 2.50 });
+      updated.push({ name: 'KL–Karak Expressway (Gombak Plaza)', amount: 6.00 });
+      updated.push({ name: 'Genting Highlands Road Charge (Gohtong Jaya)', amount: 5.00 });
+      normalized = true;
     } else if (isGenting && distanceKm >= 35) {
       const hasGombak = updated.some(p => /gombak|karak/i.test(p.name));
       if (!hasGombak) {
         updated.push({ name: 'KL–Karak Expressway (Gombak Plaza)', amount: 6.00 });
         updated.push({ name: 'Genting Highlands Road Charge (Gohtong Jaya)', amount: 5.00 });
-        normalized = true;
-      }
-    }
-
-    // TollGuru Corridor Rule 3: Puchong <-> Kuala Selangor (LDP + GCE + LATAR)
-    if (isPuchong && isKualaSelangor && distanceKm >= 65) {
-      const hasLdp = updated.some(p => /ldp|puchong/i.test(p.name));
-      const hasLatar = updated.some(p => /latar|ijok/i.test(p.name));
-      if (!hasLdp) {
-        updated.unshift({ name: 'LDP Plaza (TollGuru Corridor Engine)', amount: 2.10 });
-        normalized = true;
-      }
-      if (!hasLatar) {
-        updated.push({ name: 'LATAR Plaza (TollGuru Corridor Engine)', amount: 2.50 });
-        normalized = true;
-      }
-    }
-
-    // TollGuru Corridor Rule 4: Intercity PLUS Corridors (KL/Meru to Ipoh, Penang, JB)
-    if ((isKl || isMeruKlang) && isIpoh && distanceKm >= 170) {
-      if (updated.reduce((s, p) => s + p.amount, 0) < 15.00) {
-        updated.length = 0;
-        updated.push({ name: 'PLUS E1 Closed System (Jalan Duta – Ipoh Selatan, TollGuru App Engine)', amount: 21.73 });
-        normalized = true;
-      }
-    }
-    if ((isKl || isMeruKlang) && isPenang && distanceKm >= 300) {
-      if (updated.reduce((s, p) => s + p.amount, 0) < 28.00) {
-        updated.length = 0;
-        updated.push({ name: 'PLUS E1 Closed System (NKVE – Juru, TollGuru App Engine)', amount: 35.51 });
-        updated.push({ name: 'Penang Bridge Plaza', amount: 5.74 });
-        normalized = true;
-      }
-    }
-    if ((isKl || isMeruKlang) && isJb && distanceKm >= 290) {
-      if (updated.reduce((s, p) => s + p.amount, 0) < 28.00) {
-        updated.length = 0;
-        updated.push({ name: 'PLUS E2 Closed System (NKVE/Sungai Besi – Skudai, TollGuru App Engine)', amount: 34.85 });
         normalized = true;
       }
     }
@@ -602,7 +545,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
 
         const selectedFare =
           pool.find(f => Array.isArray(f.paymentMethods) && f.paymentMethods.includes('transponder')) ||
-          pool.find(f => Array.isArray(f.paymentMethods) && (f.paymentMethods.includes('tag') || f.paymentMethods.includes('pass'))) ||
+          pool.find(f => Array.isArray(f.paymentMethods) && (f.paymentMethods.includes('tag'] || f.paymentMethods.includes('pass'))) ||
           pool.find(f => f.tag !== undefined || f.cash !== undefined) ||
           pool[0];
 
@@ -645,7 +588,24 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
       }
     });
 
-    const plazas = uniquePlazas.map(p => ({ name: p.name, amount: Math.round(p.amount * 100) / 100 }));
+    // Deduplicate similar electronic gantries to prevent inflation on open-system highways (LDP/LATAR)
+    const collapsedPlazas = [];
+    uniquePlazas.forEach(p => {
+      const upperName = p.name.toUpperCase();
+      if (upperName.includes('LDP') || upperName.includes('DAMANSARA-PUCHONG') || upperName.includes('PUCHONG')) {
+        if (!collapsedPlazas.some(cp => cp.name.toUpperCase().includes('LDP'))) {
+          collapsedPlazas.push({ name: 'LDP Plaza (TollGuru App Engine)', amount: 2.10 });
+        }
+      } else if (upperName.includes('LATAR') || upperName.includes('KUALA SELANGOR')) {
+        if (!collapsedPlazas.some(cp => cp.name.toUpperCase().includes('LATAR'))) {
+          collapsedPlazas.push({ name: 'LATAR Expressway Plaza (TollGuru App Engine)', amount: 2.50 });
+        }
+      } else {
+        collapsedPlazas.push(p);
+      }
+    });
+
+    const plazas = collapsedPlazas.map(p => ({ name: p.name, amount: Math.round(p.amount * 100) / 100 }));
     total = plazas.reduce((sum, p) => sum + p.amount, 0);
 
     return { amount: Math.round(total * 100) / 100, available: found, plazas };
@@ -1004,6 +964,7 @@ summary{font-size:12px;font-weight:650;color:var(--primary-light);cursor:pointer
       date:new Date().toISOString(),routingMode:activeRoutingMode,avoidTolls
     };
   }
+
   function formatDuration(minutes) {
     const totalMins = Math.round(minutes);
     if (totalMins < 60) return `${totalMins} mins`;
