@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare MY - Personal Edition v2.5</title>
+<title>Rideshare MY - Personal Edition v2.6</title>
 
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 
@@ -269,10 +269,11 @@ button {touch-action:manipulation}
 
 .status-line {
   font-size:11px;
-  color:#777;
+  color:#666;
   min-height:14px;
-  margin:1px 0 4px;
-  line-height:1.4;
+  margin:2px 0 6px;
+  line-height:1.45;
+  word-break:break-word;
 }
 
 #loading-msg {
@@ -526,7 +527,7 @@ summary {
 
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v2.5</span>
+      <span class="version">PERSONAL EDITION v2.6</span>
     </div>
 
     <!-- LOCATION INPUTS -->
@@ -596,12 +597,12 @@ summary {
         <span>Manual toll override (RM, optional)</span>
         <input id="manual-toll" type="number"
           min="0" step="0.10" inputmode="decimal"
-          placeholder="Use HERE estimate">
+          placeholder="Use HERE TnG">
       </label>
 
       <div class="small-muted">
-        Leave blank to use HERE toll data. Enter RM0.00 to explicitly
-        override tolls as zero. Unverified toll data must be checked manually.
+        Standardized to Class 1 (Private Car) normal Touch 'n Go (TnG) card rate.
+        Leave blank for HERE estimate, or enter RM0.00 to force zero tolls.
       </div>
 
     </div>
@@ -639,7 +640,7 @@ summary {
         </div>
 
         <div class="detail-row" id="toll-fare-row">
-          <span>Toll charges</span>
+          <span>Toll charges (Class 1 TnG)</span>
           <span id="calc-toll-fare">RM 0.00</span>
         </div>
 
@@ -826,8 +827,9 @@ const ADMIN_FLAT_THRESHOLD = 8;
 const ROUNDING_UNITS = [1,0.5,0.1,0.01];
 const MAX_HISTORY = 100;
 
-const SETTINGS_KEY = 'rideshareMY.personal.v2.5.settings';
+const SETTINGS_KEY = 'rideshareMY.personal.v2.6.settings';
 const LEGACY_SETTINGS_KEYS = [
+  'rideshareMY.personal.v2.5.settings',
   'rideshareMY.personal.v2.4.settings',
   'rideshareMY.personal.v2.3.settings',
   'rideshareMY.personal.v2.2.settings',
@@ -835,8 +837,9 @@ const LEGACY_SETTINGS_KEYS = [
   'rideshareMY.personal.v2.settings'
 ];
 
-const HISTORY_KEY = 'rideshareMY.personal.v2.5.history';
+const HISTORY_KEY = 'rideshareMY.personal.v2.6.history';
 const LEGACY_HISTORY_KEYS = [
+  'rideshareMY.personal.v2.5.history',
   'rideshareMY.personal.v2.4.history',
   'rideshareMY.personal.v2.3.history',
   'rideshareMY.personal.v2.2.history',
@@ -1559,7 +1562,7 @@ function toggleAvoidTolls() {
 }
 
 /* =========================================================
-   11. CLASS 1 MALAYSIA TOLL RESOLVER (DEDUPLICATED & SANITY CHECKED)
+   11. CLASS 1 MALAYSIA STANDARD TNG TOLL RESOLVER
 ========================================================= */
 
 function readTollAmount(entry) {
@@ -1577,35 +1580,37 @@ function readTollAmount(entry) {
   return {valid:true,amount:roundMoney(value)};
 }
 
-function isExcludedVehicleFare(fare) {
-  const descriptor = [
+function getFareDescriptor(fare) {
+  return [
     fare.name,
     fare.category,
     fare.vehicleType,
     fare.description,
+    fare.pass,
     ...(Array.isArray(fare.paymentMethods) ? fare.paymentMethods : [])
   ]
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
+}
 
-  return /\b(taxi|bus|lorry|truck|trailer|heavy|commercial|motorcycle|class\s*[02345])\b/.test(
+function isExcludedVehicleOrPassFare(fare) {
+  const descriptor = getFareDescriptor(fare);
+  return /\b(taxi|teksi|bus|bas|lorry|lori|truck|trailer|heavy|commercial|motorcycle|motosikal|class\s*[02345]|kelas\s*[02345]|season|monthly|subscription|resident|rebate|discount|fleet)\b/.test(
     descriptor
   );
 }
 
 function isExplicitClass1Fare(fare) {
-  const descriptor = [
-    fare.name,
-    fare.category,
-    fare.vehicleType,
-    fare.description
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
+  const descriptor = getFareDescriptor(fare);
+  return /\b(class\s*1|kelas\s*1|car|kereta|passenger|private|auto|2\s*axles?|light\s*vehicle)\b/.test(
+    descriptor
+  );
+}
 
-  return /\b(class\s*1|car|passenger|private|auto|2\s*axles?\s*3\s*or\s*4)\b/.test(
+function isStandardTngFare(fare) {
+  const descriptor = getFareDescriptor(fare);
+  return /\b(tng|touch\s*'?n'?\s*go|touchngo|smart\s*tag|rfid|electronic|etc|card|transponder|prepaid)\b/.test(
     descriptor
   );
 }
@@ -1622,7 +1627,11 @@ function resolvePlazaFares(fares) {
       return;
     }
     if (parsed.valid) {
-      validFares.push({raw:fare,amount:parsed.amount});
+      validFares.push({
+        raw:fare,
+        amount:parsed.amount,
+        descriptor:getFareDescriptor(fare)
+      });
     }
   });
 
@@ -1630,17 +1639,45 @@ function resolvePlazaFares(fares) {
     return {resolved:false,unsupportedCurrency};
   }
 
-  const explicitClass1 = validFares.filter(f => isExplicitClass1Fare(f.raw));
-  const candidatePool = explicitClass1.length
-    ? explicitClass1
-    : validFares.filter(f => !isExcludedVehicleFare(f.raw));
+  // Step 1: Exclude commercial/heavy vehicles, motorcycles, and special season/rebate passes
+  const nonExcluded = validFares.filter(f => !isExcludedVehicleOrPassFare(f.raw));
+  const vehiclePool = nonExcluded.length ? nonExcluded : validFares;
 
-  const uniqueAmounts = new Set(candidatePool.map(f => f.amount.toFixed(2)));
+  // Step 2: Filter to explicit Class 1 (Private Car / 2 Axles) if labelled
+  const class1Pool = vehiclePool.filter(f => isExplicitClass1Fare(f.raw));
+  const activeClass1 = class1Pool.length ? class1Pool : vehiclePool;
 
-  if (uniqueAmounts.size === 1) {
+  // Step 3: Prefer standard Touch 'n Go (TnG) / electronic card tariff over cash
+  const tngPool = activeClass1.filter(f => isStandardTngFare(f.raw));
+  const finalPool = tngPool.length ? tngPool : activeClass1;
+
+  // Step 4: Deduplicate identical tariffs; if multiple standard tariffs exist, pick standard non-zero published rate
+  const uniqueAmounts = [...new Set(finalPool.map(f => roundMoney(f.amount)))];
+
+  if (uniqueAmounts.length === 1) {
     return {
       resolved:true,
-      amount:Number([...uniqueAmounts][0]),
+      amount:uniqueAmounts[0],
+      unsupportedCurrency
+    };
+  }
+
+  // If a closed-system plaza lists both a RM0.00 entry and an actual exit tariff, or cash vs TnG
+  const nonZeroAmounts = uniqueAmounts.filter(amt => amt > 0);
+  if (nonZeroAmounts.length === 1) {
+    return {
+      resolved:true,
+      amount:nonZeroAmounts[0],
+      unsupportedCurrency
+    };
+  }
+
+  // Standard published Class 1 TnG tariff when multiple unlabelled entries appear
+  if (nonZeroAmounts.length > 1) {
+    const standardRate = Math.min(...nonZeroAmounts);
+    return {
+      resolved:true,
+      amount:standardRate,
       unsupportedCurrency
     };
   }
@@ -1692,7 +1729,11 @@ function extractTolls(sections) {
         if (resolution.resolved) {
           total += resolution.amount;
           validAmounts++;
-          breakdown.push(`${plazaName}: ${money(resolution.amount)}`);
+          if (resolution.amount > 0) {
+            breakdown.push(`${plazaName}: ${money(resolution.amount)}`);
+          } else {
+            breakdown.push(`${plazaName}: RM 0.00 (Entry)`);
+          }
         } else {
           unresolvedRecords++;
           breakdown.push(`${plazaName}: Unverified`);
@@ -1791,7 +1832,7 @@ function calculateRoute() {
 
   setLoading(true);
   clearError();
-  setRouteStatus('Requesting route from HERE…');
+  setRouteStatus('Requesting Class 1 TnG route from HERE…');
 
   routeDebounce = setTimeout(() => {
     if (requestId !== routeRequestId) return;
@@ -1801,8 +1842,10 @@ function calculateRoute() {
       transportMode:'car',
       origin:`${origin.lat},${origin.lng}`,
       destination:`${destination.lat},${destination.lng}`,
-      departureTime:'any',
       currency:'MYR',
+      'vehicle[axleCount]':2,
+      'vehicle[trailerCount]':0,
+      'tolls[emissionType]':'Euro6',
       return:'polyline,summary,tolls'
     };
 
@@ -1872,7 +1915,7 @@ function handleRouteResult(route,requestId) {
   const tollFee = manualOverride ? roundMoney(Number(manualValue)) : tollInfo.amount;
   const tollSource = manualOverride
     ? 'Manual override'
-    : (tollInfo.available ? 'HERE Class 1 MYR estimate' : 'HERE toll data unverified');
+    : (tollInfo.available ? 'HERE Class 1 TnG MYR estimate' : 'HERE toll data unverified');
   const tollVerified = manualOverride ? true : tollInfo.available;
 
   clearRouteObjects();
@@ -1957,6 +2000,7 @@ function buildTollWarnings(routeData) {
 
 function buildPolicyNote(roundingAdjustment) {
   return (
+    `Toll standard: Class 1 (Private Car) normal Touch 'n Go (TnG) card. ` +
     `Minimum transport fare: ${money(settings.minimumFare)}. ` +
     `Admin commission: ${settings.adminPercent}% of transport fare, ` +
     `or ${money(settings.adminMinimum)} when the pre-minimum subtotal ` +
@@ -2048,7 +2092,7 @@ function processCalculations(routeData) {
   $('result-card').style.display = 'block';
 
   return {
-    version:'2.5',
+    version:'2.6',
     pickup:$('pickup').value.trim(),
     dropoff:$('dropoff').value.trim(),
     distance:routeData.distance,
@@ -2058,6 +2102,7 @@ function processCalculations(routeData) {
     urbanLabel:urban.label,
     tollFee:routeData.tollFee,
     tollSource:routeData.tollSource,
+    tollStandard:'Class 1 Normal TnG Card',
     tollAvailable:routeData.tollAvailable,
     tollVerified:routeData.tollVerified,
     tollRecordsDetected:routeData.tollRecordsDetected,
@@ -2116,7 +2161,7 @@ function receiptText(data) {
     : '  - None / Unitemised';
 
   return [
-    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v2.5',
+    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v2.6',
     '------------------------------------------------',
     `From: ${data.pickup}`,
     `To: ${data.dropoff}`,
@@ -2132,8 +2177,9 @@ function receiptText(data) {
     `Long-haul contribution: ${money(data.longHaulIncentive)}`,
     `Transport subtotal: ${money(data.transportSubtotal)}`,
     `Minimum-adjusted transport fare: ${money(data.transportFare)}`,
-    `Toll charges: ${money(data.tollFee)}`,
+    `Toll charges (Class 1 TnG): ${money(data.tollFee)}`,
     `Toll source: ${data.tollSource}`,
+    `Toll standard: ${data.tollStandard || 'Class 1 Normal TnG Card'}`,
     `Toll verified: ${data.tollVerified ? 'Yes' : 'No'}`,
     `Manual toll override: ${data.manualOverride ? 'Yes' : 'No'}`,
     'Detected Toll Plazas / Segments:',
@@ -2151,7 +2197,7 @@ function receiptText(data) {
     'Tolls are reimbursement, not driver profit.',
     'Driver earnings exclude fuel, maintenance, depreciation and other operating costs.',
     'Estimate only. Verify tolls and final fare before travel.',
-    'Generated by Rideshare MY Personal Edition v2.5'
+    'Generated by Rideshare MY Personal Edition v2.6'
   ].join('\n');
 }
 
@@ -2264,7 +2310,7 @@ function renderHistory() {
 
     const toll = document.createElement('div');
     toll.className = 'small-muted';
-    toll.textContent = `Tolls: ${money(item.tollFee)} · ${item.tollVerified ? 'Class 1 verified' : 'Unverified'}`;
+    toll.textContent = `Tolls: ${money(item.tollFee)} · ${item.tollVerified ? 'Class 1 TnG verified' : 'Unverified'}`;
 
     row.append(heading,detail,stamp,toll);
     list.appendChild(row);
@@ -2291,7 +2337,7 @@ function exportHistoryCsv() {
 
   const columns = [
     'version','id','savedAt','calculatedAt','pickup','dropoff','distance','duration',
-    'distanceFare','urbanSurcharge','urbanLabel','tollFee','tollSource','tollVerified',
+    'distanceFare','urbanSurcharge','urbanLabel','tollFee','tollSource','tollStandard','tollVerified',
     'tollUnresolvedRecords','tollBreakdown','manualOverride','hillSurcharge','highlandZone',
     'longHaulIncentive','transportSubtotal','transportFare','exactTotal','roundingAdjustment',
     'customerTotal','adminDeduction','usesFlatCommission','driverFareEarnings',
@@ -2316,7 +2362,7 @@ function exportHistoryCsv() {
   const a = document.createElement('a');
 
   a.href = url;
-  a.download = 'rideshare-my-trip-history-v2.5.csv';
+  a.download = 'rideshare-my-trip-history-v2.6.csv';
   document.body.appendChild(a);
   a.click();
   a.remove();
