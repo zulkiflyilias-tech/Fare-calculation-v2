@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare MY - Personal Edition v2.6</title>
+<title>Rideshare MY - Personal Edition v2.7</title>
 
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 
@@ -46,8 +46,8 @@ button {touch-action:manipulation}
 }
 
 #map {
-  height:24vh;
-  min-height:150px;
+  height:26vh;
+  min-height:165px;
   width:100%;
   z-index:1;
   background:#e9e9e9;
@@ -214,40 +214,77 @@ button {touch-action:manipulation}
   margin:3px 0 8px;
 }
 
-.route-mode-container {
+.route-options-section {
   display:flex;
-  gap:6px;
-}
-
-.mode-btn,.toggle-btn {
-  border:1px solid var(--border);
-  border-radius:8px;
-  background:#fff;
-  color:#555;
-  font-size:11px;
-  font-weight:650;
-  cursor:pointer;
-  padding:8px 5px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
+  flex-direction:column;
   gap:5px;
 }
 
-.mode-btn {flex:1}
-
-.mode-btn.active {
-  background:#f3e5f5;
-  border-color:var(--primary);
-  color:var(--primary);
+.route-options-label {
+  font-size:11px;
+  font-weight:700;
+  color:#555;
 }
 
-.toggle-btn {font-size:12px}
+.route-options-grid {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:6px;
+}
 
-.toggle-btn.active {
-  background:#fff3e0;
-  border-color:#f57c00;
-  color:#e65100;
+.route-choice-btn {
+  border:1px solid var(--border);
+  border-radius:9px;
+  background:#fff;
+  color:#333;
+  padding:8px 9px;
+  text-align:left;
+  cursor:pointer;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  transition:border-color .15s,background .15s;
+}
+
+.route-choice-btn:hover {
+  background:#fafafa;
+}
+
+.route-choice-btn.active {
+  background:#f3e5f5;
+  border-color:var(--primary);
+  box-shadow:0 0 0 1px var(--primary);
+}
+
+.route-choice-top {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:6px;
+  font-size:11px;
+  font-weight:750;
+}
+
+.route-swatch {
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  flex-shrink:0;
+}
+
+.route-choice-meta {
+  font-size:10px;
+  color:#666;
+  line-height:1.3;
+}
+
+.route-options-empty {
+  font-size:11px;
+  color:#888;
+  background:#f9f9f9;
+  border:1px dashed #ddd;
+  border-radius:8px;
+  padding:8px 10px;
 }
 
 .toll-adjust {
@@ -527,7 +564,7 @@ summary {
 
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v2.6</span>
+      <span class="version">PERSONAL EDITION v2.7</span>
     </div>
 
     <!-- LOCATION INPUTS -->
@@ -575,23 +612,18 @@ summary {
 
     </div>
 
-    <!-- ROUTING CONTROLS -->
+    <!-- ROUTE OPTIONS & TOLL OVERRIDE -->
 
     <div class="route-controls">
 
-      <div class="route-mode-container">
-        <button class="mode-btn active" id="btn-mode-fast" type="button">
-          ⚡ Fastest Route
-        </button>
-
-        <button class="mode-btn" id="btn-mode-short" type="button">
-          📏 Shortest Route
-        </button>
+      <div class="route-options-section">
+        <div class="route-options-label">Route Options on Map (tap to choose):</div>
+        <div id="route-options-list" class="route-options-grid">
+          <div class="route-options-empty" style="grid-column:1/-1">
+            Select pickup and drop-off to compare route options on the map.
+          </div>
+        </div>
       </div>
-
-      <button class="toggle-btn" id="btn-avoid-tolls" type="button">
-        🛑 Avoid Tolls: OFF
-      </button>
 
       <label class="toll-adjust">
         <span>Manual toll override (RM, optional)</span>
@@ -607,7 +639,7 @@ summary {
 
     </div>
 
-    <div id="loading-msg">Calculating route and fare…</div>
+    <div id="loading-msg">Calculating route options and fare…</div>
     <div id="error-msg" role="alert"></div>
     <div id="route-status" class="status-line" aria-live="polite"></div>
 
@@ -827,8 +859,9 @@ const ADMIN_FLAT_THRESHOLD = 8;
 const ROUNDING_UNITS = [1,0.5,0.1,0.01];
 const MAX_HISTORY = 100;
 
-const SETTINGS_KEY = 'rideshareMY.personal.v2.6.settings';
+const SETTINGS_KEY = 'rideshareMY.personal.v2.7.settings';
 const LEGACY_SETTINGS_KEYS = [
+  'rideshareMY.personal.v2.6.settings',
   'rideshareMY.personal.v2.5.settings',
   'rideshareMY.personal.v2.4.settings',
   'rideshareMY.personal.v2.3.settings',
@@ -837,8 +870,9 @@ const LEGACY_SETTINGS_KEYS = [
   'rideshareMY.personal.v2.settings'
 ];
 
-const HISTORY_KEY = 'rideshareMY.personal.v2.6.history';
+const HISTORY_KEY = 'rideshareMY.personal.v2.7.history';
 const LEGACY_HISTORY_KEYS = [
+  'rideshareMY.personal.v2.6.history',
   'rideshareMY.personal.v2.5.history',
   'rideshareMY.personal.v2.4.history',
   'rideshareMY.personal.v2.3.history',
@@ -865,6 +899,14 @@ const URBAN_POI_ZONES = [
   {lat:3.0442,lng:101.4456,radiusKm:4,name:'Klang City Centre'}
 ];
 
+const ROUTE_COLORS = {
+  standard:'#8e24aa',
+  shortest:'#00897b',
+  no_toll:'#ef6c00',
+  longest:'#3949ab',
+  alt:'#546e7a'
+};
+
 /* =========================================================
    2. APPLICATION STATE
 ========================================================= */
@@ -888,8 +930,8 @@ const locState = {
 };
 
 let routePolylines = [];
-let activeRoutingMode = 'fast';
-let avoidTolls = false;
+let routeOptions = [];
+let selectedRouteId = null;
 
 let routeRequestId = 0;
 let routeDebounce = null;
@@ -1163,18 +1205,25 @@ function getUrbanAssessment(pickup,dropoff,itemP,itemD) {
 }
 
 /* =========================================================
-   6. MAP OBJECT MANAGEMENT
+   6. MAP OBJECT MANAGEMENT & MULTI-ROUTE RENDERING
 ========================================================= */
 
 function clearRouteObjects() {
   if (!map) return;
 
-  routePolylines.forEach(line => {
+  routePolylines.forEach(entry => {
     try {
-      map.removeObject(line);
+      map.removeObject(entry.line);
     } catch (_) {}
   });
   routePolylines = [];
+}
+
+function resetRouteOptionsUI() {
+  routeOptions = [];
+  selectedRouteId = null;
+  $('route-options-list').innerHTML =
+    '<div class="route-options-empty" style="grid-column:1/-1">Select pickup and drop-off to compare route options on the map.</div>';
 }
 
 function clearMarker(type) {
@@ -1213,6 +1262,7 @@ function invalidateRoute(clearResults=true) {
 
   if (clearResults) {
     clearRouteObjects();
+    resetRouteOptionsUI();
     $('result-card').style.display = 'none';
     latestCalculation = null;
     setRouteStatus('');
@@ -1513,7 +1563,7 @@ function requestCurrentLocation() {
 }
 
 /* =========================================================
-   10. ROUTING CONTROLS
+   10. LOCATION SWAP
 ========================================================= */
 
 function swapLocations() {
@@ -1539,24 +1589,6 @@ function swapLocations() {
 
   if (locState.pickup.coords) updateMarker('pickup',locState.pickup.coords);
   if (locState.dropoff.coords) updateMarker('dropoff',locState.dropoff.coords);
-
-  recalculateIfReady();
-}
-
-function setRoutingMode(mode) {
-  if (!['fast','short'].includes(mode) || activeRoutingMode === mode) return;
-
-  activeRoutingMode = mode;
-  $('btn-mode-fast').classList.toggle('active',mode === 'fast');
-  $('btn-mode-short').classList.toggle('active',mode === 'short');
-
-  recalculateIfReady();
-}
-
-function toggleAvoidTolls() {
-  avoidTolls = !avoidTolls;
-  $('btn-avoid-tolls').classList.toggle('active',avoidTolls);
-  $('btn-avoid-tolls').textContent = `🛑 Avoid Tolls: ${avoidTolls ? 'ON' : 'OFF'}`;
 
   recalculateIfReady();
 }
@@ -1639,19 +1671,15 @@ function resolvePlazaFares(fares) {
     return {resolved:false,unsupportedCurrency};
   }
 
-  // Step 1: Exclude commercial/heavy vehicles, motorcycles, and special season/rebate passes
   const nonExcluded = validFares.filter(f => !isExcludedVehicleOrPassFare(f.raw));
   const vehiclePool = nonExcluded.length ? nonExcluded : validFares;
 
-  // Step 2: Filter to explicit Class 1 (Private Car / 2 Axles) if labelled
   const class1Pool = vehiclePool.filter(f => isExplicitClass1Fare(f.raw));
   const activeClass1 = class1Pool.length ? class1Pool : vehiclePool;
 
-  // Step 3: Prefer standard Touch 'n Go (TnG) / electronic card tariff over cash
   const tngPool = activeClass1.filter(f => isStandardTngFare(f.raw));
   const finalPool = tngPool.length ? tngPool : activeClass1;
 
-  // Step 4: Deduplicate identical tariffs; if multiple standard tariffs exist, pick standard non-zero published rate
   const uniqueAmounts = [...new Set(finalPool.map(f => roundMoney(f.amount)))];
 
   if (uniqueAmounts.length === 1) {
@@ -1662,7 +1690,6 @@ function resolvePlazaFares(fares) {
     };
   }
 
-  // If a closed-system plaza lists both a RM0.00 entry and an actual exit tariff, or cash vs TnG
   const nonZeroAmounts = uniqueAmounts.filter(amt => amt > 0);
   if (nonZeroAmounts.length === 1) {
     return {
@@ -1672,12 +1699,10 @@ function resolvePlazaFares(fares) {
     };
   }
 
-  // Standard published Class 1 TnG tariff when multiple unlabelled entries appear
   if (nonZeroAmounts.length > 1) {
-    const standardRate = Math.min(...nonZeroAmounts);
     return {
       resolved:true,
-      amount:standardRate,
+      amount:Math.min(...nonZeroAmounts),
       unsupportedCurrency
     };
   }
@@ -1790,8 +1815,295 @@ function extractTolls(sections) {
 }
 
 /* =========================================================
-   12. ROUTE CALCULATION
+   12. MULTI-ROUTE CALCULATION & CANDIDATE BUILDING
 ========================================================= */
+
+function requestHereRoute(params) {
+  return new Promise((resolve,reject) => {
+    router.calculateRoute(
+      params,
+      result => resolve(result),
+      error => reject(error)
+    );
+  });
+}
+
+function parseHereRouteToOption(route,id,tag,label,color,avoidTollsRequested) {
+  const sections = Array.isArray(route && route.sections) ? route.sections : [];
+  if (!sections.length) return null;
+
+  let distanceMeters = 0;
+  let durationSeconds = 0;
+  const polylines = [];
+
+  sections.forEach(section => {
+    distanceMeters += Number(section.summary && section.summary.length || 0);
+    durationSeconds += Number(section.summary && section.summary.duration || 0);
+    if (section.polyline) {
+      polylines.push(H.geo.LineString.fromFlexiblePolyline(section.polyline));
+    }
+  });
+
+  const distanceKm = distanceMeters / 1000;
+  const durationMins = durationSeconds / 60;
+
+  if (!(distanceKm > 0) || !Number.isFinite(durationMins) || durationMins < 0 || !polylines.length) {
+    return null;
+  }
+
+  const tollInfo = extractTolls(sections);
+
+  return {
+    id,
+    tag,
+    label,
+    color,
+    distance:distanceKm,
+    duration:durationMins,
+    sectionsCount:sections.length,
+    polylines,
+    tollInfo,
+    avoidTollsRequested
+  };
+}
+
+function isSameRoute(a,b) {
+  return (
+    Math.abs(a.distance - b.distance) < 0.35 &&
+    Math.abs(a.duration - b.duration) < 1.5 &&
+    Math.abs(a.tollInfo.amount - b.tollInfo.amount) < 0.05
+  );
+}
+
+function buildCandidateRoutes(rawResults) {
+  const candidates = [];
+
+  const addUnique = (route,id,tag,label,color,avoidTolls) => {
+    const parsed = parseHereRouteToOption(route,id,tag,label,color,avoidTolls);
+    if (!parsed) return;
+    if (candidates.some(existing => isSameRoute(existing,parsed))) return;
+    candidates.push(parsed);
+  };
+
+  const [standardRes,shortestRes,noTollRes,scenicRes] = rawResults;
+
+  if (standardRes && Array.isArray(standardRes.routes) && standardRes.routes.length) {
+    addUnique(
+      standardRes.routes[0],
+      'standard',
+      'standard',
+      'Standard / Toll',
+      ROUTE_COLORS.standard,
+      false
+    );
+    if (standardRes.routes[1]) {
+      addUnique(
+        standardRes.routes[1],
+        'alt-1',
+        'alt',
+        'Alternative',
+        ROUTE_COLORS.alt,
+        false
+      );
+    }
+  }
+
+  if (shortestRes && Array.isArray(shortestRes.routes) && shortestRes.routes.length) {
+    addUnique(
+      shortestRes.routes[0],
+      'shortest',
+      'shortest',
+      'Shortest',
+      ROUTE_COLORS.shortest,
+      false
+    );
+  }
+
+  if (noTollRes && Array.isArray(noTollRes.routes) && noTollRes.routes.length) {
+    addUnique(
+      noTollRes.routes[0],
+      'no_toll',
+      'no_toll',
+      'No Toll',
+      ROUTE_COLORS.no_toll,
+      true
+    );
+  }
+
+  if (scenicRes && Array.isArray(scenicRes.routes) && scenicRes.routes.length) {
+    addUnique(
+      scenicRes.routes[0],
+      'scenic',
+      'alt',
+      'Non-Highway',
+      ROUTE_COLORS.alt,
+      false
+    );
+  }
+
+  // Identify the longest distinct route among candidates if there are at least 2 distinct routes
+  if (candidates.length >= 2) {
+    let longestIdx = 0;
+    for (let i = 1; i < candidates.length; i++) {
+      if (candidates[i].distance > candidates[longestIdx].distance) {
+        longestIdx = i;
+      }
+    }
+    const longestCandidate = candidates[longestIdx];
+    const shortestCandidate = candidates.reduce(
+      (min,cur) => (cur.distance < min.distance ? cur : min),
+      candidates[0]
+    );
+    if (longestCandidate.distance - shortestCandidate.distance >= 0.4) {
+      longestCandidate.label = `Longest (${longestCandidate.label})`;
+      longestCandidate.color = ROUTE_COLORS.longest;
+    }
+  }
+
+  return candidates;
+}
+
+function renderAllRoutesOnMap(options,activeId) {
+  clearRouteObjects();
+  if (!map || !options.length) return;
+
+  const boundsGroup = new H.map.Group();
+  const inactiveLines = [];
+  let activeLineObj = null;
+
+  options.forEach(opt => {
+    const isActive = opt.id === activeId;
+    opt.polylines.forEach(lineString => {
+      const line = new H.map.Polyline(lineString,{
+        style:{
+          strokeColor:opt.color,
+          lineWidth:isActive ? 6 : 4,
+          lineDash:isActive ? [] : [6,4]
+        },
+        zIndex:isActive ? 10 : 2
+      });
+
+      line.setData({routeId:opt.id});
+      line.addEventListener('tap',() => selectRouteOption(opt.id));
+
+      routePolylines.push({routeId:opt.id,line});
+      boundsGroup.addObject(line);
+
+      if (isActive) {
+        activeLineObj = line;
+      } else {
+        inactiveLines.push(line);
+      }
+    });
+  });
+
+  if (inactiveLines.length) map.addObjects(inactiveLines);
+  if (activeLineObj) map.addObject(activeLineObj);
+
+  const bounds = boundsGroup.getBoundingBox();
+  if (bounds) {
+    map.getViewModel().setLookAtData({bounds,padding:32});
+  }
+}
+
+function renderRouteOptionsUI(options,activeId) {
+  const container = $('route-options-list');
+  container.innerHTML = '';
+
+  if (!options.length) {
+    container.innerHTML =
+      '<div class="route-options-empty" style="grid-column:1/-1">No distinct routes returned.</div>';
+    return;
+  }
+
+  options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `route-choice-btn${opt.id === activeId ? ' active' : ''}`;
+    btn.setAttribute('aria-pressed',String(opt.id === activeId));
+
+    const top = document.createElement('div');
+    top.className = 'route-choice-top';
+
+    const left = document.createElement('span');
+    left.style.display = 'inline-flex';
+    left.style.alignItems = 'center';
+    left.style.gap = '6px';
+
+    const swatch = document.createElement('span');
+    swatch.className = 'route-swatch';
+    swatch.style.backgroundColor = opt.color;
+
+    const title = document.createElement('span');
+    title.textContent = opt.label;
+
+    left.append(swatch,title);
+
+    const tollTag = document.createElement('span');
+    tollTag.textContent = `Toll ${money(opt.tollInfo.amount)}`;
+
+    top.append(left,tollTag);
+
+    const meta = document.createElement('div');
+    meta.className = 'route-choice-meta';
+    meta.textContent = `${opt.distance.toFixed(1)} km · ${formatDuration(opt.duration)}`;
+
+    btn.append(top,meta);
+    btn.addEventListener('click',() => selectRouteOption(opt.id));
+    container.appendChild(btn);
+  });
+}
+
+function selectRouteOption(routeId) {
+  const chosen = routeOptions.find(opt => opt.id === routeId) || routeOptions[0];
+  if (!chosen) return;
+
+  selectedRouteId = chosen.id;
+  renderAllRoutesOnMap(routeOptions,selectedRouteId);
+  renderRouteOptionsUI(routeOptions,selectedRouteId);
+  applySelectedRouteCalculation(chosen);
+}
+
+function applySelectedRouteCalculation(chosen) {
+  const tollInfo = chosen.tollInfo;
+  const manualValue = $('manual-toll').value.trim();
+  const manualOverride = manualValue !== '';
+
+  const tollFee = manualOverride ? roundMoney(Number(manualValue)) : tollInfo.amount;
+  const tollSource = manualOverride
+    ? 'Manual override'
+    : (tollInfo.available ? 'HERE Class 1 TnG MYR estimate' : 'HERE toll data unverified');
+  const tollVerified = manualOverride ? true : tollInfo.available;
+
+  const calculation = processCalculations({
+    distance:chosen.distance,
+    duration:chosen.duration,
+    tollFee,
+    tollSource,
+    tollAvailable:tollInfo.available,
+    tollVerified,
+    tollRecordsDetected:tollInfo.recordsDetected,
+    tollUnresolvedRecords:tollInfo.unresolvedRecords,
+    tollUnsupportedCurrency:tollInfo.unsupportedCurrency,
+    tollBreakdown:tollInfo.breakdown,
+    manualOverride,
+    sectionsCount:chosen.sectionsCount,
+    avoidTollsRequested:chosen.avoidTollsRequested,
+    routeLabel:chosen.label
+  });
+
+  latestCalculation = calculation;
+
+  const statusParts = [
+    `Selected: ${chosen.label} (${routeOptions.length} route option(s) on map)`
+  ];
+
+  if (tollInfo.breakdown && tollInfo.breakdown.length) {
+    statusParts.push(`Plazas: ${tollInfo.breakdown.join(' | ')}`);
+  }
+
+  setRouteStatus(statusParts.join(' · '));
+}
 
 function calculateRoute() {
   const pickup = locState.pickup.coords;
@@ -1825,23 +2137,20 @@ function calculateRoute() {
   invalidateRoute(true);
 
   const requestId = routeRequestId;
-  const origin = {...pickup};
-  const destination = {...dropoff};
-  const routingMode = activeRoutingMode;
-  const avoidTollSnapshot = avoidTolls;
+  const origin = `${pickup.lat},${pickup.lng}`;
+  const destination = `${dropoff.lat},${dropoff.lng}`;
 
   setLoading(true);
   clearError();
-  setRouteStatus('Requesting Class 1 TnG route from HERE…');
+  setRouteStatus('Fetching route options (Standard, Shortest, No Toll, Longest)…');
 
-  routeDebounce = setTimeout(() => {
+  routeDebounce = setTimeout(async () => {
     if (requestId !== routeRequestId) return;
 
-    const params = {
-      routingMode,
+    const baseParams = {
       transportMode:'car',
-      origin:`${origin.lat},${origin.lng}`,
-      destination:`${destination.lat},${destination.lng}`,
+      origin,
+      destination,
       currency:'MYR',
       'vehicle[axleCount]':2,
       'vehicle[trailerCount]':0,
@@ -1849,128 +2158,40 @@ function calculateRoute() {
       return:'polyline,summary,tolls'
     };
 
-    if (avoidTollSnapshot) {
-      params['avoid[features]'] = 'tollRoad';
-    }
+    const queries = [
+      requestHereRoute({...baseParams,routingMode:'fast',alternatives:1}).catch(() => null),
+      requestHereRoute({...baseParams,routingMode:'short'}).catch(() => null),
+      requestHereRoute({...baseParams,routingMode:'fast','avoid[features]':'tollRoad'}).catch(() => null),
+      requestHereRoute({...baseParams,routingMode:'short','avoid[features]':'controlledAccessHighway'}).catch(() => null)
+    ];
 
-    router.calculateRoute(
-      params,
-      result => {
-        if (requestId !== routeRequestId) return;
-        setLoading(false);
+    try {
+      const results = await Promise.all(queries);
+      if (requestId !== routeRequestId) return;
+      setLoading(false);
 
-        if (!result || !Array.isArray(result.routes) || !result.routes.length) {
-          showError('No route found for the selected locations.');
-          return;
-        }
-
-        try {
-          handleRouteResult(result.routes[0],requestId);
-        } catch (error) {
-          console.error('Route processing error:',error);
-          showError('Route was returned, but its details could not be processed.');
-        }
-      },
-      error => {
-        if (requestId !== routeRequestId) return;
-        setLoading(false);
-        console.error('HERE routing error:',error);
-        showError('Route calculation failed. Check internet access, API permissions and routing settings.');
+      const candidates = buildCandidateRoutes(results);
+      if (!candidates.length) {
+        showError('No route found for the selected locations.');
+        return;
       }
-    );
+
+      routeOptions = candidates;
+      selectedRouteId = candidates[0].id;
+      renderAllRoutesOnMap(routeOptions,selectedRouteId);
+      renderRouteOptionsUI(routeOptions,selectedRouteId);
+      applySelectedRouteCalculation(candidates[0]);
+    } catch (error) {
+      if (requestId !== routeRequestId) return;
+      setLoading(false);
+      console.error('Route calculation error:',error);
+      showError('Route calculation failed. Check internet access, API permissions and routing settings.');
+    }
   },180);
 }
 
 /* =========================================================
-   13. ROUTE RESULT PROCESSING
-========================================================= */
-
-function handleRouteResult(route,requestId) {
-  if (requestId !== routeRequestId) return;
-
-  const sections = Array.isArray(route.sections) ? route.sections : [];
-  if (!sections.length) {
-    throw new Error('Route contains no sections.');
-  }
-
-  let distanceMeters = 0;
-  let durationSeconds = 0;
-
-  sections.forEach(section => {
-    distanceMeters += Number(section.summary && section.summary.length || 0);
-    durationSeconds += Number(section.summary && section.summary.duration || 0);
-  });
-
-  const distanceKm = distanceMeters / 1000;
-  const durationMins = durationSeconds / 60;
-
-  if (!(distanceKm > 0) || !Number.isFinite(durationMins) || durationMins < 0) {
-    throw new Error('Invalid route summary.');
-  }
-
-  const tollInfo = extractTolls(sections);
-  const manualValue = $('manual-toll').value.trim();
-  const manualOverride = manualValue !== '';
-
-  const tollFee = manualOverride ? roundMoney(Number(manualValue)) : tollInfo.amount;
-  const tollSource = manualOverride
-    ? 'Manual override'
-    : (tollInfo.available ? 'HERE Class 1 TnG MYR estimate' : 'HERE toll data unverified');
-  const tollVerified = manualOverride ? true : tollInfo.available;
-
-  clearRouteObjects();
-  const group = new H.map.Group();
-
-  sections.forEach(section => {
-    if (!section.polyline) return;
-    const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
-    const line = new H.map.Polyline(lineString,{
-      style:{strokeColor:'#8e24aa',lineWidth:5}
-    });
-    routePolylines.push(line);
-    group.addObject(line);
-  });
-
-  if (routePolylines.length) {
-    map.addObjects(routePolylines);
-    const bounds = group.getBoundingBox();
-    if (bounds) {
-      map.getViewModel().setLookAtData({bounds,padding:30});
-    }
-  }
-
-  const calculation = processCalculations({
-    distance:distanceKm,
-    duration:durationMins,
-    tollFee,
-    tollSource,
-    tollAvailable:tollInfo.available,
-    tollVerified,
-    tollRecordsDetected:tollInfo.recordsDetected,
-    tollUnresolvedRecords:tollInfo.unresolvedRecords,
-    tollUnsupportedCurrency:tollInfo.unsupportedCurrency,
-    tollBreakdown:tollInfo.breakdown,
-    manualOverride,
-    sectionsCount:sections.length,
-    avoidTollsRequested:avoidTolls
-  });
-
-  latestCalculation = calculation;
-
-  const statusParts = [
-    `Route calculated · ${sections.length} section(s)`,
-    activeRoutingMode === 'fast' ? 'Fastest' : 'Shortest'
-  ];
-
-  if (tollInfo.breakdown && tollInfo.breakdown.length) {
-    statusParts.push(`Plazas: ${tollInfo.breakdown.join(' | ')}`);
-  }
-
-  setRouteStatus(statusParts.join(' · '));
-}
-
-/* =========================================================
-   14. FARE CALCULATION ENGINE
+   13. FARE CALCULATION ENGINE
 ========================================================= */
 
 function roundToUnit(value,unit) {
@@ -2081,6 +2302,7 @@ function processCalculations(routeData) {
 
   const warnings = buildTollWarnings(routeData);
   const status = [
+    `Route: ${routeData.routeLabel || 'Standard'}`,
     `Tolls: ${routeData.tollSource}`,
     `Highland: ${hillApplies ? 'applied' : 'not applied'}`,
     ...warnings
@@ -2092,9 +2314,10 @@ function processCalculations(routeData) {
   $('result-card').style.display = 'block';
 
   return {
-    version:'2.6',
+    version:'2.7',
     pickup:$('pickup').value.trim(),
     dropoff:$('dropoff').value.trim(),
+    routeOption:routeData.routeLabel || 'Standard / Toll',
     distance:routeData.distance,
     duration:routeData.duration,
     distanceFare,
@@ -2125,15 +2348,14 @@ function processCalculations(routeData) {
     usesFlatCommission,
     driverFareEarnings,
     driverAmountAfterDeduction,
-    routingMode:activeRoutingMode,
-    avoidTolls,
+    avoidTolls:routeData.avoidTollsRequested,
     settingsSnapshot:{...settings},
     calculatedAt:new Date().toISOString()
   };
 }
 
 /* =========================================================
-   15. DURATION FORMATTING
+   14. DURATION FORMATTING
 ========================================================= */
 
 function formatDuration(minutes) {
@@ -2152,7 +2374,7 @@ function formatDuration(minutes) {
 }
 
 /* =========================================================
-   16. RECEIPT GENERATION
+   15. RECEIPT GENERATION
 ========================================================= */
 
 function receiptText(data) {
@@ -2161,14 +2383,13 @@ function receiptText(data) {
     : '  - None / Unitemised';
 
   return [
-    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v2.6',
+    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v2.7',
     '------------------------------------------------',
     `From: ${data.pickup}`,
     `To: ${data.dropoff}`,
+    `Route option: ${data.routeOption || 'Standard / Toll'}`,
     `Distance: ${data.distance.toFixed(1)} km`,
     `Estimated duration: ${formatDuration(data.duration)}`,
-    `Route: ${data.routingMode === 'fast' ? 'Fastest' : 'Shortest'}`,
-    `Avoid tolls requested: ${data.avoidTolls ? 'Yes' : 'No'}`,
     '------------------------------------------------',
     `Distance fare: ${money(data.distanceFare)}`,
     `Urban / POI surcharge: ${money(data.urbanSurcharge)}`,
@@ -2197,12 +2418,12 @@ function receiptText(data) {
     'Tolls are reimbursement, not driver profit.',
     'Driver earnings exclude fuel, maintenance, depreciation and other operating costs.',
     'Estimate only. Verify tolls and final fare before travel.',
-    'Generated by Rideshare MY Personal Edition v2.6'
+    'Generated by Rideshare MY Personal Edition v2.7'
   ].join('\n');
 }
 
 /* =========================================================
-   17. CLIPBOARD
+   16. CLIPBOARD
 ========================================================= */
 
 async function copyText(text) {
@@ -2255,7 +2476,7 @@ async function copyReceipt() {
 }
 
 /* =========================================================
-   18. TRIP HISTORY
+   17. TRIP HISTORY
 ========================================================= */
 
 function saveCurrentTrip() {
@@ -2310,7 +2531,7 @@ function renderHistory() {
 
     const toll = document.createElement('div');
     toll.className = 'small-muted';
-    toll.textContent = `Tolls: ${money(item.tollFee)} · ${item.tollVerified ? 'Class 1 TnG verified' : 'Unverified'}`;
+    toll.textContent = `${item.routeOption ? item.routeOption + ' · ' : ''}Tolls: ${money(item.tollFee)} · ${item.tollVerified ? 'Class 1 TnG verified' : 'Unverified'}`;
 
     row.append(heading,detail,stamp,toll);
     list.appendChild(row);
@@ -2318,7 +2539,7 @@ function renderHistory() {
 }
 
 /* =========================================================
-   19. CSV EXPORT — FORMULA INJECTION PROTECTION
+   18. CSV EXPORT — FORMULA INJECTION PROTECTION
 ========================================================= */
 
 function safeCsvValue(value) {
@@ -2336,12 +2557,12 @@ function exportHistoryCsv() {
   }
 
   const columns = [
-    'version','id','savedAt','calculatedAt','pickup','dropoff','distance','duration',
+    'version','id','savedAt','calculatedAt','pickup','dropoff','routeOption','distance','duration',
     'distanceFare','urbanSurcharge','urbanLabel','tollFee','tollSource','tollStandard','tollVerified',
     'tollUnresolvedRecords','tollBreakdown','manualOverride','hillSurcharge','highlandZone',
     'longHaulIncentive','transportSubtotal','transportFare','exactTotal','roundingAdjustment',
     'customerTotal','adminDeduction','usesFlatCommission','driverFareEarnings',
-    'driverAmountAfterDeduction','routingMode','avoidTolls','settingsSnapshot'
+    'driverAmountAfterDeduction','avoidTolls','settingsSnapshot'
   ];
 
   const csv = [
@@ -2362,7 +2583,7 @@ function exportHistoryCsv() {
   const a = document.createElement('a');
 
   a.href = url;
-  a.download = 'rideshare-my-trip-history-v2.6.csv';
+  a.download = 'rideshare-my-trip-history-v2.7.csv';
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -2382,7 +2603,7 @@ function clearTripHistory() {
 }
 
 /* =========================================================
-   20. MAP INITIALISATION
+   19. MAP INITIALISATION
 ========================================================= */
 
 function initMap() {
@@ -2426,7 +2647,7 @@ function initMap() {
 }
 
 /* =========================================================
-   21. EVENT BINDING
+   20. EVENT BINDING
 ========================================================= */
 
 function bindEvents() {
@@ -2435,9 +2656,6 @@ function bindEvents() {
 
   $('current-loc-btn').addEventListener('click',requestCurrentLocation);
   $('swap-locations-btn').addEventListener('click',swapLocations);
-  $('btn-mode-fast').addEventListener('click',() => setRoutingMode('fast'));
-  $('btn-mode-short').addEventListener('click',() => setRoutingMode('short'));
-  $('btn-avoid-tolls').addEventListener('click',toggleAvoidTolls);
   $('manual-toll').addEventListener('change',recalculateIfReady);
   $('share-btn').addEventListener('click',copyReceipt);
   $('save-trip-btn').addEventListener('click',saveCurrentTrip);
@@ -2479,7 +2697,7 @@ function bindEvents() {
 }
 
 /* =========================================================
-   22. APPLICATION STARTUP
+   21. APPLICATION STARTUP
 ========================================================= */
 
 function boot() {
