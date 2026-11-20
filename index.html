@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare MY - Personal Edition v2.7</title>
+<title>Rideshare MY - Personal Edition v2.8</title>
 
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 
@@ -670,7 +670,7 @@ summary {
 
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v2.7</span>
+      <span class="version">PERSONAL EDITION v2.8</span>
     </div>
 
     <!-- LOCATION INPUTS -->
@@ -780,12 +780,12 @@ summary {
       </label>
 
       <div class="small-muted">
-        Resolves Class 1 Touch 'n Go / electronic card tariffs, filters duplicate/synthetic toll items, and falls back to calibrated Malaysian corridor tables if HERE returns noisy or unverified tolls.
+        Validates toll booth system IDs, active drivable road-link alignment, and Class 1 Touch 'n Go card fares while filtering defunct/abandoned booths, noise, and duplicate entries.
       </div>
 
     </div>
 
-    <div id="loading-msg">Calculating route and Class 1 TnG tolls…</div>
+    <div id="loading-msg">Calculating route and validating active Class 1 TnG tolls…</div>
     <div id="error-msg" role="alert"></div>
     <div id="route-status" class="status-line" aria-live="polite"></div>
 
@@ -975,7 +975,7 @@ summary {
         Settings are stored on this device only.
         Commission is calculated on transport fare excluding tolls.
         The flat commission applies below the RM8 pre-minimum threshold.
-        Custom corridor overrides trigger automatically (either direction) when Avoid Tolls is OFF and HERE returns unverified or duplicate-noisy tolls.
+        Custom corridor overrides trigger automatically (either direction) when Avoid Tolls is OFF and HERE returns unverified, defunct, or duplicate-noisy tolls.
       </p>
     </details>
 
@@ -1060,9 +1060,11 @@ const DEFAULT_SETTINGS = Object.freeze({
 });
 
 const ADMIN_FLAT_THRESHOLD = 8;
+const MAX_TOLL_LINK_SNAP_KM = 0.25;
 
-const SETTINGS_KEY = 'rideshareMY.personal.v2.7.settings';
+const SETTINGS_KEY = 'rideshareMY.personal.v2.8.settings';
 const LEGACY_SETTINGS_KEYS = [
+  'rideshareMY.personal.v2.7.settings',
   'rideshareMY.personal.v2.6.settings',
   'rideshareMY.personal.v2.5.settings',
   'rideshareMY.personal.v2.4.settings',
@@ -1072,8 +1074,9 @@ const LEGACY_SETTINGS_KEYS = [
   'rideshareMY.personal.v2.settings'
 ];
 
-const HISTORY_KEY = 'rideshareMY.personal.v2.7.history';
+const HISTORY_KEY = 'rideshareMY.personal.v2.8.history';
 const LEGACY_HISTORY_KEYS = [
+  'rideshareMY.personal.v2.7.history',
   'rideshareMY.personal.v2.6.history',
   'rideshareMY.personal.v2.5.history',
   'rideshareMY.personal.v2.4.history',
@@ -2277,8 +2280,71 @@ function toggleAvoidTolls() {
 }
 
 /* =========================================================
-   11. CLASS 1 + TOUCH 'N GO CARD TOLL RESOLVER + DEDUPE (v2.7)
+   11. STRUCTURAL & ROUTING-VALIDATED TOLL ENGINE (v2.8)
 ========================================================= */
+
+function extractSectionPoints(section) {
+  if (!section || !section.polyline || !window.H || !H.geo || !H.geo.LineString) {
+    return [];
+  }
+
+  try {
+    const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
+    const latLngAlt = lineString.getLatLngAltArray();
+    const pts = [];
+    for (let i = 0; i + 1 < latLngAlt.length; i += 3) {
+      const lat = Number(latLngAlt[i]);
+      const lng = Number(latLngAlt[i + 1]);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        pts.push({ lat, lng });
+      }
+    }
+    return pts;
+  } catch (_) {
+    return [];
+  }
+}
+
+function minDistanceToPolylineKm(point,polyPts) {
+  if (!point || !Array.isArray(polyPts) || !polyPts.length) {
+    return null;
+  }
+
+  let minDist = Infinity;
+  // Sample points efficiently for fast mobile execution
+  const step = polyPts.length > 600 ? Math.floor(polyPts.length / 600) : 1;
+  for (let i = 0; i < polyPts.length; i += step) {
+    const d = calculateHaversineDistance(
+      point.lat,
+      point.lng,
+      polyPts[i].lat,
+      polyPts[i].lng
+    );
+    if (d < minDist) {
+      minDist = d;
+    }
+  }
+  return Number.isFinite(minDist) ? minDist : null;
+}
+
+function hasBlockedOrClosedRoadAction(section) {
+  const actions = Array.isArray(section && section.actions) ? section.actions : [];
+  for (const act of actions) {
+    const text = [
+      act.action,
+      act.instruction,
+      ...(Array.isArray(act.roadAttributes) ? act.roadAttributes : [])
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+    if (/\b(closed|blocked|closure|not.?drivable|impassable)\b/.test(text)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 function readTollAmount(entry) {
   if (!entry || typeof entry !== 'object') return null;
@@ -2293,10 +2359,10 @@ function readTollAmount(entry) {
   ).toUpperCase();
 
   if (currency !== 'MYR') {
-    return { valid: false, unsupportedCurrency: true };
+    return { valid:false, unsupportedCurrency:true };
   }
 
-  return { valid: true, amount: roundMoney(value) };
+  return { valid:true, amount:roundMoney(value) };
 }
 
 function getFareDescriptor(fare) {
@@ -2365,6 +2431,80 @@ function isCashOnlyFare(fare) {
   return methods.every(m => m === 'cash') && !isTngCardPaymentFare(fare);
 }
 
+function validateTollPointStructure(toll,section,polyPts) {
+  if (!toll || typeof toll !== 'object') {
+    return { active:false, reason:'Malformed toll object' };
+  }
+
+  // 1. Check defunct, abandoned, closed, or non-standard status markers in toll/system metadata
+  const metaText = [
+    toll.id,
+    toll.tollId,
+    toll.name,
+    toll.status,
+    toll.state,
+    toll.type,
+    toll.category,
+    toll.tollSystem && toll.tollSystem.id,
+    toll.tollSystem && toll.tollSystem.name
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  if (/\b(abandoned|defunct|closed|inactive|decommissioned|out.?of.?service|demolished|disused|dummy|placeholder|test)\b/.test(metaText)) {
+    return { active:false, reason:'Defunct/abandoned/inactive toll marker' };
+  }
+
+  // 2. Check valid toll system / booth identifier
+  const systemId = String(
+    (toll.tollSystem && (toll.tollSystem.id || toll.tollSystem.name)) ||
+    toll.tollSystemId ||
+    ''
+  ).trim();
+
+  const boothId = String(
+    toll.id || toll.tollId || ''
+  ).trim();
+
+  const hasValidSystemOrBoothId =
+    (systemId.length > 0 && !/^(unknown|null|undefined|none|0)$/i.test(systemId)) ||
+    (boothId.length > 0 && !/^(unknown|null|undefined|none|0)$/i.test(boothId));
+
+  if (!hasValidSystemOrBoothId) {
+    return { active:false, reason:'Missing valid toll system/booth ID' };
+  }
+
+  // 3. Check section road-link traversal integrity & drivable road attributes
+  const sectionLength = Number(section && section.summary && section.summary.length || 0);
+  if (!(sectionLength > 0)) {
+    return { active:false, reason:'Section has zero/invalid traversed length' };
+  }
+
+  if (hasBlockedOrClosedRoadAction(section)) {
+    return { active:false, reason:'Road closure/non-drivable action on section' };
+  }
+
+  // 4. Verify toll point coordinate attachment against traversed route link geometry when available
+  const point = toll.position || toll.location || toll.coordinates || null;
+  if (point && Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lng))) {
+    const coords = { lat:Number(point.lat), lng:Number(point.lng) };
+    const snapDistKm = minDistanceToPolylineKm(coords,polyPts);
+    if (snapDistKm !== null && snapDistKm > MAX_TOLL_LINK_SNAP_KM) {
+      return {
+        active:false,
+        reason:`Toll point ${snapDistKm.toFixed(2)}km off traversed road link`
+      };
+    }
+  }
+
+  return {
+    active:true,
+    systemId:systemId || boothId,
+    boothId
+  };
+}
+
 function resolvePlazaFares(fares) {
   const validFares = [];
   let unsupportedCurrency = false;
@@ -2377,12 +2517,12 @@ function resolvePlazaFares(fares) {
       return;
     }
     if (parsed.valid) {
-      validFares.push({ raw: fare, amount: parsed.amount });
+      validFares.push({ raw:fare, amount:parsed.amount });
     }
   });
 
   if (!validFares.length) {
-    return { resolved: false, unsupportedCurrency };
+    return { resolved:false, unsupportedCurrency };
   }
 
   const explicitClass1 = validFares.filter(f => isExplicitClass1Fare(f.raw));
@@ -2391,7 +2531,7 @@ function resolvePlazaFares(fares) {
     : validFares.filter(f => !isExcludedVehicleFare(f.raw));
 
   if (!class1Pool.length) {
-    return { resolved: false, unsupportedCurrency };
+    return { resolved:false, unsupportedCurrency };
   }
 
   const tngCardPool = class1Pool.filter(f => isTngCardPaymentFare(f.raw));
@@ -2411,17 +2551,17 @@ function resolvePlazaFares(fares) {
 
   if (uniqueAmounts.size === 1) {
     return {
-      resolved: true,
-      amount: Number([...uniqueAmounts][0]),
+      resolved:true,
+      amount:Number([...uniqueAmounts][0]),
       methodTag,
       unsupportedCurrency
     };
   }
 
-  return { resolved: false, unsupportedCurrency };
+  return { resolved:false, unsupportedCurrency };
 }
 
-function normalizePlazaKey(plazaName,tollObj,amount) {
+function normalizePlazaSignature(plazaName,systemId,tollObj,amount) {
   const cleanName = String(plazaName || '')
     .trim()
     .toLowerCase()
@@ -2429,19 +2569,20 @@ function normalizePlazaKey(plazaName,tollObj,amount) {
     .replace(/\s+/g,' ')
     .trim();
 
-  const lat = tollObj && tollObj.position && Number.isFinite(Number(tollObj.position.lat))
-    ? Number(tollObj.position.lat).toFixed(2)
-    : '';
-  const lng = tollObj && tollObj.position && Number.isFinite(Number(tollObj.position.lng))
-    ? Number(tollObj.position.lng).toFixed(2)
-    : '';
-
-  if (cleanName && !/^toll plaza \d+$/.test(cleanName)) {
-    return `name:${cleanName}:${amount.toFixed(2)}`;
-  }
+  const point = tollObj && (tollObj.position || tollObj.location || tollObj.coordinates);
+  const lat = point && Number.isFinite(Number(point.lat)) ? Number(point.lat).toFixed(3) : '';
+  const lng = point && Number.isFinite(Number(point.lng)) ? Number(point.lng).toFixed(3) : '';
 
   if (lat && lng) {
-    return `coord:${lat},${lng}:${amount.toFixed(2)}`;
+    return `geo:${lat},${lng}:${amount.toFixed(2)}`;
+  }
+
+  if (cleanName && systemId) {
+    return `sys:${systemId.toLowerCase()}:${cleanName}:${amount.toFixed(2)}`;
+  }
+
+  if (cleanName) {
+    return `name:${cleanName}:${amount.toFixed(2)}`;
   }
 
   return null;
@@ -2452,12 +2593,12 @@ function extractTolls(sections) {
   let validAmounts = 0;
   let unresolvedRecords = 0;
   let unsupportedCurrency = false;
-  let duplicateFilteredCount = 0;
+  let filteredCount = 0;
 
   const seenPlazas = new Set();
   const seenFareIds = new Set();
-  const seenPlazaSignatures = new Set();
-  const amountOccurrenceCount = new Map();
+  const seenSignatures = new Set();
+  const amountCounts = new Map();
 
   const candidatePlazas = [];
   const filteredNotes = [];
@@ -2469,7 +2610,7 @@ function extractTolls(sections) {
     }
   });
 
-  sections.forEach((section, sectionIndex) => {
+  sections.forEach((section,sectionIndex) => {
     const tolls = Array.isArray(section.tolls) ? section.tolls : [];
     const costs =
       section.summary && Array.isArray(section.summary.tollCosts)
@@ -2478,31 +2619,42 @@ function extractTolls(sections) {
 
     if (tolls.length) {
       recordsDetected = true;
+      const polyPts = extractSectionPoints(section);
 
-      tolls.forEach((toll, tollIndex) => {
-        const hasExplicitName = Boolean(
-          toll.name || (toll.tollSystem && toll.tollSystem.name)
-        );
+      tolls.forEach((toll,tollIndex) => {
         const plazaName =
           toll.name ||
           (toll.tollSystem && toll.tollSystem.name) ||
-          `Plaza #${tollIndex + 1}`;
+          `Toll Point #${tollIndex + 1}`;
+
+        const structure = validateTollPointStructure(toll,section,polyPts);
+        if (!structure.active) {
+          filteredCount++;
+          filteredNotes.push(`${plazaName}: filtered (${structure.reason})`);
+          return;
+        }
 
         const fares = Array.isArray(toll.fares) ? toll.fares : [];
-        if (!fares.length) return;
+        if (!fares.length) {
+          filteredCount++;
+          filteredNotes.push(`${plazaName}: filtered (no tariff entries)`);
+          return;
+        }
 
         const unseenFares = fares.filter(f => !f.id || !seenFareIds.has(String(f.id)));
         if (!unseenFares.length) {
-          duplicateFilteredCount++;
+          filteredCount++;
+          filteredNotes.push(`${plazaName}: filtered (duplicate fare ID)`);
           return;
         }
 
         const identity = String(
-          toll.id || toll.tollId || `${sectionIndex}:${plazaName}:${tollIndex}`
+          toll.id || toll.tollId || `${sectionIndex}:${structure.systemId}:${plazaName}`
         );
 
         if (seenPlazas.has(identity)) {
-          duplicateFilteredCount++;
+          filteredCount++;
+          filteredNotes.push(`${plazaName}: filtered (duplicate booth record)`);
           return;
         }
         seenPlazas.add(identity);
@@ -2517,38 +2669,34 @@ function extractTolls(sections) {
         if (!resolution.resolved) {
           unresolvedRecords++;
           candidatePlazas.push({
-            label:`${plazaName} [Class 1 · TnG/Card]: Unverified`,
+            label:`${plazaName} [${structure.systemId}] [Class 1 · TnG/Card]: Unverified`,
             amount:0,
-            isDuplicateNoise:false
+            isNoise:false
           });
           return;
         }
 
-        validAmounts++;
-
-        const sig = normalizePlazaKey(plazaName,toll,resolution.amount);
-        if (sig && seenPlazaSignatures.has(sig)) {
-          duplicateFilteredCount++;
-          filteredNotes.push(`Filtered duplicate plaza ${plazaName} (${money(resolution.amount)})`);
+        const sig = normalizePlazaSignature(plazaName,structure.systemId,toll,resolution.amount);
+        if (sig && seenSignatures.has(sig)) {
+          filteredCount++;
+          filteredNotes.push(`${plazaName} (${money(resolution.amount)}): filtered (duplicate plaza/link)`);
           return;
         }
-        if (sig) seenPlazaSignatures.add(sig);
+        if (sig) seenSignatures.add(sig);
 
         const amtKey = resolution.amount.toFixed(2);
-        const prevCount = amountOccurrenceCount.get(amtKey) || 0;
-        amountOccurrenceCount.set(amtKey,prevCount + 1);
+        const prevCount = amountCounts.get(amtKey) || 0;
+        amountCounts.set(amtKey,prevCount + 1);
 
-        // If an unnamed plaza or non-standard amount repeats 3+ times, mark as suspected duplicate/synthetic noise
-        const isRepeatedNoise =
-          (!hasExplicitName && prevCount >= 2) ||
-          (prevCount >= 3);
+        // Flag repeated identical amounts or non-standard sub-sen artifacts when appearing repeatedly
+        const hasExplicitPlazaName = Boolean(toll.name && !/^toll\s*(plaza|point)\s*#?\d*$/i.test(String(toll.name).trim()));
+        const isRepeatedNoise = (!hasExplicitPlazaName && prevCount >= 2) || (prevCount >= 3);
 
+        validAmounts++;
         candidatePlazas.push({
-          label:`${plazaName} [${resolution.methodTag}]: ${money(resolution.amount)}`,
+          label:`${plazaName} [${structure.systemId} · ${resolution.methodTag}]: ${money(resolution.amount)}`,
           amount:resolution.amount,
-          isDuplicateNoise:isRepeatedNoise,
-          hasExplicitName,
-          amtKey
+          isNoise:isRepeatedNoise
         });
       });
       return;
@@ -2556,14 +2704,19 @@ function extractTolls(sections) {
 
     if (!hasItemisedTolls && costs.length) {
       recordsDetected = true;
+      if (hasBlockedOrClosedRoadAction(section)) {
+        filteredCount++;
+        filteredNotes.push(`Section ${sectionIndex + 1} summary toll: filtered (road closure/non-drivable action)`);
+        return;
+      }
 
-      costs.forEach((cost, costIndex) => {
+      costs.forEach((cost,costIndex) => {
         const identity = String(
           cost.id || cost.tollId || `${sectionIndex}:summary:${costIndex}`
         );
 
         if (seenPlazas.has(identity)) {
-          duplicateFilteredCount++;
+          filteredCount++;
           return;
         }
         seenPlazas.add(identity);
@@ -2583,50 +2736,48 @@ function extractTolls(sections) {
         if (result.valid) {
           validAmounts++;
           candidatePlazas.push({
-            label:`Highway Segment [Class 1 Summary]: ${money(result.amount)}`,
+            label:`Active Highway Link [Class 1 Summary]: ${money(result.amount)}`,
             amount:result.amount,
-            isDuplicateNoise:false
+            isNoise:false
           });
         }
       });
     }
   });
 
-  // Separate clean plazas from duplicate-noise entries
-  const cleanPlazas = candidatePlazas.filter(p => !p.isDuplicateNoise);
-  const noisyPlazas = candidatePlazas.filter(p => p.isDuplicateNoise);
+  const activePlazas = candidatePlazas.filter(p => !p.isNoise);
+  const noisePlazas = candidatePlazas.filter(p => p.isNoise);
 
-  noisyPlazas.forEach(np => {
-    duplicateFilteredCount++;
-    filteredNotes.push(`Filtered repeated/synthetic entry: ${np.label}`);
+  noisePlazas.forEach(np => {
+    filteredCount++;
+    filteredNotes.push(`${np.label}: filtered (repeated/synthetic noise)`);
   });
 
   const total = roundMoney(
-    cleanPlazas.reduce((sum,p) => sum + Number(p.amount || 0),0)
+    activePlazas.reduce((sum,p) => sum + Number(p.amount || 0),0)
   );
 
-  const breakdown = cleanPlazas.map(p => p.label);
+  const breakdown = activePlazas.map(p => p.label);
 
-  // If HERE emitted excessive entries (>= 5) or filtered repeated duplicate noise, flag for calibration/check
-  const hasExcessiveOrNoisyEntries =
-    candidatePlazas.length >= 5 || duplicateFilteredCount > 0;
+  const hasExcessiveOrFilteredNoise =
+    candidatePlazas.length >= 5 || filteredCount > 0;
 
   const available =
     recordsDetected &&
     validAmounts > 0 &&
     unresolvedRecords === 0 &&
     !unsupportedCurrency &&
-    !hasExcessiveOrNoisyEntries;
+    !hasExcessiveOrFilteredNoise;
 
   return {
-    amount: total,
+    amount:total,
     available,
     recordsDetected,
     validAmounts,
     unresolvedRecords,
     unsupportedCurrency,
-    duplicateFilteredCount,
-    hasExcessiveOrNoisyEntries,
+    duplicateFilteredCount:filteredCount,
+    hasExcessiveOrNoisyEntries:hasExcessiveOrFilteredNoise,
     filteredNotes,
     breakdown
   };
@@ -2685,7 +2836,7 @@ function calculateRoute() {
 
   setLoading(true);
   clearError();
-  setRouteStatus('Requesting route & Class 1 TnG tolls from HERE…');
+  setRouteStatus('Requesting route & validating active road-link tolls from HERE…');
 
   routeDebounce = setTimeout(() => {
     if (requestId !== routeRequestId) return;
@@ -2697,7 +2848,7 @@ function calculateRoute() {
       destination:`${destination.lat},${destination.lng}`,
       departureTime:'any',
       currency:'MYR',
-      return:'polyline,summary,tolls'
+      return:'polyline,summary,tolls,actions'
     };
 
     if (viaSnapshot) {
@@ -2795,15 +2946,14 @@ function handleRouteResult(route,requestId) {
 
   let tollFee = tollInfo.amount;
   let tollSource = tollInfo.available
-    ? 'HERE Class 1 · TnG Card (MYR)'
-    : 'HERE Class 1 · Filtered / Unverified';
+    ? 'Validated Active Toll Booths · Class 1 TnG (MYR)'
+    : 'Structural Check: Filtered / Calibrated Required';
 
   let tollVerified = tollInfo.available;
   let manualOverride = false;
   let calibratedCorridorName = '';
   let finalBreakdown = [...tollInfo.breakdown];
 
-  // Corridor fallback when HERE returns unverified or duplicate-noisy tolls & Avoid Tolls is OFF
   if (manualValue === '' && !tollVerified && !avoidTolls) {
     const matchedCorridor = matchCalibratedCorridor(pickupCoords,dropoffCoords);
     if (matchedCorridor) {
@@ -2892,7 +3042,7 @@ function handleRouteResult(route,requestId) {
     `Route calculated · ${sections.length} section(s)`,
     activeRoutingMode === 'fast' ? 'Fastest' : 'Shortest',
     viaCoords ? 'Via anchored' : null,
-    tollInfo.duplicateFilteredCount > 0 ? `Filtered ${tollInfo.duplicateFilteredCount} duplicate/noisy item(s)` : null
+    tollInfo.duplicateFilteredCount > 0 ? `Filtered ${tollInfo.duplicateFilteredCount} invalid/duplicate/noisy toll item(s)` : null
   ].filter(Boolean);
 
   setRouteStatus(statusParts.join(' · '));
@@ -3066,7 +3216,7 @@ function processCalculations(routeData) {
   ) {
     plazaBox.innerHTML = '';
     const title = document.createElement('strong');
-    title.textContent = 'Detected Toll Plazas (Class 1 · TnG Card):';
+    title.textContent = 'Validated Toll Plazas (Active Road Link · Class 1 TnG):';
     plazaBox.appendChild(title);
 
     (routeData.tollBreakdown || []).forEach(line => {
@@ -3078,7 +3228,7 @@ function processCalculations(routeData) {
     if (!routeData.calibratedCorridorName && !routeData.manualOverride && routeData.tollFilteredNotes && routeData.tollFilteredNotes.length) {
       const noteDiv = document.createElement('div');
       noteDiv.className = 'plaza-filtered-note';
-      noteDiv.textContent = `${routeData.tollFilteredNotes.length} duplicate/noisy item(s) excluded from sum.`;
+      noteDiv.textContent = `${routeData.tollFilteredNotes.length} defunct/unanchored/duplicate/noise item(s) filtered out.`;
       plazaBox.appendChild(noteDiv);
     }
 
@@ -3090,7 +3240,7 @@ function processCalculations(routeData) {
   const warnings = [];
 
   if (!routeData.tollVerified) {
-    warnings.push('Class 1 TnG toll not verified — check & enter manual override above');
+    warnings.push('Active road-link toll not independently verified — check & enter manual override above');
   }
 
   if (routeData.tollUnsupportedCurrency) {
@@ -3145,7 +3295,7 @@ function processCalculations(routeData) {
   $('result-card').style.display = 'block';
 
   return {
-    version:'2.7',
+    version:'2.8',
 
     pickup:$('pickup').value.trim(),
     dropoff:$('dropoff').value.trim(),
@@ -3161,7 +3311,7 @@ function processCalculations(routeData) {
     tollFee:routeData.tollFee,
     actualTollPaid:null,
     tollVariance:null,
-    tollCriteria:'Class 1 (Car) · Touch n Go Card Only',
+    tollCriteria:'Active Road Link · Valid System ID · Class 1 (Car) · Touch n Go Card Only',
     tollSource:routeData.tollSource,
     tollAvailable:routeData.tollAvailable,
     tollVerified:routeData.tollVerified,
@@ -3232,7 +3382,7 @@ function receiptText(data) {
     : '  - None / Unitemised';
 
   return [
-    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v2.7',
+    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v2.8',
     '------------------------------------------------',
     `From: ${data.pickup}`,
     data.via ? `Via anchor: ${data.via}` : null,
@@ -3250,12 +3400,12 @@ function receiptText(data) {
     `Transport subtotal: ${money(data.transportSubtotal)}`,
     `Minimum-adjusted transport fare: ${money(data.transportFare)}`,
     `Toll charges (Class 1 · TnG Card): ${money(data.tollFee)}`,
-    `Toll criteria: ${data.tollCriteria || 'Class 1 (Car) · Touch n Go Card Only'}`,
+    `Toll criteria: ${data.tollCriteria || 'Active Road Link · Valid System ID · Class 1 (Car) · Touch n Go Card Only'}`,
     `Toll source: ${data.tollSource}`,
     `Toll verified: ${data.tollVerified ? 'Yes' : 'No'}`,
-    `Duplicate/noisy items filtered: ${data.tollDuplicateFilteredCount || 0}`,
+    `Defunct/unanchored/duplicate/noise filtered: ${data.tollDuplicateFilteredCount || 0}`,
     `Manual toll override: ${data.manualOverride ? 'Yes' : 'No'}`,
-    'Detected Toll Plazas / Segments:',
+    'Validated Toll Plazas / Segments:',
     plazaLines,
     '------------------------------------------------',
     `Exact calculated total: ${money(data.exactTotal)}`,
@@ -3270,7 +3420,7 @@ function receiptText(data) {
     'Tolls are pass-through reimbursement (Class 1 TnG card rate), not driver profit.',
     'Driver earnings exclude fuel, maintenance, depreciation and other operating costs.',
     'Estimate only. Subject to actual Touch n Go plaza deduction.',
-    'Generated by Rideshare MY Personal Edition v2.7'
+    'Generated by Rideshare MY Personal Edition v2.8'
   ].filter(Boolean).join('\n');
 }
 
@@ -3576,7 +3726,7 @@ function exportHistoryCsv() {
   const a = document.createElement('a');
 
   a.href = url;
-  a.download = 'rideshare-my-trip-history-v2.7.csv';
+  a.download = 'rideshare-my-trip-history-v2.8.csv';
 
   document.body.appendChild(a);
   a.click();
