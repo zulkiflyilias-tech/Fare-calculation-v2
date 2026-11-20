@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Rideshare MY - Personal Edition v3.0.2</title>
+  <title>Rideshare MY - Personal Edition v3.0.3</title>
   <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
   <script src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
   <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
@@ -78,9 +78,9 @@
     #settings-panel, #toll-reference-panel { border-top:1px dashed #3a3a3c; padding-top:8px; margin-top:7px; color:#212529; }
     #settings-panel summary, #toll-reference-panel summary { color:#8e24aa; }
     .ref-system-header { font-weight:750; color:#8e24aa; font-size:11px; margin:8px 0 3px; letter-spacing:.02em; }
-    .ref-row { display:flex; justify-content:space-between; font-size:11px; padding:2px 0; border-bottom:1px solid #f2f2f2; color:#444; }
+    .ref-row { display:flex; justify-content:space-between; font-size:11px; padding:2px 0; border-bottom:1px solid #f2f2f2; color:#444; gap:8px; }
     .ref-row:last-child {border-bottom:0;}
-    .ref-amount {font-weight:650; color:#212529;}
+    .ref-amount {font-weight:650; color:#212529; white-space:nowrap;}
     .ref-amount.closed {color:#999; font-style:italic; font-weight:400;}
     .ref-badge { display:inline-block; font-size:9px; font-weight:700; padding:1px 5px; border-radius:4px; margin-left:4px; text-transform:uppercase; }
     .ref-badge.open {background:#e8f5e9; color:#2e7d32;}
@@ -96,7 +96,7 @@
   <div id="search-panel">
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.0.2</span>
+      <span class="version">PERSONAL EDITION v3.0.3</span>
     </div>
     <!-- LOCATION INPUTS -->
     <div class="routing-wrapper">
@@ -140,11 +140,11 @@
       </div>
       <label class="toll-adjust">
         <span>Actual / Manual toll override (RM)</span>
-        <input id="manual-toll" type="number" min="0" step="0.10" inputmode="decimal" placeholder="Use HERE API / Reference">
+        <input id="manual-toll" type="number" min="0" step="0.10" inputmode="decimal" placeholder="Use Standard Table / HERE">
       </label>
-      <div class="small-muted"> Toll source priority: <b>Manual override</b> → <b>GPS &amp; Reference plaza rate</b> → <b>HERE API</b>. </div>
+      <div class="small-muted"> Toll source priority: <b>Manual override</b> → <b>Standard Table Cross-Check (Open + Closed Matrix)</b> → <b>HERE API</b>. </div>
     </div>
-    <div id="loading-msg">Calculating route and HERE tolls…</div>
+    <div id="loading-msg">Calculating route and cross-checking tolls…</div>
     <div id="error-msg" role="alert"></div>
     <div id="route-status" class="status-line" aria-live="polite"></div>
     <!-- FARE RESULT -->
@@ -169,7 +169,7 @@
           <span id="calc-urban-surcharge">RM 0.00</span>
         </div>
         <div class="detail-row" id="toll-fare-row">
-          <span id="toll-fare-label">Toll charges (HERE API)</span>
+          <span id="toll-fare-label">Toll charges (Standard Table Cross-Checked)</span>
           <span id="calc-toll-fare">RM 0.00</span>
         </div>
         <div class="detail-row" id="hill-surcharge-row" style="display:none">
@@ -252,8 +252,8 @@
     </details>
     <!-- TOLL REFERENCE PANEL -->
     <details id="toll-reference-panel">
-      <summary>📖 Toll Reference Rates (Class 1 Car — All Operators)</summary>
-      <p class="small-muted" style="margin-bottom:8px"> Reference flat rates for all Malaysian tolled highway operators (major &amp; minor), matched by GPS proximity, route corridor, and plaza labels against HERE-returned toll items. Closed-system highways are distance-based and use HERE's calculation unless overridden. </p>
+      <summary>📖 Toll Reference Rates (Class 1 Car — Normal TNG)</summary>
+      <p class="small-muted" style="margin-bottom:8px"> Standard Class 1 (normal Touch 'n Go) flat open-system rates and closed-system Entry → Exit lookup pairs (PLUS, NKVE, ELITE, SKVE, WCE) cross-checked against HERE route data before final fare calculation. </p>
       <div id="toll-reference-list"></div>
     </details>
     <p class="small-muted"> Estimates are indicative. Confirm actual toll deductions and final fare before accepting a trip. HERE Maps, location search and routing require internet access. </p>
@@ -283,6 +283,7 @@
   const ADMIN_FLAT_THRESHOLD = 8;
   const SETTINGS_KEY = 'rideshareMY.personal.v3.0.settings';
   const TOLL_GPS_MATCH_RADIUS_KM = 0.25;
+  const POLYLINE_CORRIDOR_RADIUS_KM = 0.06;
 
   const HIGHLAND_ZONES = [
     {lat:3.4241,lng:101.7933,radiusKm:10,name:'Genting Highlands & Gohtong'},
@@ -304,10 +305,10 @@
   ];
 
   /* =========================================================
-     1a. TOLL PLAZA REFERENCE RATES (ALL MALAYSIAN OPERATORS, CLASS 1 + GPS)
+     1a. TOLL PLAZA REFERENCE RATES (CLASS 1 NORMAL TNG + GPS)
      ========================================================= */
   const TOLL_PLAZA_REFERENCE = [
-    // ===== GENTING HIGHLANDS ROAD CHARGE (LINGKARAN CEKAP / CLASS 1 ENTRY) =====
+    // ===== GENTING HIGHLANDS ROAD CHARGE =====
     { system:'GENTING ROAD CHARGE (LPR)', plaza:'Genting Sempah Entry', rate:5.00, type:'flat', systemType:'open', lat:3.3519, lng:101.7864 },
     { system:'GENTING ROAD CHARGE (LPR)', plaza:'Gohtong Jaya Entry', rate:5.00, type:'flat', systemType:'open', lat:3.3947, lng:101.7839 },
 
@@ -363,11 +364,6 @@
     { system:'NPE (E10 · IJM)', plaza:'PJS 5', rate:2.30, type:'flat', systemType:'open', lat:3.0772, lng:101.6164 },
     { system:'NPE (E10 · IJM)', plaza:'PJS 2 (Westbound)', rate:1.00, type:'flat', systemType:'open', lat:3.0819, lng:101.6369 },
     { system:'LEKAS (E21 · IJM)', plaza:'Ampangan (Open)', rate:2.30, type:'flat', systemType:'open', lat:2.7322, lng:101.9644 },
-    { system:'LEKAS (E21 · IJM)', plaza:'Kajang Selatan', rate:null, type:'closed', systemType:'mixed', lat:2.9764, lng:101.8022 },
-    { system:'LEKAS (E21 · IJM)', plaza:'Semenyih', rate:null, type:'closed', systemType:'mixed', lat:2.9311, lng:101.8492 },
-    { system:'LEKAS (E21 · IJM)', plaza:'Pajam', rate:null, type:'closed', systemType:'mixed', lat:2.8511, lng:101.8692 },
-    { system:'LEKAS (E21 · IJM)', plaza:'Mantin', rate:null, type:'closed', systemType:'mixed', lat:2.8158, lng:101.8942 },
-    { system:'LEKAS (E21 · IJM)', plaza:'Setul', rate:null, type:'closed', systemType:'mixed', lat:2.7681, lng:101.9289 },
 
     // ===== GRAND SEPADU / SHAPADU (NNKSB - E30) =====
     { system:'SHAPADU (E30 · GRAND SEPADU)', plaza:'Bukit Raja', rate:0.60, type:'flat', systemType:'open', lat:3.0744, lng:101.4647 },
@@ -379,18 +375,9 @@
     { system:'CHERAS-KAJANG (E7 · GRAND SAGA)', plaza:'Batu 9', rate:1.30, type:'flat', systemType:'open', lat:3.0764, lng:101.7689 },
     { system:'CHERAS-KAJANG (E7 · GRAND SAGA)', plaza:'Batu 11', rate:1.30, type:'flat', systemType:'open', lat:3.0469, lng:101.7781 },
 
-    // ===== AFA PRIME (FORMERLY ANIH): KL-KARAK & LPT1 (E8) =====
+    // ===== AFA PRIME: KL-KARAK (E8) =====
     { system:'KARAK (E8 · AFA PRIME)', plaza:'Gombak', rate:6.00, type:'flat', systemType:'open', lat:3.2571, lng:101.7318 },
     { system:'KARAK (E8 · AFA PRIME)', plaza:'Bentong', rate:3.50, type:'flat', systemType:'open', lat:3.5162, lng:101.9036 },
-    { system:'LPT1 (E8 · AFA PRIME)', plaza:'Karak', rate:null, type:'closed', systemType:'closed', lat:3.4167, lng:102.0389 },
-    { system:'LPT1 (E8 · AFA PRIME)', plaza:'Lanchang', rate:null, type:'closed', systemType:'closed', lat:3.4894, lng:102.1869 },
-    { system:'LPT1 (E8 · AFA PRIME)', plaza:'Temerloh', rate:null, type:'closed', systemType:'closed', lat:3.4481, lng:102.4192 },
-    { system:'LPT1 (E8 · AFA PRIME)', plaza:'Chenor', rate:null, type:'closed', systemType:'closed', lat:3.5356, lng:102.6169 },
-    { system:'LPT1 (E8 · AFA PRIME)', plaza:'Maran', rate:null, type:'closed', systemType:'closed', lat:3.5919, lng:102.7781 },
-    { system:'LPT1 (E8 · AFA PRIME)', plaza:'Sri Jaya', rate:null, type:'closed', systemType:'closed', lat:3.6581, lng:102.9319 },
-    { system:'LPT1 (E8 · AFA PRIME)', plaza:'Gambang', rate:null, type:'closed', systemType:'closed', lat:3.7239, lng:103.0981 },
-    { system:'LPT1 (E8 · AFA PRIME)', plaza:'Kuantan', rate:null, type:'closed', systemType:'closed', lat:3.8139, lng:103.2419 },
-    { system:'LPT1 (E8 · AFA PRIME)', plaza:'Jabor', rate:null, type:'closed', systemType:'closed', lat:3.9389, lng:103.3219 },
 
     // ===== LATAR (E25 · KLSEB) =====
     { system:'LATAR (E25)', plaza:"Templer's Park", rate:2.50, type:'flat', systemType:'open', lat:3.3144, lng:101.6083 },
@@ -403,19 +390,19 @@
     { system:'MEX (E20)', plaza:'Seri Kembangan', rate:2.20, type:'flat', systemType:'open', lat:3.0169, lng:101.6819 },
     { system:'MEX (E20)', plaza:'Putrajaya', rate:3.50, type:'flat', systemType:'open', lat:2.9469, lng:101.6822 },
 
-    // ===== SKVE HOLDINGS (E26) =====
+    // ===== SKVE HOLDINGS (E26 - CLOSED ENTRY/EXIT) =====
     { system:'SKVE (E26)', plaza:'Ayer Hitam', rate:null, type:'closed', systemType:'closed', lat:2.9681, lng:101.7519 },
     { system:'SKVE (E26)', plaza:'Saujana Putra', rate:null, type:'closed', systemType:'closed', lat:2.9522, lng:101.5844 },
     { system:'SKVE (E26)', plaza:'Telok Panglima Garang', rate:null, type:'closed', systemType:'closed', lat:2.9219, lng:101.4914 },
-    { system:'SKVE (E26)', plaza:'Pulau Indah / Carey Island', rate:null, type:'closed', systemType:'closed', lat:2.9058, lng:101.4469 },
+    { system:'SKVE (E26)', plaza:'Pulau Indah', rate:null, type:'closed', systemType:'closed', lat:2.9058, lng:101.4469 },
 
-    // ===== WEST COAST EXPRESSWAY (WCE - E32) =====
+    // ===== WEST COAST EXPRESSWAY (WCE - E32 - CLOSED ENTRY/EXIT) =====
     { system:'WCE (E32)', plaza:'Banting', rate:null, type:'closed', systemType:'closed', lat:2.8289, lng:101.5169 },
     { system:'WCE (E32)', plaza:'SKVE Interchange', rate:null, type:'closed', systemType:'closed', lat:2.9189, lng:101.4881 },
     { system:'WCE (E32)', plaza:'SAE / KESAS Interchange', rate:null, type:'closed', systemType:'closed', lat:2.9869, lng:101.4719 },
     { system:'WCE (E32)', plaza:'Bandar Bukit Raja Selatan', rate:null, type:'closed', systemType:'closed', lat:3.0819, lng:101.4481 },
-    { system:'WCE (E32)', plaza:'Bandar Bukit Raja Utara (Kapar)', rate:null, type:'closed', systemType:'closed', lat:3.1406, lng:101.3919 },
-    { system:'WCE (E32)', plaza:'Assam Jawa (Kuala Selangor)', rate:null, type:'closed', systemType:'closed', lat:3.3214, lng:101.2819 },
+    { system:'WCE (E32)', plaza:'Bandar Bukit Raja Utara', rate:null, type:'closed', systemType:'closed', lat:3.1406, lng:101.3919 },
+    { system:'WCE (E32)', plaza:'Assam Jawa', rate:null, type:'closed', systemType:'closed', lat:3.3214, lng:101.2819 },
     { system:'WCE (E32)', plaza:'Hutan Melintang', rate:null, type:'closed', systemType:'closed', lat:3.8769, lng:100.9469 },
     { system:'WCE (E32)', plaza:'Teluk Intan', rate:null, type:'closed', systemType:'closed', lat:3.9889, lng:101.0469 },
     { system:'WCE (E32)', plaza:'Lekir', rate:null, type:'closed', systemType:'closed', lat:4.1489, lng:100.7319 },
@@ -426,24 +413,14 @@
     { system:'WCE (E32)', plaza:'Trong', rate:null, type:'closed', systemType:'closed', lat:4.7089, lng:100.7281 },
     { system:'WCE (E32)', plaza:'Taiping Selatan', rate:null, type:'closed', systemType:'closed', lat:4.8119, lng:100.7381 },
 
-    // ===== EAST KLANG VALLEY EXPRESSWAY (EKVE - E27) =====
-    { system:'EKVE (E27)', plaza:'Sungai Long', rate:null, type:'closed', systemType:'closed', lat:3.0469, lng:101.8069 },
-    { system:'EKVE (E27)', plaza:'Bandar Mahkota Cheras', rate:null, type:'closed', systemType:'closed', lat:3.0589, lng:101.7919 },
-    { system:'EKVE (E27)', plaza:'Hulu Langat', rate:null, type:'closed', systemType:'closed', lat:3.1119, lng:101.8119 },
-    { system:'EKVE (E27)', plaza:'Ampang', rate:null, type:'closed', systemType:'closed', lat:3.1489, lng:101.7781 },
-
-    // ===== REGIONAL / MINOR OPERATORS: BORR (E17), JKSB (E28), SDE (E22), TUN SALAHUDDIN (E24) =====
+    // ===== REGIONAL / MINOR OPERATORS =====
     { system:'BORR (E17 · LLB)', plaza:'Perai', rate:1.50, type:'flat', systemType:'open', lat:5.3789, lng:100.3881 },
     { system:'BORR (E17 · LLB)', plaza:'Bagan Ajam', rate:1.50, type:'flat', systemType:'open', lat:5.4389, lng:100.3819 },
     { system:'BORR (E17 · LLB)', plaza:'Sungai Nyior', rate:1.20, type:'flat', systemType:'open', lat:5.4089, lng:100.3719 },
     { system:'PENANG BRIDGE 2 (E28 · JKSB)', plaza:'Bandar Cassia (Batu Kawan)', rate:5.74, type:'flat', systemType:'mixed', lat:5.2469, lng:100.4319 },
-    { system:'SDE (E22 · SENAI-DESARU)', plaza:'Senai', rate:null, type:'closed', systemType:'closed', lat:1.6358, lng:103.6353 },
-    { system:'SDE (E22 · SENAI-DESARU)', plaza:'Ulu Tiram', rate:null, type:'closed', systemType:'closed', lat:1.5925, lng:103.8164 },
-    { system:'SDE (E22 · SENAI-DESARU)', plaza:'Cahaya Baru', rate:null, type:'closed', systemType:'closed', lat:1.5319, lng:103.9319 },
-    { system:'SDE (E22 · SENAI-DESARU)', plaza:'Penawar', rate:null, type:'closed', systemType:'closed', lat:1.5589, lng:104.2119 },
     { system:'TUN SALAHUDDIN BRIDGE (E24 · SARAWAK)', plaza:'Jambatan Tun Salahuddin', rate:1.50, type:'flat', systemType:'open', lat:1.5639, lng:110.3781 },
 
-    // ===== PLUS MALAYSIA BERHAD: NSE (E1/E2), NKVE (E1), ELITE (E6), LINKEDUA (E3), BKE (E15), SPDH (E29), PENANG BRIDGE 1 (E36), LPT2 (E8) =====
+    // ===== PLUS MALAYSIA BERHAD: NSE (E1/E2), NKVE (E1), ELITE (E6), LINKEDUA (E3), BKE (E15), SPDH (E29), PENANG BRIDGE 1 (E36) =====
     { system:'PENANG BRIDGE 1 (E36 · PLUS)', plaza:'Perai (Mainland to Island)', rate:5.74, type:'flat', systemType:'open', lat:5.3575, lng:100.3436 },
     { system:'BKE (E15 · PLUS)', plaza:'Kubang Semang', rate:1.31, type:'flat', systemType:'open', lat:5.4069, lng:100.4619 },
     { system:'BKE (E15 · PLUS)', plaza:'Lunas', rate:1.31, type:'flat', systemType:'open', lat:5.4319, lng:100.5281 },
@@ -459,25 +436,6 @@
     { system:'NKVE (E1 · PLUS)', plaza:'Damansara', rate:null, type:'closed', systemType:'closed', lat:3.1667, lng:101.6156 },
     { system:'NKVE (E1 · PLUS)', plaza:'Kota Damansara', rate:null, type:'closed', systemType:'closed', lat:3.1619, lng:101.5869 },
     { system:'NKVE (E1 · PLUS)', plaza:'Jalan Duta', rate:null, type:'closed', systemType:'closed', lat:3.1739, lng:101.6689 },
-    { system:'PLUS (E1 / E2)', plaza:'Bukit Kayu Hitam', rate:null, type:'closed', systemType:'mixed', lat:6.4325, lng:100.4189 },
-    { system:'PLUS (E1 / E2)', plaza:'Jitra', rate:null, type:'closed', systemType:'mixed', lat:6.2653, lng:100.4228 },
-    { system:'PLUS (E1 / E2)', plaza:'Hutan Kampung', rate:null, type:'closed', systemType:'closed', lat:6.1489, lng:100.4019 },
-    { system:'PLUS (E1 / E2)', plaza:'Sungai Petani Selatan', rate:null, type:'closed', systemType:'closed', lat:5.6119, lng:100.4881 },
-    { system:'PLUS (E1 / E2)', plaza:'Bertam', rate:null, type:'closed', systemType:'closed', lat:5.5122, lng:100.4317 },
-    { system:'PLUS (E1 / E2)', plaza:'Sungai Dua', rate:null, type:'closed', systemType:'closed', lat:5.4419, lng:100.4281 },
-    { system:'PLUS (E1 / E2)', plaza:'Juru', rate:null, type:'closed', systemType:'closed', lat:5.3136, lng:100.4408 },
-    { system:'PLUS (E1 / E2)', plaza:'Bukit Tambun', rate:null, type:'closed', systemType:'closed', lat:5.2756, lng:100.4836 },
-    { system:'PLUS (E1 / E2)', plaza:'Taiping Utara', rate:null, type:'closed', systemType:'closed', lat:4.8919, lng:100.6819 },
-    { system:'PLUS (E1 / E2)', plaza:'Kuala Kangsar', rate:null, type:'closed', systemType:'closed', lat:4.7739, lng:100.9389 },
-    { system:'PLUS (E1 / E2)', plaza:'Ipoh Utara (Jelapang)', rate:null, type:'closed', systemType:'closed', lat:4.6619, lng:101.0719 },
-    { system:'PLUS (E1 / E2)', plaza:'Ipoh Selatan', rate:null, type:'closed', systemType:'closed', lat:4.5681, lng:101.0764 },
-    { system:'PLUS (E1 / E2)', plaza:'Gopeng', rate:null, type:'closed', systemType:'closed', lat:4.4422, lng:101.1636 },
-    { system:'PLUS (E1 / E2)', plaza:'Tapah', rate:null, type:'closed', systemType:'closed', lat:4.1956, lng:101.2619 },
-    { system:'PLUS (E1 / E2)', plaza:'Bidor', rate:null, type:'closed', systemType:'closed', lat:4.1136, lng:101.2878 },
-    { system:'PLUS (E1 / E2)', plaza:'Sungkai', rate:null, type:'closed', systemType:'closed', lat:3.9817, lng:101.3206 },
-    { system:'PLUS (E1 / E2)', plaza:'Behrang', rate:null, type:'closed', systemType:'closed', lat:3.7497, lng:101.4519 },
-    { system:'PLUS (E1 / E2)', plaza:'Tanjung Malim', rate:null, type:'closed', systemType:'closed', lat:3.6833, lng:101.5228 },
-    { system:'PLUS (E1 / E2)', plaza:'Rawang', rate:null, type:'closed', systemType:'closed', lat:3.3219, lng:101.5764 },
     { system:'PLUS (E1 / E2)', plaza:'Sungai Buloh', rate:null, type:'closed', systemType:'closed', lat:3.2044, lng:101.5806 },
     { system:'PLUS (E1 / E2)', plaza:'Bukit Lanjan', rate:null, type:'closed', systemType:'closed', lat:3.1869, lng:101.6022 },
     { system:'PLUS (E1 / E2)', plaza:'Sungai Besi', rate:null, type:'closed', systemType:'closed', lat:3.0589, lng:101.7014 },
@@ -485,17 +443,13 @@
     { system:'PLUS (E1 / E2)', plaza:'Bangi', rate:null, type:'closed', systemType:'closed', lat:2.9403, lng:101.7889 },
     { system:'PLUS (E1 / E2)', plaza:'Nilai', rate:null, type:'closed', systemType:'closed', lat:2.8158, lng:101.8056 },
     { system:'PLUS (E1 / E2)', plaza:'Seremban', rate:null, type:'closed', systemType:'closed', lat:2.7289, lng:101.9189 },
-    { system:'PLUS (E1 / E2)', plaza:'Simpang Ampat', rate:null, type:'closed', systemType:'closed', lat:2.4389, lng:102.1819 },
     { system:'PLUS (E1 / E2)', plaza:'Ayer Keroh', rate:null, type:'closed', systemType:'closed', lat:2.2731, lng:102.2953 },
-    { system:'PLUS (E1 / E2)', plaza:'Tangkak', rate:null, type:'closed', systemType:'closed', lat:2.2681, lng:102.5436 },
     { system:'PLUS (E1 / E2)', plaza:'Pagoh', rate:null, type:'closed', systemType:'closed', lat:2.1489, lng:102.7736 },
     { system:'PLUS (E1 / E2)', plaza:'Yong Peng', rate:null, type:'closed', systemType:'closed', lat:2.0158, lng:103.0639 },
-    { system:'PLUS (E1 / E2)', plaza:'Ayer Hitam', rate:null, type:'closed', systemType:'closed', lat:1.9239, lng:103.1836 },
-    { system:'PLUS (E1 / E2)', plaza:'Machap', rate:null, type:'closed', systemType:'closed', lat:1.8725, lng:103.2719 },
-    { system:'PLUS (E1 / E2)', plaza:'Sedenak', rate:null, type:'closed', systemType:'closed', lat:1.7089, lng:103.5322 },
-    { system:'PLUS (E1 / E2)', plaza:'Kulai', rate:null, type:'closed', systemType:'closed', lat:1.6531, lng:103.6008 },
     { system:'PLUS (E1 / E2)', plaza:'Skudai', rate:null, type:'closed', systemType:'closed', lat:1.5403, lng:103.6714 },
-    { system:'PLUS (E1 / E2)', plaza:'Kempas', rate:null, type:'closed', systemType:'mixed', lat:1.5253, lng:103.7278 },
+    { system:'PLUS (E1 / E2)', plaza:'Ipoh Selatan', rate:null, type:'closed', systemType:'closed', lat:4.5681, lng:101.0764 },
+    { system:'PLUS (E1 / E2)', plaza:'Tapah', rate:null, type:'closed', systemType:'closed', lat:4.1956, lng:101.2619 },
+    { system:'PLUS (E1 / E2)', plaza:'Juru', rate:null, type:'closed', systemType:'closed', lat:5.3136, lng:100.4408 },
     { system:'ELITE (E6 · PLUS)', plaza:'KLIA', rate:null, type:'closed', systemType:'closed', lat:2.7689, lng:101.7208 },
     { system:'ELITE (E6 · PLUS)', plaza:'Bandar Serenia', rate:null, type:'closed', systemType:'closed', lat:2.8519, lng:101.7281 },
     { system:'ELITE (E6 · PLUS)', plaza:'Putrajaya', rate:null, type:'closed', systemType:'closed', lat:2.9489, lng:101.6639 },
@@ -503,27 +457,100 @@
     { system:'ELITE (E6 · PLUS)', plaza:'USJ', rate:null, type:'closed', systemType:'closed', lat:3.0389, lng:101.5781 },
     { system:'ELITE (E6 · PLUS)', plaza:'Seafield', rate:null, type:'closed', systemType:'closed', lat:3.0689, lng:101.5819 },
     { system:'ELITE (E6 · PLUS)', plaza:'Ebor', rate:null, type:'closed', systemType:'closed', lat:3.0719, lng:101.5581 },
-    { system:'ELITE (E6 · PLUS)', plaza:'Shah Alam', rate:null, type:'closed', systemType:'closed', lat:3.0819, lng:101.5319 },
-    { system:'LPT2 (E8 · PLUS)', plaza:'Cheneh', rate:null, type:'closed', systemType:'closed', lat:4.1319, lng:103.2481 },
-    { system:'LPT2 (E8 · PLUS)', plaza:'Chukai', rate:null, type:'closed', systemType:'closed', lat:4.2619, lng:103.2719 },
-    { system:'LPT2 (E8 · PLUS)', plaza:'Kijal', rate:null, type:'closed', systemType:'closed', lat:4.3689, lng:103.3281 },
-    { system:'LPT2 (E8 · PLUS)', plaza:'Kerteh', rate:null, type:'closed', systemType:'closed', lat:4.5119, lng:103.3581 },
-    { system:'LPT2 (E8 · PLUS)', plaza:'Paka', rate:null, type:'closed', systemType:'closed', lat:4.6489, lng:103.3681 },
-    { system:'LPT2 (E8 · PLUS)', plaza:'Dungun', rate:null, type:'closed', systemType:'closed', lat:4.7719, lng:103.3419 },
-    { system:'LPT2 (E8 · PLUS)', plaza:'Bukit Besi', rate:null, type:'closed', systemType:'closed', lat:4.8589, lng:103.2119 },
-    { system:'LPT2 (E8 · PLUS)', plaza:'Ajil', rate:null, type:'closed', systemType:'closed', lat:5.0789, lng:103.0981 },
-    { system:'LPT2 (E8 · PLUS)', plaza:'Telemung', rate:null, type:'closed', systemType:'closed', lat:5.2189, lng:103.0481 },
-    { system:'LPT2 (E8 · PLUS)', plaza:'Kuala Terengganu', rate:null, type:'closed', systemType:'closed', lat:5.2764, lng:103.0589 }
+    { system:'ELITE (E6 · PLUS)', plaza:'Shah Alam', rate:null, type:'closed', systemType:'closed', lat:3.0819, lng:101.5319 }
   ];
 
   /* =========================================================
-     1b. REFERENCE & GPS PROXIMITY MATCHER
+     1b. CLOSED-SYSTEM ENTRY -> EXIT LOOKUP MATRIX (CLASS 1 NORMAL TNG)
+         Covers: PLUS, NKVE, ELITE, SKVE, WCE
      ========================================================= */
+  const CLOSED_TOLL_MATRIX = [
+    // ===== WCE (E32) =====
+    { network:'WCE', system:'WCE (E32)', from:'Bandar Bukit Raja Selatan', to:'Bandar Bukit Raja Utara', rate:1.50 },
+    { network:'WCE', system:'WCE (E32)', from:'Bandar Bukit Raja Selatan', to:'Assam Jawa', rate:5.05 },
+    { network:'WCE', system:'WCE (E32)', from:'Bandar Bukit Raja Utara', to:'Assam Jawa', rate:4.12 },
+    { network:'WCE', system:'WCE (E32)', from:'Hutan Melintang', to:'Teluk Intan', rate:2.90 },
+    { network:'WCE', system:'WCE (E32)', from:'Lekir', to:'Sitiawan', rate:2.00 },
+    { network:'WCE', system:'WCE (E32)', from:'Lekir', to:'Sitiawan Utara', rate:2.80 },
+    { network:'WCE', system:'WCE (E32)', from:'Lekir', to:'Changkat Cermin', rate:4.70 },
+    { network:'WCE', system:'WCE (E32)', from:'Lekir', to:'Beruas', rate:7.90 },
+    { network:'WCE', system:'WCE (E32)', from:'Sitiawan', to:'Sitiawan Utara', rate:2.20 },
+    { network:'WCE', system:'WCE (E32)', from:'Sitiawan', to:'Changkat Cermin', rate:4.20 },
+    { network:'WCE', system:'WCE (E32)', from:'Sitiawan', to:'Beruas', rate:7.30 },
+    { network:'WCE', system:'WCE (E32)', from:'Sitiawan Utara', to:'Changkat Cermin', rate:2.70 },
+    { network:'WCE', system:'WCE (E32)', from:'Sitiawan Utara', to:'Beruas', rate:5.80 },
+    { network:'WCE', system:'WCE (E32)', from:'Sitiawan Utara', to:'Trong', rate:10.04 },
+    { network:'WCE', system:'WCE (E32)', from:'Sitiawan Utara', to:'Taiping Selatan', rate:11.44 },
+    { network:'WCE', system:'WCE (E32)', from:'Changkat Cermin', to:'Beruas', rate:3.60 },
+    { network:'WCE', system:'WCE (E32)', from:'Changkat Cermin', to:'Trong', rate:7.87 },
+    { network:'WCE', system:'WCE (E32)', from:'Changkat Cermin', to:'Taiping Selatan', rate:9.30 },
+    { network:'WCE', system:'WCE (E32)', from:'Beruas', to:'Trong', rate:4.69 },
+    { network:'WCE', system:'WCE (E32)', from:'Beruas', to:'Taiping Selatan', rate:6.06 },
+    { network:'WCE', system:'WCE (E32)', from:'Trong', to:'Taiping Selatan', rate:1.88 },
+
+    // ===== SKVE (E26) =====
+    { network:'SKVE', system:'SKVE (E26)', from:'Ayer Hitam', to:'Saujana Putra', rate:4.70 },
+    { network:'SKVE', system:'SKVE (E26)', from:'Ayer Hitam', to:'Telok Panglima Garang', rate:8.90 },
+    { network:'SKVE', system:'SKVE (E26)', from:'Ayer Hitam', to:'Pulau Indah', rate:16.30 },
+    { network:'SKVE', system:'SKVE (E26)', from:'Saujana Putra', to:'Telok Panglima Garang', rate:5.40 },
+    { network:'SKVE', system:'SKVE (E26)', from:'Saujana Putra', to:'Pulau Indah', rate:12.70 },
+
+    // ===== ELITE (E6) =====
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Nilai', rate:3.36 },
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Putrajaya', rate:3.53 },
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Kajang', rate:4.92 },
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Seremban', rate:5.41 },
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Subang', rate:5.66 },
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Jalan Duta', rate:7.46 },
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Ayer Keroh', rate:13.04 },
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Tapah', rate:21.24 },
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Ipoh Selatan', rate:25.67 },
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Skudai', rate:37.46 },
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Juru', rate:40.75 },
+
+    // ===== PLUS & NKVE (E1 / E2) =====
+    { network:'PLUS', system:'PLUS (E1 / E2)', from:'Sungai Besi', to:'Seremban', rate:5.25 },
+    { network:'PLUS', system:'PLUS (E1 / E2)', from:'Sungai Besi', to:'Ayer Keroh', rate:12.87 },
+    { network:'PLUS', system:'PLUS (E1 / E2)', from:'Sungai Besi', to:'Pagoh', rate:22.10 },
+    { network:'PLUS', system:'PLUS (E1 / E2)', from:'Sungai Besi', to:'Yong Peng', rate:26.40 },
+    { network:'PLUS', system:'PLUS (E1 / E2)', from:'Sungai Besi', to:'Skudai', rate:33.21 },
+    { network:'PLUS', system:'PLUS (E1 / E2)', from:'Sungai Besi', to:'Juru', rate:44.20 },
+    { network:'PLUS', system:'PLUS (E1 / E2)', from:'Jalan Duta', to:'Ipoh Selatan', rate:21.73 },
+    { network:'PLUS', system:'PLUS (E1 / E2)', from:'Jalan Duta', to:'Juru', rate:35.51 }
+  ];
+
   function normalizeTollText(value) {
     return String(value || '')
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, ' ')
       .trim();
+  }
+
+  function getClosedNetworkTag(systemStr) {
+    const s = normalizeTollText(systemStr);
+    if (s.includes('wce') || s.includes('e32')) return 'WCE';
+    if (s.includes('skve') || s.includes('e26')) return 'SKVE';
+    if (s.includes('elite') || s.includes('e6')) return 'ELITE';
+    if (s.includes('nkve')) return 'NKVE';
+    if (s.includes('plus') || s.includes('e1') || s.includes('e2')) return 'PLUS';
+    return '';
+  }
+
+  function findClosedMatrixRate(network, plazaA, plazaB) {
+    const aNorm = normalizeTollText(plazaA);
+    const bNorm = normalizeTollText(plazaB);
+    if (!aNorm || !bNorm || aNorm === bNorm) return null;
+    for (const entry of CLOSED_TOLL_MATRIX) {
+      if (network && entry.network !== network) continue;
+      const fNorm = normalizeTollText(entry.from);
+      const tNorm = normalizeTollText(entry.to);
+      const forward = (aNorm.includes(fNorm) || fNorm.includes(aNorm)) && (bNorm.includes(tNorm) || tNorm.includes(bNorm));
+      const reverse = (aNorm.includes(tNorm) || tNorm.includes(aNorm)) && (bNorm.includes(fNorm) || fNorm.includes(fNorm));
+      if (forward || reverse) {
+        return entry;
+      }
+    }
+    return null;
   }
 
   function extractTollCoords(toll) {
@@ -596,16 +623,22 @@
     return points;
   }
 
-  function findPolylineTollMatch(polylinePoints, maxRadiusKm = 0.22, flatOnly = true) {
+  function findPolylineTollMatch(polylinePoints, maxRadiusKm = POLYLINE_CORRIDOR_RADIUS_KM, flatOnly = true) {
     if (!Array.isArray(polylinePoints) || !polylinePoints.length) return [];
     const matched = [];
     for (const ref of TOLL_PLAZA_REFERENCE) {
+      if (ref.system.startsWith('GENTING ROAD CHARGE')) continue;
       if (flatOnly && (ref.type !== 'flat' || ref.rate == null)) continue;
+      if (!flatOnly && ref.type !== 'closed') continue;
       if (!Number.isFinite(ref.lat) || !Number.isFinite(ref.lng)) continue;
       let minDist = Infinity;
+      let minIdx = -1;
       for (let i = 0; i < polylinePoints.length; i++) {
         const d = calculateHaversineDistance(polylinePoints[i].lat, polylinePoints[i].lng, ref.lat, ref.lng);
-        if (d < minDist) minDist = d;
+        if (d < minDist) {
+          minDist = d;
+          minIdx = i;
+        }
       }
       if (minDist <= maxRadiusKm) {
         matched.push({
@@ -615,11 +648,12 @@
           type: ref.type,
           systemType: ref.systemType,
           distanceKm: minDist,
+          routeOrder: minIdx,
           matchedBy: 'polyline'
         });
       }
     }
-    matched.sort((a, b) => a.distanceKm - b.distanceKm);
+    matched.sort((a, b) => a.routeOrder - b.routeOrder || a.distanceKm - b.distanceKm);
     return matched;
   }
 
@@ -1250,7 +1284,7 @@
   }
 
   /* =========================================================
-     11. HERE ROUTING API v8 GPS & REFERENCE TOLL ENGINE
+     11. HERE ROUTING API v8 + STANDARD TOLL CROSS-CHECK ENGINE
      ========================================================= */
   function getHereTollSystemMap(route) {
     const systemMap = new Map();
@@ -1321,7 +1355,9 @@
     const sections = Array.isArray(route && route.sections) ? route.sections : [];
     const tollSystems = getHereTollSystemMap(route);
     const polylinePoints = extractPolylinePoints(sections);
-    const polylineCorridorFlat = findPolylineTollMatch(polylinePoints, 0.35, true);
+    const polylineCorridorFlat = findPolylineTollMatch(polylinePoints, POLYLINE_CORRIDOR_RADIUS_KM, true);
+    const polylineCorridorClosed = findPolylineTollMatch(polylinePoints, POLYLINE_CORRIDOR_RADIUS_KM, false);
+
     let totalToll = 0;
     let hasItemisedTolls = false;
     let hasSummaryTolls = false;
@@ -1330,8 +1366,11 @@
     let referenceAppliedCount = 0;
     let referenceDiscrepancyCount = 0;
     let gpsMatchedCount = 0;
+    let closedMatchedCount = 0;
     const seenFareIds = new Set();
     const matchedPlazaKeys = new Set();
+    const seenUnmappedAmounts = new Set();
+    const rawClosedHereAmounts = [];
     const items = [];
 
     const pushItem = (item) => {
@@ -1341,7 +1380,8 @@
       if (item.matchedPreference) preferenceMatchedCount++;
       if (item.referenceApplied) referenceAppliedCount++;
       if (item.referenceDiscrepancy) referenceDiscrepancyCount++;
-      if (item.matchedBy === 'gps' || item.matchedBy === 'route+rate') gpsMatchedCount++;
+      if (item.matchedBy === 'gps' || item.matchedBy === 'route+rate' || item.matchedBy === 'closed-matrix') gpsMatchedCount++;
+      if (item.systemType === 'closed') closedMatchedCount++;
     };
 
     sections.forEach((section,secIdx) => {
@@ -1359,9 +1399,14 @@
           const picked = selectFareFromToll(toll,paymentPref);
           const pickedAmount = picked ? picked.amount : 0;
 
+          if (picked && picked.fareId) {
+            if (seenFareIds.has(picked.fareId)) return;
+            seenFareIds.add(picked.fareId);
+          }
+
           let refMatch = findReferenceRate(toll.name || '', sysName, tollCoords);
 
-          // Match by route corridor + exact fare amount when HERE gives a generic label or omits toll.location
+          // Match flat open plaza on route polyline by rate when HERE label is generic
           if (!refMatch && picked) {
             const amountMatches = polylineCorridorFlat.filter(
               pm => Math.abs(pm.rate - pickedAmount) <= 0.01 && !matchedPlazaKeys.has(`${pm.system}|${pm.plaza}`)
@@ -1371,17 +1416,34 @@
             }
           }
 
+          // If closed-system plazas lie on the route polyline and HERE returns a closed fare, defer to closed matrix pass
+          if (!refMatch && picked && polylineCorridorClosed.length >= 2) {
+            rawClosedHereAmounts.push(pickedAmount);
+            return;
+          }
+
+          // Reject unverified unmapped items that do not match any plaza on the route corridor
+          if (!refMatch && !tollCoords && polylineCorridorFlat.length === 0) {
+            return;
+          }
+
           const rawHereName = toll.name || sysName || `Toll Point ${secIdx + 1}.${tollIdx + 1}`;
           const isGenericSystemLabel = /malaysian highway toll rate system/i.test(rawHereName);
+
+          if (!picked && !(refMatch && refMatch.type === 'flat' && refMatch.rate != null)) return;
+
+          if (refMatch) {
+            const plazaKey = `${refMatch.system}|${refMatch.plaza}`;
+            if (matchedPlazaKeys.has(plazaKey)) return;
+          } else if (!tollCoords) {
+            const amtKey = pickedAmount.toFixed(2);
+            if (seenUnmappedAmounts.has(amtKey)) return;
+            seenUnmappedAmounts.add(amtKey);
+          }
+
           const plazaName = refMatch
             ? `${refMatch.plaza} (${refMatch.system})`
             : (isGenericSystemLabel ? 'Toll Plaza (Unmapped Gantry)' : rawHereName);
-
-          if (!picked && !(refMatch && refMatch.type === 'flat' && refMatch.rate != null)) return;
-          if (picked && picked.fareId) {
-            if (seenFareIds.has(picked.fareId)) return;
-            seenFareIds.add(picked.fareId);
-          }
 
           let finalAmount = pickedAmount;
           let referenceApplied = false;
@@ -1489,7 +1551,68 @@
       });
     }
 
-    // Supplement with Genting Highlands Road Charge or direct corridor plaza matches when route enters Genting
+    // Closed-system Entry -> Exit cross-check for PLUS, NKVE, ELITE, SKVE, and WCE
+    if (polylineCorridorClosed.length >= 2) {
+      const byNetwork = {};
+      polylineCorridorClosed.forEach(cp => {
+        const net = getClosedNetworkTag(cp.system);
+        if (!net) return;
+        if (!byNetwork[net]) byNetwork[net] = [];
+        if (!byNetwork[net].some(existing => existing.plaza === cp.plaza)) {
+          byNetwork[net].push(cp);
+        }
+      });
+
+      Object.keys(byNetwork).forEach(net => {
+        const netPlazas = byNetwork[net];
+        if (netPlazas.length < 2) return;
+        const entryPlaza = netPlazas[0];
+        const exitPlaza = netPlazas[netPlazas.length - 1];
+        const matrixHit = findClosedMatrixRate(net, entryPlaza.plaza, exitPlaza.plaza);
+        if (matrixHit) {
+          const fallbackHere = rawClosedHereAmounts.length ? roundMoney(rawClosedHereAmounts[0]) : matrixHit.rate;
+          const discrepancy = Math.abs(fallbackHere - matrixHit.rate) > 0.01;
+          pushItem({
+            name: `${entryPlaza.plaza} → ${exitPlaza.plaza} (${matrixHit.system})`,
+            system: matrixHit.system,
+            amount: roundMoney(matrixHit.rate),
+            hereAmount: fallbackHere,
+            currency: 'MYR',
+            paymentMethods: ['Touch \'n Go'],
+            fareName: 'Class 1 Closed Entry-Exit',
+            fareId: '',
+            matchedPreference: true,
+            referenceApplied: true,
+            referenceDiscrepancy: discrepancy,
+            referenceLabel: `${matrixHit.system} · ${entryPlaza.plaza} → ${exitPlaza.plaza} (closed matrix)`,
+            systemType: 'closed',
+            matchedBy: 'closed-matrix',
+            source: 'closed.matrix'
+          });
+        } else if (rawClosedHereAmounts.length) {
+          const hereClosedVal = roundMoney(rawClosedHereAmounts[0]);
+          pushItem({
+            name: `${entryPlaza.plaza} → ${exitPlaza.plaza} (${entryPlaza.system})`,
+            system: entryPlaza.system,
+            amount: hereClosedVal,
+            hereAmount: hereClosedVal,
+            currency: 'MYR',
+            paymentMethods: ['Touch \'n Go'],
+            fareName: 'Class 1 Closed (HERE fallback)',
+            fareId: '',
+            matchedPreference: true,
+            referenceApplied: false,
+            referenceDiscrepancy: false,
+            referenceLabel: `${entryPlaza.system} · ${entryPlaza.plaza} → ${exitPlaza.plaza} (closed · HERE fallback)`,
+            systemType: 'closed',
+            matchedBy: 'here',
+            source: 'closed.hereFallback'
+          });
+        }
+      });
+    }
+
+    // Supplement with Genting Highlands Road Charge when route enters Genting
     const inHighland = Boolean(getHighlandZone(pickupCoords, dropoffCoords));
     if (inHighland) {
       const gentingCharge = TOLL_PLAZA_REFERENCE.find(r => r.system.startsWith('GENTING ROAD CHARGE'));
@@ -1517,9 +1640,7 @@
 
     // Supplement with open-system plaza GPS matches directly on the decoded route polyline if missing
     if (polylinePoints.length) {
-      const polylineMatches = findPolylineTollMatch(polylinePoints, 0.16, true);
-      polylineMatches.forEach(pm => {
-        if (pm.system.startsWith('GENTING ROAD CHARGE')) return;
+      polylineCorridorFlat.forEach(pm => {
         const key = `${pm.system}|${pm.plaza}`;
         if (matchedPlazaKeys.has(key)) return;
         const alreadyCoveredByHere = items.some(it => Math.abs(it.amount - pm.rate) <= 0.01);
@@ -1554,6 +1675,7 @@
       referenceAppliedCount,
       referenceDiscrepancyCount,
       gpsMatchedCount,
+      closedMatchedCount,
       paymentPref,
       hasAnyTollData:hasItemisedTolls || hasSummaryTolls || items.length > 0
     };
@@ -1605,7 +1727,7 @@
     const departureTime = buildDepartureParam();
     setLoading(true);
     clearError();
-    setRouteStatus('Requesting route & HERE toll data…');
+    setRouteStatus('Requesting route & cross-checking tolls…');
     routeDebounce = setTimeout(() => {
       if (requestId !== routeRequestId) return;
       const params = {
@@ -1669,7 +1791,7 @@
     }
     const tollResult = calculateHereTolls(route,paymentPref);
 
-    /* ---- TOLL SOURCE PRIORITY: Manual > GPS/Reference > HERE ---- */
+    /* ---- TOLL SOURCE PRIORITY: Manual > Standard Table Cross-Check > HERE ---- */
     const manualRaw = $('manual-toll').value.trim();
     const hasManualToll = manualRaw !== '';
     let effectiveTollAmount;
@@ -1721,7 +1843,7 @@
     const sourceLabel = {
       manual: 'Manual override',
       verified: 'Verified 2026 rates',
-      reference: `GPS/Reference plaza rates (${tollResult.referenceAppliedCount} matched)`,
+      reference: `Standard Table cross-checked (${tollResult.referenceAppliedCount} matched)`,
       here: 'HERE API'
     }[tollSource];
     setRouteStatus(
@@ -1768,10 +1890,8 @@
 
     if (routeData.hasManualToll) {
       $('toll-fare-label').textContent = 'Toll charges (Manual / Actual override)';
-    } else if (routeData.hasKnownToll) {
-      $('toll-fare-label').textContent = 'Toll charges (Verified 2026 rates)';
     } else if (routeData.tollSource === 'reference') {
-      $('toll-fare-label').textContent = 'Toll charges (GPS / Reference plaza rates)';
+      $('toll-fare-label').textContent = 'Toll charges (Standard Table Cross-Checked)';
     } else {
       $('toll-fare-label').textContent = 'Toll charges (HERE API)';
     }
@@ -1796,11 +1916,11 @@
       const title = document.createElement('div');
       title.className = 'toll-breakdown-title';
       if (routeData.hasManualToll) {
-        title.textContent = `Active Toll: ${money(tollFee)} (Manual override · HERE raw: ${money(routeData.tollResult.amount)})`;
+        title.textContent = `Active Toll: ${money(tollFee)} (Manual override · Cross-checked: ${money(routeData.tollResult.amount)})`;
       } else if (routeData.tollSource === 'reference') {
-        title.textContent = `Active Toll: ${money(tollFee)} (GPS / Reference plaza rates applied)`;
+        title.textContent = `Active Toll: ${money(tollFee)} (Cross-checked against Standard Toll Table)`;
       } else {
-        title.textContent = `HERE Routing Tolls (${routeData.tollResult.items.length} item${routeData.tollResult.items.length > 1 ? 's' : ''})`;
+        title.textContent = `Toll Charges (${routeData.tollResult.items.length} item${routeData.tollResult.items.length > 1 ? 's' : ''})`;
       }
       breakdownBox.appendChild(title);
       routeData.tollResult.items.forEach(item => {
@@ -1819,12 +1939,12 @@
         if (item.referenceDiscrepancy) {
           const note = document.createElement('div');
           note.className = 'toll-item-note';
-          note.textContent = `Reference rate applied via ${item.matchedBy.toUpperCase()} (HERE said ${money(item.hereAmount)})`;
+          note.textContent = `Standard table applied via ${item.matchedBy.toUpperCase()} (HERE showed ${money(item.hereAmount)})`;
           breakdownBox.appendChild(note);
         } else if (item.referenceApplied && item.referenceLabel) {
           const note = document.createElement('div');
           note.className = 'toll-item-note';
-          note.textContent = `Matched (${item.matchedBy}): ${item.referenceLabel}`;
+          note.textContent = `Verified (${item.matchedBy}): ${item.referenceLabel}`;
           breakdownBox.appendChild(note);
         }
       });
@@ -1837,16 +1957,12 @@
     if (routeData.avoidTollsRequested && tollFee > 0) {
       warnings.push('Returned route still contains toll charges');
     }
-    if (!routeData.hasManualToll && !routeData.hasKnownToll && routeData.tollResult.referenceDiscrepancyCount > 0) {
-      warnings.push(`${routeData.tollResult.referenceDiscrepancyCount} toll(s) corrected against reference table`);
-    }
-    if (routeData.tollResult.paymentPref !== 'any' && routeData.tollResult.totalResolvedCount > 0 && routeData.tollResult.preferenceMatchedCount === 0) {
-      warnings.push(`No explicit "${routeData.tollResult.paymentPref}" fare tag in HERE response; used default MYR fare`);
+    if (!routeData.hasManualToll && routeData.tollResult.referenceDiscrepancyCount > 0) {
+      warnings.push(`${routeData.tollResult.referenceDiscrepancyCount} toll(s) reconciled against standard table`);
     }
     const sourceText = {
       manual: `Tolls: Manual override (${money(tollFee)})`,
-      verified: `Tolls: Verified 2026 rates (${money(tollFee)})`,
-      reference: `Tolls: GPS/Reference rates (${money(tollFee)})`,
+      reference: `Tolls: Standard Table cross-checked (${money(tollFee)})`,
       here: `Tolls: HERE Routing v8 (${routeData.tollResult.paymentPref})`
     }[routeData.tollSource || 'here'];
     const statusParts = [
@@ -1874,7 +1990,7 @@
     $('result-card').style.display = 'block';
 
     return {
-      version:'3.0.2',
+      version:'3.0.3',
       pickup:$('pickup').value.trim(),
       dropoff:$('dropoff').value.trim(),
       distance:routeData.distance,
@@ -1885,7 +2001,6 @@
       tollFee,
       hereRawTollAmount:routeData.tollResult.amount,
       hasManualToll:routeData.hasManualToll,
-      hasKnownToll:routeData.hasKnownToll,
       tollSource:routeData.tollSource || 'here',
       tollItems:routeData.tollResult.items,
       tollPaymentPref:routeData.tollResult.paymentPref,
@@ -1936,14 +2051,12 @@
       ? data.tollItems.map(t => `  - ${t.name}${t.system && !t.name.includes(t.system) ? ` (${t.system})` : ''}: ${money(t.amount)}`).join('\n')
       : '  - None';
     const tollSource = data.hasManualToll
-      ? `Manual override (HERE raw: ${money(data.hereRawTollAmount)})`
-      : data.hasKnownToll
-      ? 'Verified 2026 rates'
+      ? `Manual override (Cross-checked: ${money(data.hereRawTollAmount)})`
       : data.tollSource === 'reference'
-      ? 'GPS / Reference plaza rates'
+      ? 'Standard Table cross-checked (Class 1 Normal TNG)'
       : 'HERE API';
     return [
-      'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v3.0.2',
+      'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v3.0.3',
       '------------------------------------------------',
       `From: ${data.pickup}`,
       `To: ${data.dropoff}`,
@@ -1961,7 +2074,7 @@
       `Transport subtotal: ${money(data.transportSubtotal)}`,
       `Minimum-adjusted transport fare: ${money(data.transportFare)}`,
       `Toll charges applied: ${money(data.tollFee)} (${tollSource})`,
-      'HERE Toll Items:',
+      'Cross-Checked Toll Items:',
       tollLines,
       '------------------------------------------------',
       `Exact calculated total: ${money(data.exactTotal)}`,
@@ -1976,7 +2089,7 @@
       'Tolls are reimbursement, not driver profit.',
       'Driver earnings exclude fuel, maintenance, depreciation and other operating costs.',
       'Estimate only. Verify tolls and final fare before travel.',
-      'Generated by Rideshare MY Personal Edition v3.0.2'
+      'Generated by Rideshare MY Personal Edition v3.0.3'
     ].join('\n');
   }
 
@@ -2156,10 +2269,26 @@
         left.textContent = ref.plaza;
         const right = document.createElement('span');
         right.className = `ref-amount ${ref.rate == null ? 'closed' : ''}`;
-        right.textContent = ref.rate != null ? money(ref.rate) : 'Distance-based';
+        right.textContent = ref.rate != null ? money(ref.rate) : 'Closed Entry-Exit';
         row.append(left, right);
         container.appendChild(row);
       });
+    });
+
+    const matrixHeader = document.createElement('div');
+    matrixHeader.className = 'ref-system-header';
+    matrixHeader.textContent = 'CLOSED ENTRY → EXIT MATRIX (PLUS, NKVE, ELITE, SKVE, WCE)';
+    container.appendChild(matrixHeader);
+    CLOSED_TOLL_MATRIX.forEach(entry => {
+      const row = document.createElement('div');
+      row.className = 'ref-row';
+      const left = document.createElement('span');
+      left.textContent = `${entry.network}: ${entry.from} ↔ ${entry.to}`;
+      const right = document.createElement('span');
+      right.className = 'ref-amount';
+      right.textContent = money(entry.rate);
+      row.append(left, right);
+      container.appendChild(row);
     });
   }
 
