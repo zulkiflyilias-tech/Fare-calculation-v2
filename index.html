@@ -303,7 +303,7 @@
   ];
 
   /* =========================================================
-     1a. VERIFIED TOLL ROUTES (CLASS 1 CAR) — NATIONWIDE 2026
+     1a. VERIFIED TOLL ROUTES (CLASS 1 CAR) — 2026
      ========================================================= */
   const KNOWN_TOLL_ROUTES = [
     {
@@ -351,70 +351,21 @@
       tolls: [
         { name: 'LDP (Penchala)', amount: 2.10 },
         { name: 'Karak Highway (Gombak)', amount: 6.00 },
-        { name: 'Karak Highway (Bentong)', amount: 4.50 },
+        { name: 'Karak Highway (Bentong)', amount: 3.50 },
         { name: 'LPT (Karak – Kuantan)', amount: 19.60 }
       ],
-      total: 32.20
+      total: 31.20
     },
     {
-      name: 'Klang Valley ↔ KLIA / KLIA2 (via ELITE / MEX)',
-      matchKeywords: { from: ['klang', 'shah alam', 'subang', 'puchong', 'petaling', 'kuala lumpur', 'kl'], to: ['klia', 'klia2', 'sepang'] },
-      pickupArea: { lat: 3.100, lng: 101.580, radiusKm: 25 },
-      dropoffArea: { lat: 2.7456, lng: 101.7072, radiusKm: 8 },
+      name: 'Bandar Puteri Puchong ↔ SMT Tuanku Jaafar (Seremban)',
+      matchKeywords: { from: ['puchong', 'bandar puteri'], to: ['tuanku jaafar', 'smt tuanku jaafar', 'sttj', 'ampangan'] },
+      pickupArea: { lat: 3.026, lng: 101.616, radiusKm: 8 },
+      dropoffArea: { lat: 2.7229, lng: 101.9670, radiusKm: 8 },
       tolls: [
-        { name: 'ELITE (Shah Alam / Putra Heights – KLIA)', amount: 10.60 }
+        { name: 'LDP (Puchong Selatan)', amount: 2.10 },
+        { name: 'PLUS (Sungai Besi – Seremban)', amount: 6.50 }
       ],
-      total: 10.60
-    },
-    {
-      name: 'Kuala Lumpur ↔ Seremban (PLUS)',
-      matchKeywords: { from: ['kuala lumpur', 'kl', 'cheras', 'sri petaling', 'sungai besi'], to: ['seremban', 'nilai'] },
-      pickupArea: { lat: 3.1390, lng: 101.6869, radiusKm: 15 },
-      dropoffArea: { lat: 2.7258, lng: 101.9378, radiusKm: 10 },
-      tolls: [
-        { name: 'PLUS (Sungai Besi – Seremban)', amount: 7.90 }
-      ],
-      total: 7.90
-    },
-    {
-      name: 'Kuala Lumpur ↔ Ipoh (PLUS)',
-      matchKeywords: { from: ['kuala lumpur', 'kl', 'damansara', 'sungai buloh', 'rawang'], to: ['ipoh', 'meru raya'] },
-      pickupArea: { lat: 3.150, lng: 101.650, radiusKm: 18 },
-      dropoffArea: { lat: 4.5975, lng: 101.0901, radiusKm: 12 },
-      tolls: [
-        { name: 'PLUS (Jalan Duta / Sungai Buloh – Ipoh Selatan)', amount: 24.40 }
-      ],
-      total: 24.40
-    },
-    {
-      name: 'Kuala Lumpur ↔ Melaka / Ayer Keroh (PLUS)',
-      matchKeywords: { from: ['kuala lumpur', 'kl', 'sungai besi', 'putrajaya'], to: ['melaka', 'malacca', 'ayer keroh', 'mitc'] },
-      pickupArea: { lat: 3.1390, lng: 101.6869, radiusKm: 18 },
-      dropoffArea: { lat: 2.271, lng: 102.299, radiusKm: 12 },
-      tolls: [
-        { name: 'PLUS (Sungai Besi – Ayer Keroh)', amount: 15.80 }
-      ],
-      total: 15.80
-    },
-    {
-      name: 'Kuala Lumpur ↔ Johor Bahru (PLUS)',
-      matchKeywords: { from: ['kuala lumpur', 'kl', 'shah alam', 'kajang', 'seremban'], to: ['johor bahru', 'jb', 'skudai', 'lark'] },
-      pickupArea: { lat: 3.1390, lng: 101.6869, radiusKm: 20 },
-      dropoffArea: { lat: 1.4927, lng: 103.7414, radiusKm: 15 },
-      tolls: [
-        { name: 'PLUS (Sungai Besi – Skudai)', amount: 42.30 }
-      ],
-      total: 42.30
-    },
-    {
-      name: 'Penang Mainland (Butterworth / Juru) ↔ Penang Island (1st Bridge)',
-      matchKeywords: { from: ['butterworth', 'juru', 'perai', 'seberang jaya'], to: ['georgetown', 'george town', 'bayan lepas', 'gelugor', 'penang airport'] },
-      pickupArea: { lat: 5.355, lng: 100.405, radiusKm: 12 },
-      dropoffArea: { lat: 5.360, lng: 100.295, radiusKm: 12 },
-      tolls: [
-        { name: 'Penang Bridge (1st Bridge)', amount: 7.00 }
-      ],
-      total: 7.00
+      total: 8.60
     }
   ];
 
@@ -452,14 +403,16 @@
   }
 
   /* =========================================================
-     1b. TOLL PLAZA REFERENCE RATES (CLASS 1 CAR, MYR) — NATIONWIDE
+     1b. TOLL PLAZA REFERENCE RATES (CLASS 1 CAR, MYR)
      ========================================================= */
   const TOLL_PLAZA_REFERENCE = [
-    // ===== OPEN SYSTEM HIGHWAYS (KLANG VALLEY & SELANGOR) =====
+    // ===== OPEN SYSTEM HIGHWAYS =====
     { system:'LDP', plaza:'Penchala', rate:2.10, type:'flat', systemType:'open' },
     { system:'LDP', plaza:'Puchong Intan', rate:1.00, type:'flat', systemType:'open' },
     { system:'LDP', plaza:'Puchong Utama', rate:1.30, type:'flat', systemType:'open' },
-    { system:'LDP', plaza:'Petaling Jaya', rate:1.00, type:'flat', systemType:'open' },
+    { system:'LDP', plaza:'Puchong Barat', rate:2.10, type:'flat', systemType:'open' },
+    { system:'LDP', plaza:'Puchong Selatan', rate:2.10, type:'flat', systemType:'open' },
+    { system:'LDP', plaza:'Petaling Jaya', rate:2.10, type:'flat', systemType:'open' },
     { system:'LDP', plaza:'Damansara', rate:1.30, type:'flat', systemType:'open' },
     { system:'DUKE', plaza:'Ayer Panas', rate:2.50, type:'flat', systemType:'open' },
     { system:'DUKE', plaza:'Segambut', rate:2.50, type:'flat', systemType:'open' },
@@ -469,8 +422,6 @@
     { system:'DUKE', plaza:'Wangsa Maju', rate:2.50, type:'flat', systemType:'open' },
     { system:'DUKE', plaza:'Ampang', rate:2.50, type:'flat', systemType:'open' },
     { system:'DUKE', plaza:'Ulu Kelang', rate:2.50, type:'flat', systemType:'open' },
-    { system:'DUKE', plaza:'Bukit Antarabangsa', rate:2.50, type:'flat', systemType:'open' },
-    { system:'DUKE', plaza:'Sri Damansara', rate:2.50, type:'flat', systemType:'open' },
     { system:'KARAK', plaza:'Gombak', rate:6.00, type:'flat', systemType:'open' },
     { system:'KARAK', plaza:'Bentong', rate:4.50, type:'flat', systemType:'open' },
     { system:'KARAK', plaza:'Karak', rate:4.00, type:'flat', systemType:'open' },
@@ -485,11 +436,9 @@
     { system:'MEX', plaza:'Sri Petaling', rate:3.00, type:'flat', systemType:'open' },
     { system:'MEX', plaza:'Bukit Jalil', rate:3.00, type:'flat', systemType:'open' },
     { system:'MEX', plaza:'Putrajaya', rate:3.50, type:'flat', systemType:'open' },
-    { system:'MEX2', plaza:'Putrajaya Link', rate:3.50, type:'flat', systemType:'open' },
     { system:'SPRINT', plaza:'Damansara', rate:2.00, type:'flat', systemType:'open' },
     { system:'SPRINT', plaza:'Kerinchi', rate:2.00, type:'flat', systemType:'open' },
     { system:'SPRINT', plaza:'Bukit Kiara', rate:2.00, type:'flat', systemType:'open' },
-    { system:'SPRINT', plaza:'Pantai', rate:2.00, type:'flat', systemType:'open' },
     { system:'NKVE', plaza:'Damansara', rate:3.00, type:'flat', systemType:'open' },
     { system:'NKVE', plaza:'Kayu Ara', rate:1.50, type:'flat', systemType:'open' },
     { system:'NKVE', plaza:'Setia Alam', rate:4.00, type:'flat', systemType:'open' },
@@ -520,7 +469,7 @@
     { system:'LEKAS', plaza:'Semenyih', rate:2.50, type:'flat', systemType:'open' },
     { system:'LEKAS', plaza:'Pajam', rate:3.00, type:'flat', systemType:'open' },
     { system:'LEKAS', plaza:'Mantin', rate:3.50, type:'flat', systemType:'open' },
-    { system:'LEKAS', plaza:'Ampangan', rate:4.00, type:'flat', systemType:'open' },
+    { system:'LEKAS', plaza:'Ampangan', rate:2.30, type:'flat', systemType:'open' },
     { system:'CHERAS-KAJANG', plaza:'Cheras', rate:1.30, type:'flat', systemType:'open' },
     { system:'CHERAS-KAJANG', plaza:'Kajang', rate:2.30, type:'flat', systemType:'open' },
     { system:'CHERAS-KAJANG', plaza:'Batu 9', rate:1.30, type:'flat', systemType:'open' },
@@ -542,121 +491,61 @@
     { system:'GUTHRIE', plaza:'Bukit Jelutong', rate:2.00, type:'flat', systemType:'open' },
     { system:'GUTHRIE', plaza:'Bukit Subang', rate:2.50, type:'flat', systemType:'open' },
     { system:'GUTHRIE', plaza:'Setia Alam', rate:3.50, type:'flat', systemType:'open' },
-
-    // ===== OPEN SYSTEM HIGHWAYS (NORTHERN, EAST COAST & SOUTHERN STATES) =====
     { system:'PENANG BRIDGE 1', plaza:'Jambatan Pulau Pinang', rate:7.00, type:'flat', systemType:'open' },
     { system:'PENANG BRIDGE 2', plaza:'Jambatan Sultan Abdul Halim', rate:8.50, type:'flat', systemType:'open' },
     { system:'SMART', plaza:'SMART Tunnel', rate:3.00, type:'flat', systemType:'open' },
-    { system:'LPT2', plaza:'Kuala Terengganu', rate:null, type:'closed', systemType:'closed' },
-    { system:'LPT2', plaza:'Kerteh', rate:null, type:'closed', systemType:'closed' },
-    { system:'LPT2', plaza:'Paka', rate:null, type:'closed', systemType:'closed' },
-    { system:'LPT2', plaza:'Dungun', rate:null, type:'closed', systemType:'closed' },
-    { system:'LPT2', plaza:'Bukit Besi', rate:null, type:'closed', systemType:'closed' },
-    { system:'LPT2', plaza:'Ajil', rate:null, type:'closed', systemType:'closed' },
-    { system:'LPT2', plaza:'Kuala Berang', rate:null, type:'closed', systemType:'closed' },
-    { system:'LPT2', plaza:'Chukai (Kemaman)', rate:null, type:'closed', systemType:'closed' },
-    { system:'LPT2', plaza:'Kijal', rate:null, type:'closed', systemType:'closed' },
     { system:'SPTJ', plaza:'EDL', rate:6.80, type:'flat', systemType:'open' },
     { system:'SPTJ', plaza:'Johor Bahru Parkway', rate:1.50, type:'flat', systemType:'open' },
     { system:'SDE', plaza:'Senai', rate:4.50, type:'flat', systemType:'open' },
     { system:'SDE', plaza:'Ulu Tiram', rate:4.50, type:'flat', systemType:'open' },
-    { system:'SDE', plaza:'Cahaya Baru', rate:3.50, type:'flat', systemType:'open' },
-    { system:'JOTIC', plaza:'Tanjung Kupang / Second Link', rate:null, type:'closed', systemType:'closed' },
-
-    // ===== CLOSED SYSTEM HIGHWAYS (NATIONWIDE) =====
+    // ===== CLOSED SYSTEM HIGHWAYS =====
     { system:'PLUS', plaza:'Bukit Kayu Hitam', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Changlun', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Jitra', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Alor Setar Utara', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Alor Setar Selatan', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Pendang', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Gurun', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Sungai Petani Utara', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Sungai Petani Selatan', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Bertam', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Kepala Batas', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Sungai Dua', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Juru', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Bukit Tambun', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Bandar Cassia', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Jawi', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Alor Pongsu', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Baganserai', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Kamunting', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Taiping Utara', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Taiping Selatan', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Kuala Kangsar', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Ipoh Utara', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Ipoh Selatan', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Simpang Pulai', rate:null, type:'closed', systemType:'closed' },
+    { system:'PLUS', plaza:'Ipoh', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Gopeng', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Tapah', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Bidor', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Sungkai', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Slim River', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Behrang', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Tanjung Malim', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Bukit Beruntung', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Rawang', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Rawang Selatan', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Bukit Lanjan', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Jalan Duta', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Sungai Besi', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Kajang', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Bangi', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Putra Mahkota', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Nilai Utara', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Nilai', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Seremban', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Port Dickson', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Pedas Linggi', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Simpang Ampat (Alor Gajah)', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Ayer Keroh', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Jasin', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Tangkak', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Bukit Gambir', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Pagoh', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Yong Peng Utara', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Yong Peng Selatan', rate:null, type:'closed', systemType:'closed' },
+    { system:'PLUS', plaza:'Yong Peng', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Ayer Hitam', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Machap', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Simpang Renggam', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Sedenak', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Kulai', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Skudai', rate:null, type:'closed', systemType:'closed' },
-    { system:'PLUS', plaza:'Kempas', rate:null, type:'closed', systemType:'closed' },
     { system:'PLUS', plaza:'Johor Bahru', rate:null, type:'closed', systemType:'closed' },
     { system:'ELITE', plaza:'KLIA', rate:null, type:'closed', systemType:'closed' },
     { system:'ELITE', plaza:'Putrajaya', rate:null, type:'closed', systemType:'closed' },
     { system:'ELITE', plaza:'Cyberjaya', rate:null, type:'closed', systemType:'closed' },
     { system:'ELITE', plaza:'Bandar Saujana Putra', rate:null, type:'closed', systemType:'closed' },
-    { system:'ELITE', plaza:'USJ', rate:null, type:'closed', systemType:'closed' },
-    { system:'ELITE', plaza:'E-Borneo / Seafront', rate:null, type:'closed', systemType:'closed' },
     { system:'ELITE', plaza:'Shah Alam', rate:null, type:'closed', systemType:'closed' },
     { system:'ELITE', plaza:'Setia Alam', rate:null, type:'closed', systemType:'closed' },
     { system:'ELITE', plaza:'Bukit Raja', rate:null, type:'closed', systemType:'closed' },
     { system:'SKVE', plaza:'Kajang', rate:null, type:'closed', systemType:'closed' },
-    { system:'SKVE', plaza:'Saujana Putra', rate:null, type:'closed', systemType:'closed' },
-    { system:'SKVE', plaza:'Telok Panglima Garang', rate:null, type:'closed', systemType:'closed' },
     { system:'SKVE', plaza:'Putrajaya', rate:null, type:'closed', systemType:'closed' },
     { system:'SKVE', plaza:'Carey Island', rate:null, type:'closed', systemType:'closed' },
     { system:'LPT', plaza:'Karak', rate:null, type:'closed', systemType:'closed' },
     { system:'LPT', plaza:'Kuantan', rate:null, type:'closed', systemType:'closed' },
-    { system:'LPT', plaza:'Sri Jaya', rate:null, type:'closed', systemType:'closed' },
-    { system:'LPT', plaza:'Gambang', rate:null, type:'closed', systemType:'closed' },
     { system:'LPT', plaza:'Kuala Terengganu', rate:null, type:'closed', systemType:'closed' },
     { system:'WCE', plaza:'Kapar', rate:null, type:'closed', systemType:'closed' },
-    { system:'WCE', plaza:'Bandar Bukit Raja Utara', rate:null, type:'closed', systemType:'closed' },
-    { system:'WCE', plaza:'Bandar Bukit Raja Selatan', rate:null, type:'closed', systemType:'closed' },
-    { system:'WCE', plaza:'Assam Jawa', rate:null, type:'closed', systemType:'closed' },
     { system:'WCE', plaza:'Tanjung Karang', rate:null, type:'closed', systemType:'closed' },
     { system:'WCE', plaza:'Kuala Selangor', rate:null, type:'closed', systemType:'closed' },
-    { system:'WCE', plaza:'Changkat Jering', rate:null, type:'closed', systemType:'closed' },
-    { system:'WCE', plaza:'Beruas', rate:null, type:'closed', systemType:'closed' },
-    { system:'WCE', plaza:'Sitiawan', rate:null, type:'closed', systemType:'closed' },
-    { system:'WCE', plaza:'Teluk Intan', rate:null, type:'closed', systemType:'closed' },
-    { system:'WCE', plaza:'Hutan Melintang', rate:null, type:'closed', systemType:'closed' },
-
     // ===== MIXED SYSTEM HIGHWAYS =====
     { system:'PLUS', plaza:'Second Link (Linkedua)', rate:null, type:'closed', systemType:'mixed' },
     { system:'PLUS', plaza:'Penang Bridge (PLUS)', rate:null, type:'closed', systemType:'mixed' },
