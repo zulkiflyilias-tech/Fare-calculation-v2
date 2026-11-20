@@ -866,8 +866,8 @@ const URBAN_POI_ZONES = [
 const KNOWN_TOLL_ROUTES = [
   {
     name: 'Bandar Puteri Puchong ↔ Genting Premium Outlet',
-    pickupArea: { lat: 3.026, lng: 101.616, radiusKm: 5 }, // Bandar Puteri Puchong
-    dropoffArea: { lat: 3.359, lng: 101.787, radiusKm: 8 }, // Genting Premium Outlet
+    pickupArea: { lat: 3.026, lng: 101.616, radiusKm: 5 },
+    dropoffArea: { lat: 3.359, lng: 101.787, radiusKm: 8 },
     tolls: [
       { name: 'LDP (Penchala)', amount: 2.10 },
       { name: 'DUKE', amount: 2.50 },
@@ -875,6 +875,17 @@ const KNOWN_TOLL_ROUTES = [
       { name: 'Genting Road Charge (Sempah)', amount: 5.00 }
     ],
     total: 15.60
+  },
+  {
+    name: 'Bandar Puteri Puchong ↔ Lotus Kuala Selangor',
+    pickupArea: { lat: 3.026, lng: 101.616, radiusKm: 5 },
+    dropoffArea: { lat: 3.3406, lng: 101.2497, radiusKm: 8 },
+    tolls: [
+      { name: 'LDP (Penchala)', amount: 2.10 },
+      { name: 'DUKE', amount: 2.50 },
+      { name: "LATAR (Templer's Park – Kuala Selangor)", amount: 6.50 }
+    ],
+    total: 11.10
   }
 ];
 
