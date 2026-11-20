@@ -1,19 +1,3 @@
-Based on the screenshot you provided, here is the analysis:
-
-1. The Route: The app successfully calculated a 362.0 km route taking 3 hr 32 mins. This aligns perfectly with a trip from Puchong to Penang.
-2. The Fare Calculation: The app's math is working correctly based on its inputs: RM 524.83 (Distance) + RM 5.00 (Urban) + RM 2.70 (Toll) + RM 104.97 (Long-haul) = RM 637.50, rounded to RM 638.00.
-3. The Failure Point: The toll is only RM 2.70. The status clearly says Tolls: HERE API (RM 2.70). This means the app failed to match the verified route (which should be RM 44.36) and fell back to HERE's severely undercounted data.
-
-Why did it fail to match?
-The previous code used strict coordinate radius matching (5km around Puchong, 8km around Penang Airport). If you selected an address like "Penang International Airport" but HERE geocoded the pin slightly outside the 8km radius, or if you searched "Bayan Lepas" instead of "Penang Airport", the coordinate match would fail.
-
-The Fix
-
-To make the verification bulletproof, I have added Text-Based Matching alongside the coordinate matching. Now, if the pickup text contains "Puchong" and the dropoff text contains "Penang" or "Bayan Lepas", it will instantly apply the verified RM 44.36 toll, regardless of where the map pin dropped.
-
-Here is the updated full HTML:
-
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
