@@ -381,6 +381,12 @@ button {touch-action:manipulation}
   border-bottom:0;
 }
 
+.toll-item-note {
+  font-size:9px;
+  color:#aeb0b5;
+  margin-top:1px;
+}
+
 details {
   border-top:1px dashed #3a3a3c;
   padding-top:8px;
@@ -496,6 +502,42 @@ summary {
   color:#888;
   line-height:1.5;
 }
+
+#settings-panel,
+#toll-reference-panel {
+  border-top:1px dashed #3a3a3c;
+  padding-top:8px;
+  margin-top:7px;
+  color:#212529;
+}
+
+#settings-panel summary,
+#toll-reference-panel summary {
+  color:#8e24aa;
+}
+
+.ref-system-header {
+  font-weight:750;
+  color:#8e24aa;
+  font-size:11px;
+  margin:8px 0 3px;
+  letter-spacing:.02em;
+}
+
+.ref-row {
+  display:flex;
+  justify-content:space-between;
+  font-size:11px;
+  padding:2px 0;
+  border-bottom:1px solid #f2f2f2;
+  color:#444;
+}
+
+.ref-row:last-child {border-bottom:0;}
+
+.ref-amount {font-weight:650; color:#212529;}
+
+.ref-amount.closed {color:#999; font-style:italic; font-weight:400;}
 
 @media(min-width:768px) {
   #container {flex-direction:row-reverse}
@@ -621,11 +663,11 @@ summary {
         <span>Actual / Manual toll override (RM)</span>
         <input id="manual-toll" type="number"
           min="0" step="0.10" inputmode="decimal"
-          placeholder="Use HERE API">
+          placeholder="Use HERE API / Reference">
       </label>
 
       <div class="small-muted">
-        Powered directly by HERE Routing API v8 tolls &amp; toll systems data (MYR). Enter actual toll in override if HERE's returned toll differs from actual plazas.
+        Toll source priority: <b>Manual override</b> → <b>Verified route</b> → <b>Reference plaza rate</b> → <b>HERE API</b>. Closed-system highways (PLUS, ELITE) always use HERE distance-based tolls.
       </div>
 
     </div>
@@ -805,6 +847,19 @@ summary {
       </p>
     </details>
 
+    <!-- TOLL REFERENCE PANEL -->
+
+    <details id="toll-reference-panel">
+      <summary>📖 Toll Reference Rates (Class 1 Car)</summary>
+      <p class="small-muted" style="margin-bottom:8px">
+        Reference flat rates for common Malaysian toll plazas. These are matched against
+        HERE-returned toll items and, when matched, replace HERE's figure. Closed-system
+        highways (PLUS, ELITE) are distance-based and always use HERE's calculation.
+        <b>Verify against your Touch 'n Go statement before relying on any figure.</b>
+      </p>
+      <div id="toll-reference-list"></div>
+    </details>
+
     <p class="small-muted">
       Estimates are indicative. Confirm actual toll deductions and final fare before
       accepting a trip. HERE Maps, location search and routing require
@@ -860,7 +915,8 @@ const URBAN_POI_ZONES = [
 ];
 
 /* =========================================================
-   1a. VERIFIED TOLL ROUTES (CLASS 1 CAR) — 2026
+   1a. USER-VERIFIED POINT-TO-POINT TOLL ROUTES
+   (marked Verified 2026 — highest confidence after manual override)
 ========================================================= */
 
 const KNOWN_TOLL_ROUTES = [
@@ -916,6 +972,261 @@ function getKnownTollForRoute(pickupCoords, dropoffCoords) {
     if ((pickupMatch && dropoffMatch) || (reversePickupMatch && reverseDropoffMatch)) {
       return route;
     }
+  }
+
+  return null;
+}
+
+/* =========================================================
+   1b. TOLL PLAZA REFERENCE RATES (CLASS 1 CAR, MYR)
+   Best-effort reference of publicly documented flat rates.
+   NOT real-time verified. Used to cross-check HERE toll items.
+   type: 'flat'  -> applied when matched against HERE item
+         'closed'-> distance-based, HERE calculation always kept
+========================================================= */
+
+const TOLL_PLAZA_REFERENCE = [
+  // LDP — Lebuhraya Damansara–Puchong
+  { system:'LDP', plaza:'Penchala', rate:2.10, type:'flat' },
+  { system:'LDP', plaza:'Puchong Intan', rate:1.00, type:'flat' },
+  { system:'LDP', plaza:'Puchong Utama', rate:1.30, type:'flat' },
+  { system:'LDP', plaza:'Petaling Jaya', rate:1.00, type:'flat' },
+  { system:'LDP', plaza:'Damansara', rate:1.30, type:'flat' },
+
+  // DUKE — Duta–Ulu Kelang Elevated Expressway
+  { system:'DUKE', plaza:'Ayer Panas', rate:2.50, type:'flat' },
+  { system:'DUKE', plaza:'Segambut', rate:2.50, type:'flat' },
+  { system:'DUKE', plaza:'Jalan Duta', rate:2.50, type:'flat' },
+  { system:'DUKE', plaza:'Sentul', rate:2.50, type:'flat' },
+  { system:'DUKE', plaza:'Setiawangsa', rate:2.50, type:'flat' },
+  { system:'DUKE', plaza:'Wangsa Maju', rate:2.50, type:'flat' },
+  { system:'DUKE', plaza:'Ampang', rate:2.50, type:'flat' },
+  { system:'DUKE', plaza:'Ulu Kelang', rate:2.50, type:'flat' },
+
+  // Karak Highway (KL–Karak)
+  { system:'KARAK', plaza:'Gombak', rate:6.00, type:'flat' },
+  { system:'KARAK', plaza:'Bentong', rate:4.50, type:'flat' },
+  { system:'KARAK', plaza:'Karak', rate:4.00, type:'flat' },
+  { system:'KARAK', plaza:'Mentakab', rate:4.50, type:'flat' },
+  { system:'KARAK', plaza:'Temerloh', rate:5.00, type:'flat' },
+  { system:'KARAK', plaza:'Lanchang', rate:4.50, type:'flat' },
+
+  // LATAR — Kuala Lumpur–Kuala Selangor
+  { system:'LATAR', plaza:"Templer's Park", rate:6.50, type:'flat' },
+  { system:'LATAR', plaza:'Kundang', rate:3.50, type:'flat' },
+  { system:'LATAR', plaza:'Ijok', rate:4.00, type:'flat' },
+  { system:'LATAR', plaza:'Kuala Selangor', rate:6.50, type:'flat' },
+
+  // MEX — Maju Expressway
+  { system:'MEX', plaza:'Salak South', rate:3.00, type:'flat' },
+  { system:'MEX', plaza:'Sri Petaling', rate:3.00, type:'flat' },
+  { system:'MEX', plaza:'Bukit Jalil', rate:3.00, type:'flat' },
+  { system:'MEX', plaza:'Putrajaya', rate:3.50, type:'flat' },
+
+  // SPRINT — Sungai Besi–Puchong
+  { system:'SPRINT', plaza:'Damansara', rate:2.00, type:'flat' },
+  { system:'SPRINT', plaza:'Kerinchi', rate:2.00, type:'flat' },
+  { system:'SPRINT', plaza:'Bukit Kiara', rate:2.00, type:'flat' },
+
+  // NKVE — New Klang Valley Expressway (flat segments only)
+  { system:'NKVE', plaza:'Damansara', rate:3.00, type:'flat' },
+  { system:'NKVE', plaza:'Kayu Ara', rate:1.50, type:'flat' },
+  { system:'NKVE', plaza:'Setia Alam', rate:4.00, type:'flat' },
+  { system:'NKVE', plaza:'Bukit Raja', rate:4.50, type:'flat' },
+  { system:'NKVE', plaza:'Shah Alam', rate:4.50, type:'flat' },
+  { system:'NKVE', plaza:'Subang', rate:3.00, type:'flat' },
+  { system:'NKVE', plaza:'Sungai Buloh', rate:3.50, type:'flat' },
+
+  // KESAS — Shah Alam Expressway
+  { system:'KESAS', plaza:'Sri Petaling', rate:1.80, type:'flat' },
+  { system:'KESAS', plaza:'Sunway', rate:1.80, type:'flat' },
+  { system:'KESAS', plaza:'Puchong', rate:1.50, type:'flat' },
+  { system:'KESAS', plaza:'Kebun Baru', rate:1.80, type:'flat' },
+  { system:'KESAS', plaza:'Batu Tiga', rate:1.80, type:'flat' },
+
+  // SILK — Kajang–Seremban
+  { system:'SILK', plaza:'Kajang', rate:1.80, type:'flat' },
+  { system:'SILK', plaza:'Sungai Ramal', rate:1.50, type:'flat' },
+  { system:'SILK', plaza:'Bukit Kajang', rate:1.80, type:'flat' },
+  { system:'SILK', plaza:'Sungai Long', rate:1.80, type:'flat' },
+  { system:'SILK', plaza:'Balakong', rate:1.80, type:'flat' },
+  { system:'SILK', plaza:'Mines', rate:1.80, type:'flat' },
+  { system:'SILK', plaza:'Serdang', rate:1.50, type:'flat' },
+  { system:'SILK', plaza:'Putrajaya', rate:2.00, type:'flat' },
+  { system:'SILK', plaza:'Bangi', rate:1.80, type:'flat' },
+
+  // Besraya — Sungai Besi Expressway
+  { system:'BESRAYA', plaza:'Sungai Besi', rate:1.50, type:'flat' },
+  { system:'BESRAYA', plaza:'Salak South', rate:1.50, type:'flat' },
+  { system:'BESRAYA', plaza:'Loke Yew', rate:1.50, type:'flat' },
+  { system:'BESRAYA', plaza:'Pandan', rate:1.50, type:'flat' },
+  { system:'BESRAYA', plaza:'Ampang', rate:1.50, type:'flat' },
+
+  // LEKAS — Kajang–Seremban
+  { system:'LEKAS', plaza:'Kajang', rate:2.00, type:'flat' },
+  { system:'LEKAS', plaza:'Semenyih', rate:2.50, type:'flat' },
+  { system:'LEKAS', plaza:'Pajam', rate:3.00, type:'flat' },
+  { system:'LEKAS', plaza:'Mantin', rate:3.50, type:'flat' },
+  { system:'LEKAS', plaza:'Ampangan', rate:4.00, type:'flat' },
+
+  // Cheras–Kajang (Grand Saga)
+  { system:'CHERAS-KAJANG', plaza:'Cheras', rate:1.30, type:'flat' },
+  { system:'CHERAS-KAJANG', plaza:'Kajang', rate:2.30, type:'flat' },
+  { system:'CHERAS-KAJANG', plaza:'Batu 9', rate:1.30, type:'flat' },
+  { system:'CHERAS-KAJANG', plaza:'Batu 11', rate:1.80, type:'flat' },
+
+  // SUKE — Sungai Besi–Ulu Kelang
+  { system:'SUKE', plaza:'Sri Petaling', rate:2.30, type:'flat' },
+  { system:'SUKE', plaza:'Bukit Jalil', rate:2.30, type:'flat' },
+  { system:'SUKE', plaza:'Alam Damai', rate:2.00, type:'flat' },
+  { system:'SUKE', plaza:'Sungai Besi', rate:2.00, type:'flat' },
+  { system:'SUKE', plaza:'Pandan', rate:2.50, type:'flat' },
+  { system:'SUKE', plaza:'Ampang', rate:2.50, type:'flat' },
+
+  // DASH — Damansara–Shah Alam
+  { system:'DASH', plaza:'Denai Alam', rate:2.30, type:'flat' },
+  { system:'DASH', plaza:'Bukit Jelutong', rate:2.00, type:'flat' },
+  { system:'DASH', plaza:'Section 13', rate:2.30, type:'flat' },
+  { system:'DASH', plaza:'Section 9', rate:2.30, type:'flat' },
+  { system:'DASH', plaza:'Setia Alam', rate:3.00, type:'flat' },
+  { system:'DASH', plaza:'Puncak Alam', rate:3.50, type:'flat' },
+
+  // Guthrie Corridor Expressway
+  { system:'GUTHRIE', plaza:'Kuang', rate:2.50, type:'flat' },
+  { system:'GUTHRIE', plaza:'Elmina', rate:2.50, type:'flat' },
+  { system:'GUTHRIE', plaza:'Bukit Jelutong', rate:2.00, type:'flat' },
+  { system:'GUTHRIE', plaza:'Bukit Subang', rate:2.50, type:'flat' },
+  { system:'GUTHRIE', plaza:'Setia Alam', rate:3.50, type:'flat' },
+
+  // Penang bridges
+  { system:'PENANG BRIDGE 1', plaza:'Jambatan Pulau Pinang', rate:7.00, type:'flat' },
+  { system:'PENANG BRIDGE 2', plaza:'Jambatan Sultan Abdul Halim', rate:8.50, type:'flat' },
+
+  // SMART Tunnel
+  { system:'SMART', plaza:'SMART Tunnel', rate:3.00, type:'flat' },
+
+  // SPTJ — Johor Bahru
+  { system:'SPTJ', plaza:'EDL', rate:6.80, type:'flat' },
+  { system:'SPTJ', plaza:'Johor Bahru Parkway', rate:1.50, type:'flat' },
+
+  // SDE — Senai–Desaru
+  { system:'SDE', plaza:'Senai', rate:4.50, type:'flat' },
+  { system:'SDE', plaza:'Ulu Tiram', rate:4.50, type:'flat' },
+
+  // PLUS — North–South Expressway (closed system, distance-based)
+  { system:'PLUS', plaza:'Bukit Kayu Hitam', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Jitra', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Kepala Batas', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Juru', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Bukit Tambun', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Kuala Kangsar', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Ipoh', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Gopeng', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Tapah', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Bidor', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Sungkai', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Behrang', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Tanjung Malim', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Rawang', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Bukit Lanjan', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Jalan Duta', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Sungai Besi', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Kajang', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Bangi', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Nilai', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Seremban', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Ayer Keroh', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Tangkak', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Pagoh', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Yong Peng', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Ayer Hitam', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Machap', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Sedenak', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Kulai', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Skudai', rate:null, type:'closed' },
+  { system:'PLUS', plaza:'Johor Bahru', rate:null, type:'closed' },
+
+  // ELITE — closed system
+  { system:'ELITE', plaza:'KLIA', rate:null, type:'closed' },
+  { system:'ELITE', plaza:'Putrajaya', rate:null, type:'closed' },
+  { system:'ELITE', plaza:'Cyberjaya', rate:null, type:'closed' },
+  { system:'ELITE', plaza:'Bandar Saujana Putra', rate:null, type:'closed' },
+  { system:'ELITE', plaza:'Shah Alam', rate:null, type:'closed' },
+  { system:'ELITE', plaza:'Setia Alam', rate:null, type:'closed' },
+  { system:'ELITE', plaza:'Bukit Raja', rate:null, type:'closed' },
+
+  // WCE — West Coast Expressway (flat segments as published)
+  { system:'WCE', plaza:'Kapar', rate:null, type:'closed' },
+  { system:'WCE', plaza:'Tanjung Karang', rate:null, type:'closed' },
+  { system:'WCE', plaza:'Kuala Selangor', rate:null, type:'closed' }
+];
+
+/* =========================================================
+   1c. REFERENCE MATCHER
+========================================================= */
+
+function normalizeTollText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function findReferenceRate(plazaName, systemName) {
+  if (!plazaName && !systemName) return null;
+
+  const plazaNorm = normalizeTollText(plazaName);
+  const systemNorm = normalizeTollText(systemName);
+
+  // Tokenise for more forgiving matching
+  const plazaTokens = plazaNorm.split(' ').filter(Boolean);
+  const systemTokens = systemNorm.split(' ').filter(Boolean);
+
+  let bestFlatMatch = null;
+  let bestFlatScore = 0;
+  let bestClosedMatch = null;
+  let bestClosedScore = 0;
+
+  for (const ref of TOLL_PLAZA_REFERENCE) {
+    const refPlazaNorm = normalizeTollText(ref.plaza);
+    const refSystemNorm = normalizeTollText(ref.system);
+
+    let score = 0;
+
+    // System match
+    if (systemNorm && (systemNorm.includes(refSystemNorm) || refSystemNorm.includes(systemNorm))) {
+      score += 5;
+    }
+
+    // Plaza match — token overlap
+    const refPlazaTokens = refPlazaNorm.split(' ').filter(Boolean);
+    const plazaOverlap = plazaTokens.filter(t => refPlazaTokens.includes(t)).length;
+    if (plazaOverlap > 0) {
+      score += plazaOverlap * 2;
+    }
+
+    // Substring bonus
+    if (plazaNorm && (plazaNorm.includes(refPlazaNorm) || refPlazaNorm.includes(plazaNorm))) {
+      score += 3;
+    }
+
+    if (score <= 0) continue;
+
+    if (ref.type === 'flat' && score > bestFlatScore) {
+      bestFlatScore = score;
+      bestFlatMatch = ref;
+    } else if (ref.type === 'closed' && score > bestClosedScore) {
+      bestClosedScore = score;
+      bestClosedMatch = ref;
+    }
+  }
+
+  // Prefer a flat match; fall back to closed (informational only)
+  if (bestFlatMatch && bestFlatScore >= 2) {
+    return { rate:bestFlatMatch.rate, system:bestFlatMatch.system, plaza:bestFlatMatch.plaza, type:'flat', score:bestFlatScore };
+  }
+  if (bestClosedMatch && bestClosedScore >= 2) {
+    return { rate:null, system:bestClosedMatch.system, plaza:bestClosedMatch.plaza, type:'closed', score:bestClosedScore };
   }
 
   return null;
@@ -1695,9 +2006,20 @@ function calculateHereTolls(route,paymentPref='any') {
   let hasSummaryTolls = false;
   let preferenceMatchedCount = 0;
   let totalResolvedCount = 0;
+  let referenceAppliedCount = 0;
+  let referenceDiscrepancyCount = 0;
 
   const seenFareIds = new Set();
   const items = [];
+
+  const pushItem = (item) => {
+    items.push(item);
+    totalToll = roundMoney(totalToll + item.amount);
+    totalResolvedCount++;
+    if (item.matchedPreference) preferenceMatchedCount++;
+    if (item.referenceApplied) referenceAppliedCount++;
+    if (item.referenceDiscrepancy) referenceDiscrepancyCount++;
+  };
 
   sections.forEach((section,secIdx) => {
     const tolls = Array.isArray(section.tolls) ? section.tolls : [];
@@ -1726,18 +2048,37 @@ function calculateHereTolls(route,paymentPref='any') {
           seenFareIds.add(picked.fareId);
         }
 
-        totalToll = roundMoney(totalToll + picked.amount);
-        totalResolvedCount++;
-        if (picked.matchedPreference) preferenceMatchedCount++;
+        // Cross-check with reference
+        const refMatch = findReferenceRate(plazaName, sysName);
+        let finalAmount = picked.amount;
+        let referenceApplied = false;
+        let referenceDiscrepancy = false;
+        let referenceLabel = '';
 
-        items.push({
+        if (refMatch && refMatch.type === 'flat' && refMatch.rate != null) {
+          if (Math.abs(picked.amount - refMatch.rate) > 0.01) {
+            referenceDiscrepancy = true;
+          }
+          finalAmount = refMatch.rate;
+          referenceApplied = true;
+          referenceLabel = `${refMatch.system} · ${refMatch.plaza}`;
+        } else if (refMatch && refMatch.type === 'closed') {
+          referenceLabel = `${refMatch.system} (distance-based)`;
+        }
+
+        pushItem({
           name:plazaName,
           system:sysName,
-          amount:picked.amount,
+          amount:finalAmount,
+          hereAmount:picked.amount,
           currency:picked.currency,
           paymentMethods:picked.paymentMethods,
           fareName:picked.fareName,
           fareId:picked.fareId,
+          matchedPreference:picked.matchedPreference,
+          referenceApplied,
+          referenceDiscrepancy,
+          referenceLabel,
           source:'section.tolls'
         });
       });
@@ -1751,18 +2092,19 @@ function calculateHereTolls(route,paymentPref='any') {
         const curr = String((price && price.currency) || cost.currency || 'MYR').toUpperCase();
         if (!Number.isFinite(val) || val < 0 || curr !== 'MYR') return;
 
-        const amt = roundMoney(val);
-        totalToll = roundMoney(totalToll + amt);
-        totalResolvedCount++;
-
-        items.push({
+        pushItem({
           name:`Route Toll Summary ${secIdx + 1}.${cIdx + 1}`,
           system:'',
-          amount:amt,
+          amount:roundMoney(val),
+          hereAmount:roundMoney(val),
           currency:'MYR',
           paymentMethods:[],
           fareName:cost.name || '',
           fareId:cost.id ? String(cost.id) : '',
+          matchedPreference:false,
+          referenceApplied:false,
+          referenceDiscrepancy:false,
+          referenceLabel:'',
           source:'section.summary.tollCosts'
         });
       });
@@ -1776,18 +2118,19 @@ function calculateHereTolls(route,paymentPref='any') {
       const curr = String((price && price.currency) || cost.currency || 'MYR').toUpperCase();
       if (!Number.isFinite(val) || val < 0 || curr !== 'MYR') return;
 
-      const amt = roundMoney(val);
-      totalToll = roundMoney(totalToll + amt);
-      totalResolvedCount++;
-
-      items.push({
+      pushItem({
         name:`Route Summary Toll ${idx + 1}`,
         system:'',
-        amount:amt,
+        amount:roundMoney(val),
+        hereAmount:roundMoney(val),
         currency:'MYR',
         paymentMethods:[],
         fareName:cost.name || '',
         fareId:cost.id ? String(cost.id) : '',
+        matchedPreference:false,
+        referenceApplied:false,
+        referenceDiscrepancy:false,
+        referenceLabel:'',
         source:'route.summary.tollCosts'
       });
     });
@@ -1799,6 +2142,8 @@ function calculateHereTolls(route,paymentPref='any') {
     systemsCount:tollSystems.size,
     totalResolvedCount,
     preferenceMatchedCount,
+    referenceAppliedCount,
+    referenceDiscrepancyCount,
     paymentPref,
     hasAnyTollData:hasItemisedTolls || hasSummaryTolls || items.length > 0
   };
@@ -1939,21 +2284,28 @@ function handleRouteResult(route,routesReturnedCount,paymentPref,avoidTollsReque
 
   const tollResult = calculateHereTolls(route,paymentPref);
 
-  /* ---- VERIFIED TOLL ROUTE LOGIC ---- */
+  /* ---- TOLL SOURCE PRIORITY: Manual > Verified > Reference > HERE ---- */
   const knownRoute = getKnownTollForRoute(pickupCoords, dropoffCoords);
   const manualRaw = $('manual-toll').value.trim();
   const hasManualToll = manualRaw !== '';
 
   let effectiveTollAmount;
   let hasKnownToll = false;
+  let tollSource = 'here';
 
   if (hasManualToll) {
     effectiveTollAmount = roundMoney(Number(manualRaw));
+    tollSource = 'manual';
   } else if (knownRoute) {
     effectiveTollAmount = knownRoute.total;
     hasKnownToll = true;
+    tollSource = 'verified';
+  } else if (tollResult.referenceAppliedCount > 0) {
+    effectiveTollAmount = tollResult.amount;
+    tollSource = 'reference';
   } else {
     effectiveTollAmount = tollResult.amount;
+    tollSource = 'here';
   }
 
   let displayTollItems = tollResult.items;
@@ -1962,11 +2314,16 @@ function handleRouteResult(route,routesReturnedCount,paymentPref,avoidTollsReque
       name: t.name,
       system: 'Verified 2026',
       amount: t.amount,
+      hereAmount: t.amount,
       currency: 'MYR',
       paymentMethods: [],
       fareName: '',
       fareId: '',
-      source: 'known_route'
+      matchedPreference: false,
+      referenceApplied: true,
+      referenceDiscrepancy: false,
+      referenceLabel: 'Verified 2026',
+      source: 'verified_route'
     }));
   }
 
@@ -2002,6 +2359,7 @@ function handleRouteResult(route,routesReturnedCount,paymentPref,avoidTollsReque
     effectiveTollAmount,
     hasManualToll,
     hasKnownToll,
+    tollSource,
     avoidTollsRequested,
     sectionsCount:sections.length,
     alternativesCount:Math.max(0,routesReturnedCount - 1)
@@ -2009,16 +2367,17 @@ function handleRouteResult(route,routesReturnedCount,paymentPref,avoidTollsReque
 
   latestCalculation = calculation;
 
-  const tollSourceLabel = hasManualToll
-    ? 'Manual override'
-    : hasKnownToll
-      ? 'Verified 2026 rates'
-      : 'HERE API';
+  const sourceLabel = {
+    manual: 'Manual override',
+    verified: 'Verified 2026 rates',
+    reference: `Reference plaza rates (${tollResult.referenceAppliedCount} matched)`,
+    here: 'HERE API'
+  }[tollSource];
 
   setRouteStatus(
     `Route calculated · ${sections.length} section(s) · ` +
     `${activeRoutingMode === 'fast' ? 'Fastest' : 'Shortest'} · ` +
-    `Tolls: ${tollSourceLabel} (${money(effectiveTollAmount)})`
+    `Tolls: ${sourceLabel} (${money(effectiveTollAmount)})`
   );
 }
 
@@ -2075,6 +2434,8 @@ function processCalculations(routeData) {
     $('toll-fare-label').textContent = 'Toll charges (Manual / Actual override)';
   } else if (routeData.hasKnownToll) {
     $('toll-fare-label').textContent = 'Toll charges (Verified 2026 rates)';
+  } else if (routeData.tollSource === 'reference') {
+    $('toll-fare-label').textContent = 'Toll charges (Reference plaza rates)';
   } else {
     $('toll-fare-label').textContent = 'Toll charges (HERE API)';
   }
@@ -2103,7 +2464,9 @@ function processCalculations(routeData) {
     if (routeData.hasManualToll) {
       title.textContent = `Active Toll: ${money(tollFee)} (Manual override · HERE raw: ${money(routeData.tollResult.amount)})`;
     } else if (routeData.hasKnownToll) {
-      title.textContent = `Active Toll: ${money(tollFee)} (Verified 2026 rates · HERE raw: ${money(routeData.tollResult.amount)})`;
+      title.textContent = `Active Toll: ${money(tollFee)} (Verified 2026 rates)`;
+    } else if (routeData.tollSource === 'reference') {
+      title.textContent = `Active Toll: ${money(tollFee)} (Reference plaza rates applied)`;
     } else {
       title.textContent = `HERE Routing Tolls (${routeData.tollResult.items.length} item${routeData.tollResult.items.length > 1 ? 's' : ''})`;
     }
@@ -2123,6 +2486,18 @@ function processCalculations(routeData) {
 
       row.append(left,right);
       breakdownBox.appendChild(row);
+
+      if (item.referenceDiscrepancy) {
+        const note = document.createElement('div');
+        note.className = 'toll-item-note';
+        note.textContent = `Reference rate applied (HERE said ${money(item.hereAmount)})`;
+        breakdownBox.appendChild(note);
+      } else if (item.referenceApplied && item.referenceLabel) {
+        const note = document.createElement('div');
+        note.className = 'toll-item-note';
+        note.textContent = `Matched reference: ${item.referenceLabel}`;
+        breakdownBox.appendChild(note);
+      }
     });
 
     breakdownBox.style.display = 'block';
@@ -2134,21 +2509,22 @@ function processCalculations(routeData) {
   if (routeData.avoidTollsRequested && tollFee > 0) {
     warnings.push('Returned route still contains toll charges');
   }
-  if (!routeData.hasManualToll && !routeData.hasKnownToll && hillApplies && tollFee > 0) {
-    warnings.push('Verify HERE toll against actual expressway & highland entry charges');
+  if (!routeData.hasManualToll && !routeData.hasKnownToll && routeData.tollResult.referenceDiscrepancyCount > 0) {
+    warnings.push(`${routeData.tollResult.referenceDiscrepancyCount} toll(s) corrected against reference table`);
   }
   if (routeData.tollResult.paymentPref !== 'any' && routeData.tollResult.totalResolvedCount > 0 && routeData.tollResult.preferenceMatchedCount === 0) {
     warnings.push(`No explicit "${routeData.tollResult.paymentPref}" fare tag in HERE response; used default MYR fare`);
   }
 
-  const tollSourceText = routeData.hasManualToll
-    ? `Tolls: Manual override (${money(tollFee)})`
-    : routeData.hasKnownToll
-      ? `Tolls: Verified 2026 rates (${money(tollFee)})`
-      : `Tolls: HERE Routing v8 (${routeData.tollResult.paymentPref})`;
+  const sourceText = {
+    manual: `Tolls: Manual override (${money(tollFee)})`,
+    verified: `Tolls: Verified 2026 rates (${money(tollFee)})`,
+    reference: `Tolls: Reference plaza rates (${money(tollFee)})`,
+    here: `Tolls: HERE Routing v8 (${routeData.tollResult.paymentPref})`
+  }[routeData.tollSource || 'here'];
 
   const statusParts = [
-    tollSourceText,
+    sourceText,
     `Highland: ${hillApplies ? 'applied' : 'not applied'}`
   ];
   if (warnings.length) {
@@ -2184,8 +2560,11 @@ function processCalculations(routeData) {
     hereRawTollAmount:routeData.tollResult.amount,
     hasManualToll:routeData.hasManualToll,
     hasKnownToll:routeData.hasKnownToll,
+    tollSource:routeData.tollSource || 'here',
     tollItems:routeData.tollResult.items,
     tollPaymentPref:routeData.tollResult.paymentPref,
+    referenceAppliedCount:routeData.tollResult.referenceAppliedCount,
+    referenceDiscrepancyCount:routeData.tollResult.referenceDiscrepancyCount,
     hillSurcharge,
     highlandZone:highlandZone ? highlandZone.name : '',
     longHaulIncentive,
@@ -2230,233 +2609,5 @@ function formatDuration(minutes) {
 
 function receiptText(data) {
   const tollLines = Array.isArray(data.tollItems) && data.tollItems.length
-    ? data.tollItems.map(t => `  - ${t.name}${t.system ? ` (${t.system})` : ''}: ${money(t.amount)}`).join('\n')
-    : '  - None';
-
-  const tollSource = data.hasManualToll
-    ? `Manual override (HERE raw: ${money(data.hereRawTollAmount)})`
-    : data.hasKnownToll
-      ? 'Verified 2026 rates'
-      : 'HERE API';
-
-  return [
-    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v3.0.2',
-    '------------------------------------------------',
-    `From: ${data.pickup}`,
-    `To: ${data.dropoff}`,
-    `Distance: ${data.distance.toFixed(1)} km`,
-    `Estimated duration: ${formatDuration(data.duration)}`,
-    `Route: ${data.routingMode === 'fast' ? 'Fastest' : 'Shortest'}`,
-    `Avoid tolls requested: ${data.avoidTolls ? 'Yes' : 'No'}`,
-    `HERE toll preference: ${data.tollPaymentPref || 'any'}`,
-    '------------------------------------------------',
-    `Distance fare: ${money(data.distanceFare)}`,
-    `Urban / POI surcharge: ${money(data.urbanSurcharge)}`,
-    `Highland surcharge: ${money(data.hillSurcharge)}`,
-    `Highland zone: ${data.highlandZone || 'None'}`,
-    `Long-haul contribution: ${money(data.longHaulIncentive)}`,
-    `Transport subtotal: ${money(data.transportSubtotal)}`,
-    `Minimum-adjusted transport fare: ${money(data.transportFare)}`,
-    `Toll charges applied: ${money(data.tollFee)} (${tollSource})`,
-    'HERE Toll Items:',
-    tollLines,
-    '------------------------------------------------',
-    `Exact calculated total: ${money(data.exactTotal)}`,
-    `Quotation rounding adjustment: ${money(data.roundingAdjustment)}`,
-    `CUSTOMER QUOTATION: ${money(data.customerTotal)}`,
-    '------------------------------------------------',
-    `Admin commission: -${money(data.adminDeduction)}`,
-    `Commission method: ${data.usesFlatCommission ? 'Flat commission' : 'Percentage commission'}`,
-    `Driver transport earnings: ${money(data.driverFareEarnings)}`,
-    `Driver collection after commission (incl. tolls): ${money(data.driverAmountAfterDeduction)}`,
-    '------------------------------------------------',
-    'Tolls are reimbursement, not driver profit.',
-    'Driver earnings exclude fuel, maintenance, depreciation and other operating costs.',
-    'Estimate only. Verify tolls and final fare before travel.',
-    'Generated by Rideshare MY Personal Edition v3.0.2'
-  ].join('\n');
-}
-
-/* =========================================================
-   17. CLIPBOARD
-========================================================= */
-
-async function copyText(text) {
-  if (navigator.clipboard && window.isSecureContext) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return;
-    } catch(error) {
-      console.warn('Modern clipboard failed; trying fallback.',error);
-    }
-  }
-
-  const area = document.createElement('textarea');
-  area.value = text;
-  area.setAttribute('readonly','');
-  area.style.position = 'fixed';
-  area.style.left = '-9999px';
-  area.style.top = '0';
-  area.style.opacity = '0';
-
-  document.body.appendChild(area);
-  area.focus();
-  area.select();
-  area.setSelectionRange(0,area.value.length);
-
-  let copied = false;
-  try {
-    copied = document.execCommand('copy');
-  } finally {
-    area.remove();
-  }
-
-  if (!copied) {
-    throw new Error('Clipboard access was blocked by the browser.');
-  }
-}
-
-async function copyReceipt() {
-  if (!latestCalculation) return;
-
-  const button = $('share-btn');
-  const original = button.textContent;
-
-  try {
-    await copyText(receiptText(latestCalculation));
-    button.textContent = '✓ Receipt copied';
-    setTimeout(() => {
-      button.textContent = original;
-    },1800);
-  } catch(error) {
-    showError(`Unable to copy receipt: ${error.message}`);
-  }
-}
-
-/* =========================================================
-   18. MAP INITIALISATION
-========================================================= */
-
-function initMap() {
-  try {
-    if (!window.H || !H.service || !H.Map) {
-      showError('HERE Maps scripts did not load. Check internet connection or content blockers.');
-      return false;
-    }
-
-    if (!isApiKeyConfigured()) {
-      setRouteStatus('Setup required: configure your HERE API key to enable map services.');
-    }
-
-    platform = new H.service.Platform({apikey:HERE_API_KEY});
-    const layers = platform.createDefaultLayers();
-
-    map = new H.Map(
-      $('map'),
-      layers.vector.normal.map,
-      {
-        zoom:11,
-        center:{lat:3.1390,lng:101.6869},
-        pixelRatio:window.devicePixelRatio || 1
-      }
-    );
-
-    window.addEventListener('resize',() => {
-      if (map) map.getViewPort().resize();
-    });
-
-    new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
-    ui = H.ui.UI.createDefault(map,layers);
-    router = platform.getRoutingService(null,8);
-
-    return true;
-  } catch(error) {
-    console.error('Map initialisation error:',error);
-    showError('Unable to initialise HERE Maps. Check API key, permissions and internet connection.');
-    return false;
-  }
-}
-
-/* =========================================================
-   19. EVENT BINDING
-========================================================= */
-
-function bindEvents() {
-  setupAutocomplete('pickup');
-  setupAutocomplete('dropoff');
-
-  $('current-loc-btn').addEventListener('click',requestCurrentLocation);
-  $('swap-locations-btn').addEventListener('click',swapLocations);
-  $('btn-mode-fast').addEventListener('click',() => setRoutingMode('fast'));
-  $('btn-mode-short').addEventListener('click',() => setRoutingMode('short'));
-  $('btn-avoid-tolls').addEventListener('click',toggleAvoidTolls);
-
-  $('here-payment-pref').addEventListener('change',() => {
-    if (pickupCoords && dropoffCoords) calculateRoute();
-  });
-
-  $('here-departure-time').addEventListener('change',() => {
-    if (pickupCoords && dropoffCoords) calculateRoute();
-  });
-
-  $('manual-toll').addEventListener('change',() => {
-    if (pickupCoords && dropoffCoords) calculateRoute();
-  });
-
-  $('share-btn').addEventListener('click',copyReceipt);
-
-  $('save-settings-btn').addEventListener('click',() => {
-    try {
-      const next = readSettingsForm();
-      settings = sanitizeSettings(next);
-      if (!persistSettings()) return;
-      if (pickupCoords && dropoffCoords) calculateRoute();
-      setRouteStatus('Fare settings saved successfully on this device.');
-      clearError();
-    } catch(error) {
-      showError(error.message);
-    }
-  });
-
-  $('reset-settings-btn').addEventListener('click',() => {
-    if (!confirm('Restore all default fare settings?')) return;
-    settings = {...DEFAULT_SETTINGS};
-    populateSettingsForm();
-    if (!persistSettings()) return;
-    if (pickupCoords && dropoffCoords) calculateRoute();
-    setRouteStatus('Default fare settings restored.');
-    clearError();
-  });
-
-  document.addEventListener('click',event => {
-    ['pickup','dropoff'].forEach(type => {
-      const box = $(`${type}-suggestions`);
-      const input = $(type);
-      if (!box.contains(event.target) && !input.contains(event.target)) {
-        box.style.display = 'none';
-      }
-    });
-  });
-}
-
-/* =========================================================
-   20. APPLICATION STARTUP
-========================================================= */
-
-function boot() {
-  populateSettingsForm();
-  bindEvents();
-  initMap();
-
-  if (!isApiKeyConfigured()) {
-    setRouteStatus('Setup required: replace HERE_API_KEY with your valid key.');
-  }
-}
-
-boot();
-
-})();
-</script>
-
-</body>
-</html>
+    ? data.tollItems.map(t => {
+        const sys = t.system ? `
