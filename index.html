@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare MY - Personal Edition v3.0.1</title>
+<title>Rideshare MY - Personal Edition v3.0.2</title>
 
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 
@@ -266,6 +266,23 @@ button {touch-action:manipulation}
   background:#fff;
 }
 
+.toll-adjust {
+  display:grid;
+  grid-template-columns:1fr 118px;
+  gap:8px;
+  align-items:center;
+  font-size:12px;
+  color:#555;
+}
+
+.toll-adjust input {
+  width:100%;
+  padding:7px 8px;
+  border:1px solid var(--border);
+  border-radius:7px;
+  font-size:13px;
+}
+
 .status-line {
   font-size:11px;
   color:#777;
@@ -518,7 +535,7 @@ summary {
 
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.0.1</span>
+      <span class="version">PERSONAL EDITION v3.0.2</span>
     </div>
 
     <!-- LOCATION INPUTS -->
@@ -600,8 +617,15 @@ summary {
         </label>
       </div>
 
+      <label class="toll-adjust">
+        <span>Actual / Manual toll override (RM)</span>
+        <input id="manual-toll" type="number"
+          min="0" step="0.10" inputmode="decimal"
+          placeholder="Use HERE API">
+      </label>
+
       <div class="small-muted">
-        Powered directly by HERE Routing API v8 tolls &amp; toll systems data (MYR). Departure time supports time-dependent HERE toll tariffs when provided.
+        Powered directly by HERE Routing API v8 tolls &amp; toll systems data (MYR). Enter actual toll in override if HERE's returned toll differs from actual plazas.
       </div>
 
     </div>
@@ -641,7 +665,7 @@ summary {
         </div>
 
         <div class="detail-row" id="toll-fare-row">
-          <span>Toll charges (HERE API)</span>
+          <span id="toll-fare-label">Toll charges (HERE API)</span>
           <span id="calc-toll-fare">RM 0.00</span>
         </div>
 
@@ -782,7 +806,7 @@ summary {
     </details>
 
     <p class="small-muted">
-      Estimates are indicative. Confirm toll amounts and final fare before
+      Estimates are indicative. Confirm actual toll deductions and final fare before
       accepting a trip. HERE Maps, location search and routing require
       internet access. Browser storage is local to this device.
     </p>
@@ -1529,14 +1553,16 @@ function getHereTollSystemMap(route) {
     route && route.tollCollectionSystems
   ];
 
-  sysCollections.forEach(col => {
+  sysCollections.forEach((col,colIdx) => {
     if (!Array.isArray(col)) return;
-    col.forEach(sys => {
+    col.forEach((sys,sysIdx) => {
       if (!sys || typeof sys !== 'object') return;
-      const key = String(sys.id || sys.code || sys.name || '');
-      if (key) {
-        systemMap.set(key,sys);
-      }
+      const keys = [
+        sys.id !== undefined ? String(sys.id) : '',
+        sys.code !== undefined ? String(sys.code) : '',
+        String(sysIdx)
+      ].filter(Boolean);
+      keys.forEach(k => systemMap.set(k,sys));
     });
   });
 
@@ -1621,13 +1647,13 @@ function calculateHereTolls(route,paymentPref='any') {
       hasItemisedTolls = true;
 
       tolls.forEach((toll,tollIdx) => {
-        const sysRefId = String(
+        const sysRefRaw =
+          (toll.tollSystemRef !== undefined && toll.tollSystemRef !== null ? String(toll.tollSystemRef) : '') ||
           (toll.tollSystem && (toll.tollSystem.id || toll.tollSystem.name)) ||
           toll.tollSystemId ||
-          ''
-        );
-        const sysInfo = tollSystems.get(sysRefId) || toll.tollSystem || null;
-        const sysName = (sysInfo && (sysInfo.name || sysInfo.id)) || sysRefId || '';
+          '';
+        const sysInfo = tollSystems.get(sysRefRaw) || (typeof toll.tollSystem === 'object' ? toll.tollSystem : null) || null;
+        const sysName = (sysInfo && (sysInfo.name || sysInfo.id)) || (typeof toll.tollSystem === 'string' ? toll.tollSystem : '') || '';
         const plazaName = toll.name || sysName || `Toll Point ${secIdx + 1}.${tollIdx + 1}`;
 
         const picked = selectFareFromToll(toll,paymentPref);
@@ -1753,6 +1779,15 @@ function calculateRoute() {
     return;
   }
 
+  const manualValue = $('manual-toll').value.trim();
+  if (manualValue !== '') {
+    const parsed = Number(manualValue);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      showError('Manual toll override must be RM0.00 or more.');
+      return;
+    }
+  }
+
   invalidateRoute(true);
 
   const requestId = routeRequestId;
@@ -1841,6 +1876,11 @@ function handleRouteResult(route,routesReturnedCount,paymentPref,avoidTollsReque
   }
 
   const tollResult = calculateHereTolls(route,paymentPref);
+  const manualRaw = $('manual-toll').value.trim();
+  const hasManualToll = manualRaw !== '';
+  const effectiveTollAmount = hasManualToll
+    ? roundMoney(Number(manualRaw))
+    : tollResult.amount;
 
   clearRouteObjects();
   const group = new H.map.Group();
@@ -1867,6 +1907,8 @@ function handleRouteResult(route,routesReturnedCount,paymentPref,avoidTollsReque
     distance:distanceKm,
     duration:durationMins,
     tollResult,
+    effectiveTollAmount,
+    hasManualToll,
     avoidTollsRequested,
     sectionsCount:sections.length,
     alternativesCount:Math.max(0,routesReturnedCount - 1)
@@ -1908,7 +1950,7 @@ function processCalculations(routeData) {
   const transportSubtotal = roundMoney(distanceFare + urbanSurcharge + hillSurcharge + longHaulIncentive);
   const transportFare = roundMoney(Math.max(settings.minimumFare,transportSubtotal));
 
-  const tollFee = roundMoney(routeData.tollResult.amount);
+  const tollFee = roundMoney(routeData.effectiveTollAmount);
   const exactTotal = roundMoney(transportFare + tollFee);
   const customerTotal = roundMoney(roundToUnit(exactTotal,settings.roundingUnit));
 
@@ -1930,6 +1972,10 @@ function processCalculations(routeData) {
   $('long-haul-incentive-row').style.display = longHaulIncentive > 0 ? 'flex' : 'none';
   $('admin-deduction-row').style.display = adminDeduction > 0 ? 'flex' : 'none';
 
+  $('toll-fare-label').textContent = routeData.hasManualToll
+    ? 'Toll charges (Manual / Actual override)'
+    : 'Toll charges (HERE API)';
+
   $('total-fare').textContent = money(customerTotal);
   $('fare-distance').textContent = `${routeData.distance.toFixed(1)} km`;
   $('fare-duration').textContent = formatDuration(routeData.duration);
@@ -1946,11 +1992,13 @@ function processCalculations(routeData) {
   $('driver-net-fare').textContent = money(driverAmountAfterDeduction);
 
   const breakdownBox = $('toll-breakdown-box');
-  if (routeData.tollResult.items.length) {
+  if (routeData.tollResult.items.length || routeData.hasManualToll) {
     breakdownBox.innerHTML = '';
     const title = document.createElement('div');
     title.className = 'toll-breakdown-title';
-    title.textContent = `HERE Routing Tolls (${routeData.tollResult.items.length} item${routeData.tollResult.items.length > 1 ? 's' : ''})`;
+    title.textContent = routeData.hasManualToll
+      ? `Active Toll: ${money(tollFee)} (Manual override · HERE raw: ${money(routeData.tollResult.amount)})`
+      : `HERE Routing Tolls (${routeData.tollResult.items.length} item${routeData.tollResult.items.length > 1 ? 's' : ''})`;
     breakdownBox.appendChild(title);
 
     routeData.tollResult.items.forEach(item => {
@@ -1977,12 +2025,17 @@ function processCalculations(routeData) {
   if (routeData.avoidTollsRequested && tollFee > 0) {
     warnings.push('Returned route still contains toll charges');
   }
+  if (!routeData.hasManualToll && hillApplies && tollFee > 0) {
+    warnings.push('Verify HERE toll against actual expressway & highland entry charges');
+  }
   if (routeData.tollResult.paymentPref !== 'any' && routeData.tollResult.totalResolvedCount > 0 && routeData.tollResult.preferenceMatchedCount === 0) {
     warnings.push(`No explicit "${routeData.tollResult.paymentPref}" fare tag in HERE response; used default MYR fare`);
   }
 
   const statusParts = [
-    `Tolls: HERE Routing v8 (${routeData.tollResult.paymentPref})`,
+    routeData.hasManualToll
+      ? `Tolls: Manual override (${money(tollFee)})`
+      : `Tolls: HERE Routing v8 (${routeData.tollResult.paymentPref})`,
     `Highland: ${hillApplies ? 'applied' : 'not applied'}`
   ];
   if (warnings.length) {
@@ -2006,7 +2059,7 @@ function processCalculations(routeData) {
   $('result-card').style.display = 'block';
 
   return {
-    version:'3.0.1',
+    version:'3.0.2',
     pickup:$('pickup').value.trim(),
     dropoff:$('dropoff').value.trim(),
     distance:routeData.distance,
@@ -2015,6 +2068,8 @@ function processCalculations(routeData) {
     urbanSurcharge,
     urbanLabel:urban.label,
     tollFee,
+    hereRawTollAmount:routeData.tollResult.amount,
+    hasManualToll:routeData.hasManualToll,
     tollItems:routeData.tollResult.items,
     tollPaymentPref:routeData.tollResult.paymentPref,
     hillSurcharge,
@@ -2065,7 +2120,7 @@ function receiptText(data) {
     : '  - None';
 
   return [
-    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v3.0.1',
+    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v3.0.2',
     '------------------------------------------------',
     `From: ${data.pickup}`,
     `To: ${data.dropoff}`,
@@ -2082,7 +2137,7 @@ function receiptText(data) {
     `Long-haul contribution: ${money(data.longHaulIncentive)}`,
     `Transport subtotal: ${money(data.transportSubtotal)}`,
     `Minimum-adjusted transport fare: ${money(data.transportFare)}`,
-    `Toll charges (HERE API): ${money(data.tollFee)}`,
+    `Toll charges applied: ${money(data.tollFee)}${data.hasManualToll ? ` (Manual override; HERE raw: ${money(data.hereRawTollAmount)})` : ' (HERE API)'}`,
     'HERE Toll Items:',
     tollLines,
     '------------------------------------------------',
@@ -2098,7 +2153,7 @@ function receiptText(data) {
     'Tolls are reimbursement, not driver profit.',
     'Driver earnings exclude fuel, maintenance, depreciation and other operating costs.',
     'Estimate only. Verify tolls and final fare before travel.',
-    'Generated by Rideshare MY Personal Edition v3.0.1'
+    'Generated by Rideshare MY Personal Edition v3.0.2'
   ].join('\n');
 }
 
@@ -2221,6 +2276,10 @@ function bindEvents() {
   });
 
   $('here-departure-time').addEventListener('change',() => {
+    if (pickupCoords && dropoffCoords) calculateRoute();
+  });
+
+  $('manual-toll').addEventListener('change',() => {
     if (pickupCoords && dropoffCoords) calculateRoute();
   });
 
