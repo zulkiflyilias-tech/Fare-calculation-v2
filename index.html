@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare MY - Personal Edition v2.6</title>
+<title>Rideshare MY - Personal Edition v2.7</title>
 
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 
@@ -415,6 +415,12 @@ button {touch-action:manipulation}
   margin-bottom:3px;
 }
 
+.plaza-filtered-note {
+  color:#ffcc80;
+  font-size:10px;
+  margin-top:4px;
+}
+
 details {
   border-top:1px dashed #3a3a3c;
   padding-top:8px;
@@ -664,7 +670,7 @@ summary {
 
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v2.6</span>
+      <span class="version">PERSONAL EDITION v2.7</span>
     </div>
 
     <!-- LOCATION INPUTS -->
@@ -774,7 +780,7 @@ summary {
       </label>
 
       <div class="small-muted">
-        Resolves Class 1 Touch 'n Go / electronic card tariffs first, falling back to calibrated Malaysian corridor tables if HERE leaves a plaza unverified. Enter RM0.00 to force zero tolls.
+        Resolves Class 1 Touch 'n Go / electronic card tariffs, filters duplicate/synthetic toll items, and falls back to calibrated Malaysian corridor tables if HERE returns noisy or unverified tolls.
       </div>
 
     </div>
@@ -947,7 +953,7 @@ summary {
         <label class="setting-field">
           Corridor fallback table
           <select class="setting-input" id="setting-use-calibration">
-            <option value="true">Enabled (when unverified)</option>
+            <option value="true">Enabled (when unverified/noisy)</option>
             <option value="false">Disabled (HERE API only)</option>
           </select>
         </label>
@@ -969,7 +975,7 @@ summary {
         Settings are stored on this device only.
         Commission is calculated on transport fare excluding tolls.
         The flat commission applies below the RM8 pre-minimum threshold.
-        Custom corridor overrides trigger automatically (either direction) when Avoid Tolls is OFF and HERE returns unverified tolls.
+        Custom corridor overrides trigger automatically (either direction) when Avoid Tolls is OFF and HERE returns unverified or duplicate-noisy tolls.
       </p>
     </details>
 
@@ -1006,6 +1012,12 @@ summary {
 const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
 const DEFAULT_CALIBRATED_CORRIDORS = [
+  {
+    name:'Bandar Puteri Puchong ↔ Kuala Selangor (LDP / NKVE-GCE-LATAR)',
+    from:{lat:3.0250,lng:101.6150,radiusKm:7},
+    to:{lat:3.3500,lng:101.2500,radiusKm:10},
+    tollTngClass1:5.90
+  },
   {
     name:'Klang / Meru ↔ KLIA / KLIA2 (ELITE / WCE-ELITE)',
     from:{lat:3.0800,lng:101.4450,radiusKm:10},
@@ -1049,8 +1061,9 @@ const DEFAULT_SETTINGS = Object.freeze({
 
 const ADMIN_FLAT_THRESHOLD = 8;
 
-const SETTINGS_KEY = 'rideshareMY.personal.v2.6.settings';
+const SETTINGS_KEY = 'rideshareMY.personal.v2.7.settings';
 const LEGACY_SETTINGS_KEYS = [
+  'rideshareMY.personal.v2.6.settings',
   'rideshareMY.personal.v2.5.settings',
   'rideshareMY.personal.v2.4.settings',
   'rideshareMY.personal.v2.3.settings',
@@ -1059,8 +1072,9 @@ const LEGACY_SETTINGS_KEYS = [
   'rideshareMY.personal.v2.settings'
 ];
 
-const HISTORY_KEY = 'rideshareMY.personal.v2.6.history';
+const HISTORY_KEY = 'rideshareMY.personal.v2.7.history';
 const LEGACY_HISTORY_KEYS = [
+  'rideshareMY.personal.v2.6.history',
   'rideshareMY.personal.v2.5.history',
   'rideshareMY.personal.v2.4.history',
   'rideshareMY.personal.v2.3.history',
@@ -2263,7 +2277,7 @@ function toggleAvoidTolls() {
 }
 
 /* =========================================================
-   11. CLASS 1 + TOUCH 'N GO CARD TOLL RESOLVER (v2.6)
+   11. CLASS 1 + TOUCH 'N GO CARD TOLL RESOLVER + DEDUPE (v2.7)
 ========================================================= */
 
 function readTollAmount(entry) {
@@ -2371,7 +2385,6 @@ function resolvePlazaFares(fares) {
     return { resolved: false, unsupportedCurrency };
   }
 
-  // Step 1: Restrict to Class 1 (passenger car) fares
   const explicitClass1 = validFares.filter(f => isExplicitClass1Fare(f.raw));
   const class1Pool = explicitClass1.length
     ? explicitClass1
@@ -2381,7 +2394,6 @@ function resolvePlazaFares(fares) {
     return { resolved: false, unsupportedCurrency };
   }
 
-  // Step 2: Prefer Touch 'n Go / Electronic Card payment methods over Cash
   const tngCardPool = class1Pool.filter(f => isTngCardPaymentFare(f.raw));
   const nonCashPool = class1Pool.filter(f => !isCashOnlyFare(f.raw));
 
@@ -2409,16 +2421,46 @@ function resolvePlazaFares(fares) {
   return { resolved: false, unsupportedCurrency };
 }
 
+function normalizePlazaKey(plazaName,tollObj,amount) {
+  const cleanName = String(plazaName || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\b(toll\s*plaza|plaza\s*tol|gantry)\b/g,'')
+    .replace(/\s+/g,' ')
+    .trim();
+
+  const lat = tollObj && tollObj.position && Number.isFinite(Number(tollObj.position.lat))
+    ? Number(tollObj.position.lat).toFixed(2)
+    : '';
+  const lng = tollObj && tollObj.position && Number.isFinite(Number(tollObj.position.lng))
+    ? Number(tollObj.position.lng).toFixed(2)
+    : '';
+
+  if (cleanName && !/^toll plaza \d+$/.test(cleanName)) {
+    return `name:${cleanName}:${amount.toFixed(2)}`;
+  }
+
+  if (lat && lng) {
+    return `coord:${lat},${lng}:${amount.toFixed(2)}`;
+  }
+
+  return null;
+}
+
 function extractTolls(sections) {
-  let total = 0;
   let recordsDetected = false;
   let validAmounts = 0;
   let unresolvedRecords = 0;
   let unsupportedCurrency = false;
+  let duplicateFilteredCount = 0;
 
   const seenPlazas = new Set();
   const seenFareIds = new Set();
-  const breakdown = [];
+  const seenPlazaSignatures = new Set();
+  const amountOccurrenceCount = new Map();
+
+  const candidatePlazas = [];
+  const filteredNotes = [];
 
   let hasItemisedTolls = false;
   sections.forEach(section => {
@@ -2438,23 +2480,31 @@ function extractTolls(sections) {
       recordsDetected = true;
 
       tolls.forEach((toll, tollIndex) => {
+        const hasExplicitName = Boolean(
+          toll.name || (toll.tollSystem && toll.tollSystem.name)
+        );
         const plazaName =
           toll.name ||
           (toll.tollSystem && toll.tollSystem.name) ||
-          `Toll Plaza ${tollIndex + 1}`;
+          `Plaza #${tollIndex + 1}`;
 
         const fares = Array.isArray(toll.fares) ? toll.fares : [];
         if (!fares.length) return;
 
-        // Deduplicate closed-system fares shared across multi-section routes via fare.id
         const unseenFares = fares.filter(f => !f.id || !seenFareIds.has(String(f.id)));
-        if (!unseenFares.length) return;
+        if (!unseenFares.length) {
+          duplicateFilteredCount++;
+          return;
+        }
 
         const identity = String(
           toll.id || toll.tollId || `${sectionIndex}:${plazaName}:${tollIndex}`
         );
 
-        if (seenPlazas.has(identity)) return;
+        if (seenPlazas.has(identity)) {
+          duplicateFilteredCount++;
+          return;
+        }
         seenPlazas.add(identity);
 
         unseenFares.forEach(f => {
@@ -2464,14 +2514,42 @@ function extractTolls(sections) {
         const resolution = resolvePlazaFares(unseenFares);
         if (resolution.unsupportedCurrency) unsupportedCurrency = true;
 
-        if (resolution.resolved) {
-          total += resolution.amount;
-          validAmounts++;
-          breakdown.push(`${plazaName} [${resolution.methodTag}]: ${money(resolution.amount)}`);
-        } else {
+        if (!resolution.resolved) {
           unresolvedRecords++;
-          breakdown.push(`${plazaName} [Class 1 · TnG/Card]: Unverified`);
+          candidatePlazas.push({
+            label:`${plazaName} [Class 1 · TnG/Card]: Unverified`,
+            amount:0,
+            isDuplicateNoise:false
+          });
+          return;
         }
+
+        validAmounts++;
+
+        const sig = normalizePlazaKey(plazaName,toll,resolution.amount);
+        if (sig && seenPlazaSignatures.has(sig)) {
+          duplicateFilteredCount++;
+          filteredNotes.push(`Filtered duplicate plaza ${plazaName} (${money(resolution.amount)})`);
+          return;
+        }
+        if (sig) seenPlazaSignatures.add(sig);
+
+        const amtKey = resolution.amount.toFixed(2);
+        const prevCount = amountOccurrenceCount.get(amtKey) || 0;
+        amountOccurrenceCount.set(amtKey,prevCount + 1);
+
+        // If an unnamed plaza or non-standard amount repeats 3+ times, mark as suspected duplicate/synthetic noise
+        const isRepeatedNoise =
+          (!hasExplicitName && prevCount >= 2) ||
+          (prevCount >= 3);
+
+        candidatePlazas.push({
+          label:`${plazaName} [${resolution.methodTag}]: ${money(resolution.amount)}`,
+          amount:resolution.amount,
+          isDuplicateNoise:isRepeatedNoise,
+          hasExplicitName,
+          amtKey
+        });
       });
       return;
     }
@@ -2484,7 +2562,10 @@ function extractTolls(sections) {
           cost.id || cost.tollId || `${sectionIndex}:summary:${costIndex}`
         );
 
-        if (seenPlazas.has(identity)) return;
+        if (seenPlazas.has(identity)) {
+          duplicateFilteredCount++;
+          return;
+        }
         seenPlazas.add(identity);
 
         const result = readTollAmount(cost);
@@ -2500,21 +2581,42 @@ function extractTolls(sections) {
         }
 
         if (result.valid) {
-          total += result.amount;
           validAmounts++;
-          breakdown.push(`Highway Segment [Class 1 Summary]: ${money(result.amount)}`);
+          candidatePlazas.push({
+            label:`Highway Segment [Class 1 Summary]: ${money(result.amount)}`,
+            amount:result.amount,
+            isDuplicateNoise:false
+          });
         }
       });
     }
   });
 
-  total = roundMoney(total);
+  // Separate clean plazas from duplicate-noise entries
+  const cleanPlazas = candidatePlazas.filter(p => !p.isDuplicateNoise);
+  const noisyPlazas = candidatePlazas.filter(p => p.isDuplicateNoise);
+
+  noisyPlazas.forEach(np => {
+    duplicateFilteredCount++;
+    filteredNotes.push(`Filtered repeated/synthetic entry: ${np.label}`);
+  });
+
+  const total = roundMoney(
+    cleanPlazas.reduce((sum,p) => sum + Number(p.amount || 0),0)
+  );
+
+  const breakdown = cleanPlazas.map(p => p.label);
+
+  // If HERE emitted excessive entries (>= 5) or filtered repeated duplicate noise, flag for calibration/check
+  const hasExcessiveOrNoisyEntries =
+    candidatePlazas.length >= 5 || duplicateFilteredCount > 0;
 
   const available =
     recordsDetected &&
     validAmounts > 0 &&
     unresolvedRecords === 0 &&
-    !unsupportedCurrency;
+    !unsupportedCurrency &&
+    !hasExcessiveOrNoisyEntries;
 
   return {
     amount: total,
@@ -2523,6 +2625,9 @@ function extractTolls(sections) {
     validAmounts,
     unresolvedRecords,
     unsupportedCurrency,
+    duplicateFilteredCount,
+    hasExcessiveOrNoisyEntries,
+    filteredNotes,
     breakdown
   };
 }
@@ -2691,14 +2796,14 @@ function handleRouteResult(route,requestId) {
   let tollFee = tollInfo.amount;
   let tollSource = tollInfo.available
     ? 'HERE Class 1 · TnG Card (MYR)'
-    : 'HERE Class 1 · TnG unverified';
+    : 'HERE Class 1 · Filtered / Unverified';
 
   let tollVerified = tollInfo.available;
   let manualOverride = false;
   let calibratedCorridorName = '';
   let finalBreakdown = [...tollInfo.breakdown];
 
-  // Corridor fallback when HERE returns unverified/incomplete tolls & Avoid Tolls is OFF
+  // Corridor fallback when HERE returns unverified or duplicate-noisy tolls & Avoid Tolls is OFF
   if (manualValue === '' && !tollVerified && !avoidTolls) {
     const matchedCorridor = matchCalibratedCorridor(pickupCoords,dropoffCoords);
     if (matchedCorridor) {
@@ -2706,9 +2811,9 @@ function handleRouteResult(route,requestId) {
       tollSource = `Calibrated Class 1 · TnG (${matchedCorridor.name})`;
       tollVerified = true;
       calibratedCorridorName = matchedCorridor.name;
-      finalBreakdown.push(
+      finalBreakdown = [
         `Calibrated Corridor Override [${matchedCorridor.name}]: ${money(tollFee)}`
-      );
+      ];
     }
   }
 
@@ -2719,8 +2824,7 @@ function handleRouteResult(route,requestId) {
     manualOverride = true;
   }
 
-  // Highlight manual override box if tolls remain unverified and non-zero records exist
-  if (!tollVerified && (tollInfo.recordsDetected || tollInfo.unresolvedRecords > 0)) {
+  if (!tollVerified && (tollInfo.recordsDetected || tollInfo.unresolvedRecords > 0 || tollInfo.duplicateFilteredCount > 0)) {
     $('manual-toll').classList.add('needs-attention');
   } else {
     $('manual-toll').classList.remove('needs-attention');
@@ -2773,6 +2877,8 @@ function handleRouteResult(route,requestId) {
     tollRecordsDetected:tollInfo.recordsDetected,
     tollUnresolvedRecords:tollInfo.unresolvedRecords,
     tollUnsupportedCurrency:tollInfo.unsupportedCurrency,
+    tollDuplicateFilteredCount:tollInfo.duplicateFilteredCount,
+    tollFilteredNotes:tollInfo.filteredNotes || [],
     tollBreakdown:finalBreakdown,
     calibratedCorridorName,
     manualOverride,
@@ -2785,7 +2891,8 @@ function handleRouteResult(route,requestId) {
   const statusParts = [
     `Route calculated · ${sections.length} section(s)`,
     activeRoutingMode === 'fast' ? 'Fastest' : 'Shortest',
-    viaCoords ? 'Via anchored' : null
+    viaCoords ? 'Via anchored' : null,
+    tollInfo.duplicateFilteredCount > 0 ? `Filtered ${tollInfo.duplicateFilteredCount} duplicate/noisy item(s)` : null
   ].filter(Boolean);
 
   setRouteStatus(statusParts.join(' · '));
@@ -2952,19 +3059,29 @@ function processCalculations(routeData) {
   $('driver-net-fare').textContent =
     money(driverAmountAfterDeduction);
 
-  // Render Detected Toll Plazas box
   const plazaBox = $('plaza-list-box');
-  if (routeData.tollBreakdown && routeData.tollBreakdown.length) {
+  if (
+    (routeData.tollBreakdown && routeData.tollBreakdown.length) ||
+    (routeData.tollFilteredNotes && routeData.tollFilteredNotes.length)
+  ) {
     plazaBox.innerHTML = '';
     const title = document.createElement('strong');
     title.textContent = 'Detected Toll Plazas (Class 1 · TnG Card):';
     plazaBox.appendChild(title);
 
-    routeData.tollBreakdown.forEach(line => {
+    (routeData.tollBreakdown || []).forEach(line => {
       const div = document.createElement('div');
       div.textContent = `• ${line}`;
       plazaBox.appendChild(div);
     });
+
+    if (!routeData.calibratedCorridorName && !routeData.manualOverride && routeData.tollFilteredNotes && routeData.tollFilteredNotes.length) {
+      const noteDiv = document.createElement('div');
+      noteDiv.className = 'plaza-filtered-note';
+      noteDiv.textContent = `${routeData.tollFilteredNotes.length} duplicate/noisy item(s) excluded from sum.`;
+      plazaBox.appendChild(noteDiv);
+    }
+
     plazaBox.style.display = 'block';
   } else {
     plazaBox.style.display = 'none';
@@ -3028,7 +3145,7 @@ function processCalculations(routeData) {
   $('result-card').style.display = 'block';
 
   return {
-    version:'2.6',
+    version:'2.7',
 
     pickup:$('pickup').value.trim(),
     dropoff:$('dropoff').value.trim(),
@@ -3051,6 +3168,7 @@ function processCalculations(routeData) {
     tollRecordsDetected:routeData.tollRecordsDetected,
     tollUnresolvedRecords:routeData.tollUnresolvedRecords,
     tollUnsupportedCurrency:routeData.tollUnsupportedCurrency,
+    tollDuplicateFilteredCount:routeData.tollDuplicateFilteredCount || 0,
     tollBreakdown:routeData.tollBreakdown || [],
     calibratedCorridorName:routeData.calibratedCorridorName || '',
     manualOverride:routeData.manualOverride,
@@ -3114,7 +3232,7 @@ function receiptText(data) {
     : '  - None / Unitemised';
 
   return [
-    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v2.6',
+    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v2.7',
     '------------------------------------------------',
     `From: ${data.pickup}`,
     data.via ? `Via anchor: ${data.via}` : null,
@@ -3135,6 +3253,7 @@ function receiptText(data) {
     `Toll criteria: ${data.tollCriteria || 'Class 1 (Car) · Touch n Go Card Only'}`,
     `Toll source: ${data.tollSource}`,
     `Toll verified: ${data.tollVerified ? 'Yes' : 'No'}`,
+    `Duplicate/noisy items filtered: ${data.tollDuplicateFilteredCount || 0}`,
     `Manual toll override: ${data.manualOverride ? 'Yes' : 'No'}`,
     'Detected Toll Plazas / Segments:',
     plazaLines,
@@ -3151,7 +3270,7 @@ function receiptText(data) {
     'Tolls are pass-through reimbursement (Class 1 TnG card rate), not driver profit.',
     'Driver earnings exclude fuel, maintenance, depreciation and other operating costs.',
     'Estimate only. Subject to actual Touch n Go plaza deduction.',
-    'Generated by Rideshare MY Personal Edition v2.6'
+    'Generated by Rideshare MY Personal Edition v2.7'
   ].filter(Boolean).join('\n');
 }
 
@@ -3407,6 +3526,7 @@ function exportHistoryCsv() {
     'tollSource',
     'tollVerified',
     'tollUnresolvedRecords',
+    'tollDuplicateFilteredCount',
     'calibratedCorridorName',
     'tollBreakdown',
     'manualOverride',
@@ -3456,7 +3576,7 @@ function exportHistoryCsv() {
   const a = document.createElement('a');
 
   a.href = url;
-  a.download = 'rideshare-my-trip-history-v2.6.csv';
+  a.download = 'rideshare-my-trip-history-v2.7.csv';
 
   document.body.appendChild(a);
   a.click();
@@ -3534,7 +3654,6 @@ function initMap() {
 
     router = platform.getRoutingService(null,8);
 
-    // Allow tapping map when Via Anchor panel is open to drop a pass-through waypoint
     map.addEventListener('tap',async event => {
       const viaWrap = $('via-input-wrap');
       if (!viaWrap.classList.contains('open')) return;
