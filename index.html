@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Rideshare MY - Personal Edition v3.0.3</title>
+  <title>Rideshare MY - Personal Edition v3.0.4</title>
   <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
   <script src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
   <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
@@ -96,7 +96,7 @@
   <div id="search-panel">
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.0.3</span>
+      <span class="version">PERSONAL EDITION v3.0.4</span>
     </div>
     <!-- LOCATION INPUTS -->
     <div class="routing-wrapper">
@@ -282,8 +282,8 @@
   });
   const ADMIN_FLAT_THRESHOLD = 8;
   const SETTINGS_KEY = 'rideshareMY.personal.v3.0.settings';
-  const TOLL_GPS_MATCH_RADIUS_KM = 0.25;
-  const POLYLINE_CORRIDOR_RADIUS_KM = 0.12;
+  const TOLL_GPS_MATCH_RADIUS_KM = 0.65;
+  const POLYLINE_CORRIDOR_RADIUS_KM = 0.15;
 
   const HIGHLAND_ZONES = [
     {lat:3.4241,lng:101.7933,radiusKm:10,name:'Genting Highlands & Gohtong'},
@@ -568,7 +568,7 @@
       const fNorm = normalizeTollText(entry.from);
       const tNorm = normalizeTollText(entry.to);
       const forward = (aNorm.includes(fNorm) || fNorm.includes(aNorm)) && (bNorm.includes(tNorm) || tNorm.includes(bNorm));
-      const reverse = (aNorm.includes(tNorm) || tNorm.includes(aNorm)) && (bNorm.includes(fNorm) || fNorm.includes(bNorm));
+      const reverse = (aNorm.includes(tNorm) || tNorm.includes(aNorm)) && (bNorm.includes(fNorm) || fNorm.includes(fNorm));
       if (forward || reverse) {
         return entry;
       }
@@ -1418,6 +1418,18 @@
     };
   }
 
+  function extractSectionRoadLabel(section) {
+    const actions = Array.isArray(section && section.actions) ? section.actions : [];
+    for (const act of actions) {
+      const road = (act && act.nextRoad && act.nextRoad.name && act.nextRoad.name[0] && act.nextRoad.name[0].value) ||
+        (act && act.currentRoad && act.currentRoad.name && act.currentRoad.name[0] && act.currentRoad.name[0].value) || '';
+      if (road && !/malaysian highway toll rate system/i.test(road)) {
+        return road;
+      }
+    }
+    return '';
+  }
+
   function calculateHereTolls(route,paymentPref='any') {
     const sections = Array.isArray(route && route.sections) ? route.sections : [];
     const tollSystems = getHereTollSystemMap(route);
@@ -1457,13 +1469,15 @@
       else if (paymentPref && paymentPref !== 'any') preferenceMismatchCount++;
       if (item.referenceApplied) referenceAppliedCount++;
       if (item.referenceDiscrepancy) referenceDiscrepancyCount++;
-      if (item.matchedBy === 'gps' || item.matchedBy === 'route+rate' || item.matchedBy === 'closed-matrix') gpsMatchedCount++;
+      if (item.matchedBy === 'gps' || item.matchedBy === 'route+rate' || item.matchedBy === 'closed-matrix' || item.matchedBy === 'polyline') gpsMatchedCount++;
       if (item.systemType === 'closed') closedMatchedCount++;
     };
 
     sections.forEach((section,secIdx) => {
       const tolls = Array.isArray(section.tolls) ? section.tolls : [];
       const summaryCosts = section.summary && Array.isArray(section.summary.tollCosts) ? section.summary.tollCosts : [];
+      const sectionRoad = extractSectionRoadLabel(section);
+
       if (tolls.length) {
         hasItemisedTolls = true;
         tolls.forEach((toll,tollIdx) => {
@@ -1471,7 +1485,11 @@
             (toll.tollSystem && (toll.tollSystem.id || toll.tollSystem.name)) ||
             toll.tollSystemId || '';
           const sysInfo = tollSystems.get(sysRefRaw) || (typeof toll.tollSystem === 'object' ? toll.tollSystem : null) || null;
-          const sysName = (sysInfo && (sysInfo.name || sysInfo.id)) || (typeof toll.tollSystem === 'string' ? toll.tollSystem : '') || '';
+          const rawSysName = (sysInfo && (sysInfo.name || sysInfo.id)) || (typeof toll.tollSystem === 'string' ? toll.tollSystem : '') || '';
+          const sysName = /malaysian highway toll rate system/i.test(rawSysName) ? '' : rawSysName;
+          const rawTollName = toll.name || '';
+          const cleanTollName = /malaysian highway toll rate system/i.test(rawTollName) ? '' : rawTollName;
+
           const tollCoords = extractTollCoords(toll);
           const picked = selectFareFromToll(toll,paymentPref);
           const pickedAmount = picked ? picked.amount : 0;
@@ -1481,8 +1499,10 @@
             seenFareIds.add(picked.fareId);
           }
 
-          let refMatch = findReferenceRate(toll.name || '', sysName, tollCoords);
+          // 1. Match by GPS (within 650m) or clean plaza/system text
+          let refMatch = findReferenceRate(cleanTollName, sysName, tollCoords);
 
+          // 2. Match by polyline corridor plaza + exact Class 1 rate
           if (!refMatch && picked) {
             const amountMatches = polylineCorridorFlat.filter(
               pm => Math.abs(pm.rate - pickedAmount) <= 0.01 && !matchedPlazaKeys.has(`${pm.system}|${pm.plaza}`)
@@ -1492,33 +1512,44 @@
             }
           }
 
-          // Defer closed-system tolls to the unified closed-matrix pass to prevent double counting
+          // 3. Match next unmatched flat plaza along the route polyline if HERE omitted coords/name
+          if (!refMatch && !cleanTollName && polylineCorridorFlat.length) {
+            const nextCorridorPlaza = polylineCorridorFlat.find(
+              pm => !matchedPlazaKeys.has(`${pm.system}|${pm.plaza}`)
+            );
+            if (nextCorridorPlaza) {
+              refMatch = { ...nextCorridorPlaza, matchedBy: 'polyline' };
+            }
+          }
+
+          // Defer closed-system tolls to the unified closed-matrix pass
           const isClosedToll = Boolean(refMatch && refMatch.type === 'closed') ||
             (!refMatch && polylineCorridorClosed.length >= 2);
           if (isClosedToll) {
-            const netTag = getClosedNetworkTag(refMatch ? refMatch.system : sysName);
-            recordClosedHereFare(netTag, pickedAmount, toll.name || (refMatch && refMatch.plaza) || sysName);
+            const netTag = getClosedNetworkTag(refMatch ? refMatch.system : (sysName || sectionRoad));
+            const label = (refMatch && refMatch.plaza) || cleanTollName || sysName || sectionRoad;
+            recordClosedHereFare(netTag, pickedAmount, label);
             return;
           }
 
           if (!picked && !(refMatch && refMatch.type === 'flat' && refMatch.rate != null)) return;
-
-          const rawHereName = toll.name || sysName || `Toll Point ${secIdx + 1}.${tollIdx + 1}`;
-          const isGenericSystemLabel = /malaysian highway toll rate system/i.test(rawHereName);
 
           if (refMatch) {
             const plazaKey = `${refMatch.system}|${refMatch.plaza}`;
             if (matchedPlazaKeys.has(plazaKey)) return;
           } else {
             const coordKey = tollCoords ? `${tollCoords.lat.toFixed(4)},${tollCoords.lng.toFixed(4)}` : `${secIdx}.${tollIdx}`;
-            const unmappedKey = `${normalizeTollText(rawHereName)}|${pickedAmount.toFixed(2)}|${coordKey}`;
+            const unmappedKey = `${normalizeTollText(cleanTollName || sectionRoad)}|${pickedAmount.toFixed(2)}|${coordKey}`;
             if (seenUnmappedTollKeys.has(unmappedKey)) return;
             seenUnmappedTollKeys.add(unmappedKey);
           }
 
+          // Never display "Malaysian Highway Toll Rate System"
           const plazaName = refMatch
             ? `${refMatch.plaza} (${refMatch.system})`
-            : (isGenericSystemLabel ? 'Toll Plaza (Unmapped Gantry)' : rawHereName);
+            : cleanTollName
+              ? (sysName && !cleanTollName.includes(sysName) ? `${cleanTollName} (${sysName})` : cleanTollName)
+              : (sectionRoad ? `${sectionRoad} Toll Plaza` : `Toll Plaza #${tollIdx + 1}`);
 
           let finalAmount = pickedAmount;
           let referenceApplied = false;
@@ -1569,14 +1600,15 @@
             pm => Math.abs(pm.rate - roundMoney(val)) <= 0.01 && !matchedPlazaKeys.has(`${pm.system}|${pm.plaza}`)
           );
           if (amountMatch) matchedPlazaKeys.add(`${amountMatch.system}|${amountMatch.plaza}`);
+          const fallbackLabel = sectionRoad ? `${sectionRoad} Toll Plaza` : `Toll Plaza #${cIdx + 1}`;
           pushItem({
-            name:amountMatch ? `${amountMatch.plaza} (${amountMatch.system})` : `Route Toll Summary ${secIdx + 1}.${cIdx + 1}`,
+            name:amountMatch ? `${amountMatch.plaza} (${amountMatch.system})` : fallbackLabel,
             system:amountMatch ? amountMatch.system : '',
             amount:roundMoney(val),
             hereAmount:roundMoney(val),
             currency:'MYR',
             paymentMethods:[],
-            fareName:cost.name || '',
+            fareName:cost.name && !/malaysian highway toll rate system/i.test(cost.name) ? cost.name : '',
             fareId:cost.id ? String(cost.id) : '',
             matchedPreference:false,
             referenceApplied:Boolean(amountMatch),
@@ -1601,13 +1633,13 @@
         );
         if (amountMatch) matchedPlazaKeys.add(`${amountMatch.system}|${amountMatch.plaza}`);
         pushItem({
-          name:amountMatch ? `${amountMatch.plaza} (${amountMatch.system})` : `Route Summary Toll ${idx + 1}`,
+          name:amountMatch ? `${amountMatch.plaza} (${amountMatch.system})` : `Toll Plaza #${idx + 1}`,
           system:amountMatch ? amountMatch.system : '',
           amount:roundMoney(val),
           hereAmount:roundMoney(val),
           currency:'MYR',
           paymentMethods:[],
-          fareName:cost.name || '',
+          fareName:cost.name && !/malaysian highway toll rate system/i.test(cost.name) ? cost.name : '',
           fareId:cost.id ? String(cost.id) : '',
           matchedPreference:false,
           referenceApplied:Boolean(amountMatch),
@@ -1696,10 +1728,13 @@
       if (handledClosedNetworks.has(netKey)) return;
       const sum = roundMoney(entries.reduce((acc, e) => acc + e.amount, 0));
       if (!(sum > 0)) return;
-      const labels = entries.map(e => e.plaza).filter(Boolean).join(', ');
+      const cleanLabels = [...new Set(
+        entries.map(e => e.plaza).filter(p => p && !/malaysian highway toll rate system/i.test(p))
+      )].join(', ');
+      const netTitle = netKey !== 'UNKNOWN' ? `${netKey} Closed Toll` : 'Closed Highway Toll';
       pushItem({
-        name: labels ? `${labels} (${netKey})` : `Closed Toll (${netKey})`,
-        system: netKey,
+        name: cleanLabels ? `${cleanLabels} (${netKey})` : netTitle,
+        system: netKey !== 'UNKNOWN' ? netKey : '',
         amount: sum,
         hereAmount: sum,
         currency: 'MYR',
@@ -1743,7 +1778,7 @@
       }
     }
 
-    // Polyline supplement deduplicates by plaza key only (not by rate amount)
+    // Polyline supplement deduplicates by plaza key only
     if (polylinePoints.length) {
       polylineCorridorFlat.forEach(pm => {
         const key = `${pm.system}|${pm.plaza}`;
@@ -2094,7 +2129,7 @@
     $('result-card').style.display = 'block';
 
     return {
-      version:'3.0.3',
+      version:'3.0.4',
       pickup:$('pickup').value.trim(),
       dropoff:$('dropoff').value.trim(),
       distance:routeData.distance,
@@ -2160,7 +2195,7 @@
       ? 'Standard Table cross-checked (Class 1 Normal TNG)'
       : 'HERE API';
     return [
-      'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v3.0.3',
+      'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v3.0.4',
       '------------------------------------------------',
       `From: ${data.pickup}`,
       `To: ${data.dropoff}`,
@@ -2193,7 +2228,7 @@
       'Tolls are reimbursement, not driver profit.',
       'Driver earnings exclude fuel, maintenance, depreciation and other operating costs.',
       'Estimate only. Verify tolls and final fare before travel.',
-      'Generated by Rideshare MY Personal Edition v3.0.3'
+      'Generated by Rideshare MY Personal Edition v3.0.4'
     ].join('\n');
   }
 
