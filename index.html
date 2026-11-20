@@ -860,6 +860,57 @@ const URBAN_POI_ZONES = [
 ];
 
 /* =========================================================
+   1a. VERIFIED TOLL ROUTES (CLASS 1 CAR) — 2026
+========================================================= */
+
+const KNOWN_TOLL_ROUTES = [
+  {
+    name: 'Bandar Puteri Puchong ↔ Genting Premium Outlet',
+    pickupArea: { lat: 3.026, lng: 101.616, radiusKm: 5 }, // Bandar Puteri Puchong
+    dropoffArea: { lat: 3.359, lng: 101.787, radiusKm: 8 }, // Genting Premium Outlet
+    tolls: [
+      { name: 'LDP (Penchala)', amount: 2.10 },
+      { name: 'DUKE', amount: 2.50 },
+      { name: 'Karak Highway (Gombak)', amount: 6.00 },
+      { name: 'Genting Road Charge (Sempah)', amount: 5.00 }
+    ],
+    total: 15.60
+  }
+];
+
+function getKnownTollForRoute(pickupCoords, dropoffCoords) {
+  if (!pickupCoords || !dropoffCoords) return null;
+
+  for (const route of KNOWN_TOLL_ROUTES) {
+    const pickupMatch = calculateHaversineDistance(
+      pickupCoords.lat, pickupCoords.lng,
+      route.pickupArea.lat, route.pickupArea.lng
+    ) <= route.pickupArea.radiusKm;
+
+    const dropoffMatch = calculateHaversineDistance(
+      dropoffCoords.lat, dropoffCoords.lng,
+      route.dropoffArea.lat, route.dropoffArea.lng
+    ) <= route.dropoffArea.radiusKm;
+
+    const reversePickupMatch = calculateHaversineDistance(
+      pickupCoords.lat, pickupCoords.lng,
+      route.dropoffArea.lat, route.dropoffArea.lng
+    ) <= route.dropoffArea.radiusKm;
+
+    const reverseDropoffMatch = calculateHaversineDistance(
+      dropoffCoords.lat, dropoffCoords.lng,
+      route.pickupArea.lat, route.pickupArea.lng
+    ) <= route.pickupArea.radiusKm;
+
+    if ((pickupMatch && dropoffMatch) || (reversePickupMatch && reverseDropoffMatch)) {
+      return route;
+    }
+  }
+
+  return null;
+}
+
+/* =========================================================
    2. APPLICATION STATE
 ========================================================= */
 
@@ -1876,11 +1927,41 @@ function handleRouteResult(route,routesReturnedCount,paymentPref,avoidTollsReque
   }
 
   const tollResult = calculateHereTolls(route,paymentPref);
+
+  /* ---- VERIFIED TOLL ROUTE LOGIC ---- */
+  const knownRoute = getKnownTollForRoute(pickupCoords, dropoffCoords);
   const manualRaw = $('manual-toll').value.trim();
   const hasManualToll = manualRaw !== '';
-  const effectiveTollAmount = hasManualToll
-    ? roundMoney(Number(manualRaw))
-    : tollResult.amount;
+
+  let effectiveTollAmount;
+  let hasKnownToll = false;
+
+  if (hasManualToll) {
+    effectiveTollAmount = roundMoney(Number(manualRaw));
+  } else if (knownRoute) {
+    effectiveTollAmount = knownRoute.total;
+    hasKnownToll = true;
+  } else {
+    effectiveTollAmount = tollResult.amount;
+  }
+
+  let displayTollItems = tollResult.items;
+  if (hasKnownToll && knownRoute) {
+    displayTollItems = knownRoute.tolls.map(t => ({
+      name: t.name,
+      system: 'Verified 2026',
+      amount: t.amount,
+      currency: 'MYR',
+      paymentMethods: [],
+      fareName: '',
+      fareId: '',
+      source: 'known_route'
+    }));
+  }
+
+  const finalTollResult = hasKnownToll
+    ? { ...tollResult, amount: effectiveTollAmount, items: displayTollItems }
+    : tollResult;
 
   clearRouteObjects();
   const group = new H.map.Group();
@@ -1906,9 +1987,10 @@ function handleRouteResult(route,routesReturnedCount,paymentPref,avoidTollsReque
   const calculation = processCalculations({
     distance:distanceKm,
     duration:durationMins,
-    tollResult,
+    tollResult:finalTollResult,
     effectiveTollAmount,
     hasManualToll,
+    hasKnownToll,
     avoidTollsRequested,
     sectionsCount:sections.length,
     alternativesCount:Math.max(0,routesReturnedCount - 1)
@@ -1916,10 +1998,16 @@ function handleRouteResult(route,routesReturnedCount,paymentPref,avoidTollsReque
 
   latestCalculation = calculation;
 
+  const tollSourceLabel = hasManualToll
+    ? 'Manual override'
+    : hasKnownToll
+      ? 'Verified 2026 rates'
+      : 'HERE API';
+
   setRouteStatus(
     `Route calculated · ${sections.length} section(s) · ` +
     `${activeRoutingMode === 'fast' ? 'Fastest' : 'Shortest'} · ` +
-    `${tollResult.items.length} HERE toll item(s)`
+    `Tolls: ${tollSourceLabel} (${money(effectiveTollAmount)})`
   );
 }
 
@@ -1972,9 +2060,13 @@ function processCalculations(routeData) {
   $('long-haul-incentive-row').style.display = longHaulIncentive > 0 ? 'flex' : 'none';
   $('admin-deduction-row').style.display = adminDeduction > 0 ? 'flex' : 'none';
 
-  $('toll-fare-label').textContent = routeData.hasManualToll
-    ? 'Toll charges (Manual / Actual override)'
-    : 'Toll charges (HERE API)';
+  if (routeData.hasManualToll) {
+    $('toll-fare-label').textContent = 'Toll charges (Manual / Actual override)';
+  } else if (routeData.hasKnownToll) {
+    $('toll-fare-label').textContent = 'Toll charges (Verified 2026 rates)';
+  } else {
+    $('toll-fare-label').textContent = 'Toll charges (HERE API)';
+  }
 
   $('total-fare').textContent = money(customerTotal);
   $('fare-distance').textContent = `${routeData.distance.toFixed(1)} km`;
@@ -1996,9 +2088,15 @@ function processCalculations(routeData) {
     breakdownBox.innerHTML = '';
     const title = document.createElement('div');
     title.className = 'toll-breakdown-title';
-    title.textContent = routeData.hasManualToll
-      ? `Active Toll: ${money(tollFee)} (Manual override · HERE raw: ${money(routeData.tollResult.amount)})`
-      : `HERE Routing Tolls (${routeData.tollResult.items.length} item${routeData.tollResult.items.length > 1 ? 's' : ''})`;
+
+    if (routeData.hasManualToll) {
+      title.textContent = `Active Toll: ${money(tollFee)} (Manual override · HERE raw: ${money(routeData.tollResult.amount)})`;
+    } else if (routeData.hasKnownToll) {
+      title.textContent = `Active Toll: ${money(tollFee)} (Verified 2026 rates · HERE raw: ${money(routeData.tollResult.amount)})`;
+    } else {
+      title.textContent = `HERE Routing Tolls (${routeData.tollResult.items.length} item${routeData.tollResult.items.length > 1 ? 's' : ''})`;
+    }
+
     breakdownBox.appendChild(title);
 
     routeData.tollResult.items.forEach(item => {
@@ -2025,17 +2123,21 @@ function processCalculations(routeData) {
   if (routeData.avoidTollsRequested && tollFee > 0) {
     warnings.push('Returned route still contains toll charges');
   }
-  if (!routeData.hasManualToll && hillApplies && tollFee > 0) {
+  if (!routeData.hasManualToll && !routeData.hasKnownToll && hillApplies && tollFee > 0) {
     warnings.push('Verify HERE toll against actual expressway & highland entry charges');
   }
   if (routeData.tollResult.paymentPref !== 'any' && routeData.tollResult.totalResolvedCount > 0 && routeData.tollResult.preferenceMatchedCount === 0) {
     warnings.push(`No explicit "${routeData.tollResult.paymentPref}" fare tag in HERE response; used default MYR fare`);
   }
 
+  const tollSourceText = routeData.hasManualToll
+    ? `Tolls: Manual override (${money(tollFee)})`
+    : routeData.hasKnownToll
+      ? `Tolls: Verified 2026 rates (${money(tollFee)})`
+      : `Tolls: HERE Routing v8 (${routeData.tollResult.paymentPref})`;
+
   const statusParts = [
-    routeData.hasManualToll
-      ? `Tolls: Manual override (${money(tollFee)})`
-      : `Tolls: HERE Routing v8 (${routeData.tollResult.paymentPref})`,
+    tollSourceText,
     `Highland: ${hillApplies ? 'applied' : 'not applied'}`
   ];
   if (warnings.length) {
@@ -2070,6 +2172,7 @@ function processCalculations(routeData) {
     tollFee,
     hereRawTollAmount:routeData.tollResult.amount,
     hasManualToll:routeData.hasManualToll,
+    hasKnownToll:routeData.hasKnownToll,
     tollItems:routeData.tollResult.items,
     tollPaymentPref:routeData.tollResult.paymentPref,
     hillSurcharge,
@@ -2119,6 +2222,12 @@ function receiptText(data) {
     ? data.tollItems.map(t => `  - ${t.name}${t.system ? ` (${t.system})` : ''}: ${money(t.amount)}`).join('\n')
     : '  - None';
 
+  const tollSource = data.hasManualToll
+    ? `Manual override (HERE raw: ${money(data.hereRawTollAmount)})`
+    : data.hasKnownToll
+      ? 'Verified 2026 rates'
+      : 'HERE API';
+
   return [
     'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v3.0.2',
     '------------------------------------------------',
@@ -2137,7 +2246,7 @@ function receiptText(data) {
     `Long-haul contribution: ${money(data.longHaulIncentive)}`,
     `Transport subtotal: ${money(data.transportSubtotal)}`,
     `Minimum-adjusted transport fare: ${money(data.transportFare)}`,
-    `Toll charges applied: ${money(data.tollFee)}${data.hasManualToll ? ` (Manual override; HERE raw: ${money(data.hereRawTollAmount)})` : ' (HERE API)'}`,
+    `Toll charges applied: ${money(data.tollFee)} (${tollSource})`,
     'HERE Toll Items:',
     tollLines,
     '------------------------------------------------',
