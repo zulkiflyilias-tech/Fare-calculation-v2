@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare MY - Personal Edition v2.7</title>
+<title>Rideshare MY - Personal Edition v2.8</title>
 
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 
@@ -276,6 +276,12 @@ button {touch-action:manipulation}
   font-size:10px;
   color:#666;
   line-height:1.3;
+}
+
+.route-choice-flag {
+  font-size:9px;
+  color:#b26a00;
+  font-weight:650;
 }
 
 .route-options-empty {
@@ -564,7 +570,7 @@ summary {
 
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v2.7</span>
+      <span class="version">PERSONAL EDITION v2.8</span>
     </div>
 
     <!-- LOCATION INPUTS -->
@@ -859,8 +865,9 @@ const ADMIN_FLAT_THRESHOLD = 8;
 const ROUNDING_UNITS = [1,0.5,0.1,0.01];
 const MAX_HISTORY = 100;
 
-const SETTINGS_KEY = 'rideshareMY.personal.v2.7.settings';
+const SETTINGS_KEY = 'rideshareMY.personal.v2.8.settings';
 const LEGACY_SETTINGS_KEYS = [
+  'rideshareMY.personal.v2.7.settings',
   'rideshareMY.personal.v2.6.settings',
   'rideshareMY.personal.v2.5.settings',
   'rideshareMY.personal.v2.4.settings',
@@ -870,8 +877,9 @@ const LEGACY_SETTINGS_KEYS = [
   'rideshareMY.personal.v2.settings'
 ];
 
-const HISTORY_KEY = 'rideshareMY.personal.v2.7.history';
+const HISTORY_KEY = 'rideshareMY.personal.v2.8.history';
 const LEGACY_HISTORY_KEYS = [
+  'rideshareMY.personal.v2.7.history',
   'rideshareMY.personal.v2.6.history',
   'rideshareMY.personal.v2.5.history',
   'rideshareMY.personal.v2.4.history',
@@ -1699,18 +1707,11 @@ function resolvePlazaFares(fares) {
     };
   }
 
-  if (nonZeroAmounts.length > 1) {
-    return {
-      resolved:true,
-      amount:Math.min(...nonZeroAmounts),
-      unsupportedCurrency
-    };
-  }
-
+  // Conflicting non-zero tariffs without an unambiguous match require manual check
   return {resolved:false,unsupportedCurrency};
 }
 
-function extractTolls(sections) {
+function extractTolls(sections,options={}) {
   let total = 0;
   let recordsDetected = false;
   let validAmounts = 0;
@@ -1797,11 +1798,13 @@ function extractTolls(sections) {
   });
 
   total = roundMoney(total);
+
+  // If no toll records were returned on a toll-free / non-highway route, treat RM 0.00 as verified
+  const tollFreeConfirmed = !recordsDetected && Boolean(options.expectTollFree);
+
   const available =
-    recordsDetected &&
-    validAmounts > 0 &&
-    unresolvedRecords === 0 &&
-    !unsupportedCurrency;
+    (recordsDetected && validAmounts > 0 && unresolvedRecords === 0 && !unsupportedCurrency) ||
+    tollFreeConfirmed;
 
   return {
     amount:total,
@@ -1828,7 +1831,7 @@ function requestHereRoute(params) {
   });
 }
 
-function parseHereRouteToOption(route,id,tag,label,color,avoidTollsRequested) {
+function parseHereRouteToOption(route,id,tag,label,color,avoidTollsRequested,expectTollFree=false) {
   const sections = Array.isArray(route && route.sections) ? route.sections : [];
   if (!sections.length) return null;
 
@@ -1851,7 +1854,7 @@ function parseHereRouteToOption(route,id,tag,label,color,avoidTollsRequested) {
     return null;
   }
 
-  const tollInfo = extractTolls(sections);
+  const tollInfo = extractTolls(sections,{expectTollFree});
 
   return {
     id,
@@ -1878,8 +1881,8 @@ function isSameRoute(a,b) {
 function buildCandidateRoutes(rawResults) {
   const candidates = [];
 
-  const addUnique = (route,id,tag,label,color,avoidTolls) => {
-    const parsed = parseHereRouteToOption(route,id,tag,label,color,avoidTolls);
+  const addUnique = (route,id,tag,label,color,avoidTolls,expectTollFree=false) => {
+    const parsed = parseHereRouteToOption(route,id,tag,label,color,avoidTolls,expectTollFree);
     if (!parsed) return;
     if (candidates.some(existing => isSameRoute(existing,parsed))) return;
     candidates.push(parsed);
@@ -1894,6 +1897,7 @@ function buildCandidateRoutes(rawResults) {
       'standard',
       'Standard / Toll',
       ROUTE_COLORS.standard,
+      false,
       false
     );
     if (standardRes.routes[1]) {
@@ -1903,6 +1907,7 @@ function buildCandidateRoutes(rawResults) {
         'alt',
         'Alternative',
         ROUTE_COLORS.alt,
+        false,
         false
       );
     }
@@ -1915,6 +1920,7 @@ function buildCandidateRoutes(rawResults) {
       'shortest',
       'Shortest',
       ROUTE_COLORS.shortest,
+      false,
       false
     );
   }
@@ -1926,6 +1932,7 @@ function buildCandidateRoutes(rawResults) {
       'no_toll',
       'No Toll',
       ROUTE_COLORS.no_toll,
+      true,
       true
     );
   }
@@ -1937,11 +1944,11 @@ function buildCandidateRoutes(rawResults) {
       'alt',
       'Non-Highway',
       ROUTE_COLORS.alt,
-      false
+      false,
+      true
     );
   }
 
-  // Identify the longest distinct route among candidates if there are at least 2 distinct routes
   if (candidates.length >= 2) {
     let longestIdx = 0;
     for (let i = 1; i < candidates.length; i++) {
@@ -2049,6 +2056,14 @@ function renderRouteOptionsUI(options,activeId) {
     meta.textContent = `${opt.distance.toFixed(1)} km · ${formatDuration(opt.duration)}`;
 
     btn.append(top,meta);
+
+    if (!opt.tollInfo.available && opt.tollInfo.amount > 0) {
+      const flag = document.createElement('div');
+      flag.className = 'route-choice-flag';
+      flag.textContent = '⚠ Check toll vs actual';
+      btn.appendChild(flag);
+    }
+
     btn.addEventListener('click',() => selectRouteOption(opt.id));
     container.appendChild(btn);
   });
@@ -2314,7 +2329,7 @@ function processCalculations(routeData) {
   $('result-card').style.display = 'block';
 
   return {
-    version:'2.7',
+    version:'2.8',
     pickup:$('pickup').value.trim(),
     dropoff:$('dropoff').value.trim(),
     routeOption:routeData.routeLabel || 'Standard / Toll',
@@ -2383,7 +2398,7 @@ function receiptText(data) {
     : '  - None / Unitemised';
 
   return [
-    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v2.7',
+    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v2.8',
     '------------------------------------------------',
     `From: ${data.pickup}`,
     `To: ${data.dropoff}`,
@@ -2418,7 +2433,7 @@ function receiptText(data) {
     'Tolls are reimbursement, not driver profit.',
     'Driver earnings exclude fuel, maintenance, depreciation and other operating costs.',
     'Estimate only. Verify tolls and final fare before travel.',
-    'Generated by Rideshare MY Personal Edition v2.7'
+    'Generated by Rideshare MY Personal Edition v2.8'
   ].join('\n');
 }
 
@@ -2583,7 +2598,7 @@ function exportHistoryCsv() {
   const a = document.createElement('a');
 
   a.href = url;
-  a.download = 'rideshare-my-trip-history-v2.7.csv';
+  a.download = 'rideshare-my-trip-history-v2.8.csv';
   document.body.appendChild(a);
   a.click();
   a.remove();
