@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Rideshare MY - Personal Edition v3.0.4</title>
+  <title>Rideshare MY - Personal Edition v3.0.5</title>
   <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
   <script src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
   <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
@@ -96,7 +96,7 @@
   <div id="search-panel">
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.0.4</span>
+      <span class="version">PERSONAL EDITION v3.0.5</span>
     </div>
     <!-- LOCATION INPUTS -->
     <div class="routing-wrapper">
@@ -282,8 +282,8 @@
   });
   const ADMIN_FLAT_THRESHOLD = 8;
   const SETTINGS_KEY = 'rideshareMY.personal.v3.0.settings';
-  const TOLL_GPS_MATCH_RADIUS_KM = 0.65;
-  const POLYLINE_CORRIDOR_RADIUS_KM = 0.15;
+  const TOLL_GPS_MATCH_RADIUS_KM = 0.75;
+  const POLYLINE_CORRIDOR_RADIUS_KM = 0.45;
 
   const HIGHLAND_ZONES = [
     {lat:3.4241,lng:101.7933,radiusKm:10,name:'Genting Highlands & Gohtong'},
@@ -722,6 +722,37 @@
     }
     matched.sort((a, b) => a.routeOrder - b.routeOrder || a.distanceKm - b.distanceKm);
     return matched;
+  }
+
+  function findReferenceByAmount(amount, polylineCorridorFlat = [], matchedPlazaKeys = new Set()) {
+    if (!(amount > 0)) return null;
+    // 1. Prefer a plaza along the current route corridor that has this exact Class 1 rate
+    const corridorHit = polylineCorridorFlat.find(
+      pm => Math.abs(pm.rate - amount) <= 0.01 && !matchedPlazaKeys.has(`${pm.system}|${pm.plaza}`)
+    );
+    if (corridorHit) {
+      return { ...corridorHit, matchedBy: 'route+rate' };
+    }
+    // 2. Fallback to any plaza in TOLL_PLAZA_REFERENCE with this exact Class 1 rate
+    const refHit = TOLL_PLAZA_REFERENCE.find(
+      ref => ref.type === 'flat' &&
+        ref.rate != null &&
+        !ref.system.startsWith('GENTING ROAD CHARGE') &&
+        Math.abs(ref.rate - amount) <= 0.01 &&
+        !matchedPlazaKeys.has(`${ref.system}|${ref.plaza}`)
+    );
+    if (refHit) {
+      return {
+        rate: refHit.rate,
+        system: refHit.system,
+        plaza: refHit.plaza,
+        type: refHit.type,
+        systemType: refHit.systemType,
+        distanceKm: null,
+        matchedBy: 'rate-table'
+      };
+    }
+    return null;
   }
 
   function findReferenceRate(plazaName, systemName, tollCoords = null) {
@@ -1469,7 +1500,7 @@
       else if (paymentPref && paymentPref !== 'any') preferenceMismatchCount++;
       if (item.referenceApplied) referenceAppliedCount++;
       if (item.referenceDiscrepancy) referenceDiscrepancyCount++;
-      if (item.matchedBy === 'gps' || item.matchedBy === 'route+rate' || item.matchedBy === 'closed-matrix' || item.matchedBy === 'polyline') gpsMatchedCount++;
+      if (item.matchedBy === 'gps' || item.matchedBy === 'route+rate' || item.matchedBy === 'rate-table' || item.matchedBy === 'closed-matrix' || item.matchedBy === 'polyline') gpsMatchedCount++;
       if (item.systemType === 'closed') closedMatchedCount++;
     };
 
@@ -1499,27 +1530,12 @@
             seenFareIds.add(picked.fareId);
           }
 
-          // 1. Match by GPS (within 650m) or clean plaza/system text
+          // 1. Match by GPS (within 750m) or clean plaza/system text
           let refMatch = findReferenceRate(cleanTollName, sysName, tollCoords);
 
-          // 2. Match by polyline corridor plaza + exact Class 1 rate
-          if (!refMatch && picked) {
-            const amountMatches = polylineCorridorFlat.filter(
-              pm => Math.abs(pm.rate - pickedAmount) <= 0.01 && !matchedPlazaKeys.has(`${pm.system}|${pm.plaza}`)
-            );
-            if (amountMatches.length >= 1) {
-              refMatch = { ...amountMatches[0], matchedBy: 'route+rate' };
-            }
-          }
-
-          // 3. Match next unmatched flat plaza along the route polyline if HERE omitted coords/name
-          if (!refMatch && !cleanTollName && polylineCorridorFlat.length) {
-            const nextCorridorPlaza = polylineCorridorFlat.find(
-              pm => !matchedPlazaKeys.has(`${pm.system}|${pm.plaza}`)
-            );
-            if (nextCorridorPlaza) {
-              refMatch = { ...nextCorridorPlaza, matchedBy: 'polyline' };
-            }
+          // 2. Match by corridor plaza or reference table using exact Class 1 amount
+          if (!refMatch && pickedAmount > 0) {
+            refMatch = findReferenceByAmount(pickedAmount, polylineCorridorFlat, matchedPlazaKeys);
           }
 
           // Defer closed-system tolls to the unified closed-matrix pass
@@ -1544,7 +1560,7 @@
             seenUnmappedTollKeys.add(unmappedKey);
           }
 
-          // Never display "Malaysian Highway Toll Rate System"
+          // Always resolve to plaza name when matched; never show generic system label
           const plazaName = refMatch
             ? `${refMatch.plaza} (${refMatch.system})`
             : cleanTollName
@@ -1596,9 +1612,7 @@
           const val = Number(price && price.value);
           const curr = String((price && price.currency) || cost.currency || 'MYR').toUpperCase();
           if (!Number.isFinite(val) || val < 0 || curr !== 'MYR') return;
-          const amountMatch = polylineCorridorFlat.find(
-            pm => Math.abs(pm.rate - roundMoney(val)) <= 0.01 && !matchedPlazaKeys.has(`${pm.system}|${pm.plaza}`)
-          );
+          const amountMatch = findReferenceByAmount(roundMoney(val), polylineCorridorFlat, matchedPlazaKeys);
           if (amountMatch) matchedPlazaKeys.add(`${amountMatch.system}|${amountMatch.plaza}`);
           const fallbackLabel = sectionRoad ? `${sectionRoad} Toll Plaza` : `Toll Plaza #${cIdx + 1}`;
           pushItem({
@@ -1615,7 +1629,7 @@
             referenceDiscrepancy:false,
             referenceLabel:amountMatch ? `${amountMatch.system} · ${amountMatch.plaza} (${amountMatch.systemType})` : '',
             systemType:amountMatch ? amountMatch.systemType : 'unknown',
-            matchedBy:amountMatch ? 'route+rate' : 'here',
+            matchedBy:amountMatch ? amountMatch.matchedBy : 'here',
             source:'section.summary.tollCosts'
           });
         });
@@ -1628,9 +1642,7 @@
         const val = Number(price && price.value);
         const curr = String((price && price.currency) || cost.currency || 'MYR').toUpperCase();
         if (!Number.isFinite(val) || val < 0 || curr !== 'MYR') return;
-        const amountMatch = polylineCorridorFlat.find(
-          pm => Math.abs(pm.rate - roundMoney(val)) <= 0.01 && !matchedPlazaKeys.has(`${pm.system}|${pm.plaza}`)
-        );
+        const amountMatch = findReferenceByAmount(roundMoney(val), polylineCorridorFlat, matchedPlazaKeys);
         if (amountMatch) matchedPlazaKeys.add(`${amountMatch.system}|${amountMatch.plaza}`);
         pushItem({
           name:amountMatch ? `${amountMatch.plaza} (${amountMatch.system})` : `Toll Plaza #${idx + 1}`,
@@ -1646,7 +1658,7 @@
           referenceDiscrepancy:false,
           referenceLabel:amountMatch ? `${amountMatch.system} · ${amountMatch.plaza} (${amountMatch.systemType})` : '',
           systemType:amountMatch ? amountMatch.systemType : 'unknown',
-          matchedBy:amountMatch ? 'route+rate' : 'here',
+          matchedBy:amountMatch ? amountMatch.matchedBy : 'here',
           source:'route.summary.tollCosts'
         });
       });
@@ -1776,32 +1788,6 @@
           source: 'genting.roadCharge'
         });
       }
-    }
-
-    // Polyline supplement deduplicates by plaza key only
-    if (polylinePoints.length) {
-      polylineCorridorFlat.forEach(pm => {
-        const key = `${pm.system}|${pm.plaza}`;
-        if (matchedPlazaKeys.has(key)) return;
-        matchedPlazaKeys.add(key);
-        pushItem({
-          name: `${pm.plaza} (${pm.system})`,
-          system: pm.system,
-          amount: pm.rate,
-          hereAmount: pm.rate,
-          currency: 'MYR',
-          paymentMethods: [],
-          fareName: '',
-          fareId: '',
-          matchedPreference: false,
-          referenceApplied: true,
-          referenceDiscrepancy: false,
-          referenceLabel: `${pm.system} · ${pm.plaza} (${pm.systemType} · polyline ${Math.round(pm.distanceKm * 1000)}m)`,
-          systemType: pm.systemType,
-          matchedBy: 'polyline',
-          source: 'route.polyline'
-        });
-      });
     }
 
     return {
@@ -2129,7 +2115,7 @@
     $('result-card').style.display = 'block';
 
     return {
-      version:'3.0.4',
+      version:'3.0.5',
       pickup:$('pickup').value.trim(),
       dropoff:$('dropoff').value.trim(),
       distance:routeData.distance,
@@ -2195,7 +2181,7 @@
       ? 'Standard Table cross-checked (Class 1 Normal TNG)'
       : 'HERE API';
     return [
-      'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v3.0.4',
+      'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v3.0.5',
       '------------------------------------------------',
       `From: ${data.pickup}`,
       `To: ${data.dropoff}`,
@@ -2228,7 +2214,7 @@
       'Tolls are reimbursement, not driver profit.',
       'Driver earnings exclude fuel, maintenance, depreciation and other operating costs.',
       'Estimate only. Verify tolls and final fare before travel.',
-      'Generated by Rideshare MY Personal Edition v3.0.4'
+      'Generated by Rideshare MY Personal Edition v3.0.5'
     ].join('\n');
   }
 
