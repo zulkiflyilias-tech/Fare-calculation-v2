@@ -253,7 +253,7 @@
     <!-- TOLL REFERENCE PANEL -->
     <details id="toll-reference-panel">
       <summary>📖 Toll Reference Rates (Class 1 Car — All Operators)</summary>
-      <p class="small-muted" style="margin-bottom:8px"> Reference flat rates for all Malaysian tolled highway operators (major &amp; minor), matched by GPS proximity and plaza labels against HERE-returned toll items. Closed-system highways are distance-based and use HERE's calculation unless overridden. </p>
+      <p class="small-muted" style="margin-bottom:8px"> Reference flat rates for all Malaysian tolled highway operators (major &amp; minor), matched by GPS proximity, route corridor, and plaza labels against HERE-returned toll items. Closed-system highways are distance-based and use HERE's calculation unless overridden. </p>
       <div id="toll-reference-list"></div>
     </details>
     <p class="small-muted"> Estimates are indicative. Confirm actual toll deductions and final fare before accepting a trip. HERE Maps, location search and routing require internet access. </p>
@@ -592,27 +592,30 @@
     return points;
   }
 
-  function findPolylineTollMatch(polylinePoints, maxRadiusKm = 0.22) {
-    if (!Array.isArray(polylinePoints) || !polylinePoints.length) return null;
+  function findPolylineTollMatch(polylinePoints, maxRadiusKm = 0.22, flatOnly = true) {
+    if (!Array.isArray(polylinePoints) || !polylinePoints.length) return [];
     const matched = [];
     for (const ref of TOLL_PLAZA_REFERENCE) {
-      if (ref.type !== 'flat' || ref.rate == null || !Number.isFinite(ref.lat) || !Number.isFinite(ref.lng)) continue;
+      if (flatOnly && (ref.type !== 'flat' || ref.rate == null)) continue;
+      if (!Number.isFinite(ref.lat) || !Number.isFinite(ref.lng)) continue;
+      let minDist = Infinity;
       for (let i = 0; i < polylinePoints.length; i++) {
         const d = calculateHaversineDistance(polylinePoints[i].lat, polylinePoints[i].lng, ref.lat, ref.lng);
-        if (d <= maxRadiusKm) {
-          matched.push({
-            rate: ref.rate,
-            system: ref.system,
-            plaza: ref.plaza,
-            type: ref.type,
-            systemType: ref.systemType,
-            distanceKm: d,
-            matchedBy: 'polyline'
-          });
-          break;
-        }
+        if (d < minDist) minDist = d;
+      }
+      if (minDist <= maxRadiusKm) {
+        matched.push({
+          rate: ref.rate,
+          system: ref.system,
+          plaza: ref.plaza,
+          type: ref.type,
+          systemType: ref.systemType,
+          distanceKm: minDist,
+          matchedBy: 'polyline'
+        });
       }
     }
+    matched.sort((a, b) => a.distanceKm - b.distanceKm);
     return matched;
   }
 
@@ -1314,6 +1317,8 @@
     const sections = Array.isArray(route && route.sections) ? route.sections : [];
     const tollSystems = getHereTollSystemMap(route);
     const polylinePoints = extractPolylinePoints(sections);
+    const polylineCorridorFlat = findPolylineTollMatch(polylinePoints, 0.65, true);
+    const polylineCorridorAll = findPolylineTollMatch(polylinePoints, 0.65, false);
     let totalToll = 0;
     let hasItemisedTolls = false;
     let hasSummaryTolls = false;
@@ -1333,7 +1338,7 @@
       if (item.matchedPreference) preferenceMatchedCount++;
       if (item.referenceApplied) referenceAppliedCount++;
       if (item.referenceDiscrepancy) referenceDiscrepancyCount++;
-      if (item.matchedBy === 'gps') gpsMatchedCount++;
+      if (item.matchedBy === 'gps' || item.matchedBy === 'route+rate' || item.matchedBy === 'route-corridor') gpsMatchedCount++;
     };
 
     sections.forEach((section,secIdx) => {
@@ -1348,18 +1353,43 @@
           const sysInfo = tollSystems.get(sysRefRaw) || (typeof toll.tollSystem === 'object' ? toll.tollSystem : null) || null;
           const sysName = (sysInfo && (sysInfo.name || sysInfo.id)) || (typeof toll.tollSystem === 'string' ? toll.tollSystem : '') || '';
           const tollCoords = extractTollCoords(toll);
-          const refMatch = findReferenceRate(toll.name || '', sysName, tollCoords);
-          const plazaName = (refMatch && refMatch.matchedBy === 'gps')
-            ? `${refMatch.plaza} (${refMatch.system})`
-            : (toll.name || sysName || `Toll Point ${secIdx + 1}.${tollIdx + 1}`);
           const picked = selectFareFromToll(toll,paymentPref);
+          const pickedAmount = picked ? picked.amount : 0;
+
+          let refMatch = findReferenceRate(toll.name || '', sysName, tollCoords);
+
+          // Fallback 1: match by route corridor + exact fare amount when HERE gives a generic label or omits toll.location
+          if (!refMatch && picked) {
+            const amountMatches = polylineCorridorFlat.filter(
+              pm => Math.abs(pm.rate - pickedAmount) <= 0.01 && !matchedPlazaKeys.has(`${pm.system}|${pm.plaza}`)
+            );
+            if (amountMatches.length >= 1) {
+              refMatch = { ...amountMatches[0], matchedBy: 'route+rate' };
+            }
+          }
+
+          // Fallback 2: if still unmatched (e.g., closed-system plaza with generic label), identify nearest unconsumed plaza on route corridor
+          if (!refMatch && polylineCorridorAll.length) {
+            const corridorCandidate = polylineCorridorAll.find(
+              pm => !matchedPlazaKeys.has(`${pm.system}|${pm.plaza}`)
+            );
+            if (corridorCandidate) {
+              refMatch = { ...corridorCandidate, matchedBy: 'route-corridor' };
+            }
+          }
+
+          const rawHereName = toll.name || sysName || `Toll Point ${secIdx + 1}.${tollIdx + 1}`;
+          const isGenericSystemLabel = /malaysian highway toll rate system/i.test(rawHereName);
+          const plazaName = refMatch
+            ? `${refMatch.plaza} (${refMatch.system})`
+            : (isGenericSystemLabel ? 'Toll Plaza (Unmapped Gantry)' : rawHereName);
+
           if (!picked && !(refMatch && refMatch.type === 'flat' && refMatch.rate != null)) return;
           if (picked && picked.fareId) {
             if (seenFareIds.has(picked.fareId)) return;
             seenFareIds.add(picked.fareId);
           }
 
-          const pickedAmount = picked ? picked.amount : 0;
           let finalAmount = pickedAmount;
           let referenceApplied = false;
           let referenceDiscrepancy = false;
@@ -1377,9 +1407,10 @@
             referenceLabel = `${refMatch.system} · ${refMatch.plaza} (${refMatch.systemType}${distSuffix})`;
             matchedPlazaKeys.add(`${refMatch.system}|${refMatch.plaza}`);
           } else if (refMatch && refMatch.type === 'closed') {
+            referenceApplied = true;
             matchedBy = refMatch.matchedBy || 'text';
             const distSuffix = Number.isFinite(refMatch.distanceKm) ? ` · ${Math.round(refMatch.distanceKm * 1000)}m` : '';
-            referenceLabel = `${refMatch.system} (distance-based, ${refMatch.systemType}${distSuffix})`;
+            referenceLabel = `${refMatch.system} · ${refMatch.plaza} (distance-based, ${refMatch.systemType}${distSuffix})`;
             matchedPlazaKeys.add(`${refMatch.system}|${refMatch.plaza}`);
           }
 
@@ -1410,9 +1441,13 @@
           const val = Number(price && price.value);
           const curr = String((price && price.currency) || cost.currency || 'MYR').toUpperCase();
           if (!Number.isFinite(val) || val < 0 || curr !== 'MYR') return;
+          const amountMatch = polylineCorridorFlat.find(
+            pm => Math.abs(pm.rate - roundMoney(val)) <= 0.01 && !matchedPlazaKeys.has(`${pm.system}|${pm.plaza}`)
+          );
+          if (amountMatch) matchedPlazaKeys.add(`${amountMatch.system}|${amountMatch.plaza}`);
           pushItem({
-            name:`Route Toll Summary ${secIdx + 1}.${cIdx + 1}`,
-            system:'',
+            name:amountMatch ? `${amountMatch.plaza} (${amountMatch.system})` : `Route Toll Summary ${secIdx + 1}.${cIdx + 1}`,
+            system:amountMatch ? amountMatch.system : '',
             amount:roundMoney(val),
             hereAmount:roundMoney(val),
             currency:'MYR',
@@ -1420,11 +1455,11 @@
             fareName:cost.name || '',
             fareId:cost.id ? String(cost.id) : '',
             matchedPreference:false,
-            referenceApplied:false,
+            referenceApplied:Boolean(amountMatch),
             referenceDiscrepancy:false,
-            referenceLabel:'',
-            systemType:'unknown',
-            matchedBy:'here',
+            referenceLabel:amountMatch ? `${amountMatch.system} · ${amountMatch.plaza} (${amountMatch.systemType})` : '',
+            systemType:amountMatch ? amountMatch.systemType : 'unknown',
+            matchedBy:amountMatch ? 'route+rate' : 'here',
             source:'section.summary.tollCosts'
           });
         });
@@ -1437,9 +1472,13 @@
         const val = Number(price && price.value);
         const curr = String((price && price.currency) || cost.currency || 'MYR').toUpperCase();
         if (!Number.isFinite(val) || val < 0 || curr !== 'MYR') return;
+        const amountMatch = polylineCorridorFlat.find(
+          pm => Math.abs(pm.rate - roundMoney(val)) <= 0.01 && !matchedPlazaKeys.has(`${pm.system}|${pm.plaza}`)
+        );
+        if (amountMatch) matchedPlazaKeys.add(`${amountMatch.system}|${amountMatch.plaza}`);
         pushItem({
-          name:`Route Summary Toll ${idx + 1}`,
-          system:'',
+          name:amountMatch ? `${amountMatch.plaza} (${amountMatch.system})` : `Route Summary Toll ${idx + 1}`,
+          system:amountMatch ? amountMatch.system : '',
           amount:roundMoney(val),
           hereAmount:roundMoney(val),
           currency:'MYR',
@@ -1447,11 +1486,11 @@
           fareName:cost.name || '',
           fareId:cost.id ? String(cost.id) : '',
           matchedPreference:false,
-          referenceApplied:false,
+          referenceApplied:Boolean(amountMatch),
           referenceDiscrepancy:false,
-          referenceLabel:'',
-          systemType:'unknown',
-          matchedBy:'here',
+          referenceLabel:amountMatch ? `${amountMatch.system} · ${amountMatch.plaza} (${amountMatch.systemType})` : '',
+          systemType:amountMatch ? amountMatch.systemType : 'unknown',
+          matchedBy:amountMatch ? 'route+rate' : 'here',
           source:'route.summary.tollCosts'
         });
       });
@@ -1459,7 +1498,7 @@
 
     // Supplement with open-system plaza GPS matches along the decoded route polyline if missing
     if (polylinePoints.length) {
-      const polylineMatches = findPolylineTollMatch(polylinePoints);
+      const polylineMatches = findPolylineTollMatch(polylinePoints, 0.22, true);
       polylineMatches.forEach(pm => {
         const key = `${pm.system}|${pm.plaza}`;
         if (matchedPlazaKeys.has(key)) return;
@@ -1748,7 +1787,7 @@
         const row = document.createElement('div');
         row.className = 'toll-item-line';
         const left = document.createElement('span');
-        const sysSuffix = item.system && !item.name.includes(`(${item.system})`) ? ` · ${item.system}` : '';
+        const sysSuffix = item.system && !item.name.includes(item.system) ? ` · ${item.system}` : '';
         const typeBadge = item.systemType && item.systemType !== 'unknown'
           ? ` <span class="ref-badge ${item.systemType}">${item.systemType}</span>`
           : '';
@@ -1874,7 +1913,7 @@
      ========================================================= */
   function receiptText(data) {
     const tollLines = Array.isArray(data.tollItems) && data.tollItems.length
-      ? data.tollItems.map(t => `  - ${t.name}${t.system && !t.name.includes(`(${t.system})`) ? ` (${t.system})` : ''}: ${money(t.amount)}`).join('\n')
+      ? data.tollItems.map(t => `  - ${t.name}${t.system && !t.name.includes(t.system) ? ` (${t.system})` : ''}: ${money(t.amount)}`).join('\n')
       : '  - None';
     const tollSource = data.hasManualToll
       ? `Manual override (HERE raw: ${money(data.hereRawTollAmount)})`
