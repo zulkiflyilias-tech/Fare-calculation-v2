@@ -5,7 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare MY - Personal Edition v2.8</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Rideshare MY - Personal Edition v2.9</title>
 
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 
@@ -570,7 +573,7 @@ summary {
 
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v2.8</span>
+      <span class="version">PERSONAL EDITION v2.9</span>
     </div>
 
     <!-- LOCATION INPUTS -->
@@ -846,6 +849,7 @@ summary {
    1. CONFIGURATION
 ========================================================= */
 
+const BUILD_VERSION = '2.9';
 const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
 const DEFAULT_SETTINGS = Object.freeze({
@@ -865,8 +869,9 @@ const ADMIN_FLAT_THRESHOLD = 8;
 const ROUNDING_UNITS = [1,0.5,0.1,0.01];
 const MAX_HISTORY = 100;
 
-const SETTINGS_KEY = 'rideshareMY.personal.v2.8.settings';
+const SETTINGS_KEY = 'rideshareMY.personal.v2.9.settings';
 const LEGACY_SETTINGS_KEYS = [
+  'rideshareMY.personal.v2.8.settings',
   'rideshareMY.personal.v2.7.settings',
   'rideshareMY.personal.v2.6.settings',
   'rideshareMY.personal.v2.5.settings',
@@ -877,8 +882,9 @@ const LEGACY_SETTINGS_KEYS = [
   'rideshareMY.personal.v2.settings'
 ];
 
-const HISTORY_KEY = 'rideshareMY.personal.v2.8.history';
+const HISTORY_KEY = 'rideshareMY.personal.v2.9.history';
 const LEGACY_HISTORY_KEYS = [
+  'rideshareMY.personal.v2.8.history',
   'rideshareMY.personal.v2.7.history',
   'rideshareMY.personal.v2.6.history',
   'rideshareMY.personal.v2.5.history',
@@ -1602,7 +1608,7 @@ function swapLocations() {
 }
 
 /* =========================================================
-   11. CLASS 1 MALAYSIA STANDARD TNG TOLL RESOLVER
+   11. CLASS 1 MALAYSIA STANDARD TNG TOLL RESOLVER & FORENSICS
 ========================================================= */
 
 function readTollAmount(entry) {
@@ -1676,7 +1682,7 @@ function resolvePlazaFares(fares) {
   });
 
   if (!validFares.length) {
-    return {resolved:false,unsupportedCurrency};
+    return {resolved:false,unsupportedCurrency,reason:'no-valid-fares'};
   }
 
   const nonExcluded = validFares.filter(f => !isExcludedVehicleOrPassFare(f.raw));
@@ -1694,7 +1700,8 @@ function resolvePlazaFares(fares) {
     return {
       resolved:true,
       amount:uniqueAmounts[0],
-      unsupportedCurrency
+      unsupportedCurrency,
+      reason:tngPool.length ? 'class1-tng-exact' : 'class1-standard-exact'
     };
   }
 
@@ -1703,12 +1710,16 @@ function resolvePlazaFares(fares) {
     return {
       resolved:true,
       amount:nonZeroAmounts[0],
-      unsupportedCurrency
+      unsupportedCurrency,
+      reason:'nonzero-exit-tariff'
     };
   }
 
-  // Conflicting non-zero tariffs without an unambiguous match require manual check
-  return {resolved:false,unsupportedCurrency};
+  return {
+    resolved:false,
+    unsupportedCurrency,
+    reason:`ambiguous-tariffs(${uniqueAmounts.map(a => a.toFixed(2)).join('/')})`
+  };
 }
 
 function extractTolls(sections,options={}) {
@@ -1720,6 +1731,7 @@ function extractTolls(sections,options={}) {
 
   const seenPlazas = new Set();
   const breakdown = [];
+  const forensics = [];
   const hasItemisedTolls = sections.some(
     section => Array.isArray(section.tolls) && section.tolls.length > 0
   );
@@ -1743,11 +1755,25 @@ function extractTolls(sections,options={}) {
         const identity = String(
           toll.id || toll.tollId || `${sectionIndex}:${plazaName}:${tollIndex}`
         );
-        if (seenPlazas.has(identity)) return;
+        if (seenPlazas.has(identity)) {
+          forensics.push(`${plazaName}: duplicate skipped`);
+          return;
+        }
         seenPlazas.add(identity);
 
         const fares = Array.isArray(toll.fares) ? toll.fares : [];
-        if (!fares.length) return;
+        if (!fares.length) {
+          forensics.push(`${plazaName}: empty fares array`);
+          return;
+        }
+
+        const rawList = fares
+          .map(f => {
+            const p = readTollAmount(f);
+            const desc = getFareDescriptor(f) || 'unlabelled';
+            return p && p.valid ? `${money(p.amount)} [${desc}]` : `invalid [${desc}]`;
+          })
+          .join(', ');
 
         const resolution = resolvePlazaFares(fares);
         if (resolution.unsupportedCurrency) unsupportedCurrency = true;
@@ -1760,9 +1786,11 @@ function extractTolls(sections,options={}) {
           } else {
             breakdown.push(`${plazaName}: RM 0.00 (Entry)`);
           }
+          forensics.push(`${plazaName}: ${money(resolution.amount)} (${resolution.reason}) <- ${rawList}`);
         } else {
           unresolvedRecords++;
           breakdown.push(`${plazaName}: Unverified`);
+          forensics.push(`${plazaName}: UNVERIFIED (${resolution.reason}) <- ${rawList}`);
         }
       });
       return;
@@ -1781,17 +1809,20 @@ function extractTolls(sections,options={}) {
         const result = readTollAmount(cost);
         if (!result) {
           unresolvedRecords++;
+          forensics.push(`Segment ${costIndex + 1}: invalid summary tollCost`);
           return;
         }
         if (result.unsupportedCurrency) {
           unsupportedCurrency = true;
           unresolvedRecords++;
+          forensics.push(`Segment ${costIndex + 1}: non-MYR tollCost`);
           return;
         }
         if (result.valid) {
           total += result.amount;
           validAmounts++;
           breakdown.push(`Highway Segment: ${money(result.amount)}`);
+          forensics.push(`Segment ${costIndex + 1}: ${money(result.amount)} (summary.tollCosts fallback)`);
         }
       });
     }
@@ -1799,7 +1830,6 @@ function extractTolls(sections,options={}) {
 
   total = roundMoney(total);
 
-  // If no toll records were returned on a toll-free / non-highway route, treat RM 0.00 as verified
   const tollFreeConfirmed = !recordsDetected && Boolean(options.expectTollFree);
 
   const available =
@@ -1813,7 +1843,8 @@ function extractTolls(sections,options={}) {
     validAmounts,
     unresolvedRecords,
     unsupportedCurrency,
-    breakdown
+    breakdown,
+    forensics
   };
 }
 
@@ -2101,6 +2132,7 @@ function applySelectedRouteCalculation(chosen) {
     tollUnresolvedRecords:tollInfo.unresolvedRecords,
     tollUnsupportedCurrency:tollInfo.unsupportedCurrency,
     tollBreakdown:tollInfo.breakdown,
+    tollForensics:tollInfo.forensics || [],
     manualOverride,
     sectionsCount:chosen.sectionsCount,
     avoidTollsRequested:chosen.avoidTollsRequested,
@@ -2110,11 +2142,17 @@ function applySelectedRouteCalculation(chosen) {
   latestCalculation = calculation;
 
   const statusParts = [
-    `Selected: ${chosen.label} (${routeOptions.length} route option(s) on map)`
+    `[v${BUILD_VERSION}] ${chosen.label} (${routeOptions.length} route option(s))`
   ];
 
   if (tollInfo.breakdown && tollInfo.breakdown.length) {
     statusParts.push(`Plazas: ${tollInfo.breakdown.join(' | ')}`);
+  } else if (tollInfo.amount === 0) {
+    statusParts.push('Plazas: None');
+  }
+
+  if (tollInfo.unresolvedRecords > 0) {
+    statusParts.push(`Forensic: ${tollInfo.unresolvedRecords} unresolved plaza(s)`);
   }
 
   setRouteStatus(statusParts.join(' · '));
@@ -2157,7 +2195,7 @@ function calculateRoute() {
 
   setLoading(true);
   clearError();
-  setRouteStatus('Fetching route options (Standard, Shortest, No Toll, Longest)…');
+  setRouteStatus(`[v${BUILD_VERSION}] Fetching route options…`);
 
   routeDebounce = setTimeout(async () => {
     if (requestId !== routeRequestId) return;
@@ -2169,15 +2207,14 @@ function calculateRoute() {
       currency:'MYR',
       'vehicle[axleCount]':2,
       'vehicle[trailerCount]':0,
-      'tolls[emissionType]':'Euro6',
       return:'polyline,summary,tolls'
     };
 
     const queries = [
-      requestHereRoute({...baseParams,routingMode:'fast',alternatives:1}).catch(() => null),
-      requestHereRoute({...baseParams,routingMode:'short'}).catch(() => null),
-      requestHereRoute({...baseParams,routingMode:'fast','avoid[features]':'tollRoad'}).catch(() => null),
-      requestHereRoute({...baseParams,routingMode:'short','avoid[features]':'controlledAccessHighway'}).catch(() => null)
+      requestHereRoute({...baseParams,routingMode:'fast',alternatives:1}).catch(err => ({__err:err})),
+      requestHereRoute({...baseParams,routingMode:'short'}).catch(err => ({__err:err})),
+      requestHereRoute({...baseParams,routingMode:'fast','avoid[features]':'tollRoad'}).catch(err => ({__err:err})),
+      requestHereRoute({...baseParams,routingMode:'short','avoid[features]':'controlledAccessHighway'}).catch(err => ({__err:err}))
     ];
 
     try {
@@ -2185,8 +2222,14 @@ function calculateRoute() {
       if (requestId !== routeRequestId) return;
       setLoading(false);
 
-      const candidates = buildCandidateRoutes(results);
+      const validResults = results.map(r => (r && r.__err ? null : r));
+      const candidates = buildCandidateRoutes(validResults);
+
       if (!candidates.length) {
+        const firstErr = results.find(r => r && r.__err);
+        if (firstErr && firstErr.__err) {
+          console.error('HERE routing error:',firstErr.__err);
+        }
         showError('No route found for the selected locations.');
         return;
       }
@@ -2329,7 +2372,7 @@ function processCalculations(routeData) {
   $('result-card').style.display = 'block';
 
   return {
-    version:'2.8',
+    version:BUILD_VERSION,
     pickup:$('pickup').value.trim(),
     dropoff:$('dropoff').value.trim(),
     routeOption:routeData.routeLabel || 'Standard / Toll',
@@ -2347,6 +2390,7 @@ function processCalculations(routeData) {
     tollUnresolvedRecords:routeData.tollUnresolvedRecords,
     tollUnsupportedCurrency:routeData.tollUnsupportedCurrency,
     tollBreakdown:routeData.tollBreakdown || [],
+    tollForensics:routeData.tollForensics || [],
     manualOverride:routeData.manualOverride,
     hillSurcharge,
     highlandZone:highlandZone ? highlandZone.name : '',
@@ -2397,8 +2441,12 @@ function receiptText(data) {
     ? data.tollBreakdown.map(p => `  - ${p}`).join('\n')
     : '  - None / Unitemised';
 
+  const forensicLines = data.tollForensics && data.tollForensics.length
+    ? data.tollForensics.map(f => `  * ${f}`).join('\n')
+    : '  * No raw toll records';
+
   return [
-    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v2.8',
+    `TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v${BUILD_VERSION}`,
     '------------------------------------------------',
     `From: ${data.pickup}`,
     `To: ${data.dropoff}`,
@@ -2420,6 +2468,8 @@ function receiptText(data) {
     `Manual toll override: ${data.manualOverride ? 'Yes' : 'No'}`,
     'Detected Toll Plazas / Segments:',
     plazaLines,
+    'Forensic Toll Trace:',
+    forensicLines,
     '------------------------------------------------',
     `Exact calculated total: ${money(data.exactTotal)}`,
     `Quotation rounding adjustment: ${money(data.roundingAdjustment)}`,
@@ -2433,7 +2483,7 @@ function receiptText(data) {
     'Tolls are reimbursement, not driver profit.',
     'Driver earnings exclude fuel, maintenance, depreciation and other operating costs.',
     'Estimate only. Verify tolls and final fare before travel.',
-    'Generated by Rideshare MY Personal Edition v2.8'
+    `Generated by Rideshare MY Personal Edition v${BUILD_VERSION}`
   ].join('\n');
 }
 
@@ -2598,7 +2648,7 @@ function exportHistoryCsv() {
   const a = document.createElement('a');
 
   a.href = url;
-  a.download = 'rideshare-my-trip-history-v2.8.csv';
+  a.download = `rideshare-my-trip-history-v${BUILD_VERSION}.csv`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -2723,6 +2773,8 @@ function boot() {
 
   if (!isApiKeyConfigured()) {
     setRouteStatus('Setup required: replace HERE_API_KEY with your valid key.');
+  } else {
+    setRouteStatus(`[v${BUILD_VERSION}] Ready — select pickup and drop-off.`);
   }
 }
 
