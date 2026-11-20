@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare MY - Personal Edition v2.8</title>
+<title>Rideshare MY - Personal Edition v3.0</title>
 
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 
@@ -20,7 +20,6 @@
   --green:#25D366;
   --danger:#c62828;
   --warning:#f57c00;
-  --teal:#00695c;
 }
 
 * {box-sizing:border-box}
@@ -35,7 +34,7 @@ body {
   overflow:hidden;
 }
 
-button,input,select,textarea {font:inherit}
+button,input,select {font:inherit}
 
 button {touch-action:manipulation}
 
@@ -174,48 +173,6 @@ button {touch-action:manipulation}
   font-size:14px;
 }
 
-.via-bar {
-  display:flex;
-  flex-direction:column;
-  gap:5px;
-  background:#f7f3fa;
-  border:1px dashed #ce93d8;
-  border-radius:8px;
-  padding:7px 9px;
-  margin-bottom:6px;
-}
-
-.via-bar-top {
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:6px;
-  font-size:11px;
-  color:#5e35b1;
-  font-weight:650;
-}
-
-.via-toggle-link {
-  border:0;
-  background:none;
-  color:var(--primary);
-  font-size:11px;
-  font-weight:700;
-  cursor:pointer;
-  padding:2px 4px;
-  text-decoration:underline;
-}
-
-.via-input-wrap {
-  display:none;
-  flex-direction:column;
-  gap:4px;
-}
-
-.via-input-wrap.open {
-  display:flex;
-}
-
 .suggestions {
   position:absolute;
   top:100%;
@@ -293,41 +250,20 @@ button {touch-action:manipulation}
   color:#e65100;
 }
 
-.toll-badge-row {
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:6px;
-  background:#e0f2f1;
-  border:1px solid #b2dfdb;
-  color:var(--teal);
-  padding:6px 9px;
-  border-radius:7px;
-  font-size:11px;
-  font-weight:650;
-}
-
-.toll-adjust {
+.here-toll-meta-row {
   display:grid;
-  grid-template-columns:1fr 112px;
-  gap:8px;
-  align-items:center;
-  font-size:12px;
-  color:#555;
+  grid-template-columns:1fr 1fr;
+  gap:6px;
 }
 
-.toll-adjust input {
+.here-toll-meta-row select,
+.here-toll-meta-row input {
   width:100%;
   padding:7px 8px;
   border:1px solid var(--border);
   border-radius:7px;
-  font-size:13px;
-}
-
-.toll-adjust input.needs-attention {
-  border-color:var(--warning);
-  background:#fff8e1;
-  box-shadow:0 0 0 2px #f57c0022;
+  font-size:12px;
+  background:#fff;
 }
 
 .status-line {
@@ -399,26 +335,33 @@ button {touch-action:manipulation}
   color:#ffcc80;
 }
 
-.plaza-list-box {
+.toll-breakdown-box {
   background:#2c2c2e;
-  border-radius:7px;
-  padding:7px 9px;
+  border-radius:8px;
+  padding:8px 10px;
   margin:6px 0 8px;
   font-size:11px;
-  color:#d1d1d6;
-  line-height:1.5;
+  color:#e5e5ea;
+  line-height:1.45;
 }
 
-.plaza-list-box strong {
-  color:#80cbc4;
-  display:block;
-  margin-bottom:3px;
+.toll-breakdown-title {
+  font-weight:700;
+  color:#b388ff;
+  margin-bottom:4px;
+  font-size:11px;
 }
 
-.plaza-filtered-note {
-  color:#ffcc80;
-  font-size:10px;
-  margin-top:4px;
+.toll-item-line {
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+  padding:2px 0;
+  border-bottom:1px dashed #3a3a3c;
+}
+
+.toll-item-line:last-child {
+  border-bottom:0;
 }
 
 details {
@@ -492,19 +435,6 @@ summary {
   margin-top:9px;
 }
 
-.secondary-btn {
-  width:100%;
-  background:#424242;
-  color:#fff;
-  border:0;
-  padding:9px;
-  border-radius:8px;
-  font-size:12px;
-  font-weight:650;
-  cursor:pointer;
-  margin-top:6px;
-}
-
 .settings-grid {
   display:grid;
   grid-template-columns:1fr 1fr;
@@ -520,10 +450,6 @@ summary {
   color:#555;
 }
 
-.setting-field.full-span {
-  grid-column:1 / -1;
-}
-
 .setting-input {
   width:100%;
   padding:8px;
@@ -533,97 +459,19 @@ summary {
   background:#fafafa;
 }
 
-.calibration-textarea {
-  width:100%;
-  min-height:92px;
-  padding:7px;
-  border:1px solid var(--border);
-  border-radius:7px;
-  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
-  font-size:11px;
-  background:#fafafa;
-  resize:vertical;
-}
-
 .settings-actions {
   display:flex;
   gap:7px;
   flex-wrap:wrap;
 }
 
-.settings-actions button,
-.history-actions button {
+.settings-actions button {
   border:1px solid var(--border);
   background:#fff;
   border-radius:7px;
   padding:7px 9px;
   font-size:11px;
   cursor:pointer;
-}
-
-#history-list {
-  font-size:11px;
-  color:#555;
-  line-height:1.5;
-  max-height:240px;
-  overflow:auto;
-}
-
-.history-item {
-  border-bottom:1px solid #eee;
-  padding:8px 0;
-}
-
-.history-item strong {color:#222}
-
-.history-reconcile-row {
-  display:flex;
-  align-items:center;
-  gap:6px;
-  margin-top:5px;
-  flex-wrap:wrap;
-}
-
-.history-reconcile-row input {
-  width:84px;
-  padding:4px 6px;
-  border:1px solid var(--border);
-  border-radius:5px;
-  font-size:11px;
-}
-
-.history-reconcile-row button {
-  border:1px solid var(--border);
-  background:#f5f5f5;
-  border-radius:5px;
-  padding:4px 7px;
-  font-size:10px;
-  font-weight:650;
-  cursor:pointer;
-}
-
-.variance-pill {
-  font-size:10px;
-  font-weight:700;
-  padding:2px 6px;
-  border-radius:4px;
-}
-
-.variance-ok {
-  background:#e8f5e9;
-  color:#2e7d32;
-}
-
-.variance-diff {
-  background:#fff3e0;
-  color:#e65100;
-}
-
-.history-actions {
-  display:flex;
-  gap:7px;
-  margin-top:8px;
-  flex-wrap:wrap;
 }
 
 .small-muted {
@@ -640,8 +488,8 @@ summary {
     flex:1;
   }
   #search-panel {
-    width:410px;
-    max-width:44vw;
+    width:400px;
+    max-width:42vw;
     height:100%;
     border-radius:0;
     box-shadow:-4px 0 20px #0000000d;
@@ -670,7 +518,7 @@ summary {
 
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v2.8</span>
+      <span class="version">PERSONAL EDITION v3.0</span>
     </div>
 
     <!-- LOCATION INPUTS -->
@@ -718,38 +566,7 @@ summary {
 
     </div>
 
-    <!-- OPTIONAL VIA-WAYPOINT ANCHOR -->
-
-    <div class="via-bar">
-      <div class="via-bar-top">
-        <span id="via-summary-label">📍 Highway / Interchange Anchor: None</span>
-        <button type="button" class="via-toggle-link" id="toggle-via-btn">
-          + Anchor Via Point
-        </button>
-      </div>
-
-      <div class="via-input-wrap" id="via-input-wrap">
-        <div class="input-container">
-          <input class="location-input" type="text" id="via"
-            placeholder="Search highway plaza / interchange or tap map..."
-            autocomplete="off" enterkeyhint="search"
-            aria-label="Via waypoint location">
-
-          <div class="action-group">
-            <button class="icon-btn clear-btn" id="clear-via"
-              title="Clear via waypoint" aria-label="Clear via waypoint">&times;</button>
-          </div>
-
-          <div id="via-suggestions" class="suggestions"
-            role="listbox"></div>
-        </div>
-        <div class="small-muted">
-          Tip: Tap anywhere on the map to pin a pass-through highway/plaza waypoint for exact closed-system toll snapping.
-        </div>
-      </div>
-    </div>
-
-    <!-- ROUTING CONTROLS -->
+    <!-- ROUTING & HERE TOLL ENGINE CONTROLS -->
 
     <div class="route-controls">
 
@@ -767,25 +584,29 @@ summary {
         🛑 Avoid Tolls: OFF
       </button>
 
-      <div class="toll-badge-row">
-        <span>💳 Toll Profile: Class 1 (Car) · TnG Card Only</span>
-        <span id="calibration-badge">Calibrated Fallback: ON</span>
+      <div class="here-toll-meta-row">
+        <label class="setting-field">
+          HERE Payment Preference
+          <select id="here-payment-pref">
+            <option value="any">All HERE fares</option>
+            <option value="electronic">Electronic / Card / Tag</option>
+            <option value="cash">Cash</option>
+          </select>
+        </label>
+
+        <label class="setting-field">
+          Departure Time (optional)
+          <input id="here-departure-time" type="datetime-local">
+        </label>
       </div>
 
-      <label class="toll-adjust">
-        <span>Manual toll override (RM, optional)</span>
-        <input id="manual-toll" type="number"
-          min="0" step="0.10" inputmode="decimal"
-          placeholder="Auto Class 1 TnG">
-      </label>
-
       <div class="small-muted">
-        Validates toll booth system IDs, active drivable road-link alignment, and Class 1 Touch 'n Go card fares while filtering defunct/abandoned booths, noise, and duplicate entries.
+        Powered directly by HERE Routing API v8 tolls &amp; toll systems data (MYR). Departure time supports time-dependent HERE toll tariffs when provided.
       </div>
 
     </div>
 
-    <div id="loading-msg">Calculating route and validating active Class 1 TnG tolls…</div>
+    <div id="loading-msg">Calculating route and HERE tolls…</div>
     <div id="error-msg" role="alert"></div>
     <div id="route-status" class="status-line" aria-live="polite"></div>
 
@@ -804,7 +625,7 @@ summary {
 
       <div id="fare-status" class="fare-status"></div>
 
-      <div id="plaza-list-box" class="plaza-list-box" style="display:none"></div>
+      <div id="toll-breakdown-box" class="toll-breakdown-box" style="display:none"></div>
 
       <details open>
         <summary>Detailed Fare Calculation</summary>
@@ -820,7 +641,7 @@ summary {
         </div>
 
         <div class="detail-row" id="toll-fare-row">
-          <span>Toll charges (Class 1 · TnG Card)</span>
+          <span>Toll charges (HERE API)</span>
           <span id="calc-toll-fare">RM 0.00</span>
         </div>
 
@@ -863,7 +684,7 @@ summary {
           Minimum fare applies to transport charges before tolls.
           Admin commission is 15% of transport fare excluding tolls,
           or RM1.50 when the pre-minimum transport subtotal is below RM8.
-          Tolls are pass-through reimbursement (Class 1 TnG card rate), not driver profit.
+          Tolls are pass-through reimbursement, not driver profit.
           Vehicle operating costs are not deducted.
         </p>
 
@@ -873,16 +694,12 @@ summary {
         📋 Copy Itemised Receipt
       </button>
 
-      <button class="secondary-btn" id="save-trip-btn" type="button">
-        Save to Trip History
-      </button>
-
     </section>
 
     <!-- SETTINGS -->
 
     <details id="settings-panel">
-      <summary>⚙️ Fare &amp; Toll Calibration Settings</summary>
+      <summary>⚙️ Fare Settings</summary>
 
       <div class="settings-grid">
 
@@ -950,20 +767,6 @@ summary {
           </select>
         </label>
 
-        <label class="setting-field">
-          Corridor fallback table
-          <select class="setting-input" id="setting-use-calibration">
-            <option value="true">Enabled (when unverified/noisy)</option>
-            <option value="false">Disabled (HERE API only)</option>
-          </select>
-        </label>
-
-        <label class="setting-field full-span">
-          Custom Class 1 TnG Corridor Overrides (JSON)
-          <textarea class="calibration-textarea" id="setting-corridors"
-            spellcheck="false"></textarea>
-        </label>
-
       </div>
 
       <div class="settings-actions">
@@ -975,25 +778,11 @@ summary {
         Settings are stored on this device only.
         Commission is calculated on transport fare excluding tolls.
         The flat commission applies below the RM8 pre-minimum threshold.
-        Custom corridor overrides trigger automatically (either direction) when Avoid Tolls is OFF and HERE returns unverified, defunct, or duplicate-noisy tolls.
       </p>
     </details>
 
-    <!-- HISTORY -->
-
-    <details id="history-panel">
-      <summary>🧾 Recent Trip History &amp; Toll Reconciliation</summary>
-
-      <div id="history-list">No saved trips yet.</div>
-
-      <div class="history-actions">
-        <button id="export-history-btn" type="button">Export history (CSV)</button>
-        <button id="clear-history-btn" type="button">Clear history</button>
-      </div>
-    </details>
-
     <p class="small-muted">
-      Estimates are indicative (Class 1 car, Touch 'n Go card tariff). Confirm toll amounts and final fare before
+      Estimates are indicative. Confirm toll amounts and final fare before
       accepting a trip. HERE Maps, location search and routing require
       internet access. Browser storage is local to this device.
     </p>
@@ -1011,39 +800,6 @@ summary {
 
 const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
-const DEFAULT_CALIBRATED_CORRIDORS = [
-  {
-    name:'Bandar Puteri Puchong ↔ Kuala Selangor (LDP / NKVE-GCE-LATAR)',
-    from:{lat:3.0250,lng:101.6150,radiusKm:7},
-    to:{lat:3.3500,lng:101.2500,radiusKm:10},
-    tollTngClass1:5.90
-  },
-  {
-    name:'Klang / Meru ↔ KLIA / KLIA2 (ELITE / WCE-ELITE)',
-    from:{lat:3.0800,lng:101.4450,radiusKm:10},
-    to:{lat:2.7456,lng:101.7072,radiusKm:8},
-    tollTngClass1:11.60
-  },
-  {
-    name:'Shah Alam ↔ KLIA / KLIA2 (ELITE)',
-    from:{lat:3.0707,lng:101.5204,radiusKm:6},
-    to:{lat:2.7456,lng:101.7072,radiusKm:8},
-    tollTngClass1:7.30
-  },
-  {
-    name:'Klang / Meru ↔ KLCC / Bukit Bintang (NKVE / Federal-SPRINT)',
-    from:{lat:3.0800,lng:101.4450,radiusKm:10},
-    to:{lat:3.1579,lng:101.7116,radiusKm:5},
-    tollTngClass1:5.40
-  },
-  {
-    name:'Klang / Meru ↔ Genting Highlands (NKVE / DUKE / Karak)',
-    from:{lat:3.0800,lng:101.4450,radiusKm:10},
-    to:{lat:3.4241,lng:101.7933,radiusKm:10},
-    tollTngClass1:14.80
-  }
-];
-
 const DEFAULT_SETTINGS = Object.freeze({
   ratePerKm:1.45,
   minimumFare:8.00,
@@ -1054,108 +810,29 @@ const DEFAULT_SETTINGS = Object.freeze({
   longHaulCap:100,
   adminPercent:15,
   adminMinimum:1.50,
-  roundingUnit:1,
-  useCorridorCalibration:true,
-  calibratedCorridors:DEFAULT_CALIBRATED_CORRIDORS
+  roundingUnit:1
 });
 
 const ADMIN_FLAT_THRESHOLD = 8;
-const MAX_TOLL_LINK_SNAP_KM = 0.25;
-
-const SETTINGS_KEY = 'rideshareMY.personal.v2.8.settings';
-const LEGACY_SETTINGS_KEYS = [
-  'rideshareMY.personal.v2.7.settings',
-  'rideshareMY.personal.v2.6.settings',
-  'rideshareMY.personal.v2.5.settings',
-  'rideshareMY.personal.v2.4.settings',
-  'rideshareMY.personal.v2.3.settings',
-  'rideshareMY.personal.v2.2.settings',
-  'rideshareMY.personal.v2.1.settings',
-  'rideshareMY.personal.v2.settings'
-];
-
-const HISTORY_KEY = 'rideshareMY.personal.v2.8.history';
-const LEGACY_HISTORY_KEYS = [
-  'rideshareMY.personal.v2.7.history',
-  'rideshareMY.personal.v2.6.history',
-  'rideshareMY.personal.v2.5.history',
-  'rideshareMY.personal.v2.4.history',
-  'rideshareMY.personal.v2.3.history',
-  'rideshareMY.personal.v2.2.history',
-  'rideshareMY.personal.v2.history'
-];
-
-const MAX_HISTORY = 100;
+const SETTINGS_KEY = 'rideshareMY.personal.v3.0.settings';
 
 const HIGHLAND_ZONES = [
-  {
-    lat:3.4241,lng:101.7933,
-    radiusKm:10,
-    name:'Genting Highlands & Gohtong'
-  },
-  {
-    lat:4.4715,lng:101.3787,
-    radiusKm:22,
-    name:'Cameron Highlands'
-  },
-  {
-    lat:3.7155,lng:101.7432,
-    radiusKm:6,
-    name:"Fraser's Hill"
-  },
-  {
-    lat:3.3533,lng:101.8385,
-    radiusKm:8,
-    name:'Bukit Tinggi & Colmar Tropicale'
-  }
+  {lat:3.4241,lng:101.7933,radiusKm:10,name:'Genting Highlands & Gohtong'},
+  {lat:4.4715,lng:101.3787,radiusKm:22,name:'Cameron Highlands'},
+  {lat:3.7155,lng:101.7432,radiusKm:6,name:"Fraser's Hill"},
+  {lat:3.3533,lng:101.8385,radiusKm:8,name:'Bukit Tinggi & Colmar Tropicale'}
 ];
 
 const URBAN_POI_ZONES = [
-  {
-    lat:3.1579,lng:101.7116,
-    radiusKm:5,
-    name:'KL City Centre & Golden Triangle'
-  },
-  {
-    lat:2.7456,lng:101.7072,
-    radiusKm:8,
-    name:'KLIA / KLIA2 Airport Zone'
-  },
-  {
-    lat:3.1340,lng:101.6861,
-    radiusKm:3,
-    name:'KL Sentral & Brickfields'
-  },
-  {
-    lat:3.1191,lng:101.6741,
-    radiusKm:3,
-    name:'Mid Valley & Bangsar South'
-  },
-  {
-    lat:3.1580,lng:101.6145,
-    radiusKm:3,
-    name:'1 Utama & Mutiara Damansara'
-  },
-  {
-    lat:3.0732,lng:101.6070,
-    radiusKm:3,
-    name:'Sunway Pyramid & Subang Jaya'
-  },
-  {
-    lat:3.0449,lng:101.6212,
-    radiusKm:3,
-    name:'Puchong IOI Zone'
-  },
-  {
-    lat:3.0707,lng:101.5204,
-    radiusKm:4,
-    name:'Shah Alam City Centre'
-  },
-  {
-    lat:3.0442,lng:101.4456,
-    radiusKm:4,
-    name:'Klang City Centre'
-  }
+  {lat:3.1579,lng:101.7116,radiusKm:5,name:'KL City Centre & Golden Triangle'},
+  {lat:2.7456,lng:101.7072,radiusKm:8,name:'KLIA / KLIA2 Airport Zone'},
+  {lat:3.1340,lng:101.6861,radiusKm:3,name:'KL Sentral & Brickfields'},
+  {lat:3.1191,lng:101.6741,radiusKm:3,name:'Mid Valley & Bangsar South'},
+  {lat:3.1580,lng:101.6145,radiusKm:3,name:'1 Utama & Mutiara Damansara'},
+  {lat:3.0732,lng:101.6070,radiusKm:3,name:'Sunway Pyramid & Subang Jaya'},
+  {lat:3.0449,lng:101.6212,radiusKm:3,name:'Puchong IOI Zone'},
+  {lat:3.0707,lng:101.5204,radiusKm:4,name:'Shah Alam City Centre'},
+  {lat:3.0442,lng:101.4456,radiusKm:4,name:'Klang City Centre'}
 ];
 
 /* =========================================================
@@ -1171,7 +848,6 @@ const roundMoney = value =>
   Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
 let settings = loadSettings();
-let history = loadHistory();
 
 let map = null;
 let platform = null;
@@ -1180,15 +856,12 @@ let ui = null;
 
 let pickupCoords = null;
 let dropoffCoords = null;
-let viaCoords = null;
 
 let pickupItem = null;
 let dropoffItem = null;
-let viaItem = null;
 
 let pickupMarker = null;
 let dropoffMarker = null;
-let viaMarker = null;
 
 let routePolylines = [];
 
@@ -1202,53 +875,13 @@ let latestCalculation = null;
 let gpsAccuracy = null;
 
 let autocompleteState = {
-  pickup:{
-    controller:null,
-    sequence:0,
-    timer:null
-  },
-  dropoff:{
-    controller:null,
-    sequence:0,
-    timer:null
-  },
-  via:{
-    controller:null,
-    sequence:0,
-    timer:null
-  }
+  pickup:{controller:null,sequence:0,timer:null},
+  dropoff:{controller:null,sequence:0,timer:null}
 };
 
 /* =========================================================
-   3. STORAGE AND SETTINGS VALIDATION
+   3. SETTINGS STORAGE & VALIDATION
 ========================================================= */
-
-function sanitizeCorridors(list) {
-  if (!Array.isArray(list)) return DEFAULT_CALIBRATED_CORRIDORS.map(c => ({...c}));
-
-  return list
-    .filter(c =>
-      c &&
-      typeof c === 'object' &&
-      c.from && Number.isFinite(Number(c.from.lat)) && Number.isFinite(Number(c.from.lng)) &&
-      c.to && Number.isFinite(Number(c.to.lat)) && Number.isFinite(Number(c.to.lng)) &&
-      Number.isFinite(Number(c.tollTngClass1)) && Number(c.tollTngClass1) >= 0
-    )
-    .map(c => ({
-      name:String(c.name || 'Custom Class 1 TnG Corridor'),
-      from:{
-        lat:Number(c.from.lat),
-        lng:Number(c.from.lng),
-        radiusKm:Math.max(0.5,Number(c.from.radiusKm || 5))
-      },
-      to:{
-        lat:Number(c.to.lat),
-        lng:Number(c.to.lng),
-        radiusKm:Math.max(0.5,Number(c.to.radiusKm || 5))
-      },
-      tollTngClass1:roundMoney(Number(c.tollTngClass1))
-    }));
-}
 
 function isValidSettingObject(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -1268,165 +901,56 @@ function isValidSettingObject(value) {
   ];
 
   for (const key of numericKeys) {
-    if (
-      !Number.isFinite(Number(value[key])) ||
-      Number(value[key]) < 0
-    ) {
+    if (!Number.isFinite(Number(value[key])) || Number(value[key]) < 0) {
       return false;
     }
   }
 
-  if (
-    Number(value.longHaulPercent) > 100 ||
-    Number(value.adminPercent) > 100
-  ) {
+  if (Number(value.longHaulPercent) > 100 || Number(value.adminPercent) > 100) {
     return false;
   }
 
-  return [1,0.5,0.1,0.01].includes(
-    Number(value.roundingUnit)
-  );
+  return [1,0.5,0.1,0.01].includes(Number(value.roundingUnit));
 }
 
 function sanitizeSettings(saved) {
-  const merged = {
-    ...DEFAULT_SETTINGS,
-    ...saved
-  };
-
-  const numericKeys = [
-    'ratePerKm',
-    'minimumFare',
-    'urbanSurcharge',
-    'hillSurcharge',
-    'longHaulTriggerKm',
-    'longHaulPercent',
-    'longHaulCap',
-    'adminPercent',
-    'adminMinimum',
-    'roundingUnit'
-  ];
-
-  numericKeys.forEach(key => {
-    if (
-      !Number.isFinite(Number(merged[key])) ||
-      Number(merged[key]) < 0
-    ) {
+  const merged = {...DEFAULT_SETTINGS,...saved};
+  Object.keys(DEFAULT_SETTINGS).forEach(key => {
+    if (!Number.isFinite(Number(merged[key])) || Number(merged[key]) < 0) {
       merged[key] = DEFAULT_SETTINGS[key];
     } else {
       merged[key] = Number(merged[key]);
     }
   });
 
-  if (merged.longHaulPercent > 100) {
-    merged.longHaulPercent = DEFAULT_SETTINGS.longHaulPercent;
-  }
-
-  if (merged.adminPercent > 100) {
-    merged.adminPercent = DEFAULT_SETTINGS.adminPercent;
-  }
-
-  if (![1,0.5,0.1,0.01].includes(merged.roundingUnit)) {
-    merged.roundingUnit = DEFAULT_SETTINGS.roundingUnit;
-  }
-
-  merged.useCorridorCalibration = Boolean(merged.useCorridorCalibration);
-  merged.calibratedCorridors = sanitizeCorridors(merged.calibratedCorridors);
+  if (merged.longHaulPercent > 100) merged.longHaulPercent = DEFAULT_SETTINGS.longHaulPercent;
+  if (merged.adminPercent > 100) merged.adminPercent = DEFAULT_SETTINGS.adminPercent;
+  if (![1,0.5,0.1,0.01].includes(merged.roundingUnit)) merged.roundingUnit = DEFAULT_SETTINGS.roundingUnit;
 
   return merged;
 }
 
 function loadSettings() {
   try {
-    let raw = localStorage.getItem(SETTINGS_KEY);
-
+    const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-
       if (isValidSettingObject(parsed)) {
         return sanitizeSettings(parsed);
-      }
-
-      console.warn('Invalid saved settings. Restoring defaults.');
-      return sanitizeSettings(DEFAULT_SETTINGS);
-    }
-
-    for (const key of LEGACY_SETTINGS_KEYS) {
-      raw = localStorage.getItem(key);
-
-      if (raw) {
-        const parsed = JSON.parse(raw);
-
-        if (parsed && typeof parsed === 'object') {
-          const migrated = {
-            ...DEFAULT_SETTINGS,
-            ...parsed,
-            adminPercent:parsed.adminPercent ?? 15,
-            adminMinimum:parsed.adminMinimum ?? 1.50
-          };
-
-          return sanitizeSettings(migrated);
-        }
       }
     }
   } catch (error) {
     console.warn('Settings could not be loaded:',error);
   }
-
-  return sanitizeSettings(DEFAULT_SETTINGS);
-}
-
-function loadHistory() {
-  try {
-    let raw = localStorage.getItem(HISTORY_KEY);
-
-    if (!raw) {
-      for (const key of LEGACY_HISTORY_KEYS) {
-        raw = localStorage.getItem(key);
-        if (raw) break;
-      }
-    }
-
-    const data = JSON.parse(raw || '[]');
-
-    if (!Array.isArray(data)) return [];
-
-    return data
-      .filter(item =>
-        item &&
-        typeof item === 'object' &&
-        Number.isFinite(Number(item.customerTotal))
-      )
-      .slice(0,MAX_HISTORY);
-
-  } catch (error) {
-    console.warn('History could not be loaded:',error);
-    return [];
-  }
+  return {...DEFAULT_SETTINGS};
 }
 
 function persistSettings() {
   try {
-    localStorage.setItem(
-      SETTINGS_KEY,
-      JSON.stringify(settings)
-    );
+    localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings));
     return true;
   } catch (error) {
     showError('Unable to save settings. Browser storage may be unavailable.');
-    return false;
-  }
-}
-
-function persistHistory() {
-  try {
-    localStorage.setItem(
-      HISTORY_KEY,
-      JSON.stringify(history)
-    );
-    return true;
-  } catch (error) {
-    showError('Unable to save trip history. Device storage may be full.');
     return false;
   }
 }
@@ -1448,49 +972,19 @@ function readSettingsForm() {
 
   for (const [key,id] of Object.entries(fields)) {
     const raw = $(id).value.trim();
-
-    if (raw === '') {
-      throw new Error(`Please complete the ${key} field.`);
-    }
-
+    if (raw === '') throw new Error(`Please complete the ${key} field.`);
     const value = Number(raw);
-
-    if (!Number.isFinite(value) || value < 0) {
-      throw new Error(`Invalid non-negative value for ${key}.`);
-    }
-
+    if (!Number.isFinite(value) || value < 0) throw new Error(`Invalid non-negative value for ${key}.`);
     next[key] = value;
   }
 
-  if (
-    next.longHaulPercent > 100 ||
-    next.adminPercent > 100
-  ) {
+  if (next.longHaulPercent > 100 || next.adminPercent > 100) {
     throw new Error('Percentage values cannot exceed 100%.');
   }
 
   next.roundingUnit = Number($('setting-rounding').value);
-
   if (![1,0.5,0.1,0.01].includes(next.roundingUnit)) {
     throw new Error('Invalid rounding selection.');
-  }
-
-  next.useCorridorCalibration = $('setting-use-calibration').value === 'true';
-
-  const corridorRaw = $('setting-corridors').value.trim();
-  if (!corridorRaw) {
-    next.calibratedCorridors = [];
-  } else {
-    let parsedCorridors;
-    try {
-      parsedCorridors = JSON.parse(corridorRaw);
-    } catch (_) {
-      throw new Error('Custom Corridor Overrides must be valid JSON array.');
-    }
-    if (!Array.isArray(parsedCorridors)) {
-      throw new Error('Custom Corridor Overrides must be a JSON array.');
-    }
-    next.calibratedCorridors = sanitizeCorridors(parsedCorridors);
   }
 
   return next;
@@ -1501,27 +995,12 @@ function populateSettingsForm() {
   $('setting-minimum').value = settings.minimumFare;
   $('setting-urban').value = settings.urbanSurcharge;
   $('setting-hill').value = settings.hillSurcharge;
-
   $('setting-longhaul-km').value = settings.longHaulTriggerKm;
   $('setting-longhaul-percent').value = settings.longHaulPercent;
   $('setting-longhaul-cap').value = settings.longHaulCap;
-
   $('setting-admin-percent').value = settings.adminPercent;
   $('setting-admin-min').value = settings.adminMinimum;
-
   $('setting-rounding').value = String(settings.roundingUnit);
-  $('setting-use-calibration').value = String(Boolean(settings.useCorridorCalibration));
-  $('setting-corridors').value = JSON.stringify(settings.calibratedCorridors,null,2);
-
-  updateCalibrationBadge();
-}
-
-function updateCalibrationBadge() {
-  const badge = $('calibration-badge');
-  if (!badge) return;
-  badge.textContent = settings.useCorridorCalibration
-    ? `Calibrated Fallback: ON (${settings.calibratedCorridors.length})`
-    : 'Calibrated Fallback: OFF';
 }
 
 /* =========================================================
@@ -1556,127 +1035,57 @@ function isApiKeyConfigured() {
 }
 
 /* =========================================================
-   5. DISTANCE, ZONE & CORRIDOR DETECTION
+   5. DISTANCE AND ZONE DETECTION
 ========================================================= */
 
 function calculateHaversineDistance(lat1,lon1,lat2,lon2) {
   const R = 6371;
-
   const dLat = (lat2-lat1)*Math.PI/180;
   const dLon = (lon2-lon1)*Math.PI/180;
-
   const a =
     Math.sin(dLat/2)**2 +
     Math.cos(lat1*Math.PI/180) *
     Math.cos(lat2*Math.PI/180) *
     Math.sin(dLon/2)**2;
-
-  return R*2*Math.atan2(
-    Math.sqrt(a),
-    Math.sqrt(1-a)
-  );
-}
-
-function matchCalibratedCorridor(pickup,dropoff) {
-  if (!settings.useCorridorCalibration || !pickup || !dropoff) return null;
-
-  for (const corridor of settings.calibratedCorridors) {
-    const forwardMatch =
-      calculateHaversineDistance(pickup.lat,pickup.lng,corridor.from.lat,corridor.from.lng) <= corridor.from.radiusKm &&
-      calculateHaversineDistance(dropoff.lat,dropoff.lng,corridor.to.lat,corridor.to.lng) <= corridor.to.radiusKm;
-
-    const reverseMatch =
-      calculateHaversineDistance(pickup.lat,pickup.lng,corridor.to.lat,corridor.to.lng) <= corridor.to.radiusKm &&
-      calculateHaversineDistance(dropoff.lat,dropoff.lng,corridor.from.lat,corridor.from.lng) <= corridor.from.radiusKm;
-
-    if (forwardMatch || reverseMatch) {
-      return corridor;
-    }
-  }
-
-  return null;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
 function getHighlandZone(pickup,dropoff) {
   const points = [pickup,dropoff].filter(Boolean);
-
   for (const point of points) {
     for (const zone of HIGHLAND_ZONES) {
-      const distance = calculateHaversineDistance(
-        point.lat,
-        point.lng,
-        zone.lat,
-        zone.lng
-      );
-
-      if (distance <= zone.radiusKm) {
+      if (calculateHaversineDistance(point.lat,point.lng,zone.lat,zone.lng) <= zone.radiusKm) {
         return zone;
       }
     }
   }
-
   return null;
 }
 
 function getUrbanZone(pickup,dropoff) {
   const points = [pickup,dropoff].filter(Boolean);
-
   for (const point of points) {
     for (const zone of URBAN_POI_ZONES) {
-      const distance = calculateHaversineDistance(
-        point.lat,
-        point.lng,
-        zone.lat,
-        zone.lng
-      );
-
-      if (distance <= zone.radiusKm) {
+      if (calculateHaversineDistance(point.lat,point.lng,zone.lat,zone.lng) <= zone.radiusKm) {
         return zone;
       }
     }
   }
-
   return null;
 }
 
 function isRelevantPoi(item) {
   if (!item) return false;
-
-  const categories = Array.isArray(item.categories)
-    ? item.categories
-    : [];
-
-  const text = categories
-    .map(category =>
-      `${category.name || ''} ${category.id || ''}`
-    )
-    .join(' ')
-    .toLowerCase();
-
+  const categories = Array.isArray(item.categories) ? item.categories : [];
+  const text = categories.map(c => `${c.name || ''} ${c.id || ''}`).join(' ').toLowerCase();
   return /airport|shopping.?mall|shopping.?centre|shopping.?center|railway.?station|train.?station|bus.?station|convention.?centre|convention.?center|stadium|terminal/.test(text);
 }
 
 function getUrbanAssessment(pickup,dropoff,itemP,itemD) {
   const zone = getUrbanZone(pickup,dropoff);
-
-  if (zone) {
-    return {
-      applies:true,
-      label:`Urban zone: ${zone.name}`
-    };
-  }
-
-  if (isRelevantPoi(itemP) || isRelevantPoi(itemD)) {
-    return {
-      applies:true,
-      label:'Major transport / destination POI'
-    };
-  }
-
-  return {
-    applies:false,
-    label:''
-  };
+  if (zone) return {applies:true,label:`Urban zone: ${zone.name}`};
+  if (isRelevantPoi(itemP) || isRelevantPoi(itemD)) return {applies:true,label:'Major transport / destination POI'};
+  return {applies:false,label:''};
 }
 
 /* =========================================================
@@ -1685,88 +1094,51 @@ function getUrbanAssessment(pickup,dropoff,itemP,itemD) {
 
 function clearRouteObjects() {
   if (!map) return;
-
   routePolylines.forEach(line => {
-    try {
-      map.removeObject(line);
-    } catch (_) {}
+    try { map.removeObject(line); } catch (_) {}
   });
-
   routePolylines = [];
 }
 
 function clearMarker(type) {
   if (!map) return;
-
   if (type === 'pickup' && pickupMarker) {
     map.removeObject(pickupMarker);
     pickupMarker = null;
   }
-
   if (type === 'dropoff' && dropoffMarker) {
     map.removeObject(dropoffMarker);
     dropoffMarker = null;
-  }
-
-  if (type === 'via' && viaMarker) {
-    map.removeObject(viaMarker);
-    viaMarker = null;
   }
 }
 
 function updateMarker(type,coords) {
   if (!map) return;
-
   clearMarker(type);
 
-  const colorMap = {
-    pickup:'#2e7d32',
-    dropoff:'#c62828',
-    via:'#6a1b9a'
-  };
+  const svg = type === 'pickup'
+    ? '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42"><path fill="#2e7d32" stroke="white" stroke-width="2" d="M16 1C7.7 1 1 7.7 1 16c0 11 15 25 15 25s15-14 15-25C31 7.7 24.3 1 16 1z"/><circle cx="16" cy="16" r="6" fill="white"/></svg>'
+    : '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42"><path fill="#c62828" stroke="white" stroke-width="2" d="M16 1C7.7 1 1 7.7 1 16c0 11 15 25 15 25s15-14 15-25C31 7.7 24.3 1 16 1z"/><circle cx="16" cy="16" r="6" fill="white"/></svg>';
 
-  const fill = colorMap[type] || '#2e7d32';
-
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42"><path fill="${fill}" stroke="white" stroke-width="2" d="M16 1C7.7 1 1 7.7 1 16c0 11 15 25 15 25s15-14 15-25C31 7.7 24.3 1 16 1z"/><circle cx="16" cy="16" r="6" fill="white"/></svg>`;
-
-  const icon = new H.map.Icon(
-    'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
-  );
-
-  const marker = new H.map.Marker(
-    {lat:coords.lat,lng:coords.lng},
-    {icon}
-  );
-
+  const icon = new H.map.Icon('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg));
+  const marker = new H.map.Marker({lat:coords.lat,lng:coords.lng},{icon});
   map.addObject(marker);
 
-  if (type === 'pickup') {
-    pickupMarker = marker;
-  } else if (type === 'dropoff') {
-    dropoffMarker = marker;
-  } else if (type === 'via') {
-    viaMarker = marker;
-  }
+  if (type === 'pickup') pickupMarker = marker;
+  else dropoffMarker = marker;
 }
 
 function invalidateRoute(clearResults=true) {
   routeRequestId++;
-
   if (routeDebounce) {
     clearTimeout(routeDebounce);
     routeDebounce = null;
   }
-
   setLoading(false);
-
   if (clearResults) {
     clearRouteObjects();
-
     $('result-card').style.display = 'none';
-    $('manual-toll').classList.remove('needs-attention');
-
     latestCalculation = null;
-
     setRouteStatus('');
   }
 }
@@ -1774,19 +1146,7 @@ function invalidateRoute(clearResults=true) {
 function updateInputClearButton(type) {
   const input = $(type);
   const button = $(`clear-${type}`);
-
-  button.style.display =
-    input.value.trim() ? 'block' : 'none';
-}
-
-function updateViaSummaryUI() {
-  const label = $('via-summary-label');
-  const text = $('via').value.trim();
-  if (viaCoords && text) {
-    label.textContent = `📍 Via Anchor: ${text.slice(0,36)}${text.length > 36 ? '…' : ''}`;
-  } else {
-    label.textContent = '📍 Highway / Interchange Anchor: None';
-  }
+  button.style.display = input.value.trim() ? 'block' : 'none';
 }
 
 /* =========================================================
@@ -1795,49 +1155,28 @@ function updateViaSummaryUI() {
 
 function setSelectedLocation(type,item) {
   const coords = item && item.position;
-
-  if (
-    !coords ||
-    !Number.isFinite(coords.lat) ||
-    !Number.isFinite(coords.lng)
-  ) {
+  if (!coords || !Number.isFinite(coords.lat) || !Number.isFinite(coords.lng)) {
     showError('The selected location has invalid coordinates.');
     return;
   }
 
   invalidateRoute(true);
 
-  const point = {
-    lat:coords.lat,
-    lng:coords.lng
-  };
-
+  const point = {lat:coords.lat,lng:coords.lng};
   if (type === 'pickup') {
     pickupCoords = point;
     pickupItem = item;
-  } else if (type === 'dropoff') {
+  } else {
     dropoffCoords = point;
     dropoffItem = item;
-  } else if (type === 'via') {
-    viaCoords = point;
-    viaItem = item;
   }
 
-  $(type).value =
-    (item.address && item.address.label) ||
-    item.title ||
-    '';
-
+  $(type).value = (item.address && item.address.label) || item.title || '';
   $(`${type}-suggestions`).style.display = 'none';
   $(`${type}-suggestions`).innerHTML = '';
 
   updateInputClearButton(type);
   updateMarker(type,point);
-
-  if (type === 'via') {
-    updateViaSummaryUI();
-  }
-
   clearError();
 
   if (pickupCoords && dropoffCoords) {
@@ -1847,29 +1186,18 @@ function setSelectedLocation(type,item) {
 
 function clearLocation(type) {
   invalidateRoute(true);
-
   if (type === 'pickup') {
     pickupCoords = null;
     pickupItem = null;
     $('pickup').value = '';
-  } else if (type === 'dropoff') {
+  } else {
     dropoffCoords = null;
     dropoffItem = null;
     $('dropoff').value = '';
-  } else if (type === 'via') {
-    viaCoords = null;
-    viaItem = null;
-    $('via').value = '';
-    updateViaSummaryUI();
   }
-
   updateInputClearButton(type);
   clearMarker(type);
   clearError();
-
-  if (type === 'via' && pickupCoords && dropoffCoords) {
-    calculateRoute();
-  }
 }
 
 /* =========================================================
@@ -1879,16 +1207,10 @@ function clearLocation(type) {
 function getSearchCenter() {
   if (map) {
     const center = map.getCenter();
-
-    if (
-      center &&
-      Number.isFinite(center.lat) &&
-      Number.isFinite(center.lng)
-    ) {
+    if (center && Number.isFinite(center.lat) && Number.isFinite(center.lng)) {
       return `${center.lat},${center.lng}`;
     }
   }
-
   return '3.1390,101.6869';
 }
 
@@ -1899,22 +1221,16 @@ function setupAutocomplete(type) {
 
   input.addEventListener('input',() => {
     const query = input.value.trim();
-
     updateInputClearButton(type);
 
     if (type === 'pickup') {
       pickupCoords = null;
       pickupItem = null;
       clearMarker('pickup');
-    } else if (type === 'dropoff') {
+    } else {
       dropoffCoords = null;
       dropoffItem = null;
       clearMarker('dropoff');
-    } else if (type === 'via') {
-      viaCoords = null;
-      viaItem = null;
-      clearMarker('via');
-      updateViaSummaryUI();
     }
 
     invalidateRoute(true);
@@ -1924,14 +1240,12 @@ function setupAutocomplete(type) {
       clearTimeout(state.timer);
       state.timer = null;
     }
-
     if (state.controller) {
       state.controller.abort();
       state.controller = null;
     }
 
     state.sequence++;
-
     const sequence = state.sequence;
 
     box.innerHTML = '';
@@ -1946,7 +1260,6 @@ function setupAutocomplete(type) {
       }
 
       state.controller = new AbortController();
-
       const params = new URLSearchParams({
         q:query,
         at:getSearchCenter(),
@@ -1965,29 +1278,18 @@ function setupAutocomplete(type) {
         if (response.status === 429) {
           throw new Error('Location search limit reached. Please wait and try again.');
         }
-
         if (!response.ok) {
           throw new Error(`Location search failed (HTTP ${response.status}).`);
         }
 
         const data = await response.json();
-
-        if (
-          sequence !== state.sequence ||
-          input.value.trim() !== query
-        ) {
-          return;
-        }
+        if (sequence !== state.sequence || input.value.trim() !== query) return;
 
         const items = (data.items || []).filter(item =>
           item.position &&
           Number.isFinite(item.position.lat) &&
           Number.isFinite(item.position.lng) &&
-          (
-            !item.address ||
-            !item.address.countryCode ||
-            item.address.countryCode === 'MYS'
-          )
+          (!item.address || !item.address.countryCode || item.address.countryCode === 'MYS')
         );
 
         if (!items.length) {
@@ -2001,20 +1303,12 @@ function setupAutocomplete(type) {
 
         items.slice(0,8).forEach(item => {
           const div = document.createElement('div');
-
           div.className = 'suggestion-item';
-          div.textContent =
-            (item.address && item.address.label) ||
-            item.title ||
-            'Unnamed location';
-
+          div.textContent = (item.address && item.address.label) || item.title || 'Unnamed location';
           div.setAttribute('role','option');
           div.tabIndex = 0;
 
-          div.addEventListener('click',() => {
-            setSelectedLocation(type,item);
-          });
-
+          div.addEventListener('click',() => setSelectedLocation(type,item));
           div.addEventListener('keydown',event => {
             if (event.key === 'Enter') {
               event.preventDefault();
@@ -2026,12 +1320,8 @@ function setupAutocomplete(type) {
         });
 
         box.style.display = 'block';
-
       } catch(error) {
-        if (
-          error.name !== 'AbortError' &&
-          sequence === state.sequence
-        ) {
+        if (error.name !== 'AbortError' && sequence === state.sequence) {
           showError(error.message || 'Location search failed.');
         }
       } finally {
@@ -2039,7 +1329,6 @@ function setupAutocomplete(type) {
           state.controller = null;
         }
       }
-
     },320);
   });
 
@@ -2048,17 +1337,13 @@ function setupAutocomplete(type) {
       state.controller.abort();
       state.controller = null;
     }
-
     if (state.timer) {
       clearTimeout(state.timer);
       state.timer = null;
     }
-
     state.sequence++;
-
     box.innerHTML = '';
     box.style.display = 'none';
-
     clearLocation(type);
   });
 
@@ -2067,21 +1352,16 @@ function setupAutocomplete(type) {
       box.style.display = 'none';
       return;
     }
-
     if (event.key === 'ArrowDown') {
       const first = box.querySelector('.suggestion-item');
-
       if (first) {
         event.preventDefault();
         first.focus();
       }
-
       return;
     }
-
     if (event.key === 'Enter') {
       const first = box.querySelector('.suggestion-item');
-
       if (first) {
         event.preventDefault();
         first.click();
@@ -2101,19 +1381,13 @@ async function reverseGeocode(lat,lng) {
     apiKey:HERE_API_KEY
   });
 
-  const response = await fetch(
-    `https://revgeocode.search.hereapi.com/v1/revgeocode?${params}`
-  );
-
+  const response = await fetch(`https://revgeocode.search.hereapi.com/v1/revgeocode?${params}`);
   if (!response.ok) {
     throw new Error(`Reverse geocoding failed (HTTP ${response.status}).`);
   }
 
   const data = await response.json();
-
-  return data.items && data.items[0]
-    ? data.items[0]
-    : null;
+  return data.items && data.items[0] ? data.items[0] : null;
 }
 
 function requestCurrentLocation() {
@@ -2123,7 +1397,6 @@ function requestCurrentLocation() {
   }
 
   const button = $('current-loc-btn');
-
   button.textContent = '⏳';
   button.disabled = true;
 
@@ -2132,15 +1405,10 @@ function requestCurrentLocation() {
 
   navigator.geolocation.getCurrentPosition(
     async position => {
-      const point = {
-        lat:position.coords.latitude,
-        lng:position.coords.longitude
-      };
-
+      const point = {lat:position.coords.latitude,lng:position.coords.longitude};
       gpsAccuracy = position.coords.accuracy;
 
       let item = null;
-
       if (isApiKeyConfigured()) {
         try {
           item = await reverseGeocode(point.lat,point.lng);
@@ -2180,7 +1448,6 @@ function requestCurrentLocation() {
       button.textContent = '🎯';
       button.disabled = false;
     },
-
     error => {
       button.textContent = '🎯';
       button.disabled = false;
@@ -2191,23 +1458,15 @@ function requestCurrentLocation() {
         3:'Location request timed out. Try moving near a window or check device GPS.'
       };
 
-      showError(
-        messages[error.code] ||
-        'Unable to retrieve current location.'
-      );
+      showError(messages[error.code] || 'Unable to retrieve current location.');
       setRouteStatus('');
     },
-
-    {
-      enableHighAccuracy:true,
-      timeout:12000,
-      maximumAge:30000
-    }
+    {enableHighAccuracy:true,timeout:12000,maximumAge:30000}
   );
 }
 
 /* =========================================================
-   10. ROUTING CONTROLS
+   10. ROUTING & HERE TOLL CONTROLS
 ========================================================= */
 
 function swapLocations() {
@@ -2219,11 +1478,8 @@ function swapLocations() {
   $('pickup').value = dText;
   $('dropoff').value = pText;
 
-  [pickupCoords,dropoffCoords] =
-    [dropoffCoords,pickupCoords];
-
-  [pickupItem,dropoffItem] =
-    [dropoffItem,pickupItem];
+  [pickupCoords,dropoffCoords] = [dropoffCoords,pickupCoords];
+  [pickupItem,dropoffItem] = [dropoffItem,pickupItem];
 
   updateInputClearButton('pickup');
   updateInputClearButton('dropoff');
@@ -2231,13 +1487,8 @@ function swapLocations() {
   clearMarker('pickup');
   clearMarker('dropoff');
 
-  if (pickupCoords) {
-    updateMarker('pickup',pickupCoords);
-  }
-
-  if (dropoffCoords) {
-    updateMarker('dropoff',dropoffCoords);
-  }
+  if (pickupCoords) updateMarker('pickup',pickupCoords);
+  if (dropoffCoords) updateMarker('dropoff',dropoffCoords);
 
   if (pickupCoords && dropoffCoords) {
     calculateRoute();
@@ -2246,18 +1497,11 @@ function swapLocations() {
 
 function setRoutingMode(mode) {
   if (!['fast','short'].includes(mode)) return;
-
   if (activeRoutingMode === mode) return;
 
   activeRoutingMode = mode;
-
-  $('btn-mode-fast').classList.toggle(
-    'active',mode === 'fast'
-  );
-
-  $('btn-mode-short').classList.toggle(
-    'active',mode === 'short'
-  );
+  $('btn-mode-fast').classList.toggle('active',mode === 'fast');
+  $('btn-mode-short').classList.toggle('active',mode === 'short');
 
   if (pickupCoords && dropoffCoords) {
     calculateRoute();
@@ -2266,13 +1510,8 @@ function setRoutingMode(mode) {
 
 function toggleAvoidTolls() {
   avoidTolls = !avoidTolls;
-
-  $('btn-avoid-tolls').classList.toggle(
-    'active',avoidTolls
-  );
-
-  $('btn-avoid-tolls').textContent =
-    `🛑 Avoid Tolls: ${avoidTolls ? 'ON' : 'OFF'}`;
+  $('btn-avoid-tolls').classList.toggle('active',avoidTolls);
+  $('btn-avoid-tolls').textContent = `🛑 Avoid Tolls: ${avoidTolls ? 'ON' : 'OFF'}`;
 
   if (pickupCoords && dropoffCoords) {
     calculateRoute();
@@ -2280,512 +1519,217 @@ function toggleAvoidTolls() {
 }
 
 /* =========================================================
-   11. STRUCTURAL & ROUTING-VALIDATED TOLL ENGINE (v2.8)
+   11. FRESH HERE ROUTING API v8 TOLL ENGINE
 ========================================================= */
 
-function extractSectionPoints(section) {
-  if (!section || !section.polyline || !window.H || !H.geo || !H.geo.LineString) {
-    return [];
-  }
+function getHereTollSystemMap(route) {
+  const systemMap = new Map();
+  const sysCollections = [
+    route && route.tollSystems,
+    route && route.tollCollectionSystems
+  ];
 
-  try {
-    const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
-    const latLngAlt = lineString.getLatLngAltArray();
-    const pts = [];
-    for (let i = 0; i + 1 < latLngAlt.length; i += 3) {
-      const lat = Number(latLngAlt[i]);
-      const lng = Number(latLngAlt[i + 1]);
-      if (Number.isFinite(lat) && Number.isFinite(lng)) {
-        pts.push({ lat, lng });
+  sysCollections.forEach(col => {
+    if (!Array.isArray(col)) return;
+    col.forEach(sys => {
+      if (!sys || typeof sys !== 'object') return;
+      const key = String(sys.id || sys.code || sys.name || '');
+      if (key) {
+        systemMap.set(key,sys);
       }
-    }
-    return pts;
-  } catch (_) {
-    return [];
-  }
+    });
+  });
+
+  return systemMap;
 }
 
-function minDistanceToPolylineKm(point,polyPts) {
-  if (!point || !Array.isArray(polyPts) || !polyPts.length) {
-    return null;
-  }
+function matchesPaymentPreference(fare,pref) {
+  if (!pref || pref === 'any') return true;
+  const methods = Array.isArray(fare.paymentMethods)
+    ? fare.paymentMethods.map(m => String(m).toLowerCase())
+    : [];
+  const text = `${fare.name || ''} ${fare.description || ''} ${methods.join(' ')}`.toLowerCase();
 
-  let minDist = Infinity;
-  // Sample points efficiently for fast mobile execution
-  const step = polyPts.length > 600 ? Math.floor(polyPts.length / 600) : 1;
-  for (let i = 0; i < polyPts.length; i += step) {
-    const d = calculateHaversineDistance(
-      point.lat,
-      point.lng,
-      polyPts[i].lat,
-      polyPts[i].lng
+  if (pref === 'electronic') {
+    return (
+      methods.some(m => /electronic|transponder|card|tag|rfid|tng|pass|account|mobile/.test(m)) ||
+      /electronic|transponder|card|tag|rfid|touch.?n.?go|tng|smart.?tag/.test(text)
     );
-    if (d < minDist) {
-      minDist = d;
-    }
   }
-  return Number.isFinite(minDist) ? minDist : null;
+
+  if (pref === 'cash') {
+    return methods.includes('cash') || /\bcash\b/.test(text);
+  }
+
+  return true;
 }
 
-function hasBlockedOrClosedRoadAction(section) {
-  const actions = Array.isArray(section && section.actions) ? section.actions : [];
-  for (const act of actions) {
-    const text = [
-      act.action,
-      act.instruction,
-      ...(Array.isArray(act.roadAttributes) ? act.roadAttributes : [])
-    ]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase();
+function selectFareFromToll(toll,paymentPref) {
+  const fares = Array.isArray(toll.fares) ? toll.fares : [];
+  if (!fares.length) return null;
 
-    if (/\b(closed|blocked|closure|not.?drivable|impassable)\b/.test(text)) {
-      return true;
-    }
-  }
-  return false;
-}
+  const myrFares = fares.filter(f => {
+    const price = f && (f.price || f);
+    const val = Number(price && price.value);
+    const curr = String((price && price.currency) || f.currency || 'MYR').toUpperCase();
+    return Number.isFinite(val) && val >= 0 && curr === 'MYR';
+  });
 
-function readTollAmount(entry) {
-  if (!entry || typeof entry !== 'object') return null;
+  if (!myrFares.length) return null;
 
-  const price = entry.price || entry;
-  const value = Number(price.value);
+  const prefFiltered = myrFares.filter(f => matchesPaymentPreference(f,paymentPref));
+  const pool = prefFiltered.length ? prefFiltered : myrFares;
 
-  if (!Number.isFinite(value) || value < 0) return null;
+  // Prefer explicit passenger/car vehicle tariffs if multiple vehicle classes are listed
+  const carPool = pool.filter(f => {
+    const desc = `${f.name || ''} ${f.vehicleType || ''} ${f.category || ''} ${f.description || ''}`.toLowerCase();
+    return /\b(car|passenger|class\s*1|auto|private)\b/.test(desc) && !/\b(truck|lorry|bus|trailer|motorcycle)\b/.test(desc);
+  });
 
-  const currency = String(
-    price.currency || entry.currency || 'MYR'
-  ).toUpperCase();
-
-  if (currency !== 'MYR') {
-    return { valid:false, unsupportedCurrency:true };
-  }
-
-  return { valid:true, amount:roundMoney(value) };
-}
-
-function getFareDescriptor(fare) {
-  return [
-    fare.name,
-    fare.category,
-    fare.vehicleType,
-    fare.description,
-    ...(Array.isArray(fare.paymentMethods) ? fare.paymentMethods : [])
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-}
-
-function isExcludedVehicleFare(fare) {
-  const descriptor = getFareDescriptor(fare);
-
-  return /\b(taxi|bus|lorry|truck|trailer|heavy|commercial|motorcycle|class\s*[02345])\b/.test(
-    descriptor
-  );
-}
-
-function isExplicitClass1Fare(fare) {
-  const descriptor = [
-    fare.name,
-    fare.category,
-    fare.vehicleType,
-    fare.description
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-
-  return /\b(class\s*1|car|passenger|private|auto|2\s*axles?\s*3\s*or\s*4)\b/.test(
-    descriptor
-  );
-}
-
-function isTngCardPaymentFare(fare) {
-  const methods = Array.isArray(fare.paymentMethods)
-    ? fare.paymentMethods.map(m => String(m).toLowerCase())
-    : [];
-
-  const descriptor = getFareDescriptor(fare);
-
-  return (
-    methods.some(m =>
-      /^(transponder|electronic|card|bankcard|creditcard|debitcard|tng|rfid|smarttag)$/.test(m)
-    ) ||
-    /\b(touch\s*['’]?\s*n\s*go|tng|electronic|transponder|smart\s*tag|rfid|card)\b/.test(
-      descriptor
-    )
-  );
-}
-
-function isCashOnlyFare(fare) {
-  const methods = Array.isArray(fare.paymentMethods)
-    ? fare.paymentMethods.map(m => String(m).toLowerCase())
-    : [];
-
-  if (!methods.length) {
-    return /\bcash\s*only\b/i.test(getFareDescriptor(fare));
-  }
-
-  return methods.every(m => m === 'cash') && !isTngCardPaymentFare(fare);
-}
-
-function validateTollPointStructure(toll,section,polyPts) {
-  if (!toll || typeof toll !== 'object') {
-    return { active:false, reason:'Malformed toll object' };
-  }
-
-  // 1. Check defunct, abandoned, closed, or non-standard status markers in toll/system metadata
-  const metaText = [
-    toll.id,
-    toll.tollId,
-    toll.name,
-    toll.status,
-    toll.state,
-    toll.type,
-    toll.category,
-    toll.tollSystem && toll.tollSystem.id,
-    toll.tollSystem && toll.tollSystem.name
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-
-  if (/\b(abandoned|defunct|closed|inactive|decommissioned|out.?of.?service|demolished|disused|dummy|placeholder|test)\b/.test(metaText)) {
-    return { active:false, reason:'Defunct/abandoned/inactive toll marker' };
-  }
-
-  // 2. Check valid toll system / booth identifier
-  const systemId = String(
-    (toll.tollSystem && (toll.tollSystem.id || toll.tollSystem.name)) ||
-    toll.tollSystemId ||
-    ''
-  ).trim();
-
-  const boothId = String(
-    toll.id || toll.tollId || ''
-  ).trim();
-
-  const hasValidSystemOrBoothId =
-    (systemId.length > 0 && !/^(unknown|null|undefined|none|0)$/i.test(systemId)) ||
-    (boothId.length > 0 && !/^(unknown|null|undefined|none|0)$/i.test(boothId));
-
-  if (!hasValidSystemOrBoothId) {
-    return { active:false, reason:'Missing valid toll system/booth ID' };
-  }
-
-  // 3. Check section road-link traversal integrity & drivable road attributes
-  const sectionLength = Number(section && section.summary && section.summary.length || 0);
-  if (!(sectionLength > 0)) {
-    return { active:false, reason:'Section has zero/invalid traversed length' };
-  }
-
-  if (hasBlockedOrClosedRoadAction(section)) {
-    return { active:false, reason:'Road closure/non-drivable action on section' };
-  }
-
-  // 4. Verify toll point coordinate attachment against traversed route link geometry when available
-  const point = toll.position || toll.location || toll.coordinates || null;
-  if (point && Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lng))) {
-    const coords = { lat:Number(point.lat), lng:Number(point.lng) };
-    const snapDistKm = minDistanceToPolylineKm(coords,polyPts);
-    if (snapDistKm !== null && snapDistKm > MAX_TOLL_LINK_SNAP_KM) {
-      return {
-        active:false,
-        reason:`Toll point ${snapDistKm.toFixed(2)}km off traversed road link`
-      };
-    }
-  }
+  const chosen = (carPool.length ? carPool : pool)[0];
+  const priceObj = chosen.price || chosen;
 
   return {
-    active:true,
-    systemId:systemId || boothId,
-    boothId
+    amount:roundMoney(Number(priceObj.value)),
+    currency:'MYR',
+    fareId:chosen.id ? String(chosen.id) : '',
+    fareName:chosen.name || chosen.description || '',
+    paymentMethods:Array.isArray(chosen.paymentMethods) ? chosen.paymentMethods : [],
+    matchedPreference:prefFiltered.length > 0
   };
 }
 
-function resolvePlazaFares(fares) {
-  const validFares = [];
-  let unsupportedCurrency = false;
+function calculateHereTolls(route,paymentPref='any') {
+  const sections = Array.isArray(route && route.sections) ? route.sections : [];
+  const tollSystems = getHereTollSystemMap(route);
 
-  fares.forEach(fare => {
-    const parsed = readTollAmount(fare);
-    if (!parsed) return;
-    if (parsed.unsupportedCurrency) {
-      unsupportedCurrency = true;
-      return;
-    }
-    if (parsed.valid) {
-      validFares.push({ raw:fare, amount:parsed.amount });
-    }
-  });
-
-  if (!validFares.length) {
-    return { resolved:false, unsupportedCurrency };
-  }
-
-  const explicitClass1 = validFares.filter(f => isExplicitClass1Fare(f.raw));
-  const class1Pool = explicitClass1.length
-    ? explicitClass1
-    : validFares.filter(f => !isExcludedVehicleFare(f.raw));
-
-  if (!class1Pool.length) {
-    return { resolved:false, unsupportedCurrency };
-  }
-
-  const tngCardPool = class1Pool.filter(f => isTngCardPaymentFare(f.raw));
-  const nonCashPool = class1Pool.filter(f => !isCashOnlyFare(f.raw));
-
-  const finalPool = tngCardPool.length
-    ? tngCardPool
-    : (nonCashPool.length ? nonCashPool : class1Pool);
-
-  const methodTag = tngCardPool.length
-    ? 'Class 1 · TnG/Card'
-    : 'Class 1 · Standard';
-
-  const uniqueAmounts = new Set(
-    finalPool.map(f => f.amount.toFixed(2))
-  );
-
-  if (uniqueAmounts.size === 1) {
-    return {
-      resolved:true,
-      amount:Number([...uniqueAmounts][0]),
-      methodTag,
-      unsupportedCurrency
-    };
-  }
-
-  return { resolved:false, unsupportedCurrency };
-}
-
-function normalizePlazaSignature(plazaName,systemId,tollObj,amount) {
-  const cleanName = String(plazaName || '')
-    .trim()
-    .toLowerCase()
-    .replace(/\b(toll\s*plaza|plaza\s*tol|gantry)\b/g,'')
-    .replace(/\s+/g,' ')
-    .trim();
-
-  const point = tollObj && (tollObj.position || tollObj.location || tollObj.coordinates);
-  const lat = point && Number.isFinite(Number(point.lat)) ? Number(point.lat).toFixed(3) : '';
-  const lng = point && Number.isFinite(Number(point.lng)) ? Number(point.lng).toFixed(3) : '';
-
-  if (lat && lng) {
-    return `geo:${lat},${lng}:${amount.toFixed(2)}`;
-  }
-
-  if (cleanName && systemId) {
-    return `sys:${systemId.toLowerCase()}:${cleanName}:${amount.toFixed(2)}`;
-  }
-
-  if (cleanName) {
-    return `name:${cleanName}:${amount.toFixed(2)}`;
-  }
-
-  return null;
-}
-
-function extractTolls(sections) {
-  let recordsDetected = false;
-  let validAmounts = 0;
-  let unresolvedRecords = 0;
-  let unsupportedCurrency = false;
-  let filteredCount = 0;
-
-  const seenPlazas = new Set();
-  const seenFareIds = new Set();
-  const seenSignatures = new Set();
-  const amountCounts = new Map();
-
-  const candidatePlazas = [];
-  const filteredNotes = [];
-
+  let totalToll = 0;
   let hasItemisedTolls = false;
-  sections.forEach(section => {
-    if (Array.isArray(section.tolls) && section.tolls.length > 0) {
-      hasItemisedTolls = true;
-    }
-  });
+  let hasSummaryTolls = false;
+  let preferenceMatchedCount = 0;
+  let totalResolvedCount = 0;
 
-  sections.forEach((section,sectionIndex) => {
+  const seenFareIds = new Set();
+  const items = [];
+
+  sections.forEach((section,secIdx) => {
     const tolls = Array.isArray(section.tolls) ? section.tolls : [];
-    const costs =
-      section.summary && Array.isArray(section.summary.tollCosts)
-        ? section.summary.tollCosts
-        : [];
+    const summaryCosts = section.summary && Array.isArray(section.summary.tollCosts)
+      ? section.summary.tollCosts
+      : [];
 
     if (tolls.length) {
-      recordsDetected = true;
-      const polyPts = extractSectionPoints(section);
+      hasItemisedTolls = true;
 
-      tolls.forEach((toll,tollIndex) => {
-        const plazaName =
-          toll.name ||
-          (toll.tollSystem && toll.tollSystem.name) ||
-          `Toll Point #${tollIndex + 1}`;
-
-        const structure = validateTollPointStructure(toll,section,polyPts);
-        if (!structure.active) {
-          filteredCount++;
-          filteredNotes.push(`${plazaName}: filtered (${structure.reason})`);
-          return;
-        }
-
-        const fares = Array.isArray(toll.fares) ? toll.fares : [];
-        if (!fares.length) {
-          filteredCount++;
-          filteredNotes.push(`${plazaName}: filtered (no tariff entries)`);
-          return;
-        }
-
-        const unseenFares = fares.filter(f => !f.id || !seenFareIds.has(String(f.id)));
-        if (!unseenFares.length) {
-          filteredCount++;
-          filteredNotes.push(`${plazaName}: filtered (duplicate fare ID)`);
-          return;
-        }
-
-        const identity = String(
-          toll.id || toll.tollId || `${sectionIndex}:${structure.systemId}:${plazaName}`
+      tolls.forEach((toll,tollIdx) => {
+        const sysRefId = String(
+          (toll.tollSystem && (toll.tollSystem.id || toll.tollSystem.name)) ||
+          toll.tollSystemId ||
+          ''
         );
+        const sysInfo = tollSystems.get(sysRefId) || toll.tollSystem || null;
+        const sysName = (sysInfo && (sysInfo.name || sysInfo.id)) || sysRefId || '';
+        const plazaName = toll.name || sysName || `Toll Point ${secIdx + 1}.${tollIdx + 1}`;
 
-        if (seenPlazas.has(identity)) {
-          filteredCount++;
-          filteredNotes.push(`${plazaName}: filtered (duplicate booth record)`);
-          return;
-        }
-        seenPlazas.add(identity);
+        const picked = selectFareFromToll(toll,paymentPref);
+        if (!picked) return;
 
-        unseenFares.forEach(f => {
-          if (f.id) seenFareIds.add(String(f.id));
-        });
-
-        const resolution = resolvePlazaFares(unseenFares);
-        if (resolution.unsupportedCurrency) unsupportedCurrency = true;
-
-        if (!resolution.resolved) {
-          unresolvedRecords++;
-          candidatePlazas.push({
-            label:`${plazaName} [${structure.systemId}] [Class 1 · TnG/Card]: Unverified`,
-            amount:0,
-            isNoise:false
-          });
-          return;
+        // Deduplicate shared closed-system fare IDs across route sections
+        if (picked.fareId) {
+          if (seenFareIds.has(picked.fareId)) return;
+          seenFareIds.add(picked.fareId);
         }
 
-        const sig = normalizePlazaSignature(plazaName,structure.systemId,toll,resolution.amount);
-        if (sig && seenSignatures.has(sig)) {
-          filteredCount++;
-          filteredNotes.push(`${plazaName} (${money(resolution.amount)}): filtered (duplicate plaza/link)`);
-          return;
-        }
-        if (sig) seenSignatures.add(sig);
+        totalToll = roundMoney(totalToll + picked.amount);
+        totalResolvedCount++;
+        if (picked.matchedPreference) preferenceMatchedCount++;
 
-        const amtKey = resolution.amount.toFixed(2);
-        const prevCount = amountCounts.get(amtKey) || 0;
-        amountCounts.set(amtKey,prevCount + 1);
-
-        // Flag repeated identical amounts or non-standard sub-sen artifacts when appearing repeatedly
-        const hasExplicitPlazaName = Boolean(toll.name && !/^toll\s*(plaza|point)\s*#?\d*$/i.test(String(toll.name).trim()));
-        const isRepeatedNoise = (!hasExplicitPlazaName && prevCount >= 2) || (prevCount >= 3);
-
-        validAmounts++;
-        candidatePlazas.push({
-          label:`${plazaName} [${structure.systemId} · ${resolution.methodTag}]: ${money(resolution.amount)}`,
-          amount:resolution.amount,
-          isNoise:isRepeatedNoise
+        items.push({
+          name:plazaName,
+          system:sysName,
+          amount:picked.amount,
+          currency:picked.currency,
+          paymentMethods:picked.paymentMethods,
+          fareName:picked.fareName,
+          fareId:picked.fareId,
+          source:'section.tolls'
         });
       });
-      return;
     }
 
-    if (!hasItemisedTolls && costs.length) {
-      recordsDetected = true;
-      if (hasBlockedOrClosedRoadAction(section)) {
-        filteredCount++;
-        filteredNotes.push(`Section ${sectionIndex + 1} summary toll: filtered (road closure/non-drivable action)`);
-        return;
-      }
+    if (!hasItemisedTolls && summaryCosts.length) {
+      hasSummaryTolls = true;
+      summaryCosts.forEach((cost,cIdx) => {
+        const price = cost && (cost.price || cost);
+        const val = Number(price && price.value);
+        const curr = String((price && price.currency) || cost.currency || 'MYR').toUpperCase();
+        if (!Number.isFinite(val) || val < 0 || curr !== 'MYR') return;
 
-      costs.forEach((cost,costIndex) => {
-        const identity = String(
-          cost.id || cost.tollId || `${sectionIndex}:summary:${costIndex}`
-        );
+        const amt = roundMoney(val);
+        totalToll = roundMoney(totalToll + amt);
+        totalResolvedCount++;
 
-        if (seenPlazas.has(identity)) {
-          filteredCount++;
-          return;
-        }
-        seenPlazas.add(identity);
-
-        const result = readTollAmount(cost);
-        if (!result) {
-          unresolvedRecords++;
-          return;
-        }
-
-        if (result.unsupportedCurrency) {
-          unsupportedCurrency = true;
-          unresolvedRecords++;
-          return;
-        }
-
-        if (result.valid) {
-          validAmounts++;
-          candidatePlazas.push({
-            label:`Active Highway Link [Class 1 Summary]: ${money(result.amount)}`,
-            amount:result.amount,
-            isNoise:false
-          });
-        }
+        items.push({
+          name:`Route Toll Summary ${secIdx + 1}.${cIdx + 1}`,
+          system:'',
+          amount:amt,
+          currency:'MYR',
+          paymentMethods:[],
+          fareName:cost.name || '',
+          fareId:cost.id ? String(cost.id) : '',
+          source:'section.summary.tollCosts'
+        });
       });
     }
   });
 
-  const activePlazas = candidatePlazas.filter(p => !p.isNoise);
-  const noisePlazas = candidatePlazas.filter(p => p.isNoise);
+  // Also check route-level summary tollCosts if neither section tolls nor section summary tolls were populated
+  if (!hasItemisedTolls && !hasSummaryTolls && route && route.summary && Array.isArray(route.summary.tollCosts)) {
+    route.summary.tollCosts.forEach((cost,idx) => {
+      const price = cost && (cost.price || cost);
+      const val = Number(price && price.value);
+      const curr = String((price && price.currency) || cost.currency || 'MYR').toUpperCase();
+      if (!Number.isFinite(val) || val < 0 || curr !== 'MYR') return;
 
-  noisePlazas.forEach(np => {
-    filteredCount++;
-    filteredNotes.push(`${np.label}: filtered (repeated/synthetic noise)`);
-  });
+      const amt = roundMoney(val);
+      totalToll = roundMoney(totalToll + amt);
+      totalResolvedCount++;
 
-  const total = roundMoney(
-    activePlazas.reduce((sum,p) => sum + Number(p.amount || 0),0)
-  );
-
-  const breakdown = activePlazas.map(p => p.label);
-
-  const hasExcessiveOrFilteredNoise =
-    candidatePlazas.length >= 5 || filteredCount > 0;
-
-  const available =
-    recordsDetected &&
-    validAmounts > 0 &&
-    unresolvedRecords === 0 &&
-    !unsupportedCurrency &&
-    !hasExcessiveOrFilteredNoise;
+      items.push({
+        name:`Route Summary Toll ${idx + 1}`,
+        system:'',
+        amount:amt,
+        currency:'MYR',
+        paymentMethods:[],
+        fareName:cost.name || '',
+        fareId:cost.id ? String(cost.id) : '',
+        source:'route.summary.tollCosts'
+      });
+    });
+  }
 
   return {
-    amount:total,
-    available,
-    recordsDetected,
-    validAmounts,
-    unresolvedRecords,
-    unsupportedCurrency,
-    duplicateFilteredCount:filteredCount,
-    hasExcessiveOrNoisyEntries:hasExcessiveOrFilteredNoise,
-    filteredNotes,
-    breakdown
+    amount:roundMoney(totalToll),
+    items,
+    systemsCount:tollSystems.size,
+    totalResolvedCount,
+    preferenceMatchedCount,
+    paymentPref,
+    hasAnyTollData:hasItemisedTolls || hasSummaryTolls || items.length > 0
   };
 }
 
 /* =========================================================
-   12. ROUTE CALCULATION
+   12. ROUTE CALCULATION (HERE ROUTING API v8)
 ========================================================= */
+
+function buildDepartureParam() {
+  const raw = $('here-departure-time').value;
+  if (!raw) return 'any';
+  const dt = new Date(raw);
+  if (Number.isNaN(dt.getTime())) return 'any';
+  return dt.toISOString();
+}
 
 function calculateRoute() {
   if (!pickupCoords || !dropoffCoords) return;
@@ -2812,31 +1756,19 @@ function calculateRoute() {
     return;
   }
 
-  const manualValue = $('manual-toll').value.trim();
-
-  if (manualValue !== '') {
-    const parsed = Number(manualValue);
-
-    if (!Number.isFinite(parsed) || parsed < 0) {
-      showError('Manual toll override must be RM0 or more.');
-      return;
-    }
-  }
-
   invalidateRoute(true);
 
   const requestId = routeRequestId;
-
   const origin = {...pickupCoords};
   const destination = {...dropoffCoords};
-  const viaSnapshot = viaCoords ? {...viaCoords} : null;
-
   const routingMode = activeRoutingMode;
   const avoidTollSnapshot = avoidTolls;
+  const paymentPref = $('here-payment-pref').value;
+  const departureTime = buildDepartureParam();
 
   setLoading(true);
   clearError();
-  setRouteStatus('Requesting route & validating active road-link tolls from HERE…');
+  setRouteStatus('Requesting route & HERE toll data…');
 
   routeDebounce = setTimeout(() => {
     if (requestId !== routeRequestId) return;
@@ -2846,14 +1778,11 @@ function calculateRoute() {
       transportMode:'car',
       origin:`${origin.lat},${origin.lng}`,
       destination:`${destination.lat},${destination.lng}`,
-      departureTime:'any',
+      departureTime,
       currency:'MYR',
-      return:'polyline,summary,tolls,actions'
+      alternatives:'1',
+      return:'polyline,summary,tolls,tollSystems,actions'
     };
-
-    if (viaSnapshot) {
-      params.via = `${viaSnapshot.lat},${viaSnapshot.lng}!stopDuration=0`;
-    }
 
     if (avoidTollSnapshot) {
       params['avoid[features]'] = 'tollRoad';
@@ -2861,42 +1790,29 @@ function calculateRoute() {
 
     router.calculateRoute(
       params,
-
       result => {
         if (requestId !== routeRequestId) return;
-
         setLoading(false);
 
-        if (
-          !result ||
-          !Array.isArray(result.routes) ||
-          !result.routes.length
-        ) {
+        if (!result || !Array.isArray(result.routes) || !result.routes.length) {
           showError('No route found for the selected locations.');
           return;
         }
 
         try {
-          handleRouteResult(result.routes[0],requestId);
+          handleRouteResult(result.routes[0],result.routes.length,paymentPref,avoidTollSnapshot,requestId);
         } catch(error) {
           console.error('Route processing error:',error);
           showError('Route was returned, but its details could not be processed.');
         }
       },
-
       error => {
         if (requestId !== routeRequestId) return;
-
         setLoading(false);
-
         console.error('HERE routing error:',error);
-
-        showError(
-          'Route calculation failed. Check internet access, API permissions and routing settings.'
-        );
+        showError('Route calculation failed. Check internet access, API permissions and routing settings.');
       }
     );
-
   },180);
 }
 
@@ -2904,13 +1820,10 @@ function calculateRoute() {
    13. ROUTE RESULT PROCESSING
 ========================================================= */
 
-function handleRouteResult(route,requestId) {
+function handleRouteResult(route,routesReturnedCount,paymentPref,avoidTollsRequested,requestId) {
   if (requestId !== routeRequestId) return;
 
-  const sections = Array.isArray(route.sections)
-    ? route.sections
-    : [];
-
+  const sections = Array.isArray(route.sections) ? route.sections : [];
   if (!sections.length) {
     throw new Error('Route contains no sections.');
   }
@@ -2919,133 +1832,56 @@ function handleRouteResult(route,requestId) {
   let durationSeconds = 0;
 
   sections.forEach(section => {
-    distanceMeters += Number(
-      section.summary &&
-      section.summary.length || 0
-    );
-
-    durationSeconds += Number(
-      section.summary &&
-      section.summary.duration || 0
-    );
+    distanceMeters += Number(section.summary && section.summary.length || 0);
+    durationSeconds += Number(section.summary && section.summary.duration || 0);
   });
 
   const distanceKm = distanceMeters / 1000;
   const durationMins = durationSeconds / 60;
 
-  if (
-    !(distanceKm > 0) ||
-    !Number.isFinite(durationMins) ||
-    durationMins < 0
-  ) {
+  if (!(distanceKm > 0) || !Number.isFinite(durationMins) || durationMins < 0) {
     throw new Error('Invalid route summary.');
   }
 
-  const tollInfo = extractTolls(sections);
-  const manualValue = $('manual-toll').value.trim();
-
-  let tollFee = tollInfo.amount;
-  let tollSource = tollInfo.available
-    ? 'Validated Active Toll Booths · Class 1 TnG (MYR)'
-    : 'Structural Check: Filtered / Calibrated Required';
-
-  let tollVerified = tollInfo.available;
-  let manualOverride = false;
-  let calibratedCorridorName = '';
-  let finalBreakdown = [...tollInfo.breakdown];
-
-  if (manualValue === '' && !tollVerified && !avoidTolls) {
-    const matchedCorridor = matchCalibratedCorridor(pickupCoords,dropoffCoords);
-    if (matchedCorridor) {
-      tollFee = roundMoney(matchedCorridor.tollTngClass1);
-      tollSource = `Calibrated Class 1 · TnG (${matchedCorridor.name})`;
-      tollVerified = true;
-      calibratedCorridorName = matchedCorridor.name;
-      finalBreakdown = [
-        `Calibrated Corridor Override [${matchedCorridor.name}]: ${money(tollFee)}`
-      ];
-    }
-  }
-
-  if (manualValue !== '') {
-    tollFee = roundMoney(Number(manualValue));
-    tollSource = 'Manual Class 1 · TnG override';
-    tollVerified = true;
-    manualOverride = true;
-  }
-
-  if (!tollVerified && (tollInfo.recordsDetected || tollInfo.unresolvedRecords > 0 || tollInfo.duplicateFilteredCount > 0)) {
-    $('manual-toll').classList.add('needs-attention');
-  } else {
-    $('manual-toll').classList.remove('needs-attention');
-  }
+  const tollResult = calculateHereTolls(route,paymentPref);
 
   clearRouteObjects();
-
   const group = new H.map.Group();
 
   sections.forEach(section => {
     if (!section.polyline) return;
-
-    const lineString =
-      H.geo.LineString.fromFlexiblePolyline(section.polyline);
-
-    const line = new H.map.Polyline(
-      lineString,
-      {
-        style:{
-          strokeColor:'#8e24aa',
-          lineWidth:5
-        }
-      }
-    );
-
+    const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
+    const line = new H.map.Polyline(lineString,{
+      style:{strokeColor:'#8e24aa',lineWidth:5}
+    });
     routePolylines.push(line);
     group.addObject(line);
   });
 
   if (routePolylines.length) {
     map.addObjects(routePolylines);
-
     const bounds = group.getBoundingBox();
-
     if (bounds) {
-      map.getViewModel().setLookAtData({
-        bounds,
-        padding:30
-      });
+      map.getViewModel().setLookAtData({bounds,padding:30});
     }
   }
 
   const calculation = processCalculations({
     distance:distanceKm,
     duration:durationMins,
-    tollFee,
-    tollSource,
-    tollAvailable:tollInfo.available,
-    tollVerified,
-    tollRecordsDetected:tollInfo.recordsDetected,
-    tollUnresolvedRecords:tollInfo.unresolvedRecords,
-    tollUnsupportedCurrency:tollInfo.unsupportedCurrency,
-    tollDuplicateFilteredCount:tollInfo.duplicateFilteredCount,
-    tollFilteredNotes:tollInfo.filteredNotes || [],
-    tollBreakdown:finalBreakdown,
-    calibratedCorridorName,
-    manualOverride,
+    tollResult,
+    avoidTollsRequested,
     sectionsCount:sections.length,
-    avoidTollsRequested:avoidTolls
+    alternativesCount:Math.max(0,routesReturnedCount - 1)
   });
 
   latestCalculation = calculation;
 
-  const statusParts = [
-    `Route calculated · ${sections.length} section(s)`,
-    activeRoutingMode === 'fast' ? 'Fastest' : 'Shortest',
-    viaCoords ? 'Via anchored' : null,
-    tollInfo.duplicateFilteredCount > 0 ? `Filtered ${tollInfo.duplicateFilteredCount} invalid/duplicate/noisy toll item(s)` : null
-  ].filter(Boolean);
-
-  setRouteStatus(statusParts.join(' · '));
+  setRouteStatus(
+    `Route calculated · ${sections.length} section(s) · ` +
+    `${activeRoutingMode === 'fast' ? 'Fastest' : 'Shortest'} · ` +
+    `${tollResult.items.length} HERE toll item(s)`
+  );
 }
 
 /* =========================================================
@@ -3053,241 +1889,120 @@ function handleRouteResult(route,requestId) {
 ========================================================= */
 
 function roundToUnit(value,unit) {
-  if (!(unit > 0)) {
-    return roundMoney(value);
-  }
-
-  return roundMoney(
-    Math.round((value + Number.EPSILON) / unit) * unit
-  );
+  if (!(unit > 0)) return roundMoney(value);
+  return roundMoney(Math.round((value + Number.EPSILON) / unit) * unit);
 }
 
 function processCalculations(routeData) {
+  const distanceFare = roundMoney(routeData.distance * settings.ratePerKm);
 
-  const distanceFare = roundMoney(
-    routeData.distance * settings.ratePerKm
-  );
+  const urban = getUrbanAssessment(pickupCoords,dropoffCoords,pickupItem,dropoffItem);
+  const urbanSurcharge = urban.applies ? roundMoney(settings.urbanSurcharge) : 0;
 
-  const urban = getUrbanAssessment(
-    pickupCoords,
-    dropoffCoords,
-    pickupItem,
-    dropoffItem
-  );
-
-  const urbanSurcharge = urban.applies
-    ? roundMoney(settings.urbanSurcharge)
-    : 0;
-
-  const highlandZone = getHighlandZone(
-    pickupCoords,
-    dropoffCoords
-  );
-
+  const highlandZone = getHighlandZone(pickupCoords,dropoffCoords);
   const hillApplies = Boolean(highlandZone);
+  const hillSurcharge = hillApplies ? roundMoney(settings.hillSurcharge) : 0;
 
-  const hillSurcharge = hillApplies
-    ? roundMoney(settings.hillSurcharge)
-    : 0;
-
-  const longHaulApplies =
-    settings.longHaulTriggerKm > 0 &&
-    routeData.distance >= settings.longHaulTriggerKm;
-
+  const longHaulApplies = settings.longHaulTriggerKm > 0 && routeData.distance >= settings.longHaulTriggerKm;
   const longHaulIncentive = longHaulApplies
-    ? roundMoney(
-        Math.min(
-          settings.longHaulCap,
-          distanceFare * settings.longHaulPercent / 100
-        )
-      )
+    ? roundMoney(Math.min(settings.longHaulCap,distanceFare * settings.longHaulPercent / 100))
     : 0;
 
-  const transportSubtotal = roundMoney(
-    distanceFare +
-    urbanSurcharge +
-    hillSurcharge +
-    longHaulIncentive
-  );
+  const transportSubtotal = roundMoney(distanceFare + urbanSurcharge + hillSurcharge + longHaulIncentive);
+  const transportFare = roundMoney(Math.max(settings.minimumFare,transportSubtotal));
 
-  const transportFare = roundMoney(
-    Math.max(
-      settings.minimumFare,
-      transportSubtotal
-    )
-  );
+  const tollFee = roundMoney(routeData.tollResult.amount);
+  const exactTotal = roundMoney(transportFare + tollFee);
+  const customerTotal = roundMoney(roundToUnit(exactTotal,settings.roundingUnit));
 
-  const exactTotal = roundMoney(
-    transportFare + routeData.tollFee
-  );
-
-  const customerTotal = roundMoney(
-    roundToUnit(
-      exactTotal,
-      settings.roundingUnit
-    )
-  );
-
-  const usesFlatCommission =
-    transportSubtotal < ADMIN_FLAT_THRESHOLD;
-
+  const usesFlatCommission = transportSubtotal < ADMIN_FLAT_THRESHOLD;
   const adminDeduction = usesFlatCommission
     ? roundMoney(settings.adminMinimum)
-    : roundMoney(
-        transportFare * settings.adminPercent / 100
-      );
+    : roundMoney(transportFare * settings.adminPercent / 100);
 
-  const driverFareEarnings = roundMoney(
-    Math.max(0,transportFare-adminDeduction)
-  );
+  const driverFareEarnings = roundMoney(Math.max(0,transportFare - adminDeduction));
+  const driverAmountAfterDeduction = roundMoney(Math.max(0,customerTotal - adminDeduction));
+  const roundingAdjustment = roundMoney(customerTotal - exactTotal);
 
-  const driverAmountAfterDeduction = roundMoney(
-    Math.max(0,customerTotal-adminDeduction)
-  );
+  $('urban-surcharge-row').style.display = urbanSurcharge > 0 ? 'flex' : 'none';
+  $('urban-surcharge-label').textContent = urban.label ? `Urban / POI surcharge (${urban.label})` : 'Urban / POI surcharge';
 
-  const roundingAdjustment = roundMoney(
-    customerTotal-exactTotal
-  );
+  $('hill-surcharge-row').style.display = hillSurcharge > 0 ? 'flex' : 'none';
+  $('hill-surcharge-label').textContent = highlandZone ? `Highland surcharge (${highlandZone.name})` : 'Highland surcharge';
 
-  $('urban-surcharge-row').style.display =
-    urbanSurcharge > 0 ? 'flex' : 'none';
-
-  $('urban-surcharge-label').textContent =
-    urban.label
-      ? `Urban / POI surcharge (${urban.label})`
-      : 'Urban / POI surcharge';
-
-  $('hill-surcharge-row').style.display =
-    hillSurcharge > 0 ? 'flex' : 'none';
-
-  $('hill-surcharge-label').textContent =
-    highlandZone
-      ? `Highland surcharge (${highlandZone.name})`
-      : 'Highland surcharge';
-
-  $('long-haul-incentive-row').style.display =
-    longHaulIncentive > 0 ? 'flex' : 'none';
-
-  $('admin-deduction-row').style.display =
-    adminDeduction > 0 ? 'flex' : 'none';
+  $('long-haul-incentive-row').style.display = longHaulIncentive > 0 ? 'flex' : 'none';
+  $('admin-deduction-row').style.display = adminDeduction > 0 ? 'flex' : 'none';
 
   $('total-fare').textContent = money(customerTotal);
+  $('fare-distance').textContent = `${routeData.distance.toFixed(1)} km`;
+  $('fare-duration').textContent = formatDuration(routeData.duration);
 
-  $('fare-distance').textContent =
-    `${routeData.distance.toFixed(1)} km`;
+  $('calc-distance-fare').textContent = money(distanceFare);
+  $('calc-urban-surcharge').textContent = money(urbanSurcharge);
+  $('calc-toll-fare').textContent = money(tollFee);
+  $('calc-hill-surcharge').textContent = money(hillSurcharge);
+  $('calc-long-haul-incentive').textContent = money(longHaulIncentive);
+  $('calc-grand').textContent = money(exactTotal);
+  $('calc-customer-total').textContent = money(customerTotal);
+  $('calc-deduction').textContent = `-${money(adminDeduction)}`;
+  $('driver-fare-net').textContent = money(driverFareEarnings);
+  $('driver-net-fare').textContent = money(driverAmountAfterDeduction);
 
-  $('fare-duration').textContent =
-    formatDuration(routeData.duration);
+  // Render HERE toll breakdown items
+  const breakdownBox = $('toll-breakdown-box');
+  if (routeData.tollResult.items.length) {
+    breakdownBox.innerHTML = '';
+    const title = document.createElement('div');
+    title.className = 'toll-breakdown-title';
+    title.textContent = `HERE Routing Tolls (${routeData.tollResult.items.length} item${routeData.tollResult.items.length > 1 ? 's' : ''})`;
+    breakdownBox.appendChild(title);
 
-  $('calc-distance-fare').textContent =
-    money(distanceFare);
+    routeData.tollResult.items.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'toll-item-line';
 
-  $('calc-urban-surcharge').textContent =
-    money(urbanSurcharge);
+      const left = document.createElement('span');
+      const sysSuffix = item.system ? ` · ${item.system}` : '';
+      left.textContent = `${item.name}${sysSuffix}`;
 
-  $('calc-toll-fare').textContent =
-    money(routeData.tollFee);
+      const right = document.createElement('span');
+      right.textContent = money(item.amount);
 
-  $('calc-hill-surcharge').textContent =
-    money(hillSurcharge);
-
-  $('calc-long-haul-incentive').textContent =
-    money(longHaulIncentive);
-
-  $('calc-grand').textContent =
-    money(exactTotal);
-
-  $('calc-customer-total').textContent =
-    money(customerTotal);
-
-  $('calc-deduction').textContent =
-    `-${money(adminDeduction)}`;
-
-  $('driver-fare-net').textContent =
-    money(driverFareEarnings);
-
-  $('driver-net-fare').textContent =
-    money(driverAmountAfterDeduction);
-
-  const plazaBox = $('plaza-list-box');
-  if (
-    (routeData.tollBreakdown && routeData.tollBreakdown.length) ||
-    (routeData.tollFilteredNotes && routeData.tollFilteredNotes.length)
-  ) {
-    plazaBox.innerHTML = '';
-    const title = document.createElement('strong');
-    title.textContent = 'Validated Toll Plazas (Active Road Link · Class 1 TnG):';
-    plazaBox.appendChild(title);
-
-    (routeData.tollBreakdown || []).forEach(line => {
-      const div = document.createElement('div');
-      div.textContent = `• ${line}`;
-      plazaBox.appendChild(div);
+      row.append(left,right);
+      breakdownBox.appendChild(row);
     });
 
-    if (!routeData.calibratedCorridorName && !routeData.manualOverride && routeData.tollFilteredNotes && routeData.tollFilteredNotes.length) {
-      const noteDiv = document.createElement('div');
-      noteDiv.className = 'plaza-filtered-note';
-      noteDiv.textContent = `${routeData.tollFilteredNotes.length} defunct/unanchored/duplicate/noise item(s) filtered out.`;
-      plazaBox.appendChild(noteDiv);
-    }
-
-    plazaBox.style.display = 'block';
+    breakdownBox.style.display = 'block';
   } else {
-    plazaBox.style.display = 'none';
+    breakdownBox.style.display = 'none';
   }
 
   const warnings = [];
-
-  if (!routeData.tollVerified) {
-    warnings.push('Active road-link toll not independently verified — check & enter manual override above');
-  }
-
-  if (routeData.tollUnsupportedCurrency) {
-    warnings.push('Non-MYR toll prices ignored');
-  }
-
-  if (
-    routeData.avoidTollsRequested &&
-    routeData.tollFee > 0
-  ) {
+  if (routeData.avoidTollsRequested && tollFee > 0) {
     warnings.push('Returned route still contains toll charges');
   }
-
-  if (
-    routeData.avoidTollsRequested &&
-    routeData.tollFee === 0 &&
-    !routeData.tollVerified
-  ) {
-    warnings.push('Zero tolls not confirmed');
+  if (routeData.tollResult.paymentPref !== 'any' && routeData.tollResult.totalResolvedCount > 0 && routeData.tollResult.preferenceMatchedCount === 0) {
+    warnings.push(`No explicit "${routeData.tollResult.paymentPref}" fare tag in HERE response; used default MYR fare`);
   }
 
-  if (routeData.tollUnresolvedRecords > 0 && !routeData.calibratedCorridorName && !routeData.manualOverride) {
-    warnings.push(
-      `${routeData.tollUnresolvedRecords} plaza(s) unresolved`
-    );
-  }
-
-  const status = [
-    `Tolls: ${routeData.tollSource}`,
+  const statusParts = [
+    `Tolls: HERE Routing v8 (${routeData.tollResult.paymentPref})`,
     `Highland: ${hillApplies ? 'applied' : 'not applied'}`
   ];
-
   if (warnings.length) {
-    status.push(...warnings);
+    statusParts.push(...warnings);
     $('fare-status').classList.add('fare-warning');
   } else {
     $('fare-status').classList.remove('fare-warning');
   }
-
-  $('fare-status').textContent = status.join(' · ');
+  $('fare-status').textContent = statusParts.join(' · ');
 
   $('fare-policy-note').textContent =
     `Minimum transport fare: ${money(settings.minimumFare)}. ` +
     `Admin commission: ${settings.adminPercent}% of transport fare, ` +
     `or ${money(settings.adminMinimum)} when the pre-minimum subtotal ` +
     `is below RM${ADMIN_FLAT_THRESHOLD.toFixed(2)}. ` +
-    `Tolls are pass-through reimbursement (Class 1 car, Touch 'n Go card rate), not driver profit. ` +
+    `Tolls are pass-through reimbursement, not driver profit. ` +
     `Vehicle fuel, maintenance, depreciation and other operating costs ` +
     `are not deducted. ` +
     `Quotation rounding adjustment: ${money(roundingAdjustment)}.`;
@@ -3295,60 +2010,35 @@ function processCalculations(routeData) {
   $('result-card').style.display = 'block';
 
   return {
-    version:'2.8',
-
+    version:'3.0',
     pickup:$('pickup').value.trim(),
     dropoff:$('dropoff').value.trim(),
-    via:$('via').value.trim(),
-
     distance:routeData.distance,
     duration:routeData.duration,
-
     distanceFare,
     urbanSurcharge,
     urbanLabel:urban.label,
-
-    tollFee:routeData.tollFee,
-    actualTollPaid:null,
-    tollVariance:null,
-    tollCriteria:'Active Road Link · Valid System ID · Class 1 (Car) · Touch n Go Card Only',
-    tollSource:routeData.tollSource,
-    tollAvailable:routeData.tollAvailable,
-    tollVerified:routeData.tollVerified,
-    tollRecordsDetected:routeData.tollRecordsDetected,
-    tollUnresolvedRecords:routeData.tollUnresolvedRecords,
-    tollUnsupportedCurrency:routeData.tollUnsupportedCurrency,
-    tollDuplicateFilteredCount:routeData.tollDuplicateFilteredCount || 0,
-    tollBreakdown:routeData.tollBreakdown || [],
-    calibratedCorridorName:routeData.calibratedCorridorName || '',
-    manualOverride:routeData.manualOverride,
-
+    tollFee,
+    tollItems:routeData.tollResult.items,
+    tollPaymentPref:routeData.tollResult.paymentPref,
     hillSurcharge,
     highlandZone:highlandZone ? highlandZone.name : '',
-
     longHaulIncentive,
-
     transportSubtotal,
     transportFare,
-
     exactTotal,
     customerTotal,
     roundingAdjustment,
-
     adminDeduction,
     adminPercent:settings.adminPercent,
     adminFlatBelowThreshold:settings.adminMinimum,
     adminFlatThreshold:ADMIN_FLAT_THRESHOLD,
     usesFlatCommission,
-
     driverFareEarnings,
     driverAmountAfterDeduction,
-
     routingMode:activeRoutingMode,
     avoidTolls:avoidTolls,
-
     settingsSnapshot:{...settings},
-
     calculatedAt:new Date().toISOString()
   };
 }
@@ -3361,14 +2051,11 @@ function formatDuration(minutes) {
   if (minutes < 60) {
     return `${Math.round(minutes)} mins`;
   }
-
   const hours = Math.floor(minutes/60);
   const mins = Math.round(minutes%60);
-
   if (mins === 60) {
     return `${hours+1} hr 0 mins`;
   }
-
   return `${hours} hr ${mins} mins`;
 }
 
@@ -3377,20 +2064,20 @@ function formatDuration(minutes) {
 ========================================================= */
 
 function receiptText(data) {
-  const plazaLines = data.tollBreakdown && data.tollBreakdown.length
-    ? data.tollBreakdown.map(p => `  - ${p}`).join('\n')
-    : '  - None / Unitemised';
+  const tollLines = Array.isArray(data.tollItems) && data.tollItems.length
+    ? data.tollItems.map(t => `  - ${t.name}${t.system ? ` (${t.system})` : ''}: ${money(t.amount)}`).join('\n')
+    : '  - None';
 
   return [
-    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v2.8',
+    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v3.0',
     '------------------------------------------------',
     `From: ${data.pickup}`,
-    data.via ? `Via anchor: ${data.via}` : null,
     `To: ${data.dropoff}`,
     `Distance: ${data.distance.toFixed(1)} km`,
     `Estimated duration: ${formatDuration(data.duration)}`,
     `Route: ${data.routingMode === 'fast' ? 'Fastest' : 'Shortest'}`,
     `Avoid tolls requested: ${data.avoidTolls ? 'Yes' : 'No'}`,
+    `HERE toll preference: ${data.tollPaymentPref || 'any'}`,
     '------------------------------------------------',
     `Distance fare: ${money(data.distanceFare)}`,
     `Urban / POI surcharge: ${money(data.urbanSurcharge)}`,
@@ -3399,14 +2086,9 @@ function receiptText(data) {
     `Long-haul contribution: ${money(data.longHaulIncentive)}`,
     `Transport subtotal: ${money(data.transportSubtotal)}`,
     `Minimum-adjusted transport fare: ${money(data.transportFare)}`,
-    `Toll charges (Class 1 · TnG Card): ${money(data.tollFee)}`,
-    `Toll criteria: ${data.tollCriteria || 'Active Road Link · Valid System ID · Class 1 (Car) · Touch n Go Card Only'}`,
-    `Toll source: ${data.tollSource}`,
-    `Toll verified: ${data.tollVerified ? 'Yes' : 'No'}`,
-    `Defunct/unanchored/duplicate/noise filtered: ${data.tollDuplicateFilteredCount || 0}`,
-    `Manual toll override: ${data.manualOverride ? 'Yes' : 'No'}`,
-    'Validated Toll Plazas / Segments:',
-    plazaLines,
+    `Toll charges (HERE API): ${money(data.tollFee)}`,
+    'HERE Toll Items:',
+    tollLines,
     '------------------------------------------------',
     `Exact calculated total: ${money(data.exactTotal)}`,
     `Quotation rounding adjustment: ${money(data.roundingAdjustment)}`,
@@ -3417,11 +2099,11 @@ function receiptText(data) {
     `Driver transport earnings: ${money(data.driverFareEarnings)}`,
     `Driver collection after commission (incl. tolls): ${money(data.driverAmountAfterDeduction)}`,
     '------------------------------------------------',
-    'Tolls are pass-through reimbursement (Class 1 TnG card rate), not driver profit.',
+    'Tolls are reimbursement, not driver profit.',
     'Driver earnings exclude fuel, maintenance, depreciation and other operating costs.',
-    'Estimate only. Subject to actual Touch n Go plaza deduction.',
-    'Generated by Rideshare MY Personal Edition v2.8'
-  ].filter(Boolean).join('\n');
+    'Estimate only. Verify tolls and final fare before travel.',
+    'Generated by Rideshare MY Personal Edition v3.0'
+  ].join('\n');
 }
 
 /* =========================================================
@@ -3439,23 +2121,19 @@ async function copyText(text) {
   }
 
   const area = document.createElement('textarea');
-
   area.value = text;
   area.setAttribute('readonly','');
-
   area.style.position = 'fixed';
   area.style.left = '-9999px';
   area.style.top = '0';
   area.style.opacity = '0';
 
   document.body.appendChild(area);
-
   area.focus();
   area.select();
   area.setSelectionRange(0,area.value.length);
 
   let copied = false;
-
   try {
     copied = document.execCommand('copy');
   } finally {
@@ -3475,306 +2153,31 @@ async function copyReceipt() {
 
   try {
     await copyText(receiptText(latestCalculation));
-
     button.textContent = '✓ Receipt copied';
-
     setTimeout(() => {
       button.textContent = original;
     },1800);
-
   } catch(error) {
     showError(`Unable to copy receipt: ${error.message}`);
   }
 }
 
 /* =========================================================
-   18. TRIP HISTORY & ACTUAL TOLL RECONCILIATION
-========================================================= */
-
-function saveCurrentTrip() {
-  if (!latestCalculation) return;
-
-  const record = {
-    ...latestCalculation,
-
-    id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
-
-    savedAt:new Date().toISOString()
-  };
-
-  history.unshift(record);
-  history = history.slice(0,MAX_HISTORY);
-
-  if (!persistHistory()) return;
-
-  renderHistory();
-
-  const button = $('save-trip-btn');
-  const original = button.textContent;
-
-  button.disabled = true;
-  button.textContent = '✓ Saved to history';
-
-  setTimeout(() => {
-    button.textContent = original;
-    button.disabled = false;
-  },1600);
-}
-
-function logActualToll(tripId,rawValue) {
-  const index = history.findIndex(item => item.id === tripId);
-  if (index === -1) return;
-
-  const trimmed = String(rawValue ?? '').trim();
-  if (trimmed === '') {
-    history[index].actualTollPaid = null;
-    history[index].tollVariance = null;
-  } else {
-    const parsed = Number(trimmed);
-    if (!Number.isFinite(parsed) || parsed < 0) {
-      showError('Actual TnG toll paid must be RM0.00 or more.');
-      return;
-    }
-    const actual = roundMoney(parsed);
-    const est = roundMoney(Number(history[index].tollFee || 0));
-    history[index].actualTollPaid = actual;
-    history[index].tollVariance = roundMoney(actual - est);
-  }
-
-  clearError();
-  if (persistHistory()) {
-    renderHistory();
-    setRouteStatus('Actual TnG toll deduction logged.');
-  }
-}
-
-function renderHistory() {
-  const list = $('history-list');
-
-  if (!history.length) {
-    list.textContent = 'No saved trips yet.';
-    return;
-  }
-
-  list.innerHTML = '';
-
-  history.slice(0,25).forEach(item => {
-    const row = document.createElement('div');
-    row.className = 'history-item';
-
-    const date = new Date(
-      item.savedAt || item.calculatedAt || item.date
-    );
-
-    const heading = document.createElement('strong');
-
-    heading.textContent =
-      `${money(item.customerTotal)} · ${Number(item.distance).toFixed(1)} km`;
-
-    const detail = document.createElement('div');
-
-    detail.textContent =
-      `${item.pickup || 'Unknown pickup'} → ${item.dropoff || 'Unknown destination'}`;
-
-    const stamp = document.createElement('div');
-    stamp.className = 'small-muted';
-
-    stamp.textContent =
-      Number.isNaN(date.getTime())
-        ? ''
-        : date.toLocaleString();
-
-    const toll = document.createElement('div');
-    toll.className = 'small-muted';
-
-    toll.textContent =
-      `Est. Toll (Class 1 TnG): ${money(item.tollFee)} · ` +
-      `${item.tollVerified ? 'Verified' : 'Unverified'}`;
-
-    const reconcileRow = document.createElement('div');
-    reconcileRow.className = 'history-reconcile-row';
-
-    const actualInput = document.createElement('input');
-    actualInput.type = 'number';
-    actualInput.min = '0';
-    actualInput.step = '0.10';
-    actualInput.inputMode = 'decimal';
-    actualInput.placeholder = 'Actual TnG RM';
-    if (Number.isFinite(Number(item.actualTollPaid)) && item.actualTollPaid !== null) {
-      actualInput.value = Number(item.actualTollPaid).toFixed(2);
-    }
-
-    const logBtn = document.createElement('button');
-    logBtn.type = 'button';
-    logBtn.textContent = 'Log TnG';
-    logBtn.addEventListener('click',() => {
-      logActualToll(item.id,actualInput.value);
-    });
-
-    reconcileRow.append(actualInput,logBtn);
-
-    if (Number.isFinite(Number(item.actualTollPaid)) && item.actualTollPaid !== null) {
-      const variance = roundMoney(Number(item.actualTollPaid) - Number(item.tollFee || 0));
-      const pill = document.createElement('span');
-      pill.className = `variance-pill ${Math.abs(variance) < 0.01 ? 'variance-ok' : 'variance-diff'}`;
-      const sign = variance > 0 ? '+' : '';
-      pill.textContent = Math.abs(variance) < 0.01
-        ? 'Exact match (RM0.00)'
-        : `Variance: ${sign}${money(variance)}`;
-      reconcileRow.appendChild(pill);
-    }
-
-    row.append(
-      heading,
-      detail,
-      stamp,
-      toll,
-      reconcileRow
-    );
-
-    list.appendChild(row);
-  });
-}
-
-/* =========================================================
-   19. CSV EXPORT — FORMULA INJECTION PROTECTION
-========================================================= */
-
-function safeCsvValue(value) {
-  let text = String(value ?? '');
-
-  if (/^[\s\u0000-\u001f]*[=+\-@]/.test(text)) {
-    text = "'" + text;
-  }
-
-  return `"${text.replace(/"/g,'""')}"`;
-}
-
-function exportHistoryCsv() {
-  if (!history.length) {
-    showError('There are no saved trips to export.');
-    return;
-  }
-
-  const columns = [
-    'version',
-    'id',
-    'savedAt',
-    'calculatedAt',
-    'pickup',
-    'via',
-    'dropoff',
-    'distance',
-    'duration',
-    'distanceFare',
-    'urbanSurcharge',
-    'urbanLabel',
-    'tollCriteria',
-    'tollFee',
-    'actualTollPaid',
-    'tollVariance',
-    'tollSource',
-    'tollVerified',
-    'tollUnresolvedRecords',
-    'tollDuplicateFilteredCount',
-    'calibratedCorridorName',
-    'tollBreakdown',
-    'manualOverride',
-    'hillSurcharge',
-    'highlandZone',
-    'longHaulIncentive',
-    'transportSubtotal',
-    'transportFare',
-    'exactTotal',
-    'roundingAdjustment',
-    'customerTotal',
-    'adminDeduction',
-    'usesFlatCommission',
-    'driverFareEarnings',
-    'driverAmountAfterDeduction',
-    'routingMode',
-    'avoidTolls',
-    'settingsSnapshot'
-  ];
-
-  const csv = [
-    columns.join(','),
-
-    ...history.map(item =>
-      columns.map(key => {
-        let value = item[key];
-
-        if (
-          value !== null &&
-          typeof value === 'object'
-        ) {
-          value = JSON.stringify(value);
-        }
-
-        return safeCsvValue(value);
-      }).join(',')
-    )
-
-  ].join('\r\n');
-
-  const blob = new Blob(
-    ['\uFEFF',csv],
-    {type:'text/csv;charset=utf-8;'}
-  );
-
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-
-  a.href = url;
-  a.download = 'rideshare-my-trip-history-v2.8.csv';
-
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-
-  setTimeout(() => {
-    URL.revokeObjectURL(url);
-  },1000);
-}
-
-function clearTripHistory() {
-  if (!history.length) return;
-
-  if (
-    confirm('Delete all saved trip history from this device?')
-  ) {
-    history = [];
-
-    if (persistHistory()) {
-      renderHistory();
-      setRouteStatus('Trip history cleared.');
-    }
-  }
-}
-
-/* =========================================================
-   20. MAP INITIALISATION & TAP-TO-PIN VIA ANCHOR
+   18. MAP INITIALISATION
 ========================================================= */
 
 function initMap() {
   try {
     if (!window.H || !H.service || !H.Map) {
-      showError(
-        'HERE Maps scripts did not load. Check internet connection or content blockers.'
-      );
+      showError('HERE Maps scripts did not load. Check internet connection or content blockers.');
       return false;
     }
 
     if (!isApiKeyConfigured()) {
-      setRouteStatus(
-        'Setup required: configure your HERE API key to enable map services.'
-      );
+      setRouteStatus('Setup required: configure your HERE API key to enable map services.');
     }
 
-    platform = new H.service.Platform({
-      apikey:HERE_API_KEY
-    });
-
+    platform = new H.service.Platform({apikey:HERE_API_KEY});
     const layers = platform.createDefaultLayers();
 
     map = new H.Map(
@@ -3782,199 +2185,79 @@ function initMap() {
       layers.vector.normal.map,
       {
         zoom:11,
-        center:{
-          lat:3.1390,
-          lng:101.6869
-        },
+        center:{lat:3.1390,lng:101.6869},
         pixelRatio:window.devicePixelRatio || 1
       }
     );
 
     window.addEventListener('resize',() => {
-      if (map) {
-        map.getViewPort().resize();
-      }
+      if (map) map.getViewPort().resize();
     });
 
-    new H.mapevents.Behavior(
-      new H.mapevents.MapEvents(map)
-    );
-
+    new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
     ui = H.ui.UI.createDefault(map,layers);
-
     router = platform.getRoutingService(null,8);
 
-    map.addEventListener('tap',async event => {
-      const viaWrap = $('via-input-wrap');
-      if (!viaWrap.classList.contains('open')) return;
-
-      const pointer = event.currentPointer;
-      if (!pointer) return;
-
-      const geo = map.screenToGeo(pointer.viewportX,pointer.viewportY);
-      if (!geo || !Number.isFinite(geo.lat) || !Number.isFinite(geo.lng)) return;
-
-      let label = `Via Pin (${geo.lat.toFixed(5)}, ${geo.lng.toFixed(5)})`;
-      if (isApiKeyConfigured()) {
-        try {
-          const rev = await reverseGeocode(geo.lat,geo.lng);
-          if (rev && rev.address && rev.address.label) {
-            label = rev.address.label;
-          }
-        } catch (_) {}
-      }
-
-      setSelectedLocation('via',{
-        title:label,
-        address:{label},
-        position:{lat:geo.lat,lng:geo.lng}
-      });
-    });
-
     return true;
-
   } catch(error) {
     console.error('Map initialisation error:',error);
-
-    showError(
-      'Unable to initialise HERE Maps. Check API key, permissions and internet connection.'
-    );
-
+    showError('Unable to initialise HERE Maps. Check API key, permissions and internet connection.');
     return false;
   }
 }
 
 /* =========================================================
-   21. EVENT BINDING
+   19. EVENT BINDING
 ========================================================= */
 
 function bindEvents() {
-
   setupAutocomplete('pickup');
   setupAutocomplete('dropoff');
-  setupAutocomplete('via');
 
-  $('toggle-via-btn').addEventListener('click',() => {
-    const wrap = $('via-input-wrap');
-    const isOpen = wrap.classList.toggle('open');
-    $('toggle-via-btn').textContent = isOpen ? 'Hide Via Anchor' : '+ Anchor Via Point';
+  $('current-loc-btn').addEventListener('click',requestCurrentLocation);
+  $('swap-locations-btn').addEventListener('click',swapLocations);
+  $('btn-mode-fast').addEventListener('click',() => setRoutingMode('fast'));
+  $('btn-mode-short').addEventListener('click',() => setRoutingMode('short'));
+  $('btn-avoid-tolls').addEventListener('click',toggleAvoidTolls);
+
+  $('here-payment-pref').addEventListener('change',() => {
+    if (pickupCoords && dropoffCoords) calculateRoute();
   });
 
-  $('current-loc-btn').addEventListener(
-    'click',
-    requestCurrentLocation
-  );
+  $('here-departure-time').addEventListener('change',() => {
+    if (pickupCoords && dropoffCoords) calculateRoute();
+  });
 
-  $('swap-locations-btn').addEventListener(
-    'click',
-    swapLocations
-  );
+  $('share-btn').addEventListener('click',copyReceipt);
 
-  $('btn-mode-fast').addEventListener(
-    'click',
-    () => setRoutingMode('fast')
-  );
-
-  $('btn-mode-short').addEventListener(
-    'click',
-    () => setRoutingMode('short')
-  );
-
-  $('btn-avoid-tolls').addEventListener(
-    'click',
-    toggleAvoidTolls
-  );
-
-  $('manual-toll').addEventListener(
-    'change',
-    () => {
-      if (pickupCoords && dropoffCoords) {
-        calculateRoute();
-      }
-    }
-  );
-
-  $('share-btn').addEventListener(
-    'click',
-    copyReceipt
-  );
-
-  $('save-trip-btn').addEventListener(
-    'click',
-    saveCurrentTrip
-  );
-
-  $('save-settings-btn').addEventListener(
-    'click',
-    () => {
-      try {
-        const next = readSettingsForm();
-
-        settings = sanitizeSettings(next);
-
-        if (!persistSettings()) return;
-
-        updateCalibrationBadge();
-
-        if (pickupCoords && dropoffCoords) {
-          calculateRoute();
-        }
-
-        setRouteStatus(
-          'Fare & Class 1 TnG calibration settings saved on this device.'
-        );
-
-        clearError();
-
-      } catch(error) {
-        showError(error.message);
-      }
-    }
-  );
-
-  $('reset-settings-btn').addEventListener(
-    'click',
-    () => {
-      if (
-        !confirm('Restore all default fare and Class 1 TnG calibration settings?')
-      ) {
-        return;
-      }
-
-      settings = sanitizeSettings(DEFAULT_SETTINGS);
-
-      populateSettingsForm();
-
+  $('save-settings-btn').addEventListener('click',() => {
+    try {
+      const next = readSettingsForm();
+      settings = sanitizeSettings(next);
       if (!persistSettings()) return;
-
-      if (pickupCoords && dropoffCoords) {
-        calculateRoute();
-      }
-
-      setRouteStatus('Default fare & calibration settings restored.');
+      if (pickupCoords && dropoffCoords) calculateRoute();
+      setRouteStatus('Fare settings saved successfully on this device.');
       clearError();
+    } catch(error) {
+      showError(error.message);
     }
-  );
+  });
 
-  $('export-history-btn').addEventListener(
-    'click',
-    exportHistoryCsv
-  );
-
-  $('clear-history-btn').addEventListener(
-    'click',
-    clearTripHistory
-  );
+  $('reset-settings-btn').addEventListener('click',() => {
+    if (!confirm('Restore all default fare settings?')) return;
+    settings = {...DEFAULT_SETTINGS};
+    populateSettingsForm();
+    if (!persistSettings()) return;
+    if (pickupCoords && dropoffCoords) calculateRoute();
+    setRouteStatus('Default fare settings restored.');
+    clearError();
+  });
 
   document.addEventListener('click',event => {
-    ['pickup','dropoff','via'].forEach(type => {
+    ['pickup','dropoff'].forEach(type => {
       const box = $(`${type}-suggestions`);
       const input = $(type);
-
-      if (
-        !box.contains(event.target) &&
-        !input.contains(event.target)
-      ) {
+      if (!box.contains(event.target) && !input.contains(event.target)) {
         box.style.display = 'none';
       }
     });
@@ -3982,22 +2265,16 @@ function bindEvents() {
 }
 
 /* =========================================================
-   22. APPLICATION STARTUP
+   20. APPLICATION STARTUP
 ========================================================= */
 
 function boot() {
   populateSettingsForm();
-
-  renderHistory();
-
   bindEvents();
-
   initMap();
 
   if (!isApiKeyConfigured()) {
-    setRouteStatus(
-      'Setup required: replace HERE_API_KEY with your valid key.'
-    );
+    setRouteStatus('Setup required: replace HERE_API_KEY with your valid key.');
   }
 }
 
