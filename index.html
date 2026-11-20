@@ -964,6 +964,19 @@ const KNOWN_TOLL_ROUTES = [
       { name: 'Penang Bridge (1st Bridge)', amount: 7.00 }
     ],
     total: 44.36
+  },
+  {
+    name: 'Bandar Puteri Puchong ↔ Kuantan Port',
+    matchKeywords: { from: ['puchong', 'bandar puteri'], to: ['kuantan'] },
+    pickupArea: { lat: 3.026, lng: 101.616, radiusKm: 8 },
+    dropoffArea: { lat: 3.966, lng: 103.416, radiusKm: 12 },
+    tolls: [
+      { name: 'LDP (Penchala)', amount: 2.10 },
+      { name: 'Karak Highway (Gombak)', amount: 6.00 },
+      { name: 'Karak Highway (Bentong)', amount: 3.50 },
+      { name: 'LPT (Karak – Kuantan)', amount: 19.60 }
+    ],
+    total: 31.20
   }
 ];
 
@@ -974,7 +987,6 @@ function getKnownTollForRoute(pickupCoords, dropoffCoords, pickupText = '', drop
   const dText = normalizeTollText(dropoffText);
 
   for (const route of KNOWN_TOLL_ROUTES) {
-    // 1. Text-based match (more robust against geocoding pin drops)
     if (route.matchKeywords) {
       const fromMatchP = route.matchKeywords.from.some(k => pText.includes(k));
       const toMatchP = route.matchKeywords.to.some(k => pText.includes(k));
@@ -986,7 +998,6 @@ function getKnownTollForRoute(pickupCoords, dropoffCoords, pickupText = '', drop
       }
     }
 
-    // 2. Coordinate match fallback
     const pickupMatch = calculateHaversineDistance(
       pickupCoords.lat, pickupCoords.lng,
       route.pickupArea.lat, route.pickupArea.lng
@@ -1021,14 +1032,12 @@ function getKnownTollForRoute(pickupCoords, dropoffCoords, pickupText = '', drop
 
 const TOLL_PLAZA_REFERENCE = [
   // ===== OPEN SYSTEM HIGHWAYS =====
-  // LDP — Lebuhraya Damansara–Puchong (Open)
   { system:'LDP', plaza:'Penchala', rate:2.10, type:'flat', systemType:'open' },
   { system:'LDP', plaza:'Puchong Intan', rate:1.00, type:'flat', systemType:'open' },
   { system:'LDP', plaza:'Puchong Utama', rate:1.30, type:'flat', systemType:'open' },
   { system:'LDP', plaza:'Petaling Jaya', rate:1.00, type:'flat', systemType:'open' },
   { system:'LDP', plaza:'Damansara', rate:1.30, type:'flat', systemType:'open' },
 
-  // DUKE — Duta–Ulu Klang Elevated Expressway (Open)
   { system:'DUKE', plaza:'Ayer Panas', rate:2.50, type:'flat', systemType:'open' },
   { system:'DUKE', plaza:'Segambut', rate:2.50, type:'flat', systemType:'open' },
   { system:'DUKE', plaza:'Jalan Duta', rate:2.50, type:'flat', systemType:'open' },
@@ -1038,7 +1047,6 @@ const TOLL_PLAZA_REFERENCE = [
   { system:'DUKE', plaza:'Ampang', rate:2.50, type:'flat', systemType:'open' },
   { system:'DUKE', plaza:'Ulu Kelang', rate:2.50, type:'flat', systemType:'open' },
 
-  // Karak Highway (KL–Karak) (Open)
   { system:'KARAK', plaza:'Gombak', rate:6.00, type:'flat', systemType:'open' },
   { system:'KARAK', plaza:'Bentong', rate:4.50, type:'flat', systemType:'open' },
   { system:'KARAK', plaza:'Karak', rate:4.00, type:'flat', systemType:'open' },
@@ -1046,24 +1054,20 @@ const TOLL_PLAZA_REFERENCE = [
   { system:'KARAK', plaza:'Temerloh', rate:5.00, type:'flat', systemType:'open' },
   { system:'KARAK', plaza:'Lanchang', rate:4.50, type:'flat', systemType:'open' },
 
-  // LATAR — Kuala Lumpur–Kuala Selangor (Open)
   { system:'LATAR', plaza:"Templer's Park", rate:6.50, type:'flat', systemType:'open' },
   { system:'LATAR', plaza:'Kundang', rate:3.50, type:'flat', systemType:'open' },
   { system:'LATAR', plaza:'Ijok', rate:4.00, type:'flat', systemType:'open' },
   { system:'LATAR', plaza:'Kuala Selangor', rate:6.50, type:'flat', systemType:'open' },
 
-  // MEX — Maju Expressway (Open)
   { system:'MEX', plaza:'Salak South', rate:3.00, type:'flat', systemType:'open' },
   { system:'MEX', plaza:'Sri Petaling', rate:3.00, type:'flat', systemType:'open' },
   { system:'MEX', plaza:'Bukit Jalil', rate:3.00, type:'flat', systemType:'open' },
   { system:'MEX', plaza:'Putrajaya', rate:3.50, type:'flat', systemType:'open' },
 
-  // SPRINT — Sungai Besi–Puchong (Open)
   { system:'SPRINT', plaza:'Damansara', rate:2.00, type:'flat', systemType:'open' },
   { system:'SPRINT', plaza:'Kerinchi', rate:2.00, type:'flat', systemType:'open' },
   { system:'SPRINT', plaza:'Bukit Kiara', rate:2.00, type:'flat', systemType:'open' },
 
-  // NKVE — New Klang Valley Expressway (Open segments)
   { system:'NKVE', plaza:'Damansara', rate:3.00, type:'flat', systemType:'open' },
   { system:'NKVE', plaza:'Kayu Ara', rate:1.50, type:'flat', systemType:'open' },
   { system:'NKVE', plaza:'Setia Alam', rate:4.00, type:'flat', systemType:'open' },
@@ -1072,14 +1076,12 @@ const TOLL_PLAZA_REFERENCE = [
   { system:'NKVE', plaza:'Subang', rate:3.00, type:'flat', systemType:'open' },
   { system:'NKVE', plaza:'Sungai Buloh', rate:3.50, type:'flat', systemType:'open' },
 
-  // KESAS — Shah Alam Expressway (Open)
   { system:'KESAS', plaza:'Sri Petaling', rate:1.80, type:'flat', systemType:'open' },
   { system:'KESAS', plaza:'Sunway', rate:1.80, type:'flat', systemType:'open' },
   { system:'KESAS', plaza:'Puchong', rate:1.50, type:'flat', systemType:'open' },
   { system:'KESAS', plaza:'Kebun Baru', rate:1.80, type:'flat', systemType:'open' },
   { system:'KESAS', plaza:'Batu Tiga', rate:1.80, type:'flat', systemType:'open' },
 
-  // SILK — Kajang–Seremban (Open)
   { system:'SILK', plaza:'Kajang', rate:1.80, type:'flat', systemType:'open' },
   { system:'SILK', plaza:'Sungai Ramal', rate:1.50, type:'flat', systemType:'open' },
   { system:'SILK', plaza:'Bukit Kajang', rate:1.80, type:'flat', systemType:'open' },
@@ -1090,27 +1092,23 @@ const TOLL_PLAZA_REFERENCE = [
   { system:'SILK', plaza:'Putrajaya', rate:2.00, type:'flat', systemType:'open' },
   { system:'SILK', plaza:'Bangi', rate:1.80, type:'flat', systemType:'open' },
 
-  // BESRAYA — Sungai Besi Expressway (Open)
   { system:'BESRAYA', plaza:'Sungai Besi', rate:1.50, type:'flat', systemType:'open' },
   { system:'BESRAYA', plaza:'Salak South', rate:1.50, type:'flat', systemType:'open' },
   { system:'BESRAYA', plaza:'Loke Yew', rate:1.50, type:'flat', systemType:'open' },
   { system:'BESRAYA', plaza:'Pandan', rate:1.50, type:'flat', systemType:'open' },
   { system:'BESRAYA', plaza:'Ampang', rate:1.50, type:'flat', systemType:'open' },
 
-  // LEKAS — Kajang–Seremban (Open)
   { system:'LEKAS', plaza:'Kajang', rate:2.00, type:'flat', systemType:'open' },
   { system:'LEKAS', plaza:'Semenyih', rate:2.50, type:'flat', systemType:'open' },
   { system:'LEKAS', plaza:'Pajam', rate:3.00, type:'flat', systemType:'open' },
   { system:'LEKAS', plaza:'Mantin', rate:3.50, type:'flat', systemType:'open' },
   { system:'LEKAS', plaza:'Ampangan', rate:4.00, type:'flat', systemType:'open' },
 
-  // Cheras–Kajang (Grand Saga) (Open)
   { system:'CHERAS-KAJANG', plaza:'Cheras', rate:1.30, type:'flat', systemType:'open' },
   { system:'CHERAS-KAJANG', plaza:'Kajang', rate:2.30, type:'flat', systemType:'open' },
   { system:'CHERAS-KAJANG', plaza:'Batu 9', rate:1.30, type:'flat', systemType:'open' },
   { system:'CHERAS-KAJANG', plaza:'Batu 11', rate:1.80, type:'flat', systemType:'open' },
 
-  // SUKE — Sungai Besi–Ulu Klang (Open)
   { system:'SUKE', plaza:'Sri Petaling', rate:2.30, type:'flat', systemType:'open' },
   { system:'SUKE', plaza:'Bukit Jalil', rate:2.30, type:'flat', systemType:'open' },
   { system:'SUKE', plaza:'Alam Damai', rate:2.00, type:'flat', systemType:'open' },
@@ -1118,7 +1116,6 @@ const TOLL_PLAZA_REFERENCE = [
   { system:'SUKE', plaza:'Pandan', rate:2.50, type:'flat', systemType:'open' },
   { system:'SUKE', plaza:'Ampang', rate:2.50, type:'flat', systemType:'open' },
 
-  // DASH — Damansara–Shah Alam (Open)
   { system:'DASH', plaza:'Denai Alam', rate:2.30, type:'flat', systemType:'open' },
   { system:'DASH', plaza:'Bukit Jelutong', rate:2.00, type:'flat', systemType:'open' },
   { system:'DASH', plaza:'Section 13', rate:2.30, type:'flat', systemType:'open' },
@@ -1126,30 +1123,24 @@ const TOLL_PLAZA_REFERENCE = [
   { system:'DASH', plaza:'Setia Alam', rate:3.00, type:'flat', systemType:'open' },
   { system:'DASH', plaza:'Puncak Alam', rate:3.50, type:'flat', systemType:'open' },
 
-  // Guthrie Corridor Expressway (Open)
   { system:'GUTHRIE', plaza:'Kuang', rate:2.50, type:'flat', systemType:'open' },
   { system:'GUTHRIE', plaza:'Elmina', rate:2.50, type:'flat', systemType:'open' },
   { system:'GUTHRIE', plaza:'Bukit Jelutong', rate:2.00, type:'flat', systemType:'open' },
   { system:'GUTHRIE', plaza:'Bukit Subang', rate:2.50, type:'flat', systemType:'open' },
   { system:'GUTHRIE', plaza:'Setia Alam', rate:3.50, type:'flat', systemType:'open' },
 
-  // Penang bridges (Open)
   { system:'PENANG BRIDGE 1', plaza:'Jambatan Pulau Pinang', rate:7.00, type:'flat', systemType:'open' },
   { system:'PENANG BRIDGE 2', plaza:'Jambatan Sultan Abdul Halim', rate:8.50, type:'flat', systemType:'open' },
 
-  // SMART Tunnel (Open)
   { system:'SMART', plaza:'SMART Tunnel', rate:3.00, type:'flat', systemType:'open' },
 
-  // SPTJ — Johor Bahru (Open)
   { system:'SPTJ', plaza:'EDL', rate:6.80, type:'flat', systemType:'open' },
   { system:'SPTJ', plaza:'Johor Bahru Parkway', rate:1.50, type:'flat', systemType:'open' },
 
-  // SDE — Senai–Desaru (Open)
   { system:'SDE', plaza:'Senai', rate:4.50, type:'flat', systemType:'open' },
   { system:'SDE', plaza:'Ulu Tiram', rate:4.50, type:'flat', systemType:'open' },
 
   // ===== CLOSED SYSTEM HIGHWAYS =====
-  // PLUS — North–South Expressway (Closed)
   { system:'PLUS', plaza:'Bukit Kayu Hitam', rate:null, type:'closed', systemType:'closed' },
   { system:'PLUS', plaza:'Jitra', rate:null, type:'closed', systemType:'closed' },
   { system:'PLUS', plaza:'Kepala Batas', rate:null, type:'closed', systemType:'closed' },
@@ -1182,7 +1173,6 @@ const TOLL_PLAZA_REFERENCE = [
   { system:'PLUS', plaza:'Skudai', rate:null, type:'closed', systemType:'closed' },
   { system:'PLUS', plaza:'Johor Bahru', rate:null, type:'closed', systemType:'closed' },
 
-  // ELITE — North–South Expressway Central Link (Closed)
   { system:'ELITE', plaza:'KLIA', rate:null, type:'closed', systemType:'closed' },
   { system:'ELITE', plaza:'Putrajaya', rate:null, type:'closed', systemType:'closed' },
   { system:'ELITE', plaza:'Cyberjaya', rate:null, type:'closed', systemType:'closed' },
@@ -1191,17 +1181,14 @@ const TOLL_PLAZA_REFERENCE = [
   { system:'ELITE', plaza:'Setia Alam', rate:null, type:'closed', systemType:'closed' },
   { system:'ELITE', plaza:'Bukit Raja', rate:null, type:'closed', systemType:'closed' },
 
-  // SKVE — South Klang Valley Expressway (Closed)
   { system:'SKVE', plaza:'Kajang', rate:null, type:'closed', systemType:'closed' },
   { system:'SKVE', plaza:'Putrajaya', rate:null, type:'closed', systemType:'closed' },
   { system:'SKVE', plaza:'Carey Island', rate:null, type:'closed', systemType:'closed' },
 
-  // LPT — East Coast Expressway (Closed)
   { system:'LPT', plaza:'Karak', rate:null, type:'closed', systemType:'closed' },
   { system:'LPT', plaza:'Kuantan', rate:null, type:'closed', systemType:'closed' },
   { system:'LPT', plaza:'Kuala Terengganu', rate:null, type:'closed', systemType:'closed' },
 
-  // WCE — West Coast Expressway (Closed)
   { system:'WCE', plaza:'Kapar', rate:null, type:'closed', systemType:'closed' },
   { system:'WCE', plaza:'Tanjung Karang', rate:null, type:'closed', systemType:'closed' },
   { system:'WCE', plaza:'Kuala Selangor', rate:null, type:'closed', systemType:'closed' },
@@ -2336,7 +2323,6 @@ function handleRouteResult(route,routesReturnedCount,paymentPref,avoidTollsReque
   const tollResult = calculateHereTolls(route,paymentPref);
 
   /* ---- TOLL SOURCE PRIORITY: Manual > Verified > Reference > HERE ---- */
-  // Pass text values for robust matching
   const knownRoute = getKnownTollForRoute(
     pickupCoords, 
     dropoffCoords, 
