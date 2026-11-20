@@ -282,7 +282,7 @@
   });
   const ADMIN_FLAT_THRESHOLD = 8;
   const SETTINGS_KEY = 'rideshareMY.personal.v3.0.settings';
-  const TOLL_GPS_MATCH_RADIUS_KM = 0.35;
+  const TOLL_GPS_MATCH_RADIUS_KM = 0.25;
 
   const HIGHLAND_ZONES = [
     {lat:3.4241,lng:101.7933,radiusKm:10,name:'Genting Highlands & Gohtong'},
@@ -307,6 +307,10 @@
      1a. TOLL PLAZA REFERENCE RATES (ALL MALAYSIAN OPERATORS, CLASS 1 + GPS)
      ========================================================= */
   const TOLL_PLAZA_REFERENCE = [
+    // ===== GENTING HIGHLANDS ROAD CHARGE (LINGKARAN CEKAP / CLASS 1 ENTRY) =====
+    { system:'GENTING ROAD CHARGE (LPR)', plaza:'Genting Sempah Entry', rate:5.00, type:'flat', systemType:'open', lat:3.3519, lng:101.7864 },
+    { system:'GENTING ROAD CHARGE (LPR)', plaza:'Gohtong Jaya Entry', rate:5.00, type:'flat', systemType:'open', lat:3.3947, lng:101.7839 },
+
     // ===== AMANAT LEBUHRAYA RAKYAT (ALR): LDP (E11), KESAS (E5), SPRINT (E23), SMART (E38) =====
     { system:'LDP (E11 · ALR)', plaza:'Penchala', rate:2.10, type:'flat', systemType:'open', lat:3.1563, lng:101.6227 },
     { system:'LDP (E11 · ALR)', plaza:'Puchong Intan', rate:1.00, type:'flat', systemType:'open', lat:3.0285, lng:101.6177 },
@@ -553,7 +557,7 @@
     for (const ref of TOLL_PLAZA_REFERENCE) {
       if (!Number.isFinite(ref.lat) || !Number.isFinite(ref.lng)) continue;
       const distKm = calculateHaversineDistance(coords.lat, coords.lng, ref.lat, ref.lng);
-      const systemBonus = sysNorm && (sysNorm.includes(normalizeTollText(ref.system)) || normalizeTollText(ref.system).includes(sysNorm)) ? -0.08 : 0;
+      const systemBonus = sysNorm && (sysNorm.includes(normalizeTollText(ref.system)) || normalizeTollText(ref.system).includes(sysNorm)) ? -0.06 : 0;
       const effectiveDist = distKm + systemBonus;
       if (distKm <= maxRadiusKm && effectiveDist < bestDistanceKm) {
         bestDistanceKm = effectiveDist;
@@ -1317,8 +1321,7 @@
     const sections = Array.isArray(route && route.sections) ? route.sections : [];
     const tollSystems = getHereTollSystemMap(route);
     const polylinePoints = extractPolylinePoints(sections);
-    const polylineCorridorFlat = findPolylineTollMatch(polylinePoints, 0.65, true);
-    const polylineCorridorAll = findPolylineTollMatch(polylinePoints, 0.65, false);
+    const polylineCorridorFlat = findPolylineTollMatch(polylinePoints, 0.35, true);
     let totalToll = 0;
     let hasItemisedTolls = false;
     let hasSummaryTolls = false;
@@ -1338,7 +1341,7 @@
       if (item.matchedPreference) preferenceMatchedCount++;
       if (item.referenceApplied) referenceAppliedCount++;
       if (item.referenceDiscrepancy) referenceDiscrepancyCount++;
-      if (item.matchedBy === 'gps' || item.matchedBy === 'route+rate' || item.matchedBy === 'route-corridor') gpsMatchedCount++;
+      if (item.matchedBy === 'gps' || item.matchedBy === 'route+rate') gpsMatchedCount++;
     };
 
     sections.forEach((section,secIdx) => {
@@ -1358,23 +1361,13 @@
 
           let refMatch = findReferenceRate(toll.name || '', sysName, tollCoords);
 
-          // Fallback 1: match by route corridor + exact fare amount when HERE gives a generic label or omits toll.location
+          // Match by route corridor + exact fare amount when HERE gives a generic label or omits toll.location
           if (!refMatch && picked) {
             const amountMatches = polylineCorridorFlat.filter(
               pm => Math.abs(pm.rate - pickedAmount) <= 0.01 && !matchedPlazaKeys.has(`${pm.system}|${pm.plaza}`)
             );
             if (amountMatches.length >= 1) {
               refMatch = { ...amountMatches[0], matchedBy: 'route+rate' };
-            }
-          }
-
-          // Fallback 2: if still unmatched (e.g., closed-system plaza with generic label), identify nearest unconsumed plaza on route corridor
-          if (!refMatch && polylineCorridorAll.length) {
-            const corridorCandidate = polylineCorridorAll.find(
-              pm => !matchedPlazaKeys.has(`${pm.system}|${pm.plaza}`)
-            );
-            if (corridorCandidate) {
-              refMatch = { ...corridorCandidate, matchedBy: 'route-corridor' };
             }
           }
 
@@ -1496,10 +1489,37 @@
       });
     }
 
-    // Supplement with open-system plaza GPS matches along the decoded route polyline if missing
+    // Supplement with Genting Highlands Road Charge or direct corridor plaza matches when route enters Genting
+    const inHighland = Boolean(getHighlandZone(pickupCoords, dropoffCoords));
+    if (inHighland) {
+      const gentingCharge = TOLL_PLAZA_REFERENCE.find(r => r.system.startsWith('GENTING ROAD CHARGE'));
+      if (gentingCharge && !matchedPlazaKeys.has(`${gentingCharge.system}|${gentingCharge.plaza}`)) {
+        matchedPlazaKeys.add(`${gentingCharge.system}|${gentingCharge.plaza}`);
+        pushItem({
+          name: `${gentingCharge.plaza} (${gentingCharge.system})`,
+          system: gentingCharge.system,
+          amount: gentingCharge.rate,
+          hereAmount: 0,
+          currency: 'MYR',
+          paymentMethods: ['LPR / Electronic'],
+          fareName: 'Class 1 Road Charge',
+          fareId: '',
+          matchedPreference: true,
+          referenceApplied: true,
+          referenceDiscrepancy: false,
+          referenceLabel: `${gentingCharge.system} · ${gentingCharge.plaza} (Class 1 Road Charge)`,
+          systemType: gentingCharge.systemType,
+          matchedBy: 'zone+reference',
+          source: 'genting.roadCharge'
+        });
+      }
+    }
+
+    // Supplement with open-system plaza GPS matches directly on the decoded route polyline if missing
     if (polylinePoints.length) {
-      const polylineMatches = findPolylineTollMatch(polylinePoints, 0.22, true);
+      const polylineMatches = findPolylineTollMatch(polylinePoints, 0.16, true);
       polylineMatches.forEach(pm => {
+        if (pm.system.startsWith('GENTING ROAD CHARGE')) return;
         const key = `${pm.system}|${pm.plaza}`;
         if (matchedPlazaKeys.has(key)) return;
         const alreadyCoveredByHere = items.some(it => Math.abs(it.amount - pm.rate) <= 0.01);
