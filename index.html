@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Rideshare MY - Personal Edition v3.0.5</title>
+  <title>Rideshare MY - Personal Edition v3.0.3</title>
   <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
   <script src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
   <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
@@ -96,7 +96,7 @@
   <div id="search-panel">
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.0.5</span>
+      <span class="version">PERSONAL EDITION v3.0.3</span>
     </div>
     <!-- LOCATION INPUTS -->
     <div class="routing-wrapper">
@@ -142,7 +142,7 @@
         <span>Actual / Manual toll override (RM)</span>
         <input id="manual-toll" type="number" min="0" step="0.10" inputmode="decimal" placeholder="Use Standard Table / HERE">
       </label>
-      <div class="small-muted"> Toll source priority: <b>Manual override</b> → <b>HERE + Standard Table Cross-Check (Open + Closed Matrix)</b> → <b>HERE API</b>. </div>
+      <div class="small-muted"> Toll source priority: <b>Manual override</b> → <b>Standard Table Cross-Check (Open + Closed Matrix)</b> → <b>HERE API</b>. </div>
     </div>
     <div id="loading-msg">Calculating route and cross-checking tolls…</div>
     <div id="error-msg" role="alert"></div>
@@ -282,8 +282,8 @@
   });
   const ADMIN_FLAT_THRESHOLD = 8;
   const SETTINGS_KEY = 'rideshareMY.personal.v3.0.settings';
-  const TOLL_GPS_MATCH_RADIUS_KM = 0.75;
-  const POLYLINE_CORRIDOR_RADIUS_KM = 0.45;
+  const TOLL_GPS_MATCH_RADIUS_KM = 0.25;
+  const POLYLINE_CORRIDOR_RADIUS_KM = 0.10;
 
   const HIGHLAND_ZONES = [
     {lat:3.4241,lng:101.7933,radiusKm:10,name:'Genting Highlands & Gohtong'},
@@ -462,11 +462,10 @@
 
   /* =========================================================
      1b. CLOSED-SYSTEM ENTRY -> EXIT LOOKUP MATRIX (CLASS 1 NORMAL TNG)
-         Covers: Integrated PLUS/NKVE/ELITE, SKVE, WCE
+         Covers: PLUS, NKVE, ELITE, SKVE, WCE
      ========================================================= */
   const CLOSED_TOLL_MATRIX = [
     // ===== WCE (E32) =====
-    { network:'WCE', system:'WCE (E32)', from:'Banting', to:'SKVE Interchange', rate:2.34 },
     { network:'WCE', system:'WCE (E32)', from:'Bandar Bukit Raja Selatan', to:'Bandar Bukit Raja Utara', rate:1.50 },
     { network:'WCE', system:'WCE (E32)', from:'Bandar Bukit Raja Selatan', to:'Assam Jawa', rate:5.05 },
     { network:'WCE', system:'WCE (E32)', from:'Bandar Bukit Raja Utara', to:'Assam Jawa', rate:4.12 },
@@ -489,46 +488,27 @@
     { network:'WCE', system:'WCE (E32)', from:'Beruas', to:'Taiping Selatan', rate:6.06 },
     { network:'WCE', system:'WCE (E32)', from:'Trong', to:'Taiping Selatan', rate:1.88 },
 
-    // ===== SKVE (E26) & WCE-SKVE INTEGRATED =====
+    // ===== SKVE (E26) =====
     { network:'SKVE', system:'SKVE (E26)', from:'Ayer Hitam', to:'Saujana Putra', rate:4.70 },
     { network:'SKVE', system:'SKVE (E26)', from:'Ayer Hitam', to:'Telok Panglima Garang', rate:8.90 },
     { network:'SKVE', system:'SKVE (E26)', from:'Ayer Hitam', to:'Pulau Indah', rate:16.30 },
     { network:'SKVE', system:'SKVE (E26)', from:'Saujana Putra', to:'Telok Panglima Garang', rate:5.40 },
     { network:'SKVE', system:'SKVE (E26)', from:'Saujana Putra', to:'Pulau Indah', rate:12.70 },
-    { network:'SKVE', system:'SKVE / WCE (E26 · E32)', from:'Banting', to:'Ayer Hitam', rate:6.26 },
-    { network:'SKVE', system:'SKVE / WCE (E26 · E32)', from:'Banting', to:'Saujana Putra', rate:4.45 },
-    { network:'SKVE', system:'SKVE / WCE (E26 · E32)', from:'Banting', to:'Telok Panglima Garang', rate:3.41 },
-    { network:'SKVE', system:'SKVE / WCE (E26 · E32)', from:'Banting', to:'Pulau Indah', rate:6.88 },
 
-    // ===== INTEGRATED PLUS / NKVE / ELITE (E1 · E2 · E6) =====
-    // Klang / Bukit Raja / Setia Alam / Shah Alam / Subang / Seafield corridors
-    { network:'PLUS', system:'NKVE (E1 · PLUS)', from:'Bukit Raja', to:'Subang', rate:1.97 },
-    { network:'PLUS', system:'NKVE (E1 · PLUS)', from:'Bukit Raja', to:'Jalan Duta', rate:3.77 },
-    { network:'PLUS', system:'NKVE / PLUS (E1)', from:'Bukit Raja', to:'Sungai Buloh', rate:3.28 },
-    { network:'PLUS', system:'NKVE / PLUS (E1 · E2)', from:'Bukit Raja', to:'Skudai', rate:37.31 },
-    { network:'PLUS', system:'NKVE (E1 · PLUS)', from:'Setia Alam', to:'Shah Alam', rate:1.15 },
-    { network:'PLUS', system:'NKVE (E1 · PLUS)', from:'Setia Alam', to:'Subang', rate:1.80 },
-    { network:'PLUS', system:'NKVE (E1 · PLUS)', from:'Setia Alam', to:'Jalan Duta', rate:3.61 },
-    { network:'PLUS', system:'NKVE (E1 · PLUS)', from:'Shah Alam', to:'Kota Damansara', rate:1.56 },
-    { network:'PLUS', system:'NKVE / PLUS (E1)', from:'Shah Alam', to:'Ipoh Selatan', rate:22.22 },
-    { network:'PLUS', system:'NKVE / ELITE (E1 · E6)', from:'Subang', to:'Nilai', rate:6.81 },
-    { network:'PLUS', system:'NKVE / ELITE (E1 · E6)', from:'Subang', to:'KLIA', rate:5.66 },
-    { network:'PLUS', system:'ELITE / NKVE (E6 · E1)', from:'Seafield', to:'Jalan Duta', rate:3.36 },
-    { network:'PLUS', system:'ELITE / PLUS (E6 · E1)', from:'Seafield', to:'Sungai Buloh', rate:2.79 },
+    // ===== ELITE (E6) =====
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Nilai', rate:3.36 },
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Putrajaya', rate:3.53 },
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Kajang', rate:4.92 },
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Seremban', rate:5.41 },
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Subang', rate:5.66 },
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Jalan Duta', rate:7.46 },
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Ayer Keroh', rate:13.04 },
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Tapah', rate:21.24 },
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Ipoh Selatan', rate:25.67 },
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Skudai', rate:37.46 },
+    { network:'ELITE', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Juru', rate:40.75 },
 
-    // ELITE (E6) KLIA corridors
-    { network:'PLUS', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Nilai', rate:3.36 },
-    { network:'PLUS', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Putrajaya', rate:3.53 },
-    { network:'PLUS', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Kajang', rate:4.92 },
-    { network:'PLUS', system:'ELITE (E6 · PLUS)', from:'KLIA', to:'Seremban', rate:5.41 },
-    { network:'PLUS', system:'ELITE / NKVE (E6 · E1)', from:'KLIA', to:'Jalan Duta', rate:7.46 },
-    { network:'PLUS', system:'ELITE / PLUS (E6 · E2)', from:'KLIA', to:'Ayer Keroh', rate:13.04 },
-    { network:'PLUS', system:'ELITE / PLUS (E6 · E1)', from:'KLIA', to:'Tapah', rate:21.24 },
-    { network:'PLUS', system:'ELITE / PLUS (E6 · E1)', from:'KLIA', to:'Ipoh Selatan', rate:25.67 },
-    { network:'PLUS', system:'ELITE / PLUS (E6 · E2)', from:'KLIA', to:'Skudai', rate:37.46 },
-    { network:'PLUS', system:'ELITE / PLUS (E6 · E1)', from:'KLIA', to:'Juru', rate:40.75 },
-
-    // PLUS North-South mainline (E1 / E2)
+    // ===== PLUS & NKVE (E1 / E2) =====
     { network:'PLUS', system:'PLUS (E1 / E2)', from:'Sungai Besi', to:'Seremban', rate:5.25 },
     { network:'PLUS', system:'PLUS (E1 / E2)', from:'Sungai Besi', to:'Ayer Keroh', rate:12.87 },
     { network:'PLUS', system:'PLUS (E1 / E2)', from:'Sungai Besi', to:'Pagoh', rate:22.10 },
@@ -550,12 +530,9 @@
     const s = normalizeTollText(systemStr);
     if (s.includes('wce') || /\be32\b/.test(s)) return 'WCE';
     if (s.includes('skve') || /\be26\b/.test(s)) return 'SKVE';
-    // PLUS, NKVE, and ELITE operate as one unified closed toll network
-    if (
-      s.includes('elite') || /\be6\b/.test(s) ||
-      s.includes('nkve') ||
-      s.includes('plus') || /\be1\b/.test(s) || /\be2\b/.test(s)
-    ) return 'PLUS';
+    if (s.includes('elite') || /\be6\b/.test(s)) return 'ELITE';
+    if (s.includes('nkve')) return 'NKVE';
+    if (s.includes('plus') || /\be1\b/.test(s) || /\be2\b/.test(s)) return 'PLUS';
     return '';
   }
 
@@ -568,7 +545,7 @@
       const fNorm = normalizeTollText(entry.from);
       const tNorm = normalizeTollText(entry.to);
       const forward = (aNorm.includes(fNorm) || fNorm.includes(aNorm)) && (bNorm.includes(tNorm) || tNorm.includes(bNorm));
-      const reverse = (aNorm.includes(tNorm) || tNorm.includes(aNorm)) && (bNorm.includes(fNorm) || fNorm.includes(fNorm));
+      const reverse = (aNorm.includes(tNorm) || tNorm.includes(aNorm)) && (bNorm.includes(fNorm) || fNorm.includes(bNorm));
       if (forward || reverse) {
         return entry;
       }
@@ -646,6 +623,8 @@
     return points;
   }
 
+  // NEW: Approximate point-to-segment distance in km (equirectangular projection).
+  // Used to refine vertex-only distance so gantries between sparse polyline vertices are caught.
   function pointToSegmentDistanceKm(pLat, pLng, aLat, aLng, bLat, bLng) {
     const midLat = (aLat + bLat) / 2;
     const cosLat = Math.cos(midLat * Math.PI / 180) || 1;
@@ -656,15 +635,20 @@
     const px = pLng * kmPerDegLng, py = pLat * kmPerDegLat;
     const dx = bx - ax, dy = by - ay;
     const lenSq = dx * dx + dy * dy;
-    if (lenSq === 0) return Math.sqrt((px - ax) ** 2 + (py - ay) ** 2);
+    if (lenSq === 0) {
+      return Math.sqrt((px - ax) * (px - ax) + (py - ay) * (py - ay));
+    }
     let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
     if (t < 0) t = 0; else if (t > 1) t = 1;
-    return Math.sqrt((px - (ax + t * dx)) ** 2 + (py - (ay + t * dy)) ** 2);
+    const projX = ax + t * dx;
+    const projY = ay + t * dy;
+    return Math.sqrt((px - projX) * (px - projX) + (py - projY) * (py - projY));
   }
 
   function findPolylineTollMatch(polylinePoints, maxRadiusKm = POLYLINE_CORRIDOR_RADIUS_KM, flatOnly = true) {
     if (!Array.isArray(polylinePoints) || !polylinePoints.length) return [];
 
+    // Bounding-box pre-filter: 4-5x speedup by skipping far-away plazas before haversine loop
     let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
     for (let i = 0; i < polylinePoints.length; i++) {
       const p = polylinePoints[i];
@@ -684,6 +668,7 @@
       if (flatOnly && (ref.type !== 'flat' || ref.rate == null)) continue;
       if (!flatOnly && ref.type !== 'closed') continue;
       if (!Number.isFinite(ref.lat) || !Number.isFinite(ref.lng)) continue;
+      // Bbox filter
       if (ref.lat < minLat - padLat || ref.lat > maxLat + padLat) continue;
       if (ref.lng < minLng - padLng || ref.lng > maxLng + padLng) continue;
 
@@ -695,7 +680,8 @@
           minDist = vDist;
           minIdx = i;
         }
-        if (i > 0 && vDist < maxRadiusKm * 2.5) {
+        // Only compute segment distance when the vertex is already reasonably close
+        if (i > 0 && vDist < maxRadiusKm * 2) {
           const sDist = pointToSegmentDistanceKm(
             ref.lat, ref.lng,
             polylinePoints[i - 1].lat, polylinePoints[i - 1].lng,
@@ -722,37 +708,6 @@
     }
     matched.sort((a, b) => a.routeOrder - b.routeOrder || a.distanceKm - b.distanceKm);
     return matched;
-  }
-
-  function findReferenceByAmount(amount, polylineCorridorFlat = [], matchedPlazaKeys = new Set()) {
-    if (!(amount > 0)) return null;
-    // 1. Prefer a plaza along the current route corridor that has this exact Class 1 rate
-    const corridorHit = polylineCorridorFlat.find(
-      pm => Math.abs(pm.rate - amount) <= 0.01 && !matchedPlazaKeys.has(`${pm.system}|${pm.plaza}`)
-    );
-    if (corridorHit) {
-      return { ...corridorHit, matchedBy: 'route+rate' };
-    }
-    // 2. Fallback to any plaza in TOLL_PLAZA_REFERENCE with this exact Class 1 rate
-    const refHit = TOLL_PLAZA_REFERENCE.find(
-      ref => ref.type === 'flat' &&
-        ref.rate != null &&
-        !ref.system.startsWith('GENTING ROAD CHARGE') &&
-        Math.abs(ref.rate - amount) <= 0.01 &&
-        !matchedPlazaKeys.has(`${ref.system}|${ref.plaza}`)
-    );
-    if (refHit) {
-      return {
-        rate: refHit.rate,
-        system: refHit.system,
-        plaza: refHit.plaza,
-        type: refHit.type,
-        systemType: refHit.systemType,
-        distanceKm: null,
-        matchedBy: 'rate-table'
-      };
-    }
-    return null;
   }
 
   function findReferenceRate(plazaName, systemName, tollCoords = null) {
@@ -1390,7 +1345,7 @@
       route && route.tollSystems,
       route && route.tollCollectionSystems
     ];
-    sysCollections.forEach(col => {
+    sysCollections.forEach((col,colIdx) => {
       if (!Array.isArray(col)) return;
       col.forEach((sys,sysIdx) => {
         if (!sys || typeof sys !== 'object') return;
@@ -1449,18 +1404,6 @@
     };
   }
 
-  function extractSectionRoadLabel(section) {
-    const actions = Array.isArray(section && section.actions) ? section.actions : [];
-    for (const act of actions) {
-      const road = (act && act.nextRoad && act.nextRoad.name && act.nextRoad.name[0] && act.nextRoad.name[0].value) ||
-        (act && act.currentRoad && act.currentRoad.name && act.currentRoad.name[0] && act.currentRoad.name[0].value) || '';
-      if (road && !/malaysian highway toll rate system/i.test(road)) {
-        return road;
-      }
-    }
-    return '';
-  }
-
   function calculateHereTolls(route,paymentPref='any') {
     const sections = Array.isArray(route && route.sections) ? route.sections : [];
     const tollSystems = getHereTollSystemMap(route);
@@ -1480,17 +1423,10 @@
     let closedMatchedCount = 0;
     const seenFareIds = new Set();
     const matchedPlazaKeys = new Set();
-    const seenUnmappedTollKeys = new Set();
-    const closedHereByNetwork = new Map();
+    const seenUnmappedAmounts = new Set();
+    // FIX P0-B: rawClosedHereAmounts now bucketed per network (object, not plain number)
+    const rawClosedHereAmounts = [];
     const items = [];
-
-    const recordClosedHereFare = (network, amount, plazaLabel) => {
-      if (!(amount > 0)) return;
-      const key = network || 'UNKNOWN';
-      const existing = closedHereByNetwork.get(key) || [];
-      existing.push({ amount: roundMoney(amount), plaza: plazaLabel || '' });
-      closedHereByNetwork.set(key, existing);
-    };
 
     const pushItem = (item) => {
       items.push(item);
@@ -1500,15 +1436,13 @@
       else if (paymentPref && paymentPref !== 'any') preferenceMismatchCount++;
       if (item.referenceApplied) referenceAppliedCount++;
       if (item.referenceDiscrepancy) referenceDiscrepancyCount++;
-      if (item.matchedBy === 'gps' || item.matchedBy === 'route+rate' || item.matchedBy === 'rate-table' || item.matchedBy === 'closed-matrix' || item.matchedBy === 'polyline') gpsMatchedCount++;
+      if (item.matchedBy === 'gps' || item.matchedBy === 'route+rate' || item.matchedBy === 'closed-matrix') gpsMatchedCount++;
       if (item.systemType === 'closed') closedMatchedCount++;
     };
 
     sections.forEach((section,secIdx) => {
       const tolls = Array.isArray(section.tolls) ? section.tolls : [];
       const summaryCosts = section.summary && Array.isArray(section.summary.tollCosts) ? section.summary.tollCosts : [];
-      const sectionRoad = extractSectionRoadLabel(section);
-
       if (tolls.length) {
         hasItemisedTolls = true;
         tolls.forEach((toll,tollIdx) => {
@@ -1516,11 +1450,7 @@
             (toll.tollSystem && (toll.tollSystem.id || toll.tollSystem.name)) ||
             toll.tollSystemId || '';
           const sysInfo = tollSystems.get(sysRefRaw) || (typeof toll.tollSystem === 'object' ? toll.tollSystem : null) || null;
-          const rawSysName = (sysInfo && (sysInfo.name || sysInfo.id)) || (typeof toll.tollSystem === 'string' ? toll.tollSystem : '') || '';
-          const sysName = /malaysian highway toll rate system/i.test(rawSysName) ? '' : rawSysName;
-          const rawTollName = toll.name || '';
-          const cleanTollName = /malaysian highway toll rate system/i.test(rawTollName) ? '' : rawTollName;
-
+          const sysName = (sysInfo && (sysInfo.name || sysInfo.id)) || (typeof toll.tollSystem === 'string' ? toll.tollSystem : '') || '';
           const tollCoords = extractTollCoords(toll);
           const picked = selectFareFromToll(toll,paymentPref);
           const pickedAmount = picked ? picked.amount : 0;
@@ -1530,42 +1460,56 @@
             seenFareIds.add(picked.fareId);
           }
 
-          // 1. Match by GPS (within 750m) or clean plaza/system text
-          let refMatch = findReferenceRate(cleanTollName, sysName, tollCoords);
+          let refMatch = findReferenceRate(toll.name || '', sysName, tollCoords);
 
-          // 2. Match by corridor plaza or reference table using exact Class 1 amount
-          if (!refMatch && pickedAmount > 0) {
-            refMatch = findReferenceByAmount(pickedAmount, polylineCorridorFlat, matchedPlazaKeys);
+          // Rate-corridor match against route polyline (open-flat supplement)
+          if (!refMatch && picked) {
+            const amountMatches = polylineCorridorFlat.filter(
+              pm => Math.abs(pm.rate - pickedAmount) <= 0.01 && !matchedPlazaKeys.has(`${pm.system}|${pm.plaza}`)
+            );
+            if (amountMatches.length >= 1) {
+              refMatch = { ...amountMatches[0], matchedBy: 'route+rate' };
+            }
           }
 
-          // Defer closed-system tolls to the unified closed-matrix pass
-          const isClosedToll = Boolean(refMatch && refMatch.type === 'closed') ||
-            (!refMatch && polylineCorridorClosed.length >= 2);
-          if (isClosedToll) {
-            const netTag = getClosedNetworkTag(refMatch ? refMatch.system : (sysName || sectionRoad));
-            const label = (refMatch && refMatch.plaza) || cleanTollName || sysName || sectionRoad;
-            recordClosedHereFare(netTag, pickedAmount, label);
+          // FIX P0-A: Always defer closed-system tolls to the closed-matrix pass, whether
+          // the reference match or the HERE coords classify it as closed. Previously the
+          // itemised loop also pushed an amount for closed-type refMatches, doubling the
+          // closed fare later when the matrix pass ran.
+          const refClosed = refMatch && refMatch.type === 'closed';
+          const hereOnClosedCorridor = !refMatch && picked && polylineCorridorClosed.length >= 2;
+          if (picked && (refClosed || hereOnClosedCorridor)) {
+            const network = getClosedNetworkTag(refMatch ? refMatch.system : sysName) || '';
+            rawClosedHereAmounts.push({
+              network,
+              amount: pickedAmount,
+              plaza: refMatch ? refMatch.plaza : (toll.name || sysName || '')
+            });
             return;
           }
 
+          // FIX P1-C: Unmapped HERE tolls are no longer silently dropped when the route
+          // polyline contains no matching flat plazas. HERE remains authoritative for
+          // any toll the reference table cannot yet resolve.
           if (!picked && !(refMatch && refMatch.type === 'flat' && refMatch.rate != null)) return;
+
+          const rawHereName = toll.name || sysName || `Toll Point ${secIdx + 1}.${tollIdx + 1}`;
+          const isGenericSystemLabel = /malaysian highway toll rate system/i.test(rawHereName);
 
           if (refMatch) {
             const plazaKey = `${refMatch.system}|${refMatch.plaza}`;
             if (matchedPlazaKeys.has(plazaKey)) return;
           } else {
-            const coordKey = tollCoords ? `${tollCoords.lat.toFixed(4)},${tollCoords.lng.toFixed(4)}` : `${secIdx}.${tollIdx}`;
-            const unmappedKey = `${normalizeTollText(cleanTollName || sectionRoad)}|${pickedAmount.toFixed(2)}|${coordKey}`;
-            if (seenUnmappedTollKeys.has(unmappedKey)) return;
-            seenUnmappedTollKeys.add(unmappedKey);
+            // FIX P0-D: Per-toll dedup key rather than amount-only, so two distinct
+            // plazas at the same rate are no longer collapsed into one line item.
+            const amtKey = `${normalizeTollText(rawHereName)}|${pickedAmount.toFixed(2)}`;
+            if (seenUnmappedAmounts.has(amtKey)) return;
+            seenUnmappedAmounts.add(amtKey);
           }
 
-          // Always resolve to plaza name when matched; never show generic system label
           const plazaName = refMatch
             ? `${refMatch.plaza} (${refMatch.system})`
-            : cleanTollName
-              ? (sysName && !cleanTollName.includes(sysName) ? `${cleanTollName} (${sysName})` : cleanTollName)
-              : (sectionRoad ? `${sectionRoad} Toll Plaza` : `Toll Plaza #${tollIdx + 1}`);
+            : (isGenericSystemLabel ? 'Toll Plaza (Unmapped Gantry)' : rawHereName);
 
           let finalAmount = pickedAmount;
           let referenceApplied = false;
@@ -1605,6 +1549,8 @@
         });
       }
 
+      // FIX P1-H: Per-section summary fallback. Previously a first-section itemised
+      // route suppressed summary tolls on subsequent sections.
       if (tolls.length === 0 && summaryCosts.length) {
         hasSummaryTolls = true;
         summaryCosts.forEach((cost,cIdx) => {
@@ -1612,24 +1558,25 @@
           const val = Number(price && price.value);
           const curr = String((price && price.currency) || cost.currency || 'MYR').toUpperCase();
           if (!Number.isFinite(val) || val < 0 || curr !== 'MYR') return;
-          const amountMatch = findReferenceByAmount(roundMoney(val), polylineCorridorFlat, matchedPlazaKeys);
+          const amountMatch = polylineCorridorFlat.find(
+            pm => Math.abs(pm.rate - roundMoney(val)) <= 0.01 && !matchedPlazaKeys.has(`${pm.system}|${pm.plaza}`)
+          );
           if (amountMatch) matchedPlazaKeys.add(`${amountMatch.system}|${amountMatch.plaza}`);
-          const fallbackLabel = sectionRoad ? `${sectionRoad} Toll Plaza` : `Toll Plaza #${cIdx + 1}`;
           pushItem({
-            name:amountMatch ? `${amountMatch.plaza} (${amountMatch.system})` : fallbackLabel,
+            name:amountMatch ? `${amountMatch.plaza} (${amountMatch.system})` : `Route Toll Summary ${secIdx + 1}.${cIdx + 1}`,
             system:amountMatch ? amountMatch.system : '',
             amount:roundMoney(val),
             hereAmount:roundMoney(val),
             currency:'MYR',
             paymentMethods:[],
-            fareName:cost.name && !/malaysian highway toll rate system/i.test(cost.name) ? cost.name : '',
+            fareName:cost.name || '',
             fareId:cost.id ? String(cost.id) : '',
             matchedPreference:false,
             referenceApplied:Boolean(amountMatch),
             referenceDiscrepancy:false,
             referenceLabel:amountMatch ? `${amountMatch.system} · ${amountMatch.plaza} (${amountMatch.systemType})` : '',
             systemType:amountMatch ? amountMatch.systemType : 'unknown',
-            matchedBy:amountMatch ? amountMatch.matchedBy : 'here',
+            matchedBy:amountMatch ? 'route+rate' : 'here',
             source:'section.summary.tollCosts'
           });
         });
@@ -1642,30 +1589,35 @@
         const val = Number(price && price.value);
         const curr = String((price && price.currency) || cost.currency || 'MYR').toUpperCase();
         if (!Number.isFinite(val) || val < 0 || curr !== 'MYR') return;
-        const amountMatch = findReferenceByAmount(roundMoney(val), polylineCorridorFlat, matchedPlazaKeys);
+        const amountMatch = polylineCorridorFlat.find(
+          pm => Math.abs(pm.rate - roundMoney(val)) <= 0.01 && !matchedPlazaKeys.has(`${pm.system}|${pm.plaza}`)
+        );
         if (amountMatch) matchedPlazaKeys.add(`${amountMatch.system}|${amountMatch.plaza}`);
         pushItem({
-          name:amountMatch ? `${amountMatch.plaza} (${amountMatch.system})` : `Toll Plaza #${idx + 1}`,
+          name:amountMatch ? `${amountMatch.plaza} (${amountMatch.system})` : `Route Summary Toll ${idx + 1}`,
           system:amountMatch ? amountMatch.system : '',
           amount:roundMoney(val),
           hereAmount:roundMoney(val),
           currency:'MYR',
           paymentMethods:[],
-          fareName:cost.name && !/malaysian highway toll rate system/i.test(cost.name) ? cost.name : '',
+          fareName:cost.name || '',
           fareId:cost.id ? String(cost.id) : '',
           matchedPreference:false,
           referenceApplied:Boolean(amountMatch),
           referenceDiscrepancy:false,
           referenceLabel:amountMatch ? `${amountMatch.system} · ${amountMatch.plaza} (${amountMatch.systemType})` : '',
           systemType:amountMatch ? amountMatch.systemType : 'unknown',
-          matchedBy:amountMatch ? amountMatch.matchedBy : 'here',
+          matchedBy:amountMatch ? 'route+rate' : 'here',
           source:'route.summary.tollCosts'
         });
       });
     }
 
-    // Closed-system Entry -> Exit cross-check with unified PLUS/NKVE/ELITE network & per-network fallback
-    const handledClosedNetworks = new Set();
+    // Closed-system Entry → Exit cross-check.
+    // FIX P0-B: HERE fallback amounts are looked up per network, so a SKVE + WCE route
+    // no longer reuses SKVE's HERE fare for WCE. FIX P0-A: matrix pass is now the sole
+    // source of closed-system line items — the itemised loop defers all closed tolls.
+    const closedProcessedNetworks = new Set();
     if (polylineCorridorClosed.length >= 2) {
       const byNetwork = {};
       polylineCorridorClosed.forEach(cp => {
@@ -1683,13 +1635,11 @@
         const entryPlaza = netPlazas[0];
         const exitPlaza = netPlazas[netPlazas.length - 1];
         const matrixHit = findClosedMatrixRate(net, entryPlaza.plaza, exitPlaza.plaza);
-        const netHereList = closedHereByNetwork.get(net) || [];
-        const netHereSum = netHereList.length
-          ? roundMoney(netHereList.reduce((acc, e) => acc + e.amount, 0))
-          : null;
+        const netHereAmounts = rawClosedHereAmounts.filter(r => r.network === net);
+        const netHereAmount = netHereAmounts.length ? netHereAmounts[0].amount : null;
 
         if (matrixHit) {
-          const fallbackHere = netHereSum != null ? netHereSum : matrixHit.rate;
+          const fallbackHere = netHereAmount != null ? roundMoney(netHereAmount) : matrixHit.rate;
           const discrepancy = Math.abs(fallbackHere - matrixHit.rate) > 0.01;
           pushItem({
             name: `${entryPlaza.plaza} → ${exitPlaza.plaza} (${matrixHit.system})`,
@@ -1708,64 +1658,63 @@
             matchedBy: 'closed-matrix',
             source: 'closed.matrix'
           });
-          handledClosedNetworks.add(net);
-        } else if (netHereSum != null && netHereSum > 0) {
-          const sysLabel = entryPlaza.system === exitPlaza.system
-            ? entryPlaza.system
-            : `${entryPlaza.system} / ${exitPlaza.system}`;
+          closedProcessedNetworks.add(net);
+        } else if (netHereAmount != null && netHereAmount > 0) {
           pushItem({
-            name: `${entryPlaza.plaza} → ${exitPlaza.plaza} (${sysLabel})`,
-            system: sysLabel,
-            amount: netHereSum,
-            hereAmount: netHereSum,
+            name: `${entryPlaza.plaza} → ${exitPlaza.plaza} (${entryPlaza.system})`,
+            system: entryPlaza.system,
+            amount: roundMoney(netHereAmount),
+            hereAmount: roundMoney(netHereAmount),
             currency: 'MYR',
             paymentMethods: ['Touch \'n Go'],
-            fareName: 'Class 1 Closed (HERE per-network)',
+            fareName: 'Class 1 Closed (HERE fallback)',
             fareId: '',
             matchedPreference: true,
             referenceApplied: false,
             referenceDiscrepancy: false,
-            referenceLabel: `${sysLabel} · ${entryPlaza.plaza} → ${exitPlaza.plaza} (closed · HERE fallback)`,
+            referenceLabel: `${entryPlaza.system} · ${entryPlaza.plaza} → ${exitPlaza.plaza} (closed · HERE fallback)`,
             systemType: 'closed',
             matchedBy: 'here',
             source: 'closed.hereFallback'
           });
-          handledClosedNetworks.add(net);
+          closedProcessedNetworks.add(net);
         }
       });
     }
 
-    // Any remaining per-network closed HERE tolls not resolved by a 2-plaza matrix pair
-    closedHereByNetwork.forEach((entries, netKey) => {
-      if (handledClosedNetworks.has(netKey)) return;
-      const sum = roundMoney(entries.reduce((acc, e) => acc + e.amount, 0));
-      if (!(sum > 0)) return;
-      const cleanLabels = [...new Set(
-        entries.map(e => e.plaza).filter(p => p && !/malaysian highway toll rate system/i.test(p))
-      )].join(', ');
-      const netTitle = netKey !== 'UNKNOWN' ? `${netKey} Closed Toll` : 'Closed Highway Toll';
+    // Deferred closed tolls not covered by polyline/matrix fallback: keep HERE amount.
+    // This ensures a HERE-identified closed toll is never silently lost when the route
+    // polyline has fewer than two closed plazas on it.
+    rawClosedHereAmounts.forEach(raw => {
+      if (!raw.amount || raw.amount <= 0) return;
+      if (raw.network && closedProcessedNetworks.has(raw.network)) return;
+      const dup = items.some(it => it.systemType === 'closed' && Math.abs(it.amount - raw.amount) <= 0.01);
+      if (dup) return;
       pushItem({
-        name: cleanLabels ? `${cleanLabels} (${netKey})` : netTitle,
-        system: netKey !== 'UNKNOWN' ? netKey : '',
-        amount: sum,
-        hereAmount: sum,
+        name: `${raw.plaza || 'Closed Toll'} (${raw.network || 'HERE'})`,
+        system: raw.network || '',
+        amount: roundMoney(raw.amount),
+        hereAmount: roundMoney(raw.amount),
         currency: 'MYR',
         paymentMethods: [],
-        fareName: 'Class 1 Closed (HERE fallback)',
+        fareName: 'Class 1 Closed (HERE)',
         fareId: '',
         matchedPreference: true,
         referenceApplied: false,
         referenceDiscrepancy: false,
-        referenceLabel: netKey !== 'UNKNOWN' ? `${netKey} closed HERE fare` : '',
+        referenceLabel: '',
         systemType: 'closed',
         matchedBy: 'here',
         source: 'closed.hereFallback'
       });
+      if (raw.network) closedProcessedNetworks.add(raw.network);
     });
 
-    // Restrict RM 5.00 Genting Road Charge strictly to Genting Highlands
+    // FIX P0-E: Genting road charge is gated on the highland zone name. Previously any
+    // of the four highland zones (Cameron, Fraser's Hill, Bukit Tinggi) received the
+    // Genting RM5 charge, which is factually incorrect for those routes.
     const highlandZone = getHighlandZone(pickupCoords, dropoffCoords);
-    const isGentingRoute = Boolean(highlandZone && /genting/i.test(highlandZone.name));
+    const isGentingRoute = highlandZone && /genting/i.test(highlandZone.name || '');
     if (isGentingRoute) {
       const gentingCharge = TOLL_PLAZA_REFERENCE.find(r => r.system.startsWith('GENTING ROAD CHARGE'));
       if (gentingCharge && !matchedPlazaKeys.has(`${gentingCharge.system}|${gentingCharge.plaza}`)) {
@@ -1788,6 +1737,35 @@
           source: 'genting.roadCharge'
         });
       }
+    }
+
+    // Polyline supplement for open-flat plazas the HERE response omitted.
+    // FIX P0-C: The previous "alreadyCoveredByHere" amount-based check silently dropped
+    // legitimate second plazas sharing a rate with an earlier one (e.g., two RM2.00 KESAS
+    // gantries). matchedPlazaKeys is now the sole duplicate guard.
+    if (polylinePoints.length) {
+      polylineCorridorFlat.forEach(pm => {
+        const key = `${pm.system}|${pm.plaza}`;
+        if (matchedPlazaKeys.has(key)) return;
+        matchedPlazaKeys.add(key);
+        pushItem({
+          name: `${pm.plaza} (${pm.system})`,
+          system: pm.system,
+          amount: pm.rate,
+          hereAmount: pm.rate,
+          currency: 'MYR',
+          paymentMethods: [],
+          fareName: '',
+          fareId: '',
+          matchedPreference: false,
+          referenceApplied: true,
+          referenceDiscrepancy: false,
+          referenceLabel: `${pm.system} · ${pm.plaza} (${pm.systemType} · polyline ${Math.round(pm.distanceKm * 1000)}m)`,
+          systemType: pm.systemType,
+          matchedBy: 'polyline',
+          source: 'route.polyline'
+        });
+      });
     }
 
     return {
@@ -2082,8 +2060,10 @@
     if (!routeData.hasManualToll && routeData.tollResult.referenceDiscrepancyCount > 0) {
       warnings.push(`${routeData.tollResult.referenceDiscrepancyCount} toll(s) reconciled against standard table`);
     }
+    // FIX P1-E: surface payment-preference mismatches rather than silently falling back.
     if (!routeData.hasManualToll && routeData.tollResult.preferenceMismatchCount > 0) {
-      warnings.push(`${routeData.tollResult.preferenceMismatchCount} toll(s) fell back from "${routeData.tollResult.paymentPref}" preference`);
+      const prefLabel = routeData.tollResult.paymentPref === 'cash' ? 'cash' : 'electronic';
+      warnings.push(`${routeData.tollResult.preferenceMismatchCount} toll(s) lack ${prefLabel} fare — used alternative payment method`);
     }
     const sourceText = {
       manual: `Tolls: Manual override (${money(tollFee)})`,
@@ -2115,7 +2095,7 @@
     $('result-card').style.display = 'block';
 
     return {
-      version:'3.0.5',
+      version:'3.0.3',
       pickup:$('pickup').value.trim(),
       dropoff:$('dropoff').value.trim(),
       distance:routeData.distance,
@@ -2131,6 +2111,7 @@
       tollPaymentPref:routeData.tollResult.paymentPref,
       referenceAppliedCount:routeData.tollResult.referenceAppliedCount,
       referenceDiscrepancyCount:routeData.tollResult.referenceDiscrepancyCount,
+      preferenceMismatchCount:routeData.tollResult.preferenceMismatchCount || 0,
       hillSurcharge,
       highlandZone:highlandZone ? highlandZone.name : '',
       longHaulIncentive,
@@ -2181,7 +2162,7 @@
       ? 'Standard Table cross-checked (Class 1 Normal TNG)'
       : 'HERE API';
     return [
-      'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v3.0.5',
+      'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v3.0.3',
       '------------------------------------------------',
       `From: ${data.pickup}`,
       `To: ${data.dropoff}`,
@@ -2214,7 +2195,7 @@
       'Tolls are reimbursement, not driver profit.',
       'Driver earnings exclude fuel, maintenance, depreciation and other operating costs.',
       'Estimate only. Verify tolls and final fare before travel.',
-      'Generated by Rideshare MY Personal Edition v3.0.5'
+      'Generated by Rideshare MY Personal Edition v3.0.3'
     ].join('\n');
   }
 
@@ -2402,7 +2383,7 @@
 
     const matrixHeader = document.createElement('div');
     matrixHeader.className = 'ref-system-header';
-    matrixHeader.textContent = 'CLOSED ENTRY → EXIT MATRIX (PLUS / NKVE / ELITE, SKVE, WCE)';
+    matrixHeader.textContent = 'CLOSED ENTRY → EXIT MATRIX (PLUS, NKVE, ELITE, SKVE, WCE)';
     container.appendChild(matrixHeader);
     CLOSED_TOLL_MATRIX.forEach(entry => {
       const row = document.createElement('div');
