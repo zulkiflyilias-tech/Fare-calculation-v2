@@ -283,7 +283,7 @@
   const ADMIN_FLAT_THRESHOLD = 8;
   const SETTINGS_KEY = 'rideshareMY.personal.v3.0.settings';
   const TOLL_GPS_MATCH_RADIUS_KM = 0.25;
-  const POLYLINE_CORRIDOR_RADIUS_KM = 0.10;
+  const POLYLINE_CORRIDOR_RADIUS_KM = 0.15;
 
   const HIGHLAND_ZONES = [
     {lat:3.4241,lng:101.7933,radiusKm:10,name:'Genting Highlands & Gohtong'},
@@ -623,8 +623,6 @@
     return points;
   }
 
-  // NEW: Approximate point-to-segment distance in km (equirectangular projection).
-  // Used to refine vertex-only distance so gantries between sparse polyline vertices are caught.
   function pointToSegmentDistanceKm(pLat, pLng, aLat, aLng, bLat, bLng) {
     const midLat = (aLat + bLat) / 2;
     const cosLat = Math.cos(midLat * Math.PI / 180) || 1;
@@ -648,7 +646,6 @@
   function findPolylineTollMatch(polylinePoints, maxRadiusKm = POLYLINE_CORRIDOR_RADIUS_KM, flatOnly = true) {
     if (!Array.isArray(polylinePoints) || !polylinePoints.length) return [];
 
-    // Bounding-box pre-filter: 4-5x speedup by skipping far-away plazas before haversine loop
     let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
     for (let i = 0; i < polylinePoints.length; i++) {
       const p = polylinePoints[i];
@@ -668,7 +665,6 @@
       if (flatOnly && (ref.type !== 'flat' || ref.rate == null)) continue;
       if (!flatOnly && ref.type !== 'closed') continue;
       if (!Number.isFinite(ref.lat) || !Number.isFinite(ref.lng)) continue;
-      // Bbox filter
       if (ref.lat < minLat - padLat || ref.lat > maxLat + padLat) continue;
       if (ref.lng < minLng - padLng || ref.lng > maxLng + padLng) continue;
 
@@ -680,7 +676,6 @@
           minDist = vDist;
           minIdx = i;
         }
-        // Only compute segment distance when the vertex is already reasonably close
         if (i > 0 && vDist < maxRadiusKm * 2) {
           const sDist = pointToSegmentDistanceKm(
             ref.lat, ref.lng,
@@ -1424,7 +1419,6 @@
     const seenFareIds = new Set();
     const matchedPlazaKeys = new Set();
     const seenUnmappedAmounts = new Set();
-    // FIX P0-B: rawClosedHereAmounts now bucketed per network (object, not plain number)
     const rawClosedHereAmounts = [];
     const items = [];
 
@@ -1462,7 +1456,6 @@
 
           let refMatch = findReferenceRate(toll.name || '', sysName, tollCoords);
 
-          // Rate-corridor match against route polyline (open-flat supplement)
           if (!refMatch && picked) {
             const amountMatches = polylineCorridorFlat.filter(
               pm => Math.abs(pm.rate - pickedAmount) <= 0.01 && !matchedPlazaKeys.has(`${pm.system}|${pm.plaza}`)
@@ -1472,10 +1465,6 @@
             }
           }
 
-          // FIX P0-A: Always defer closed-system tolls to the closed-matrix pass, whether
-          // the reference match or the HERE coords classify it as closed. Previously the
-          // itemised loop also pushed an amount for closed-type refMatches, doubling the
-          // closed fare later when the matrix pass ran.
           const refClosed = refMatch && refMatch.type === 'closed';
           const hereOnClosedCorridor = !refMatch && picked && polylineCorridorClosed.length >= 2;
           if (picked && (refClosed || hereOnClosedCorridor)) {
@@ -1488,28 +1477,37 @@
             return;
           }
 
-          // FIX P1-C: Unmapped HERE tolls are no longer silently dropped when the route
-          // polyline contains no matching flat plazas. HERE remains authoritative for
-          // any toll the reference table cannot yet resolve.
           if (!picked && !(refMatch && refMatch.type === 'flat' && refMatch.rate != null)) return;
 
           const rawHereName = toll.name || sysName || `Toll Point ${secIdx + 1}.${tollIdx + 1}`;
-          const isGenericSystemLabel = /malaysian highway toll rate system/i.test(rawHereName);
+          const isGenericSystemLabel = /malaysian highway toll rate system/i.test(rawHereName) || /toll plaza/i.test(rawHereName);
 
           if (refMatch) {
             const plazaKey = `${refMatch.system}|${refMatch.plaza}`;
             if (matchedPlazaKeys.has(plazaKey)) return;
           } else {
-            // FIX P0-D: Per-toll dedup key rather than amount-only, so two distinct
-            // plazas at the same rate are no longer collapsed into one line item.
             const amtKey = `${normalizeTollText(rawHereName)}|${pickedAmount.toFixed(2)}`;
             if (seenUnmappedAmounts.has(amtKey)) return;
             seenUnmappedAmounts.add(amtKey);
           }
 
-          const plazaName = refMatch
-            ? `${refMatch.plaza} (${refMatch.system})`
-            : (isGenericSystemLabel ? 'Toll Plaza (Unmapped Gantry)' : rawHereName);
+          // ✨ SMART NAME FALLBACK ✨
+          // If HERE gives a generic name and we can't match by GPS/Text,
+          // we attempt to guess the highway system by exact amount match.
+          let plazaName;
+          if (refMatch) {
+              plazaName = `${refMatch.plaza} (${refMatch.system})`;
+          } else {
+              const possibleMatches = TOLL_PLAZA_REFERENCE.filter(r => r.type === 'flat' && Math.abs(r.rate - pickedAmount) <= 0.01);
+              if (possibleMatches.length > 0) {
+                  const systems = [...new Set(possibleMatches.map(m => m.system.split('(')[0].trim()))];
+                  plazaName = `${systems.join(' / ')} Gantry (Amount Match)`;
+              } else if (isGenericSystemLabel) {
+                  plazaName = `Highway Toll (RM ${pickedAmount.toFixed(2)})`;
+              } else {
+                  plazaName = rawHereName;
+              }
+          }
 
           let finalAmount = pickedAmount;
           let referenceApplied = false;
@@ -1549,8 +1547,6 @@
         });
       }
 
-      // FIX P1-H: Per-section summary fallback. Previously a first-section itemised
-      // route suppressed summary tolls on subsequent sections.
       if (tolls.length === 0 && summaryCosts.length) {
         hasSummaryTolls = true;
         summaryCosts.forEach((cost,cIdx) => {
@@ -1613,10 +1609,6 @@
       });
     }
 
-    // Closed-system Entry → Exit cross-check.
-    // FIX P0-B: HERE fallback amounts are looked up per network, so a SKVE + WCE route
-    // no longer reuses SKVE's HERE fare for WCE. FIX P0-A: matrix pass is now the sole
-    // source of closed-system line items — the itemised loop defers all closed tolls.
     const closedProcessedNetworks = new Set();
     if (polylineCorridorClosed.length >= 2) {
       const byNetwork = {};
@@ -1682,9 +1674,6 @@
       });
     }
 
-    // Deferred closed tolls not covered by polyline/matrix fallback: keep HERE amount.
-    // This ensures a HERE-identified closed toll is never silently lost when the route
-    // polyline has fewer than two closed plazas on it.
     rawClosedHereAmounts.forEach(raw => {
       if (!raw.amount || raw.amount <= 0) return;
       if (raw.network && closedProcessedNetworks.has(raw.network)) return;
@@ -1710,9 +1699,6 @@
       if (raw.network) closedProcessedNetworks.add(raw.network);
     });
 
-    // FIX P0-E: Genting road charge is gated on the highland zone name. Previously any
-    // of the four highland zones (Cameron, Fraser's Hill, Bukit Tinggi) received the
-    // Genting RM5 charge, which is factually incorrect for those routes.
     const highlandZone = getHighlandZone(pickupCoords, dropoffCoords);
     const isGentingRoute = highlandZone && /genting/i.test(highlandZone.name || '');
     if (isGentingRoute) {
@@ -1739,10 +1725,6 @@
       }
     }
 
-    // Polyline supplement for open-flat plazas the HERE response omitted.
-    // FIX P0-C: The previous "alreadyCoveredByHere" amount-based check silently dropped
-    // legitimate second plazas sharing a rate with an earlier one (e.g., two RM2.00 KESAS
-    // gantries). matchedPlazaKeys is now the sole duplicate guard.
     if (polylinePoints.length) {
       polylineCorridorFlat.forEach(pm => {
         const key = `${pm.system}|${pm.plaza}`;
@@ -1894,7 +1876,6 @@
     }
     const tollResult = calculateHereTolls(route,paymentPref);
 
-    /* ---- TOLL SOURCE PRIORITY: Manual > Standard Table Cross-Check > HERE ---- */
     const manualRaw = $('manual-toll').value.trim();
     const hasManualToll = manualRaw !== '';
     let effectiveTollAmount;
@@ -2060,7 +2041,6 @@
     if (!routeData.hasManualToll && routeData.tollResult.referenceDiscrepancyCount > 0) {
       warnings.push(`${routeData.tollResult.referenceDiscrepancyCount} toll(s) reconciled against standard table`);
     }
-    // FIX P1-E: surface payment-preference mismatches rather than silently falling back.
     if (!routeData.hasManualToll && routeData.tollResult.preferenceMismatchCount > 0) {
       const prefLabel = routeData.tollResult.paymentPref === 'cash' ? 'cash' : 'electronic';
       warnings.push(`${routeData.tollResult.preferenceMismatchCount} toll(s) lack ${prefLabel} fare — used alternative payment method`);
