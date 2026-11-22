@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare MY - Personal Edition v3.2</title>
+<title>Rideshare MY - Personal Edition v3.3.1</title>
 
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 
@@ -518,7 +518,7 @@ summary {
 
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.2</span>
+      <span class="version">PERSONAL EDITION v3.3.1</span>
     </div>
 
     <!-- LOCATION INPUTS -->
@@ -1617,12 +1617,15 @@ function selectFareFromToll(toll,paymentPref) {
 
 function getSectionTollSystemName(section,toll) {
   const systems = Array.isArray(section && section.tollSystems) ? section.tollSystems : [];
-  const ref = toll && toll.tollSystemRef;
-  if (Number.isInteger(ref) && systems[ref]) {
-    const system = systems[ref];
+  const refs = toll && Array.isArray(toll.tollSystems) ? toll.tollSystems : [];
+  const allRefs = refs.length ? refs :
+    (Number.isInteger(toll && toll.tollSystemRef) ? [toll.tollSystemRef] : []);
+  const names = allRefs.map(ref => {
+    const system = Number.isInteger(ref) ? systems[ref] : null;
     if (typeof system === 'string') return system;
-    if (system && system.name) return String(system.name);
-  }
+    return system && system.name ? String(system.name) : '';
+  }).filter(Boolean);
+  if (names.length) return names.join(' + ');
   if (toll && typeof toll.tollSystem === 'string' && toll.tollSystem.trim()) {
     return toll.tollSystem.trim();
   }
@@ -1632,16 +1635,70 @@ function getSectionTollSystemName(section,toll) {
   return '';
 }
 
-function getTollCollectionLocationName(toll) {
+
+function cleanTollSystemLabel(value) {
+  return String(value || '')
+    .replace(/malaysian\s+highway\s+toll\s+rate\s+system/ig, '')
+    .replace(/\btoll\s+rate\s+system\b/ig, '')
+    .replace(/\s*[·|,+]\s*/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getShortTollDisplayName(item) {
+  const name = cleanTollSystemLabel(item && item.name);
+  return name || 'Toll point';
+}
+
+function getTollCollectionLocationDetails(toll) {
   const locations = toll && toll.tollCollectionLocations;
-  if (Array.isArray(locations) && locations.length) {
-    const named = locations.find(location => location && location.name);
-    if (named) return String(named.name);
+  const list = Array.isArray(locations) ? locations :
+    (locations && typeof locations === 'object' ? [locations] : []);
+  const named = list.find(location => location && location.name) || list[0] || null;
+  const point = named && named.location && typeof named.location === 'object'
+    ? named.location : named;
+  const lat = point && point.lat != null && Number.isFinite(Number(point.lat)) ? Number(point.lat) : null;
+  const lng = point && point.lng != null && Number.isFinite(Number(point.lng)) ? Number(point.lng) : null;
+  return {
+    name:named && named.name ? String(named.name) : '',
+    lat, lng
+  };
+}
+
+function normaliseTollLabel(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+}
+
+function distanceBetweenTollPointsKm(a,b) {
+  if (![a && a.locationLat,a && a.locationLng,b && b.locationLat,b && b.locationLng]
+      .every(value => Number.isFinite(value))) return null;
+  const rad = value => value * Math.PI / 180;
+  const dLat = rad(b.locationLat - a.locationLat);
+  const dLng = rad(b.locationLng - a.locationLng);
+  const x = Math.sin(dLat/2) ** 2 + Math.cos(rad(a.locationLat)) *
+    Math.cos(rad(b.locationLat)) * Math.sin(dLng/2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+
+function markPossibleDuplicateTolls(items) {
+  let pairCount = 0;
+  const resolved = items.filter(item => !item.unresolved && !item.duplicateFareId &&
+    Number.isFinite(Number(item.amount)));
+  for (let i=0; i<resolved.length; i++) {
+    for (let j=i+1; j<resolved.length; j++) {
+      const a = resolved[i], b = resolved[j];
+      const sameName = normaliseTollLabel(a.name) === normaliseTollLabel(b.name);
+      const sameSystem = normaliseTollLabel(a.system) === normaliseTollLabel(b.system);
+      const sameAmount = Math.abs(Number(a.amount)-Number(b.amount)) < 0.005;
+      if (!sameName || !sameSystem || !sameAmount) continue;
+      const distance = distanceBetweenTollPointsKm(a,b);
+      if (distance !== null && distance > 0.1) continue;
+      a.possibleDuplicate = true;
+      b.possibleDuplicate = true;
+      pairCount++;
+    }
   }
-  if (locations && typeof locations === 'object' && locations.name) {
-    return String(locations.name);
-  }
-  return '';
+  return pairCount;
 }
 
 function calculateHereTolls(route,paymentPref='any') {
@@ -1652,6 +1709,8 @@ function calculateHereTolls(route,paymentPref='any') {
   let unresolvedCount = 0;
   let preferenceFallbackCount = 0;
   let systemsCount = 0;
+  let duplicateFareIdCount = 0;
+  const firstSectionByFareId = new Map();
   const items = [];
 
   sections.forEach((section,secIdx) => {
@@ -1666,8 +1725,8 @@ function calculateHereTolls(route,paymentPref='any') {
       itemisedSectionCount++;
       tolls.forEach((toll,tollIdx) => {
         const systemName = getSectionTollSystemName(section,toll);
-        const collectionName = getTollCollectionLocationName(toll);
-        const plazaName = collectionName || systemName || `Toll Point ${secIdx + 1}.${tollIdx + 1}`;
+        const location = getTollCollectionLocationDetails(toll);
+        const plazaName = location.name || systemName || `Toll Point ${secIdx + 1}.${tollIdx + 1}`;
         const picked = selectFareFromToll(toll,paymentPref);
 
         if (!picked) {
@@ -1681,11 +1740,17 @@ function calculateHereTolls(route,paymentPref='any') {
         }
 
         if (paymentPref !== 'any' && !picked.matchedPreference) preferenceFallbackCount++;
-        totalToll = roundMoney(totalToll + picked.amount);
+        const firstSection = picked.fareId ? firstSectionByFareId.get(picked.fareId) : undefined;
+        const repeatedFareId = Boolean(picked.fareId && firstSection !== undefined && firstSection !== secIdx);
+        if (picked.fareId && firstSection === undefined) firstSectionByFareId.set(picked.fareId,secIdx);
+        if (repeatedFareId) duplicateFareIdCount++;
+        else totalToll = roundMoney(totalToll + picked.amount);
         items.push({
           name:plazaName, system:systemName, amount:picked.amount, currency:picked.currency,
           paymentMethods:picked.paymentMethods, fareName:picked.fareName, fareId:picked.fareId,
-          source:'section.tolls', unresolved:false
+          locationLat:location.lat, locationLng:location.lng,
+          source:'section.tolls', unresolved:false, duplicateFareId:repeatedFareId,
+          counted:!repeatedFareId
         });
       });
       return;
@@ -1715,8 +1780,9 @@ function calculateHereTolls(route,paymentPref='any') {
         items.push({
           name:`Route Toll Summary ${secIdx + 1}.${cIdx + 1}`, system:'',
           amount, currency:'MYR', paymentMethods:[],
-          fareName:cost.name || '', fareId:cost.id ? String(cost.id) : '',
-          source:'section.summary.tollCosts', unresolved:false
+          fareName:cost.name || '', fareId:'',
+          source:'section.summary.tollCosts', unresolved:false,
+          duplicateFareId:false, counted:true
         });
       });
     }
@@ -1746,13 +1812,15 @@ function calculateHereTolls(route,paymentPref='any') {
       totalToll = roundMoney(totalToll + amount);
       items.push({
         name:`Route Summary Toll ${idx + 1}`, system:'', amount, currency:'MYR',
-        paymentMethods:[], fareName:cost.name || '', fareId:cost.id ? String(cost.id) : '',
-        source:'route.summary.tollCosts', unresolved:false
+        paymentMethods:[], fareName:cost.name || '', fareId:'',
+        source:'route.summary.tollCosts', unresolved:false,
+        duplicateFareId:false, counted:true
       });
     });
   }
 
-  const resolvedCount = items.filter(item => !item.unresolved).length;
+  const possibleDuplicateCount = markPossibleDuplicateTolls(items);
+  const resolvedCount = items.filter(item => !item.unresolved && !item.duplicateFareId).length;
   const dataStatus = unresolvedCount > 0
     ? (resolvedCount > 0 ? 'partial' : 'unresolved')
     : (resolvedCount > 0 ? 'available' : 'not_returned');
@@ -1761,7 +1829,8 @@ function calculateHereTolls(route,paymentPref='any') {
     amount:roundMoney(totalToll), items, systemsCount,
     totalResolvedCount:resolvedCount, unresolvedCount,
     preferenceMatchedCount:Math.max(0,resolvedCount - preferenceFallbackCount),
-    preferenceFallbackCount, paymentPref, dataStatus,
+    preferenceFallbackCount, duplicateFareIdCount, possibleDuplicateCount,
+    paymentPref, dataStatus,
     hasAnyTollData:resolvedCount > 0 || unresolvedCount > 0
   };
 }
@@ -2010,12 +2079,22 @@ function processCalculations(routeData) {
       row.className = 'toll-item-line';
 
       const left = document.createElement('span');
-      const sysSuffix = item.system ? ` · ${item.system}` : '';
-      left.textContent = `${item.name}${sysSuffix}`;
+      const shortName = getShortTollDisplayName(item);
+      const shortSystem = cleanTollSystemLabel(item.system);
+      const sysSuffix = shortSystem && shortSystem.toLowerCase() !== shortName.toLowerCase()
+        ? ` · ${shortSystem}` : '';
+      left.textContent = `${shortName}${sysSuffix}`;
 
       const right = document.createElement('span');
-      right.textContent = item.unresolved ? 'Unverified' : money(item.amount);
-      if (item.unresolved) row.classList.add('fare-warning');
+      right.textContent = item.unresolved ? 'Unverified' :
+        (item.duplicateFareId ? 'Duplicate ignored' : money(item.amount));
+      if (item.unresolved || item.duplicateFareId || item.possibleDuplicate) row.classList.add('fare-warning');
+      if (item.possibleDuplicate && !item.duplicateFareId) {
+        const note = document.createElement('small');
+        note.textContent = ' · Possible duplicate — retained pending verification';
+        note.className = 'small-muted';
+        left.appendChild(note);
+      }
 
       row.append(left,right);
       breakdownBox.appendChild(row);
@@ -2037,7 +2116,13 @@ function processCalculations(routeData) {
     warnings.push(`${routeData.tollResult.unresolvedCount} toll record(s) could not be verified as Malaysia Class 1 MYR fares`);
   }
   if (routeData.tollResult.preferenceFallbackCount > 0) {
-    warnings.push(`${routeData.tollResult.preferenceFallbackCount} toll record(s) had no matching payment preference; another Class 1 MYR fare was used`);
+    warnings.push(`${routeData.tollResult.preferenceFallbackCount} toll record(s) had no matching payment preference; another HERE MYR fare was used`);
+  }
+  if (routeData.tollResult.duplicateFareIdCount > 0) {
+    warnings.push(`${routeData.tollResult.duplicateFareIdCount} repeated HERE fare ID(s) were counted only once`);
+  }
+  if (routeData.tollResult.possibleDuplicateCount > 0) {
+    warnings.push(`${routeData.tollResult.possibleDuplicateCount} possible duplicate toll pair(s) detected; separate fare IDs were retained`);
   }
 
   const statusParts = [
@@ -2076,6 +2161,8 @@ function processCalculations(routeData) {
     tollFee,
     tollDataStatus:routeData.tollResult.dataStatus,
     tollUnresolvedCount:routeData.tollResult.unresolvedCount,
+    tollDuplicateFareIdCount:routeData.tollResult.duplicateFareIdCount,
+    tollPossibleDuplicateCount:routeData.tollResult.possibleDuplicateCount,
     tollItems:routeData.tollResult.items,
     tollPaymentPref:routeData.tollResult.paymentPref,
     hillSurcharge,
@@ -2119,11 +2206,11 @@ function formatDuration(minutes) {
 
 function receiptText(data) {
   const tollLines = Array.isArray(data.tollItems) && data.tollItems.length
-    ? data.tollItems.map(t => `  - ${t.name}${t.system ? ` (${t.system})` : ''}: ${t.unresolved ? 'UNVERIFIED — confirm manually' : money(t.amount)}`).join('\n')
+    ? data.tollItems.map(t => `  - ${getShortTollDisplayName(t)}${cleanTollSystemLabel(t.system) && cleanTollSystemLabel(t.system).toLowerCase() !== getShortTollDisplayName(t).toLowerCase() ? ` (${cleanTollSystemLabel(t.system)})` : ''}: ${t.unresolved ? 'UNVERIFIED — confirm manually' : (t.duplicateFareId ? `DUPLICATE FARE ID — not added (${money(t.amount)})` : `${money(t.amount)}${t.possibleDuplicate ? ' — possible duplicate; retained' : ''}`)}`).join('\n')
     : '  - No toll records returned by HERE; this does not confirm a toll-free route';
 
   return [
-    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v3.2',
+    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v3.3.1',
     '------------------------------------------------',
     `From: ${data.pickup}`,
     `To: ${data.dropoff}`,
@@ -2143,6 +2230,8 @@ function receiptText(data) {
     `Toll charges (HERE API): ${money(data.tollFee)}`,
     `Toll data status: ${data.tollDataStatus || 'unknown'}`,
     `Unverified toll records: ${data.tollUnresolvedCount || 0}`,
+    `Repeated HERE fare IDs ignored: ${data.tollDuplicateFareIdCount || 0}`,
+    `Possible duplicate toll pairs retained for checking: ${data.tollPossibleDuplicateCount || 0}`, 
     'HERE Toll Items:',
     tollLines,
     '------------------------------------------------',
@@ -2158,7 +2247,7 @@ function receiptText(data) {
     'Tolls are reimbursement, not driver profit.',
     'Driver earnings exclude fuel, maintenance, depreciation and other operating costs.',
     'Estimate only. Verify tolls and final fare before travel.',
-    'Generated by Rideshare MY Personal Edition v3.2'
+    'Generated by Rideshare MY Personal Edition v3.3.1'
   ].join('\n');
 }
 
