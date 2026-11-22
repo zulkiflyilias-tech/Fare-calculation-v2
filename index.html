@@ -331,6 +331,11 @@ button {touch-action:manipulation}
   line-height:1.5;
 }
 
+.fare-status:empty {
+  display:none;
+  margin-bottom:0;
+}
+
 .fare-warning {
   color:#ffcc80;
 }
@@ -2128,10 +2133,10 @@ function processCalculations(routeData) {
     warnings.push('Genting Highlands RM5 road charge added manually (not returned by HERE API)');
   }
 
-  const statusParts = [
-    `Tolls: HERE Routing v8 (${routeData.tollResult.paymentPref}) — ${routeData.tollResult.dataStatus.replace('_',' ')}`,
-    `Highland: ${hillApplies ? 'applied' : 'not applied'}`
-  ];
+  const statusParts = [];
+  if (hillApplies) {
+    statusParts.push('Highland: applied');
+  }
   if (warnings.length) {
     statusParts.push(...warnings);
     $('fare-status').classList.add('fare-warning');
