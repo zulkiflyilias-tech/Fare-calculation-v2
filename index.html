@@ -250,22 +250,6 @@ button {touch-action:manipulation}
   color:#e65100;
 }
 
-.here-toll-meta-row {
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:6px;
-}
-
-.here-toll-meta-row select,
-.here-toll-meta-row input {
-  width:100%;
-  padding:7px 8px;
-  border:1px solid var(--border);
-  border-radius:7px;
-  font-size:12px;
-  background:#fff;
-}
-
 .status-line {
   font-size:11px;
   color:#777;
@@ -590,22 +574,6 @@ summary {
       <button class="toggle-btn" id="btn-avoid-tolls" type="button">
         🛑 Avoid Tolls: OFF
       </button>
-
-      <div class="here-toll-meta-row">
-        <label class="setting-field">
-          Toll Payment Preference
-          <select id="here-payment-pref">
-            <option value="any">All fares</option>
-            <option value="electronic">Electronic / Card / Tag</option>
-            <option value="cash">Cash</option>
-          </select>
-        </label>
-
-        <label class="setting-field">
-          Departure Time (optional)
-          <input id="here-departure-time" type="datetime-local">
-        </label>
-      </div>
 
     </div>
 
@@ -1661,26 +1629,7 @@ function formatTollDisplayName(item) {
   return plaza || operator || 'Toll Plaza';
 }
 
-function matchesTollPaymentPref(fare,pref) {
-  if (!pref || pref === 'any') return true;
-  const methods = Array.isArray(fare.paymentMethods)
-    ? fare.paymentMethods.map(m => String(m).toLowerCase())
-    : [];
-  const text = `${fare.name || ''} ${fare.description || ''} ${methods.join(' ')}`.toLowerCase();
-
-  if (pref === 'electronic') {
-    return (
-      methods.some(m => /electronic|transponder|card|tag|rfid|tng|pass|account|mobile|bankcard|creditcard|travelcard/.test(m)) ||
-      /electronic|transponder|card|tag|rfid|touch.?n.?go|tng|smart.?tag/.test(text)
-    );
-  }
-  if (pref === 'cash') {
-    return methods.some(m => m === 'cash' || m.includes('cash')) || /\bcash\b/.test(text);
-  }
-  return true;
-}
-
-function extractMyrFare(toll,paymentPref) {
+function extractMyrFare(toll) {
   const fares = Array.isArray(toll && toll.fares) ? toll.fares : [];
   if (!fares.length) return null;
 
@@ -1697,22 +1646,13 @@ function extractMyrFare(toll,paymentPref) {
     if (!price) return null;
 
     return {
-      fare,
       amount:roundMoney(Number(price.value)),
       fareId:fare.id ? String(fare.id) : ''
     };
   }).filter(Boolean);
 
   if (!valid.length) return null;
-
-  const matched = valid.filter(entry => matchesTollPaymentPref(entry.fare,paymentPref));
-  const picked = (matched.length ? matched : valid)[0];
-
-  return {
-    amount:picked.amount,
-    fareId:picked.fareId,
-    matchedPreference:paymentPref === 'any' || matched.length > 0
-  };
+  return valid[0];
 }
 
 function getTollSystemLabel(section,toll) {
@@ -1741,11 +1681,10 @@ function getTollLocationName(toll) {
   return named && named.name ? String(named.name).trim() : '';
 }
 
-function extractTollCostsArray(costs,prefix,paymentPref,outItems,seenFareIds) {
-  if (!Array.isArray(costs)) return {resolved:0,unresolved:0,fallback:0};
+function extractTollCostsArray(costs,prefix,outItems,seenFareIds) {
+  if (!Array.isArray(costs)) return {resolved:0,unresolved:0};
   let resolved = 0;
   let unresolved = 0;
-  let fallback = 0;
 
   costs.forEach((cost,idx) => {
     const price = [cost && cost.convertedPrice,cost && cost.price,cost].find(p =>
@@ -1781,7 +1720,7 @@ function extractTollCostsArray(costs,prefix,paymentPref,outItems,seenFareIds) {
     });
   });
 
-  return {resolved,unresolved,fallback};
+  return {resolved,unresolved};
 }
 
 function detectPenangBridgeFromRoute(route) {
@@ -1793,11 +1732,9 @@ function detectPenangBridgeFromRoute(route) {
       const count = ls.getPointCount();
       for (let i = 0; i < count; i++) {
         const pt = ls.extractPoint(i);
-        // Penang 2nd Bridge (JSAHMS) corridor: lat ~5.24–5.29, lng ~100.30–100.43
         if (pt.lat >= 5.23 && pt.lat <= 5.295 && pt.lng >= 100.30 && pt.lng <= 100.43) {
           return 'second';
         }
-        // Penang 1st Bridge corridor: lat ~5.34–5.37, lng ~100.32–100.38
         if (pt.lat >= 5.335 && pt.lat <= 5.375 && pt.lng >= 100.32 && pt.lng <= 100.38) {
           return 'first';
         }
@@ -1807,7 +1744,7 @@ function detectPenangBridgeFromRoute(route) {
   return '';
 }
 
-function evaluateRouteTolls(route,paymentPref='any') {
+function evaluateRouteTolls(route) {
   const sections = Array.isArray(route && route.sections) ? route.sections : [];
   const items = [];
   const seenFareIds = new Set();
@@ -1816,7 +1753,6 @@ function evaluateRouteTolls(route,paymentPref='any') {
   let itemisedSections = 0;
   let summarySections = 0;
   let unresolvedCount = 0;
-  let preferenceFallbackCount = 0;
 
   sections.forEach((section,sIdx) => {
     const tolls = Array.isArray(section.tolls) ? section.tolls : [];
@@ -1829,7 +1765,7 @@ function evaluateRouteTolls(route,paymentPref='any') {
         const systemName = getTollSystemLabel(section,toll);
         const locationName = getTollLocationName(toll);
         const plazaName = locationName || systemName || `Toll Plaza ${sIdx + 1}.${tIdx + 1}`;
-        const picked = extractMyrFare(toll,paymentPref);
+        const picked = extractMyrFare(toll);
 
         if (!picked) {
           unresolvedCount++;
@@ -1846,7 +1782,6 @@ function evaluateRouteTolls(route,paymentPref='any') {
         if (picked.fareId && seenFareIds.has(picked.fareId)) return;
         if (picked.fareId) seenFareIds.add(picked.fareId);
 
-        if (paymentPref !== 'any' && !picked.matchedPreference) preferenceFallbackCount++;
         totalToll = roundMoney(totalToll + picked.amount);
 
         items.push({
@@ -1862,7 +1797,7 @@ function evaluateRouteTolls(route,paymentPref='any') {
 
     if (secCosts.length) {
       summarySections++;
-      const res = extractTollCostsArray(secCosts,`Toll Section ${sIdx + 1}`,paymentPref,items,seenFareIds);
+      const res = extractTollCostsArray(secCosts,`Toll Section ${sIdx + 1}`,items,seenFareIds);
       unresolvedCount += res.unresolved;
       items.slice(-res.resolved).forEach(entry => {
         if (!entry.unresolved) totalToll = roundMoney(totalToll + entry.amount);
@@ -1873,7 +1808,7 @@ function evaluateRouteTolls(route,paymentPref='any') {
   if (itemisedSections === 0 && summarySections === 0 &&
       route && route.summary && Array.isArray(route.summary.tollCosts) &&
       route.summary.tollCosts.length) {
-    const res = extractTollCostsArray(route.summary.tollCosts,'Toll Summary',paymentPref,items,seenFareIds);
+    const res = extractTollCostsArray(route.summary.tollCosts,'Toll Summary',items,seenFareIds);
     unresolvedCount += res.unresolved;
     items.slice(-res.resolved).forEach(entry => {
       if (!entry.unresolved) totalToll = roundMoney(totalToll + entry.amount);
@@ -1939,23 +1874,13 @@ function evaluateRouteTolls(route,paymentPref='any') {
   return {
     amount:roundMoney(totalToll),
     items,
-    unresolvedCount,
-    preferenceFallbackCount,
-    paymentPref
+    unresolvedCount
   };
 }
 
 /* =========================================================
    12. ROUTE CALCULATION (HERE ROUTING API v8)
 ========================================================= */
-
-function buildDepartureParam() {
-  const raw = $('here-departure-time').value;
-  if (!raw) return 'any';
-  const dt = new Date(raw);
-  if (Number.isNaN(dt.getTime())) return 'any';
-  return dt.toISOString();
-}
 
 function calculateRoute() {
   if (!pickupCoords || !dropoffCoords) return;
@@ -1989,8 +1914,6 @@ function calculateRoute() {
   const destination = {...dropoffCoords};
   const routingMode = activeRoutingMode;
   const avoidTollSnapshot = avoidTolls;
-  const paymentPref = $('here-payment-pref').value;
-  const departureTime = buildDepartureParam();
 
   setLoading(true);
   clearError();
@@ -2004,7 +1927,7 @@ function calculateRoute() {
       transportMode:'car',
       origin:`${origin.lat},${origin.lng}`,
       destination:`${destination.lat},${destination.lng}`,
-      departureTime,
+      departureTime:'any',
       currency:'MYR',
       return:'polyline,summary,tolls,actions'
     };
@@ -2025,7 +1948,7 @@ function calculateRoute() {
         }
 
         try {
-          handleRouteResult(result.routes[0],result.routes.length,paymentPref,avoidTollSnapshot,requestId);
+          handleRouteResult(result.routes[0],result.routes.length,avoidTollSnapshot,requestId);
         } catch(error) {
           console.error('Route processing error:',error);
           showError('Route was returned, but its details could not be processed.');
@@ -2046,7 +1969,7 @@ function calculateRoute() {
    13. ROUTE RESULT PROCESSING
 ========================================================= */
 
-function handleRouteResult(route,routesReturnedCount,paymentPref,avoidTollsRequested,requestId) {
+function handleRouteResult(route,routesReturnedCount,avoidTollsRequested,requestId) {
   if (requestId !== routeRequestId) return;
 
   const sections = Array.isArray(route.sections) ? route.sections : [];
@@ -2069,7 +1992,7 @@ function handleRouteResult(route,routesReturnedCount,paymentPref,avoidTollsReque
     throw new Error('Invalid route summary.');
   }
 
-  const tollResult = evaluateRouteTolls(route,paymentPref);
+  const tollResult = evaluateRouteTolls(route);
 
   clearRouteObjects();
   const group = new H.map.Group();
@@ -2226,7 +2149,6 @@ function processCalculations(routeData) {
     urbanLabel:urban.label,
     tollFee,
     tollItems:routeData.tollResult.items,
-    tollPaymentPref:routeData.tollResult.paymentPref,
     hillSurcharge,
     highlandZone:highlandZone ? highlandZone.name : '',
     longHaulIncentive,
@@ -2423,14 +2345,6 @@ function bindEvents() {
   $('btn-mode-fast').addEventListener('click',() => setRoutingMode('fast'));
   $('btn-mode-short').addEventListener('click',() => setRoutingMode('short'));
   $('btn-avoid-tolls').addEventListener('click',toggleAvoidTolls);
-
-  $('here-payment-pref').addEventListener('change',() => {
-    if (pickupCoords && dropoffCoords) calculateRoute();
-  });
-
-  $('here-departure-time').addEventListener('change',() => {
-    if (pickupCoords && dropoffCoords) calculateRoute();
-  });
 
   $('share-btn').addEventListener('click',copyReceipt);
 
