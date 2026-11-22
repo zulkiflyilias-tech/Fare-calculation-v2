@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare MY - Personal Edition v3.4.1</title>
+<title>Rideshare MY - Personal Edition v3.4.2</title>
 
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 
@@ -525,7 +525,7 @@ summary {
 
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.4.1</span>
+      <span class="version">PERSONAL EDITION v3.4.2</span>
     </div>
 
     <!-- LOCATION INPUTS -->
@@ -799,7 +799,7 @@ summary {
    1. CONFIGURATION & MALAYSIAN TOLL OPERATOR DIRECTORY
 ========================================================= */
 
-const APP_VERSION = '3.4.1';
+const APP_VERSION = '3.4.2';
 const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
 const DEFAULT_SETTINGS = Object.freeze({
@@ -822,12 +822,15 @@ const LEGACY_SETTINGS_KEY = 'rideshareMY.personal.v3.0.settings';
 const GENTING_ROAD_CHARGE = 5.00;
 const GENTING_ROAD_CHARGE_NAME = 'Genting Highlands Road Charge';
 
+const PENANG_1ST_BRIDGE_RATE = 7.00;
+const PENANG_2ND_BRIDGE_RATE = 5.74;
+
 const MALAYSIA_TOLL_OPERATORS = Object.freeze([
   {
     tier:'major',
     operator:'PLUS Malaysia Berhad',
     highways:['E1/E2 North-South Expressway','NKVE','ELITE (E6)','Linkedua (E3)','BKE (E15)','Penang Bridge (E36)','LPT2 (E8)'],
-    keywords:['plus','north-south','nkve','elite','linkedua','bke','penang bridge','lpt2']
+    keywords:['plus','north-south','nkve','elite','linkedua','bke','penang bridge','penang 1st','1st bridge','first bridge','jambatan pulau pinang','perai','lpt2']
   },
   {
     tier:'major',
@@ -851,7 +854,7 @@ const MALAYSIA_TOLL_OPERATORS = Object.freeze([
     tier:'independent',
     operator:'Jambatan Kedua Sdn Bhd (JKSB)',
     highways:['Penang Second Bridge (E28)'],
-    keywords:['jksb','2nd bridge','second bridge','sultan abdul halim']
+    keywords:['jksb','2nd bridge','second bridge','jambatan kedua','sultan abdul halim','bandar cassia','jk2pp','batu kawan']
   },
   {
     tier:'independent',
@@ -1127,6 +1130,11 @@ function calculateHaversineDistance(lat1,lon1,lat2,lon2) {
     Math.cos(lat2*Math.PI/180) *
     Math.sin(dLon/2)**2;
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+function isOnPenangIsland(point) {
+  if (!point || !Number.isFinite(point.lat) || !Number.isFinite(point.lng)) return false;
+  return point.lat >= 5.24 && point.lat <= 5.49 && point.lng >= 100.18 && point.lng <= 100.36;
 }
 
 function getHighlandZone(pickup,dropoff) {
@@ -1776,6 +1784,29 @@ function extractTollCostsArray(costs,prefix,paymentPref,outItems,seenFareIds) {
   return {resolved,unresolved,fallback};
 }
 
+function detectPenangBridgeFromRoute(route) {
+  const sections = Array.isArray(route && route.sections) ? route.sections : [];
+  for (const section of sections) {
+    if (!section.polyline || !window.H || !H.geo || !H.geo.LineString) continue;
+    try {
+      const ls = H.geo.LineString.fromFlexiblePolyline(section.polyline);
+      const count = ls.getPointCount();
+      for (let i = 0; i < count; i++) {
+        const pt = ls.extractPoint(i);
+        // Penang 2nd Bridge (JSAHMS) corridor: lat ~5.24–5.29, lng ~100.30–100.43
+        if (pt.lat >= 5.23 && pt.lat <= 5.295 && pt.lng >= 100.30 && pt.lng <= 100.43) {
+          return 'second';
+        }
+        // Penang 1st Bridge corridor: lat ~5.34–5.37, lng ~100.32–100.38
+        if (pt.lat >= 5.335 && pt.lat <= 5.375 && pt.lng >= 100.32 && pt.lng <= 100.38) {
+          return 'first';
+        }
+      }
+    } catch (_) {}
+  }
+  return '';
+}
+
 function evaluateRouteTolls(route,paymentPref='any') {
   const sections = Array.isArray(route && route.sections) ? route.sections : [];
   const items = [];
@@ -1868,6 +1899,40 @@ function evaluateRouteTolls(route,paymentPref='any') {
         amount:GENTING_ROAD_CHARGE,
         unresolved:false
       });
+    }
+  }
+
+  // Penang 1st & 2nd Bridge Toll Check (Mainland -> Penang Island only; Island -> Mainland is RM 0.00)
+  const pickupIsland = isOnPenangIsland(pickupCoords);
+  const dropoffIsland = isOnPenangIsland(dropoffCoords);
+  if (!pickupIsland && dropoffIsland) {
+    const hasBridgeItem = items.some(item =>
+      !item.unresolved &&
+      /penang.*bridge|jambatan.*(pulau pinang|kedua|sultan abdul halim)|jksb|perai|bandar cassia|jk2pp/i.test(
+        `${item.plazaName || ''} ${item.systemName || ''} ${item.operator || ''}`
+      )
+    );
+    if (!hasBridgeItem) {
+      const bridgeType = detectPenangBridgeFromRoute(route);
+      if (bridgeType === 'second') {
+        totalToll = roundMoney(totalToll + PENANG_2ND_BRIDGE_RATE);
+        items.push({
+          plazaName:'Bandar Cassia / JK2PP (Penang 2nd Bridge)',
+          systemName:'Penang Second Bridge (E28)',
+          operator:'Jambatan Kedua Sdn Bhd (JKSB)',
+          amount:PENANG_2ND_BRIDGE_RATE,
+          unresolved:false
+        });
+      } else {
+        totalToll = roundMoney(totalToll + PENANG_1ST_BRIDGE_RATE);
+        items.push({
+          plazaName:'Perai (Penang 1st Bridge)',
+          systemName:'Penang Bridge (E36)',
+          operator:'PLUS Malaysia Berhad',
+          amount:PENANG_1ST_BRIDGE_RATE,
+          unresolved:false
+        });
+      }
     }
   }
 
