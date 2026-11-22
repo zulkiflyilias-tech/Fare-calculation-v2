@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare MY - Personal Edition v3.1</title>
+<title>Rideshare MY - Personal Edition v3.2</title>
 
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 
@@ -518,7 +518,7 @@ summary {
 
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.1</span>
+      <span class="version">PERSONAL EDITION v3.2</span>
     </div>
 
     <!-- LOCATION INPUTS -->
@@ -1554,27 +1554,6 @@ function toggleAvoidTolls() {
    11. HERE ROUTING API v8 TOLL ENGINE
 ========================================================= */
 
-function getHereTollSystemMap(route) {
-  const systemMap = new Map();
-  const sysCollections = [
-    route && route.tollSystems,
-    route && route.tollCollectionSystems
-  ];
-
-  sysCollections.forEach(col => {
-    if (!Array.isArray(col)) return;
-    col.forEach(sys => {
-      if (!sys || typeof sys !== 'object') return;
-      const key = String(sys.id || sys.code || sys.name || '');
-      if (key) {
-        systemMap.set(key,sys);
-      }
-    });
-  });
-
-  return systemMap;
-}
-
 function matchesPaymentPreference(fare,pref) {
   if (!pref || pref === 'any') return true;
   const methods = Array.isArray(fare.paymentMethods)
@@ -1584,257 +1563,191 @@ function matchesPaymentPreference(fare,pref) {
 
   if (pref === 'electronic') {
     return (
-      methods.some(m => /electronic|transponder|card|tag|rfid|tng|pass|account|mobile/.test(m)) ||
+      methods.some(m => /electronic|transponder|card|tag|rfid|tng|pass|account|mobile|bankcard|creditcard|travelcard/.test(m)) ||
       /electronic|transponder|card|tag|rfid|touch.?n.?go|tng|smart.?tag/.test(text)
     );
   }
-
-  if (pref === 'cash') {
-    return methods.includes('cash') || /\bcash\b/.test(text);
-  }
-
+  if (pref === 'cash') return methods.some(m => /cash/.test(m)) || /\bcash\b/.test(text);
   return true;
 }
 
-function getFareVehicleDescription(fare) {
-  const vehicleType = fare && fare.vehicleType;
-  const vehicleText = typeof vehicleType === 'string'
-    ? vehicleType
-    : vehicleType && typeof vehicleType === 'object'
-      ? `${vehicleType.name || ''} ${vehicleType.type || ''} ${vehicleType.id || ''}`
-      : '';
-
-  return [
-    fare && fare.name,
-    fare && fare.description,
-    fare && fare.category,
-    fare && fare.vehicleCategory,
-    vehicleText
-  ].filter(Boolean).join(' ').toLowerCase();
-}
-
-function getPassengerCarFareScore(fare) {
-  const desc = getFareVehicleDescription(fare);
-
-  // Explicit heavy-vehicle, motorcycle and non-Class-1 categories must never be treated as passenger cars.
-  if (/\b(truck|lorry|bus|coach|trailer|motorcycle|motorbike|motor\s*cycle|heavy\s*vehicle)\b/.test(desc)) {
-    return -1;
-  }
-  if (/\bclass\s*(?:[2-9]|\d{2,}|ii|iii|iv|v|vi|vii|viii|ix|x)\b/.test(desc)) {
-    return -1;
-  }
-
-  if (/\bclass\s*1\b|\bclass\s*i\b/.test(desc)) return 100;
-  if (/\b(passenger\s*car|private\s*car|car|automobile|auto)\b/.test(desc)) return 80;
-
-  // Unknown classes are deliberately not guessed.
-  return 0;
-}
-
+/*
+ * HERE returns fare options for the requested transportMode:'car'.
+ * Its toll Fare schema does not reliably contain a textual "Class 1" or
+ * "passenger car" label. Do not reject a valid car fare based on its name.
+ */
 function selectFareFromToll(toll,paymentPref) {
-  const fares = Array.isArray(toll.fares) ? toll.fares : [];
+  const fares = Array.isArray(toll && toll.fares) ? toll.fares : [];
   if (!fares.length) return null;
 
-  const validMyrFares = fares.filter(f => {
-    if (!f || typeof f !== 'object') return false;
-    const price = f.price && typeof f.price === 'object' ? f.price : f;
-    const val = Number(price.value);
-    const curr = String(price.currency || f.currency || '').toUpperCase();
-    return Number.isFinite(val) && val >= 0 && curr === 'MYR';
-  });
+  const candidates = fares.map(fare => {
+    if (!fare || typeof fare !== 'object') return null;
+    if (fare.reason && String(fare.reason).toLowerCase() !== 'toll') return null;
 
-  if (!validMyrFares.length) return null;
+    // Prefer HERE's converted MYR price; otherwise accept only an explicit MYR price.
+    const priceOptions = [fare.convertedPrice,fare.price,fare];
+    const price = priceOptions.find(p =>
+      p && typeof p === 'object' &&
+      Number.isFinite(Number(p.value)) &&
+      Number(p.value) >= 0 &&
+      String(p.currency || fare.currency || '').toUpperCase() === 'MYR'
+    );
+    if (!price) return null;
 
-  const carFares = validMyrFares
-    .map(fare => ({fare,score:getPassengerCarFareScore(fare)}))
-    .filter(entry => entry.score > 0)
-    .sort((a,b) => b.score - a.score);
+    return {
+      fare,
+      amount:roundMoney(Number(price.value)),
+      paymentMethods:Array.isArray(fare.paymentMethods) ? fare.paymentMethods : []
+    };
+  }).filter(Boolean);
 
-  if (!carFares.length) return null;
-
-  const preferred = carFares.filter(entry => matchesPaymentPreference(entry.fare,paymentPref));
-  const chosenEntry = (preferred.length ? preferred : carFares)[0];
-  const chosen = chosenEntry.fare;
-  const priceObj = chosen.price && typeof chosen.price === 'object' ? chosen.price : chosen;
+  if (!candidates.length) return null;
+  const preferred = candidates.filter(entry => matchesPaymentPreference(entry.fare,paymentPref));
+  const chosen = (preferred.length ? preferred : candidates)[0];
 
   return {
-    amount:roundMoney(Number(priceObj.value)),
+    amount:chosen.amount,
     currency:'MYR',
-    fareId:chosen.id ? String(chosen.id) : '',
-    fareName:chosen.name || chosen.description || '',
-    paymentMethods:Array.isArray(chosen.paymentMethods) ? chosen.paymentMethods : [],
+    fareId:chosen.fare.id ? String(chosen.fare.id) : '',
+    fareName:chosen.fare.name || chosen.fare.description || '',
+    paymentMethods:chosen.paymentMethods,
     matchedPreference:paymentPref === 'any' || preferred.length > 0
   };
 }
 
-function getHereTollSystemMap(route) {
-  const systemMap = new Map();
-  const sysCollections = [
-    route && route.tollSystems,
-    route && route.tollCollectionSystems
-  ];
+function getSectionTollSystemName(section,toll) {
+  const systems = Array.isArray(section && section.tollSystems) ? section.tollSystems : [];
+  const ref = toll && toll.tollSystemRef;
+  if (Number.isInteger(ref) && systems[ref]) {
+    const system = systems[ref];
+    if (typeof system === 'string') return system;
+    if (system && system.name) return String(system.name);
+  }
+  if (toll && typeof toll.tollSystem === 'string' && toll.tollSystem.trim()) {
+    return toll.tollSystem.trim();
+  }
+  if (toll && toll.tollSystem && typeof toll.tollSystem === 'object') {
+    return String(toll.tollSystem.name || toll.tollSystem.id || '');
+  }
+  return '';
+}
 
-  sysCollections.forEach(col => {
-    if (!Array.isArray(col)) return;
-    col.forEach(sys => {
-      if (!sys || typeof sys !== 'object') return;
-      const key = String(sys.id || sys.code || sys.name || '');
-      if (key) systemMap.set(key,sys);
-    });
-  });
-
-  return systemMap;
+function getTollCollectionLocationName(toll) {
+  const locations = toll && toll.tollCollectionLocations;
+  if (Array.isArray(locations) && locations.length) {
+    const named = locations.find(location => location && location.name);
+    if (named) return String(named.name);
+  }
+  if (locations && typeof locations === 'object' && locations.name) {
+    return String(locations.name);
+  }
+  return '';
 }
 
 function calculateHereTolls(route,paymentPref='any') {
   const sections = Array.isArray(route && route.sections) ? route.sections : [];
-  const tollSystems = getHereTollSystemMap(route);
-
   let totalToll = 0;
   let itemisedSectionCount = 0;
   let summarySectionCount = 0;
   let unresolvedCount = 0;
   let preferenceFallbackCount = 0;
+  let systemsCount = 0;
   const items = [];
 
   sections.forEach((section,secIdx) => {
     const tolls = Array.isArray(section.tolls) ? section.tolls : [];
     const summaryCosts = section.summary && Array.isArray(section.summary.tollCosts)
-      ? section.summary.tollCosts
-      : [];
+      ? section.summary.tollCosts : [];
 
-    // A section's itemised toll records take precedence over its summary.
-    // Do not add both representations of the same section.
+    if (Array.isArray(section.tollSystems)) systemsCount += section.tollSystems.length;
+
+    // Detailed section tolls take precedence over summary costs to avoid double-counting.
     if (tolls.length) {
       itemisedSectionCount++;
-
       tolls.forEach((toll,tollIdx) => {
-        const sysRefId = String(
-          (toll.tollSystem && (toll.tollSystem.id || toll.tollSystem.name)) ||
-          toll.tollSystemId ||
-          ''
-        );
-        const sysInfo = tollSystems.get(sysRefId) || toll.tollSystem || null;
-        const sysName = (sysInfo && (sysInfo.name || sysInfo.id)) || sysRefId || '';
-        const plazaName = toll.name || sysName || `Toll Point ${secIdx + 1}.${tollIdx + 1}`;
+        const systemName = getSectionTollSystemName(section,toll);
+        const collectionName = getTollCollectionLocationName(toll);
+        const plazaName = collectionName || systemName || `Toll Point ${secIdx + 1}.${tollIdx + 1}`;
         const picked = selectFareFromToll(toll,paymentPref);
 
         if (!picked) {
           unresolvedCount++;
           items.push({
-            name:plazaName,
-            system:sysName,
-            amount:null,
-            currency:'MYR',
-            paymentMethods:[],
-            fareName:'',
-            fareId:'',
-            source:'section.tolls',
-            unresolved:true
+            name:plazaName, system:systemName, amount:null, currency:'MYR',
+            paymentMethods:[], fareName:'', fareId:'',
+            source:'section.tolls', unresolved:true
           });
           return;
         }
 
-        if (paymentPref !== 'any' && !picked.matchedPreference) {
-          preferenceFallbackCount++;
-        }
-
-        // Do not deduplicate on fareId: the same tariff ID may legitimately occur
-        // at more than one toll point along a route.
+        if (paymentPref !== 'any' && !picked.matchedPreference) preferenceFallbackCount++;
         totalToll = roundMoney(totalToll + picked.amount);
         items.push({
-          name:plazaName,
-          system:sysName,
-          amount:picked.amount,
-          currency:picked.currency,
-          paymentMethods:picked.paymentMethods,
-          fareName:picked.fareName,
-          fareId:picked.fareId,
-          source:'section.tolls',
-          unresolved:false
+          name:plazaName, system:systemName, amount:picked.amount, currency:picked.currency,
+          paymentMethods:picked.paymentMethods, fareName:picked.fareName, fareId:picked.fareId,
+          source:'section.tolls', unresolved:false
         });
       });
-
       return;
     }
 
     if (summaryCosts.length) {
       summarySectionCount++;
       summaryCosts.forEach((cost,cIdx) => {
-        const price = cost && cost.price && typeof cost.price === 'object' ? cost.price : cost;
-        const val = Number(price && price.value);
-        const curr = String((price && price.currency) || (cost && cost.currency) || '').toUpperCase();
-
-        if (!Number.isFinite(val) || val < 0 || curr !== 'MYR') {
+        const priceOptions = [cost && cost.convertedPrice,cost && cost.price,cost];
+        const price = priceOptions.find(p =>
+          p && typeof p === 'object' &&
+          Number.isFinite(Number(p.value)) && Number(p.value) >= 0 &&
+          String(p.currency || (cost && cost.currency) || '').toUpperCase() === 'MYR'
+        );
+        if (!price) {
           unresolvedCount++;
           items.push({
-            name:`Route Toll Summary ${secIdx + 1}.${cIdx + 1}`,
-            system:'',
-            amount:null,
-            currency:'MYR',
-            paymentMethods:[],
-            fareName:cost && (cost.name || ''),
-            fareId:'',
-            source:'section.summary.tollCosts',
-            unresolved:true
+            name:`Route Toll Summary ${secIdx + 1}.${cIdx + 1}`, system:'',
+            amount:null, currency:'MYR', paymentMethods:[],
+            fareName:cost && (cost.name || ''), fareId:'',
+            source:'section.summary.tollCosts', unresolved:true
           });
           return;
         }
-
-        const amount = roundMoney(val);
+        const amount = roundMoney(Number(price.value));
         totalToll = roundMoney(totalToll + amount);
         items.push({
-          name:`Route Toll Summary ${secIdx + 1}.${cIdx + 1}`,
-          system:'',
-          amount,
-          currency:'MYR',
-          paymentMethods:[],
-          fareName:cost.name || '',
-          fareId:cost.id ? String(cost.id) : '',
-          source:'section.summary.tollCosts',
-          unresolved:false
+          name:`Route Toll Summary ${secIdx + 1}.${cIdx + 1}`, system:'',
+          amount, currency:'MYR', paymentMethods:[],
+          fareName:cost.name || '', fareId:cost.id ? String(cost.id) : '',
+          source:'section.summary.tollCosts', unresolved:false
         });
       });
     }
   });
 
-  // Route-level summary is a fallback only when no section exposed toll data.
+  // Route-level summary is a final fallback only if no section exposed toll data.
   if (itemisedSectionCount === 0 && summarySectionCount === 0 &&
       route && route.summary && Array.isArray(route.summary.tollCosts) &&
       route.summary.tollCosts.length) {
     route.summary.tollCosts.forEach((cost,idx) => {
-      const price = cost && cost.price && typeof cost.price === 'object' ? cost.price : cost;
-      const val = Number(price && price.value);
-      const curr = String((price && price.currency) || (cost && cost.currency) || '').toUpperCase();
-
-      if (!Number.isFinite(val) || val < 0 || curr !== 'MYR') {
+      const priceOptions = [cost && cost.convertedPrice,cost && cost.price,cost];
+      const price = priceOptions.find(p =>
+        p && typeof p === 'object' &&
+        Number.isFinite(Number(p.value)) && Number(p.value) >= 0 &&
+        String(p.currency || (cost && cost.currency) || '').toUpperCase() === 'MYR'
+      );
+      if (!price) {
         unresolvedCount++;
         items.push({
-          name:`Route Summary Toll ${idx + 1}`,
-          system:'',
-          amount:null,
-          currency:'MYR',
-          paymentMethods:[],
-          fareName:cost && (cost.name || ''),
-          fareId:'',
-          source:'route.summary.tollCosts',
-          unresolved:true
+          name:`Route Summary Toll ${idx + 1}`, system:'', amount:null, currency:'MYR',
+          paymentMethods:[], fareName:cost && (cost.name || ''), fareId:'',
+          source:'route.summary.tollCosts', unresolved:true
         });
         return;
       }
-
-      const amount = roundMoney(val);
+      const amount = roundMoney(Number(price.value));
       totalToll = roundMoney(totalToll + amount);
       items.push({
-        name:`Route Summary Toll ${idx + 1}`,
-        system:'',
-        amount,
-        currency:'MYR',
-        paymentMethods:[],
-        fareName:cost.name || '',
-        fareId:cost.id ? String(cost.id) : '',
-        source:'route.summary.tollCosts',
-        unresolved:false
+        name:`Route Summary Toll ${idx + 1}`, system:'', amount, currency:'MYR',
+        paymentMethods:[], fareName:cost.name || '', fareId:cost.id ? String(cost.id) : '',
+        source:'route.summary.tollCosts', unresolved:false
       });
     });
   }
@@ -1845,15 +1758,10 @@ function calculateHereTolls(route,paymentPref='any') {
     : (resolvedCount > 0 ? 'available' : 'not_returned');
 
   return {
-    amount:roundMoney(totalToll),
-    items,
-    systemsCount:tollSystems.size,
-    totalResolvedCount:resolvedCount,
-    unresolvedCount,
+    amount:roundMoney(totalToll), items, systemsCount,
+    totalResolvedCount:resolvedCount, unresolvedCount,
     preferenceMatchedCount:Math.max(0,resolvedCount - preferenceFallbackCount),
-    preferenceFallbackCount,
-    paymentPref,
-    dataStatus,
+    preferenceFallbackCount, paymentPref, dataStatus,
     hasAnyTollData:resolvedCount > 0 || unresolvedCount > 0
   };
 }
@@ -2157,7 +2065,7 @@ function processCalculations(routeData) {
   $('result-card').style.display = 'block';
 
   return {
-    version:'3.0.1',
+    version:'3.2',
     pickup:$('pickup').value.trim(),
     dropoff:$('dropoff').value.trim(),
     distance:routeData.distance,
@@ -2215,7 +2123,7 @@ function receiptText(data) {
     : '  - No toll records returned by HERE; this does not confirm a toll-free route';
 
   return [
-    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v3.1',
+    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v3.2',
     '------------------------------------------------',
     `From: ${data.pickup}`,
     `To: ${data.dropoff}`,
@@ -2250,7 +2158,7 @@ function receiptText(data) {
     'Tolls are reimbursement, not driver profit.',
     'Driver earnings exclude fuel, maintenance, depreciation and other operating costs.',
     'Estimate only. Verify tolls and final fare before travel.',
-    'Generated by Rideshare MY Personal Edition v3.1'
+    'Generated by Rideshare MY Personal Edition v3.2'
   ].join('\n');
 }
 
