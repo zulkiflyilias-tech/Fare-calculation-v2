@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare MY - Personal Edition v3.3.5</title>
+<title>Rideshare MY - Personal Edition v3.3.6</title>
 
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 
@@ -111,8 +111,7 @@ button {touch-action:manipulation}
 }
 
 .location-input:focus,
-.setting-input:focus,
-.operator-filter-input:focus {
+.setting-input:focus {
   outline:none;
   border-color:var(--primary);
   background:#fff;
@@ -365,6 +364,10 @@ button {touch-action:manipulation}
   border-bottom:0;
 }
 
+.toll-item-line span:last-child {
+  white-space:nowrap;
+}
+
 details {
   border-top:1px dashed #3a3a3c;
   padding-top:8px;
@@ -491,81 +494,6 @@ summary {
   line-height:1.5;
 }
 
-/* Toll Operator Directory Table */
-.operator-controls {
-  display:grid;
-  grid-template-columns:110px 1fr;
-  gap:6px;
-  margin:6px 0 8px;
-}
-
-.operator-filter-input {
-  width:100%;
-  padding:6px 8px;
-  border:1px solid var(--border);
-  border-radius:7px;
-  font-size:11px;
-  background:#fafafa;
-}
-
-.operator-table-wrap {
-  max-height:260px;
-  overflow:auto;
-  border:1px solid var(--border);
-  border-radius:8px;
-  background:#fff;
-}
-
-.operator-table {
-  width:100%;
-  border-collapse:collapse;
-  font-size:10.5px;
-  text-align:left;
-}
-
-.operator-table th {
-  position:sticky;
-  top:0;
-  background:#f3e5f5;
-  color:#4a148c;
-  font-weight:700;
-  padding:6px 7px;
-  border-bottom:1px solid #d1c4e9;
-  z-index:2;
-}
-
-.operator-table td {
-  padding:6px 7px;
-  border-bottom:1px solid #f0f0f0;
-  vertical-align:top;
-  line-height:1.35;
-}
-
-.operator-table tr:last-child td {
-  border-bottom:0;
-}
-
-.op-badge {
-  display:inline-block;
-  padding:1px 5px;
-  border-radius:4px;
-  font-size:9px;
-  font-weight:700;
-  text-transform:uppercase;
-  white-space:nowrap;
-}
-
-.op-major {background:#ede7f6;color:#5e35b1;}
-.op-minor {background:#e3f2fd;color:#1565c0;}
-.op-independent {background:#e8f5e9;color:#2e7d32;}
-.op-private {background:#fff3e0;color:#ef6c00;}
-
-.op-code {
-  font-weight:700;
-  color:var(--primary);
-  white-space:nowrap;
-}
-
 @media(min-width:768px) {
   #container {flex-direction:row-reverse}
   #map {
@@ -604,7 +532,7 @@ summary {
 
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.3.5</span>
+      <span class="version">PERSONAL EDITION v3.3.6</span>
     </div>
 
     <!-- LOCATION INPUTS -->
@@ -684,10 +612,6 @@ summary {
           Departure Time (optional)
           <input id="here-departure-time" type="datetime-local">
         </label>
-      </div>
-
-      <div class="small-muted">
-        Powered directly by HERE Routing API v8 tolls &amp; toll systems data (MYR), cross-referenced with Malaysia's complete toll operator directory (Major, Minor, Independent &amp; Private).
       </div>
 
     </div>
@@ -781,41 +705,6 @@ summary {
       </button>
 
     </section>
-
-    <!-- MALAYSIA TOLL OPERATORS DIRECTORY -->
-
-    <details id="toll-operators-panel">
-      <summary>🛣️ Malaysia Toll Operators Directory (2026)</summary>
-
-      <div class="operator-controls">
-        <select id="operator-tier-filter" class="operator-filter-input" aria-label="Filter operator tier">
-          <option value="all">All Tiers (34)</option>
-          <option value="Major">Major Groups</option>
-          <option value="Minor">Minor / Dual</option>
-          <option value="Independent">Independent</option>
-          <option value="Private">Private / Other</option>
-        </select>
-
-        <input id="operator-search-input" class="operator-filter-input" type="search"
-          placeholder="Filter code (E1, E32), highway, or operator...">
-      </div>
-
-      <div class="operator-table-wrap">
-        <table class="operator-table">
-          <thead>
-            <tr>
-              <th>Code</th>
-              <th>Highway / Facility</th>
-              <th>Operator &amp; Concessionaire</th>
-              <th>Tier &amp; System</th>
-            </tr>
-          </thead>
-          <tbody id="operator-table-body"></tbody>
-        </table>
-      </div>
-
-      <p class="small-muted" id="operator-table-count" style="margin:6px 0 0;"></p>
-    </details>
 
     <!-- SETTINGS -->
 
@@ -916,7 +805,7 @@ summary {
 'use strict';
 
 /* =========================================================
-   1. CONFIGURATION & MALAYSIA TOLL OPERATORS REGISTRY
+   1. CONFIGURATION
 ========================================================= */
 
 const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
@@ -940,359 +829,6 @@ const LEGACY_SETTINGS_KEY = 'rideshareMY.personal.v3.0.settings';
 
 const GENTING_ROAD_CHARGE = 5.00;
 const GENTING_ROAD_CHARGE_NAME = 'Genting Highlands Road Charge';
-
-// Major Malaysian Highway Supplements (Fallback)
-const SUPPLEMENTAL_PLUS_RATE = 35.51;
-const SUPPLEMENTAL_PENANG_BRIDGE_RATE = 5.74;
-
-/**
- * Complete Registry of Malaysian Toll Operators (2026)
- * Categories: Major | Minor | Independent | Private
- */
-const MALAYSIA_TOLL_OPERATORS = Object.freeze([
-  // --- MAJOR MULTI-HIGHWAY CONCESSION GROUPS ---
-  {
-    code:'E1',
-    highway:'North–South Expressway Northern Route (NSE North)',
-    operator:'PLUS Malaysia Berhad (Projek Lebuhraya Usahasama Berhad)',
-    group:'PLUS Malaysia',
-    tier:'Major',
-    system:'Closed / Open',
-    keywords:/plus|north.?south|utara.?selatan|bukit kayu hitam|juru|jalan duta|bukit lanjan|sungai buloh|ipoh|tapah|simpang pulai/i
-  },
-  {
-    code:'E1',
-    highway:'New Klang Valley Expressway (NKVE)',
-    operator:'PLUS Malaysia Berhad (Projek Lebuhraya Usahasama Berhad)',
-    group:'PLUS Malaysia',
-    tier:'Major',
-    system:'Closed',
-    keywords:/nkve|new klang valley|bukit raja|setia alam|subang|damansara|kota damansara|jalan duta/i
-  },
-  {
-    code:'E2',
-    highway:'North–South Expressway Southern Route (NSE South) & CIQ Causeway',
-    operator:'PLUS Malaysia Berhad (Projek Lebuhraya Usahasama Berhad)',
-    group:'PLUS Malaysia',
-    tier:'Major',
-    system:'Closed / Open',
-    keywords:/plus|north.?south|sungai besi|seremban|ayer keroh|skudai|kempas|tanjung kupang|bangunan sultan iskandar|ciq/i
-  },
-  {
-    code:'E3',
-    highway:'Malaysia–Singapore Second Link (LINKEDUA)',
-    operator:'PLUS Malaysia Berhad (Linkedua Malaysia Berhad)',
-    group:'PLUS Malaysia',
-    tier:'Major',
-    system:'Open',
-    keywords:/linkedua|second link|lima kedai|perling|tanjung kupang/i
-  },
-  {
-    code:'E6',
-    highway:'North–South Expressway Central Link (ELITE)',
-    operator:'PLUS Malaysia Berhad (Expressway Lingkaran Tengah Sdn Bhd)',
-    group:'PLUS Malaysia',
-    tier:'Major',
-    system:'Closed',
-    keywords:/elite|central link|shah alam|usj|putra heights|bandar saujana putra|klia|nilai/i
-  },
-  {
-    code:'E8',
-    highway:'East Coast Expressway Phase 2 (LPT2)',
-    operator:'PLUS Malaysia Berhad (Lebuhraya Pantai Timur 2 Sdn Bhd)',
-    group:'PLUS Malaysia',
-    tier:'Major',
-    system:'Closed',
-    keywords:/lpt2|pantai timur 2|jabor|cheneh|kijal|kerteh|paka|dungun|bukit besi|ajil|kuala terengganu|gemuroh/i
-  },
-  {
-    code:'E15',
-    highway:'Butterworth–Kulim Expressway (BKE)',
-    operator:'PLUS Malaysia Berhad (Konsortium Lebuhraya Butterworth-Kulim)',
-    group:'PLUS Malaysia',
-    tier:'Major',
-    system:'Open',
-    keywords:/bke|butterworth.?kulim|kubang semang|lunas/i
-  },
-  {
-    code:'E29',
-    highway:'Seremban–Port Dickson Highway (SPDH)',
-    operator:'PLUS Malaysia Berhad (Seremban-Port Dickson Highway Sdn Bhd)',
-    group:'PLUS Malaysia',
-    tier:'Major',
-    system:'Open',
-    keywords:/spdh|seremban.?port dickson|mambau|lukut/i
-  },
-  {
-    code:'E36',
-    highway:'Penang Bridge (1st Bridge)',
-    operator:'PLUS Malaysia Berhad (Penang Bridge Sdn Bhd)',
-    group:'PLUS Malaysia',
-    tier:'Major',
-    system:'Open (Island-bound)',
-    keywords:/penang bridge|jambatan pulau pinang|perai/i
-  },
-  {
-    code:'E12',
-    highway:'Ampang–Kuala Lumpur Elevated Highway (AKLEH)',
-    operator:'PROLINTAS (Projek Lintasan Kota Sdn Bhd)',
-    group:'PROLINTAS',
-    tier:'Major',
-    system:'Open',
-    keywords:/akleh|ampang.?kuala lumpur|dato keramat/i
-  },
-  {
-    code:'E13',
-    highway:'Kemuning–Shah Alam Highway (LKSA)',
-    operator:'PROLINTAS (Projek Lintasan Shah Alam Sdn Bhd)',
-    group:'PROLINTAS',
-    tier:'Major',
-    system:'Open',
-    keywords:/lksa|kemuning.?shah alam|seri muda|alam impian/i
-  },
-  {
-    code:'E18',
-    highway:'Kajang Dispersal Link Expressway (Kajang SILK)',
-    operator:'PROLINTAS (Sistem Lingkaran-Lebuhraya Kajang Sdn Bhd)',
-    group:'PROLINTAS',
-    tier:'Major',
-    system:'Open',
-    keywords:/silk|kajang dispersal|sungai ramal|bukit kajang|sungai long|sungai balak/i
-  },
-  {
-    code:'E19',
-    highway:'Sungai Besi–Ulu Klang Elevated Expressway (SUKE)',
-    operator:'PROLINTAS (Projek Lintasan Sungai Besi-Ulu Klang Sdn Bhd)',
-    group:'PROLINTAS',
-    tier:'Major',
-    system:'Open',
-    keywords:/suke|sungai besi.?ulu klang|alam damai|bukit teratai|ampang/i
-  },
-  {
-    code:'E31',
-    highway:'Damansara–Shah Alam Elevated Expressway (DASH)',
-    operator:'PROLINTAS (Projek Lintasan Damansara-Shah Alam Sdn Bhd)',
-    group:'PROLINTAS',
-    tier:'Major',
-    system:'Open',
-    keywords:/dash|damansara.?shah alam|denai alam|rrim|kota damansara/i
-  },
-  {
-    code:'E35',
-    highway:'Guthrie Corridor Expressway (GCE)',
-    operator:'PROLINTAS (Prolintas Expressway Sdn Bhd)',
-    group:'PROLINTAS',
-    tier:'Major',
-    system:'Open',
-    keywords:/gce|guthrie|bukit jelutong|elmina|lagong/i
-  },
-  {
-    code:'E5',
-    highway:'Shah Alam Expressway (KESAS)',
-    operator:'Amanat Lebuhraya Rakyat (Kesas Sdn Bhd)',
-    group:'ALR',
-    tier:'Major',
-    system:'Open',
-    keywords:/kesas|shah alam expressway|kemuning|sunway|awan besar|awan kecil/i
-  },
-  {
-    code:'E11',
-    highway:'Damansara–Puchong Expressway (LDP)',
-    operator:'Amanat Lebuhraya Rakyat (Lingkaran Trans Kota Sdn Bhd / LITRAK)',
-    group:'ALR',
-    tier:'Major',
-    system:'Open',
-    keywords:/ldp|litrak|damansara.?puchong|penchala|petaling jaya|puchong selatan|puchong barat/i
-  },
-  {
-    code:'E23',
-    highway:'Western KL Traffic Dispersion Scheme (SPRINT)',
-    operator:'Amanat Lebuhraya Rakyat (Sistem Penyuraian Trafik KL Barat Sdn Bhd)',
-    group:'ALR',
-    tier:'Major',
-    system:'Open',
-    keywords:/sprint|kerinchi|damansara|pantai|kiara/i
-  },
-  {
-    code:'E38',
-    highway:'Stormwater Management and Road Tunnel (SMART)',
-    operator:'Amanat Lebuhraya Rakyat (Syarikat Mengurus Air Banjir & Terowong Sdn Bhd)',
-    group:'ALR',
-    tier:'Major',
-    system:'Open',
-    keywords:/smart|stormwater|terowong smart/i
-  },
-  {
-    code:'E9',
-    highway:'Sungai Besi Expressway (BESRAYA)',
-    operator:'IJM Corporation (Besraya (M) Sdn Bhd)',
-    group:'IJM Toll',
-    tier:'Major',
-    system:'Open',
-    keywords:/besraya|sungai besi expressway|mines|loke yew/i
-  },
-  {
-    code:'E10',
-    highway:'New Pantai Expressway (NPE)',
-    operator:'IJM Corporation (New Pantai Expressway Sdn Bhd)',
-    group:'IJM Toll',
-    tier:'Major',
-    system:'Open',
-    keywords:/npe|new pantai|pantai dalam|pjs 2|pjs 5/i
-  },
-  {
-    code:'E21',
-    highway:'Kajang–Seremban Highway (LEKAS)',
-    operator:'IJM Corporation (Lebuhraya Kajang-Seremban Sdn Bhd)',
-    group:'IJM Toll',
-    tier:'Major',
-    system:'Closed / Open',
-    keywords:/lekas|kajang.?seremban|kajang selatan|semenyih|pajam|mantin|setul|ampangan/i
-  },
-  {
-    code:'E32',
-    highway:'West Coast Expressway (WCE)',
-    operator:'IJM / WCE Holdings (West Coast Expressway Sdn Bhd)',
-    group:'IJM / WCE',
-    tier:'Major',
-    system:'Closed',
-    keywords:/wce|west coast|banting|skve|kesas|bukit raja|kapar|assam jawa|tanjung karang|hutan melintang|teluk intan|lekir|sitiawan|changakt jering|taiping/i
-  },
-
-  // --- MINOR / DUAL-ASSET & REGIONAL CONCESSIONAIRES ---
-  {
-    code:'E33',
-    highway:'Duta–Ulu Klang Expressway (DUKE 1 & 2)',
-    operator:'Ekovest Berhad (Konsortium Lebuhraya Utara-Timur (KL) Sdn Bhd)',
-    group:'Ekovest',
-    tier:'Minor',
-    system:'Open',
-    keywords:/duke|duta.?ulu klang|kesturi|batu|ayer panas|sentul pasar|segambut/i
-  },
-  {
-    code:'E39',
-    highway:'Setiawangsa–Pantai Expressway (SPE / DUKE 3)',
-    operator:'Ekovest Berhad (Lebuhraya DUKE Fasa 3 Sdn Bhd)',
-    group:'Ekovest',
-    tier:'Minor',
-    system:'Open',
-    keywords:/spe|setiawangsa.?pantai|duke 3|chan sow lin|salak selatan/i
-  },
-  {
-    code:'E7',
-    highway:'Cheras–Kajang Expressway (Grand Saga)',
-    operator:'Taliworks / EPF (Grand Saga Sdn Bhd)',
-    group:'Taliworks',
-    tier:'Minor',
-    system:'Open',
-    keywords:/grand saga|cheras.?kajang|batu 9|batu 11/i
-  },
-  {
-    code:'E30',
-    highway:'New North Klang Straits Bypass (Grand Sepadu)',
-    operator:'Taliworks / EPF (Grand Sepadu (NK) Sdn Bhd)',
-    group:'Taliworks',
-    tier:'Minor',
-    system:'Open',
-    keywords:/grand sepadu|north klang straits|bukit raja|kapar|bandar baru klang/i
-  },
-  {
-    code:'E8',
-    highway:'Kuala Lumpur–Karak Expressway (KLK) & East Coast Expressway Phase 1 (LPT1)',
-    operator:'AFA Prime Berhad (formerly ANIH Berhad)',
-    group:'AFA Prime',
-    tier:'Minor',
-    system:'Open (KLK) / Closed (LPT1)',
-    keywords:/afa prime|anih|karak|gombak|bentong|lpt1|lanchang|temerloh|chenor|maran|sri jaya|gambang|kuantan|jabor/i
-  },
-
-  // --- INDEPENDENT SINGLE-HIGHWAY / BRIDGE OPERATORS ---
-  {
-    code:'E28',
-    highway:'Sultan Abdul Halim Mu\'adzam Shah Bridge (Penang 2nd Bridge)',
-    operator:'Jambatan Kedua Sdn Bhd (JKSB)',
-    group:'Independent (MoF)',
-    tier:'Independent',
-    system:'Open / Closed Link',
-    keywords:/jksb|second bridge|jambatan kedua|sultan abdul halim|bandar cassia|batu maung/i
-  },
-  {
-    code:'E20',
-    highway:'Maju Expressway (MEX)',
-    operator:'Maju Expressway Sdn Bhd (MESB)',
-    group:'Independent',
-    tier:'Independent',
-    system:'Open',
-    keywords:/mex|maju expressway|salak selatan|putrajaya|seri kembangan/i
-  },
-  {
-    code:'E25',
-    highway:'Kuala Lumpur–Kuala Selangor Expressway (LATAR)',
-    operator:'KL–Kuala Selangor Expressway Berhad (KLSEB)',
-    group:'Independent',
-    tier:'Independent',
-    system:'Open',
-    keywords:/latar|kuala selangor|ijok|kuang|kundang|templer/i
-  },
-  {
-    code:'E26',
-    highway:'South Klang Valley Expressway (SKVE)',
-    operator:'SKVE Holdings Sdn Bhd',
-    group:'Independent',
-    tier:'Independent',
-    system:'Closed',
-    keywords:/skve|south klang valley|ayer hitam|saujana putra|telok panglima garang|pulau indah/i
-  },
-  {
-    code:'E27',
-    highway:'East Klang Valley Expressway (EKVE)',
-    operator:'EKVE Sdn Bhd (Ahmad Zaki Resources Berhad)',
-    group:'Independent',
-    tier:'Independent',
-    system:'Closed',
-    keywords:/ekve|east klang valley|hulu langat|mahkota cheras|ukay perdana/i
-  },
-  {
-    code:'E22',
-    highway:'Senai–Desaru Expressway (SDE)',
-    operator:'Senai–Desaru Expressway Berhad (SDEB)',
-    group:'Independent',
-    tier:'Independent',
-    system:'Closed',
-    keywords:/sde|senai.?desaru|ulu tiram|cahaya baru|penawar/i
-  },
-  {
-    code:'E17',
-    highway:'Butterworth Outer Ring Road (BORR)',
-    operator:'Lingkaran Luar Butterworth (Penang) Sdn Bhd (LLB)',
-    group:'Independent',
-    tier:'Independent',
-    system:'Open',
-    keywords:/borr|butterworth outer ring|bagan ajam|sungai nyior|perai lama/i
-  },
-
-  // --- PRIVATE / NON-LLM ROAD CHARGE OPERATORS ---
-  {
-    code:'PRIVATE',
-    highway:'Jalan Genting Highlands (Gohtong Jaya / Genting Sempah)',
-    operator:'Lingkaran Cekap Sdn Bhd (Genting Malaysia Berhad)',
-    group:'Private Road',
-    tier:'Private',
-    system:'Private Entry Charge (RM5 Class 1)',
-    keywords:/genting|lingkaran cekap|gohtong|sempah/i
-  }
-]);
-
-function matchMalaysianOperator(name,system) {
-  const haystack = `${name || ''} ${system || ''}`;
-  if (!haystack.trim()) return null;
-  for (const op of MALAYSIA_TOLL_OPERATORS) {
-    if (op.keywords.test(haystack)) {
-      return op;
-    }
-  }
-  return null;
-}
 
 const HIGHLAND_ZONES = [
   {lat:3.4241,lng:101.7933,radiusKm:10,name:'Genting Highlands & Gohtong'},
@@ -2138,7 +1674,7 @@ function markPossibleDuplicateTolls(items) {
   return pairCount;
 }
 
-function calculateHereTolls(route,paymentPref='any',distanceKm=0) {
+function calculateHereTolls(route,paymentPref='any') {
   const sections = Array.isArray(route && route.sections) ? route.sections : [];
   let totalToll = 0;
   let itemisedSectionCount = 0;
@@ -2164,12 +1700,11 @@ function calculateHereTolls(route,paymentPref='any',distanceKm=0) {
         const location = getTollCollectionLocationDetails(toll);
         const plazaName = location.name || systemName || `Toll Point ${secIdx + 1}.${tollIdx + 1}`;
         const picked = selectFareFromToll(toll,paymentPref);
-        const matchedOp = matchMalaysianOperator(plazaName,systemName);
 
         if (!picked) {
           unresolvedCount++;
           items.push({
-            name:plazaName, system:systemName, operatorMeta:matchedOp, amount:null, currency:'MYR',
+            name:plazaName, system:systemName, amount:null, currency:'MYR',
             paymentMethods:[], fareName:'', fareId:'',
             source:'section.tolls', unresolved:true
           });
@@ -2183,7 +1718,7 @@ function calculateHereTolls(route,paymentPref='any',distanceKm=0) {
         if (repeatedFareId) duplicateFareIdCount++;
         else totalToll = roundMoney(totalToll + picked.amount);
         items.push({
-          name:plazaName, system:systemName, operatorMeta:matchedOp, amount:picked.amount, currency:picked.currency,
+          name:plazaName, system:systemName, amount:picked.amount, currency:picked.currency,
           paymentMethods:picked.paymentMethods, fareName:picked.fareName, fareId:picked.fareId,
           locationLat:location.lat, locationLng:location.lng,
           source:'section.tolls', unresolved:false, duplicateFareId:repeatedFareId,
@@ -2205,7 +1740,7 @@ function calculateHereTolls(route,paymentPref='any',distanceKm=0) {
         if (!price) {
           unresolvedCount++;
           items.push({
-            name:`Route Toll Summary ${secIdx + 1}.${cIdx + 1}`, system:'', operatorMeta:null,
+            name:`Route Toll Summary ${secIdx + 1}.${cIdx + 1}`, system:'',
             amount:null, currency:'MYR', paymentMethods:[],
             fareName:cost && (cost.name || ''), fareId:'',
             source:'section.summary.tollCosts', unresolved:true
@@ -2215,7 +1750,7 @@ function calculateHereTolls(route,paymentPref='any',distanceKm=0) {
         const amount = roundMoney(Number(price.value));
         totalToll = roundMoney(totalToll + amount);
         items.push({
-          name:`Route Toll Summary ${secIdx + 1}.${cIdx + 1}`, system:'', operatorMeta:null,
+          name:`Route Toll Summary ${secIdx + 1}.${cIdx + 1}`, system:'',
           amount, currency:'MYR', paymentMethods:[],
           fareName:cost.name || '', fareId:'',
           source:'section.summary.tollCosts', unresolved:false,
@@ -2238,7 +1773,7 @@ function calculateHereTolls(route,paymentPref='any',distanceKm=0) {
       if (!price) {
         unresolvedCount++;
         items.push({
-          name:`Route Summary Toll ${idx + 1}`, system:'', operatorMeta:null, amount:null, currency:'MYR',
+          name:`Route Summary Toll ${idx + 1}`, system:'', amount:null, currency:'MYR',
           paymentMethods:[], fareName:cost && (cost.name || ''), fareId:'',
           source:'route.summary.tollCosts', unresolved:true
         });
@@ -2247,7 +1782,7 @@ function calculateHereTolls(route,paymentPref='any',distanceKm=0) {
       const amount = roundMoney(Number(price.value));
       totalToll = roundMoney(totalToll + amount);
       items.push({
-        name:`Route Summary Toll ${idx + 1}`, system:'', operatorMeta:null, amount, currency:'MYR',
+        name:`Route Summary Toll ${idx + 1}`, system:'', amount, currency:'MYR',
         paymentMethods:[], fareName:cost.name || '', fareId:'',
         source:'route.summary.tollCosts', unresolved:false,
         duplicateFareId:false, counted:true
@@ -2255,7 +1790,7 @@ function calculateHereTolls(route,paymentPref='any',distanceKm=0) {
     });
   }
 
-  // ---- Genting Highlands Private Road Charge (Lingkaran Cekap, since 28 May 2026) ----
+  // ---- Genting Highlands Road Charge (since 28 May 2026) ----
   const highlandZone = getHighlandZone(pickupCoords, dropoffCoords);
   const isGentingRoute = highlandZone && /genting/i.test(highlandZone.name || '');
 
@@ -2275,8 +1810,7 @@ function calculateHereTolls(route,paymentPref='any',distanceKm=0) {
       totalToll = roundMoney(totalToll + GENTING_ROAD_CHARGE);
       items.push({
         name: GENTING_ROAD_CHARGE_NAME,
-        system: 'Lingkaran Cekap Sdn Bhd (Private Road)',
-        operatorMeta: MALAYSIA_TOLL_OPERATORS.find(o => o.code === 'PRIVATE') || null,
+        system: 'Jalan Genting Highlands',
         amount: GENTING_ROAD_CHARGE,
         currency: 'MYR',
         paymentMethods: ['electronic', 'card', 'tng', 'rfid'],
@@ -2287,57 +1821,6 @@ function calculateHereTolls(route,paymentPref='any',distanceKm=0) {
         duplicateFareId: false,
         counted: true
       });
-    }
-  }
-
-  // ---- Major Highway Supplement (PLUS / Penang Bridge) ----
-  if (distanceKm > 250 && totalToll < 15.00) {
-    const hasMajorHighway = items.some(item =>
-      !item.unresolved &&
-      /plus|north.?south|elite|juru|bukit.?kayu|tapah|simpang.?pulai|penang.?bridge|jambatan/i.test(`${item.name} ${item.system}`)
-    );
-
-    if (!hasMajorHighway) {
-      totalToll = roundMoney(totalToll + SUPPLEMENTAL_PLUS_RATE);
-      items.push({
-        name: 'PLUS Expressway (Supplemental)',
-        system: 'PLUS Malaysia Berhad (E1/E2)',
-        operatorMeta: MALAYSIA_TOLL_OPERATORS.find(o => o.code === 'E1') || null,
-        amount: SUPPLEMENTAL_PLUS_RATE,
-        currency: 'MYR',
-        paymentMethods: ['electronic', 'tng', 'rfid'],
-        fareName: 'Class 1 Fallback Rate',
-        fareId: 'supplement-plus-2026',
-        source: 'supplemental:plus',
-        unresolved: false,
-        duplicateFareId: false,
-        counted: true
-      });
-
-      if (dropoffCoords && dropoffCoords.lat > 5.0 && dropoffCoords.lng > 100.0) {
-        const hasPenangBridge = items.some(item =>
-          !item.unresolved &&
-          /penang.?bridge|jambatan/i.test(`${item.name} ${item.system}`)
-        );
-
-        if (!hasPenangBridge) {
-          totalToll = roundMoney(totalToll + SUPPLEMENTAL_PENANG_BRIDGE_RATE);
-          items.push({
-            name: 'Penang Bridge (Supplemental)',
-            system: 'PLUS Malaysia Berhad (E36)',
-            operatorMeta: MALAYSIA_TOLL_OPERATORS.find(o => o.code === 'E36') || null,
-            amount: SUPPLEMENTAL_PENANG_BRIDGE_RATE,
-            currency: 'MYR',
-            paymentMethods: ['electronic', 'tng', 'rfid'],
-            fareName: 'Class 1 Fallback Rate',
-            fareId: 'supplement-penang-bridge-2026',
-            source: 'supplemental:penang-bridge',
-            unresolved: false,
-            duplicateFareId: false,
-            counted: true
-          });
-        }
-      }
     }
   }
 
@@ -2481,7 +1964,7 @@ function handleRouteResult(route,routesReturnedCount,paymentPref,avoidTollsReque
     throw new Error('Invalid route summary.');
   }
 
-  const tollResult = calculateHereTolls(route,paymentPref,distanceKm);
+  const tollResult = calculateHereTolls(route,paymentPref);
 
   clearRouteObjects();
   const group = new H.map.Group();
@@ -2600,14 +2083,7 @@ function processCalculations(routeData) {
       row.className = 'toll-item-line';
 
       const left = document.createElement('span');
-      const shortName = getShortTollDisplayName(item);
-      const shortSystem = cleanTollSystemLabel(item.system);
-      const opTag = item.operatorMeta
-        ? ` [${item.operatorMeta.code} · ${item.operatorMeta.group} · ${item.operatorMeta.tier}]`
-        : '';
-      const sysSuffix = shortSystem && shortSystem.toLowerCase() !== shortName.toLowerCase()
-        ? ` · ${shortSystem}` : '';
-      left.textContent = `${shortName}${sysSuffix}${opTag}`;
+      left.textContent = getShortTollDisplayName(item);
 
       const right = document.createElement('span');
       right.textContent = item.unresolved ? 'Unverified' :
@@ -2649,13 +2125,7 @@ function processCalculations(routeData) {
     warnings.push(`${routeData.tollResult.possibleDuplicateCount} possible duplicate toll pair(s) detected; separate fare IDs were retained`);
   }
   if (routeData.tollResult.items.some(i => i.source === 'supplemental:genting-road-charge')) {
-    warnings.push('Genting Highlands RM5 private road charge added manually (Lingkaran Cekap)');
-  }
-  if (routeData.tollResult.items.some(i => i.source === 'supplemental:plus')) {
-    warnings.push('PLUS Expressway rate supplemented manually (HERE omitted highway routing)');
-  }
-  if (routeData.tollResult.items.some(i => i.source === 'supplemental:penang-bridge')) {
-    warnings.push('Penang Bridge rate supplemented manually (HERE omitted highway routing)');
+    warnings.push('Genting Highlands RM5 road charge added manually (not returned by HERE API)');
   }
 
   const statusParts = [
@@ -2683,7 +2153,7 @@ function processCalculations(routeData) {
   $('result-card').style.display = 'block';
 
   return {
-    version:'3.3.5',
+    version:'3.3.6',
     pickup:$('pickup').value.trim(),
     dropoff:$('dropoff').value.trim(),
     distance:routeData.distance,
@@ -2721,7 +2191,7 @@ function processCalculations(routeData) {
 }
 
 /* =========================================================
-   15. DURATION FORMATTING & OPERATOR DIRECTORY RENDERER
+   15. DURATION FORMATTING
 ========================================================= */
 
 function formatDuration(minutes) {
@@ -2733,73 +2203,6 @@ function formatDuration(minutes) {
   return `${hours} hr ${mins} mins`;
 }
 
-function renderOperatorDirectory() {
-  const tbody = $('operator-table-body');
-  const countEl = $('operator-table-count');
-  if (!tbody) return;
-
-  const tierFilter = $('operator-tier-filter') ? $('operator-tier-filter').value : 'all';
-  const query = $('operator-search-input') ? $('operator-search-input').value.trim().toLowerCase() : '';
-
-  const filtered = MALAYSIA_TOLL_OPERATORS.filter(item => {
-    if (tierFilter !== 'all' && item.tier !== tierFilter) return false;
-    if (!query) return true;
-    return (
-      item.code.toLowerCase().includes(query) ||
-      item.highway.toLowerCase().includes(query) ||
-      item.operator.toLowerCase().includes(query) ||
-      item.group.toLowerCase().includes(query) ||
-      item.tier.toLowerCase().includes(query) ||
-      item.system.toLowerCase().includes(query)
-    );
-  });
-
-  tbody.innerHTML = '';
-
-  if (!filtered.length) {
-    const tr = document.createElement('tr');
-    const td = document.createElement('td');
-    td.colSpan = 4;
-    td.style.textAlign = 'center';
-    td.style.color = '#777';
-    td.textContent = 'No matching Malaysian toll operator found.';
-    tr.appendChild(td);
-    tbody.appendChild(tr);
-  } else {
-    filtered.forEach(item => {
-      const tr = document.createElement('tr');
-
-      const tdCode = document.createElement('td');
-      tdCode.className = 'op-code';
-      tdCode.textContent = item.code;
-
-      const tdHighway = document.createElement('td');
-      tdHighway.textContent = item.highway;
-
-      const tdOp = document.createElement('td');
-      tdOp.textContent = item.operator;
-
-      const tdMeta = document.createElement('td');
-      const badge = document.createElement('span');
-      badge.className = `op-badge op-${item.tier.toLowerCase()}`;
-      badge.textContent = item.tier;
-      const sysDiv = document.createElement('div');
-      sysDiv.style.fontSize = '9.5px';
-      sysDiv.style.color = '#666';
-      sysDiv.style.marginTop = '2px';
-      sysDiv.textContent = item.system;
-      tdMeta.append(badge,sysDiv);
-
-      tr.append(tdCode,tdHighway,tdOp,tdMeta);
-      tbody.appendChild(tr);
-    });
-  }
-
-  if (countEl) {
-    countEl.textContent = `Showing ${filtered.length} of ${MALAYSIA_TOLL_OPERATORS.length} tolled expressways, bridges & private road charges in Malaysia.`;
-  }
-}
-
 /* =========================================================
    16. RECEIPT GENERATION
 ========================================================= */
@@ -2807,17 +2210,15 @@ function renderOperatorDirectory() {
 function receiptText(data) {
   const tollLines = Array.isArray(data.tollItems) && data.tollItems.length
     ? data.tollItems.map(t => {
-        let note = '';
-        if (t.source === 'supplemental:genting-road-charge') note = ' (Supplied manually — Lingkaran Cekap private road charge)';
-        if (t.source === 'supplemental:plus') note = ' (Supplied manually because HERE omitted highway routing)';
-        if (t.source === 'supplemental:penang-bridge') note = ' (Supplied manually because HERE omitted highway routing)';
-        const opSuffix = t.operatorMeta ? ` [${t.operatorMeta.code} - ${t.operatorMeta.group}]` : '';
-        return `  - ${getShortTollDisplayName(t)}${cleanTollSystemLabel(t.system) && cleanTollSystemLabel(t.system).toLowerCase() !== getShortTollDisplayName(t).toLowerCase() ? ` (${cleanTollSystemLabel(t.system)})` : ''}${opSuffix}: ${t.unresolved ? 'UNVERIFIED — confirm manually' : (t.duplicateFareId ? `DUPLICATE FARE ID — not added (${money(t.amount)})` : `${money(t.amount)}${t.possibleDuplicate ? ' — possible duplicate; retained' : ''}`)}${note}`;
+        const note = t.source === 'supplemental:genting-road-charge'
+          ? ' (Supplied manually because HERE did not return this 2026 gantry)'
+          : '';
+        return `  - ${getShortTollDisplayName(t)}: ${t.unresolved ? 'UNVERIFIED — confirm manually' : (t.duplicateFareId ? `DUPLICATE FARE ID — not added (${money(t.amount)})` : `${money(t.amount)}${t.possibleDuplicate ? ' — possible duplicate; retained' : ''}`)}${note}`;
       }).join('\n')
     : '  - No toll records returned by HERE; this does not confirm a toll-free route';
 
   return [
-    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v3.3.5',
+    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v3.3.6',
     '------------------------------------------------',
     `From: ${data.pickup}`,
     `To: ${data.dropoff}`,
@@ -2854,7 +2255,7 @@ function receiptText(data) {
     'Tolls are reimbursement, not driver profit.',
     'Driver earnings exclude fuel, maintenance, depreciation and other operating costs.',
     'Estimate only. Verify tolls and final fare before travel.',
-    'Generated by Rideshare MY Personal Edition v3.3.5'
+    'Generated by Rideshare MY Personal Edition v3.3.6'
   ].join('\n');
 }
 
@@ -2980,9 +2381,6 @@ function bindEvents() {
     if (pickupCoords && dropoffCoords) calculateRoute();
   });
 
-  $('operator-tier-filter').addEventListener('change',renderOperatorDirectory);
-  $('operator-search-input').addEventListener('input',renderOperatorDirectory);
-
   $('share-btn').addEventListener('click',copyReceipt);
 
   $('save-settings-btn').addEventListener('click',() => {
@@ -3025,7 +2423,6 @@ function bindEvents() {
 
 function boot() {
   populateSettingsForm();
-  renderOperatorDirectory();
   bindEvents();
   initMap();
 
