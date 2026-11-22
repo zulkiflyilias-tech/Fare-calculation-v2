@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare MY - Personal Edition v3.3.1</title>
+<title>Rideshare MY - Personal Edition v3.3.2</title>
 
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 
@@ -518,7 +518,7 @@ summary {
 
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.3.1</span>
+      <span class="version">PERSONAL EDITION v3.3.2</span>
     </div>
 
     <!-- LOCATION INPUTS -->
@@ -816,6 +816,9 @@ const DEFAULT_SETTINGS = Object.freeze({
 const ADMIN_FLAT_THRESHOLD = 8;
 const SETTINGS_KEY = 'rideshareMY.personal.v3.1.settings';
 const LEGACY_SETTINGS_KEY = 'rideshareMY.personal.v3.0.settings';
+
+const GENTING_ROAD_CHARGE = 5.00;
+const GENTING_ROAD_CHARGE_NAME = 'Genting Highlands Road Charge';
 
 const HIGHLAND_ZONES = [
   {lat:3.4241,lng:101.7933,radiusKm:10,name:'Genting Highlands & Gohtong'},
@@ -1819,6 +1822,41 @@ function calculateHereTolls(route,paymentPref='any') {
     });
   }
 
+  // ---- Genting Highlands road charge (since 28 May 2026) ----
+  const highlandZone = getHighlandZone(pickupCoords, dropoffCoords);
+  const isGentingRoute = highlandZone && /genting/i.test(highlandZone.name || '');
+
+  const routeTouchesGentingEntry = isGentingRoute ||
+    items.some(item => /sempah|gohtong/i.test(`${item.name} ${item.system}`));
+
+  if (routeTouchesGentingEntry) {
+    const alreadyItemised = items.some(item =>
+      !item.unresolved &&
+      !item.duplicateFareId &&
+      /genting|sempah|gohtong/i.test(
+        `${item.name || ''} ${item.system || ''}`
+      )
+    );
+
+    if (!alreadyItemised) {
+      totalToll = roundMoney(totalToll + GENTING_ROAD_CHARGE);
+      items.push({
+        name: GENTING_ROAD_CHARGE_NAME,
+        system: 'Jalan Genting Highlands (Lingkaran Cekap)',
+        amount: GENTING_ROAD_CHARGE,
+        currency: 'MYR',
+        paymentMethods: ['electronic', 'card', 'tng', 'rfid'],
+        fareName: 'Class 1 entry charge',
+        fareId: 'genting-road-charge-2026',
+        source: 'supplemental:genting-road-charge',
+        unresolved: false,
+        duplicateFareId: false,
+        counted: true
+      });
+    }
+  }
+  // ---- end Genting road charge ----
+
   const possibleDuplicateCount = markPossibleDuplicateTolls(items);
   const resolvedCount = items.filter(item => !item.unresolved && !item.duplicateFareId).length;
   const dataStatus = unresolvedCount > 0
@@ -2124,6 +2162,9 @@ function processCalculations(routeData) {
   if (routeData.tollResult.possibleDuplicateCount > 0) {
     warnings.push(`${routeData.tollResult.possibleDuplicateCount} possible duplicate toll pair(s) detected; separate fare IDs were retained`);
   }
+  if (routeData.tollResult.items.some(i => i.source === 'supplemental:genting-road-charge')) {
+    warnings.push('Genting Highlands RM5 road charge added manually (not returned by HERE API)');
+  }
 
   const statusParts = [
     `Tolls: HERE Routing v8 (${routeData.tollResult.paymentPref}) — ${routeData.tollResult.dataStatus.replace('_',' ')}`,
@@ -2150,7 +2191,7 @@ function processCalculations(routeData) {
   $('result-card').style.display = 'block';
 
   return {
-    version:'3.2',
+    version:'3.3.2',
     pickup:$('pickup').value.trim(),
     dropoff:$('dropoff').value.trim(),
     distance:routeData.distance,
@@ -2206,11 +2247,15 @@ function formatDuration(minutes) {
 
 function receiptText(data) {
   const tollLines = Array.isArray(data.tollItems) && data.tollItems.length
-    ? data.tollItems.map(t => `  - ${getShortTollDisplayName(t)}${cleanTollSystemLabel(t.system) && cleanTollSystemLabel(t.system).toLowerCase() !== getShortTollDisplayName(t).toLowerCase() ? ` (${cleanTollSystemLabel(t.system)})` : ''}: ${t.unresolved ? 'UNVERIFIED — confirm manually' : (t.duplicateFareId ? `DUPLICATE FARE ID — not added (${money(t.amount)})` : `${money(t.amount)}${t.possibleDuplicate ? ' — possible duplicate; retained' : ''}`)}`).join('\n')
+    ? data.tollItems.map(t => {
+        const isSupplemental = t.source === 'supplemental:genting-road-charge';
+        const note = isSupplemental ? ' (Supplied manually because HERE did not return this 2026 gantry)' : '';
+        return `  - ${getShortTollDisplayName(t)}${cleanTollSystemLabel(t.system) && cleanTollSystemLabel(t.system).toLowerCase() !== getShortTollDisplayName(t).toLowerCase() ? ` (${cleanTollSystemLabel(t.system)})` : ''}: ${t.unresolved ? 'UNVERIFIED — confirm manually' : (t.duplicateFareId ? `DUPLICATE FARE ID — not added (${money(t.amount)})` : `${money(t.amount)}${t.possibleDuplicate ? ' — possible duplicate; retained' : ''}`)}${note}`;
+      }).join('\n')
     : '  - No toll records returned by HERE; this does not confirm a toll-free route';
 
   return [
-    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v3.3.1',
+    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v3.3.2',
     '------------------------------------------------',
     `From: ${data.pickup}`,
     `To: ${data.dropoff}`,
@@ -2247,7 +2292,7 @@ function receiptText(data) {
     'Tolls are reimbursement, not driver profit.',
     'Driver earnings exclude fuel, maintenance, depreciation and other operating costs.',
     'Estimate only. Verify tolls and final fare before travel.',
-    'Generated by Rideshare MY Personal Edition v3.3.1'
+    'Generated by Rideshare MY Personal Edition v3.3.2'
   ].join('\n');
 }
 
