@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare MY - Personal Edition v3.4.4</title>
+<title>Rideshare v3.5.0</title>
 
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 
@@ -35,7 +35,6 @@ body {
 }
 
 button,input,select {font:inherit}
-
 button {touch-action:manipulation}
 
 #container {
@@ -46,8 +45,8 @@ button {touch-action:manipulation}
 }
 
 #map {
-  height:24vh;
-  min-height:150px;
+  height:23vh;
+  min-height:145px;
   width:100%;
   z-index:1;
   background:#e9e9e9;
@@ -194,6 +193,10 @@ button {touch-action:manipulation}
   font-size:13px;
   line-height:1.4;
   border-bottom:1px solid #f5f5f5;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
 }
 
 .suggestion-item:hover,
@@ -206,6 +209,32 @@ button {touch-action:manipulation}
   font-size:12px;
   color:#777;
 }
+
+.quick-bar {
+  display:flex;
+  gap:6px;
+  overflow-x:auto;
+  padding:2px 0 6px;
+  scrollbar-width:none;
+}
+.quick-bar::-webkit-scrollbar {display:none}
+
+.chip-btn {
+  border:1px solid var(--border);
+  background:#f5f3f7;
+  color:#4a148c;
+  border-radius:16px;
+  padding:5px 10px;
+  font-size:11px;
+  font-weight:600;
+  white-space:nowrap;
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+}
+.chip-btn:hover {background:#ede7f6}
+.chip-btn.recent {background:#f1f3f5;color:#495057}
 
 .route-controls {
   display:flex;
@@ -251,6 +280,22 @@ button {touch-action:manipulation}
   min-height:14px;
   margin:1px 0 4px;
   line-height:1.4;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+
+.retry-link {
+  border:1px solid var(--primary);
+  background:#f3e5f5;
+  color:var(--primary);
+  border-radius:6px;
+  padding:2px 8px;
+  font-size:11px;
+  font-weight:650;
+  cursor:pointer;
+  white-space:nowrap;
 }
 
 #loading-msg {
@@ -292,6 +337,18 @@ button {touch-action:manipulation}
   font-weight:800;
   color:var(--primary-light);
 }
+
+.pin-trip-btn {
+  border:1px solid #3a3a3c;
+  background:#2c2c2e;
+  color:#e5e5ea;
+  border-radius:8px;
+  padding:5px 9px;
+  font-size:11px;
+  font-weight:600;
+  cursor:pointer;
+}
+.pin-trip-btn:hover {background:#3a3a3c}
 
 .fare-meta {
   font-size:12px;
@@ -404,21 +461,37 @@ summary {
   margin:4px 0 7px;
 }
 
+.share-actions {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:9px;
+}
+
 .share-btn {
   width:100%;
   background:var(--green);
   color:#fff;
   border:0;
-  padding:11px;
+  padding:10px 8px;
   border-radius:8px;
-  font-size:13px;
+  font-size:12px;
   font-weight:750;
   cursor:pointer;
   display:flex;
   align-items:center;
   justify-content:center;
-  gap:6px;
-  margin-top:9px;
+  gap:5px;
+}
+
+.share-btn.secondary {
+  background:#3a3a3c;
+  color:#fff;
+}
+
+.share-btn.whatsapp-full {
+  grid-column:1 / -1;
+  background:#128c7e;
 }
 
 .settings-grid {
@@ -474,8 +547,8 @@ summary {
     flex:1;
   }
   #search-panel {
-    width:420px;
-    max-width:44vw;
+    width:430px;
+    max-width:45vw;
     height:100%;
     border-radius:0;
     box-shadow:-4px 0 20px #0000000d;
@@ -487,6 +560,7 @@ summary {
   .settings-grid {gap:6px}
   .fare-header {font-size:24px}
   .mode-btn,.toggle-btn {font-size:10px;padding:7px 3px}
+  .share-actions {grid-template-columns:1fr}
 }
 </style>
 
@@ -505,11 +579,13 @@ summary {
 
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.4.4</span>
+      <span class="version">PERSONAL EDITION v3.5.0</span>
     </div>
 
-    <!-- LOCATION INPUTS -->
+    <!-- QUICK PINS & RECENT ROUTES -->
+    <div id="quick-bar" class="quick-bar" style="display:none" aria-label="Saved and recent routes"></div>
 
+    <!-- LOCATION INPUTS -->
     <div class="routing-wrapper">
 
       <div class="input-container">
@@ -554,7 +630,6 @@ summary {
     </div>
 
     <!-- ROUTING CONTROLS -->
-
     <div class="route-controls">
       <button class="mode-btn active" id="btn-mode-fast" type="button">
         ⚡ Fastest
@@ -571,14 +646,17 @@ summary {
 
     <div id="loading-msg">Calculating route and tolls…</div>
     <div id="error-msg" role="alert"></div>
-    <div id="route-status" class="status-line" aria-live="polite"></div>
+    <div class="status-line" aria-live="polite">
+      <span id="route-status"></span>
+      <button id="retry-route-btn" class="retry-link" type="button" style="display:none">↻ Retry</button>
+    </div>
 
     <!-- FARE RESULT -->
-
     <section id="result-card">
 
       <div class="fare-header-row">
         <div id="total-fare" class="fare-header">RM --</div>
+        <button class="pin-trip-btn" id="pin-trip-btn" type="button" title="Pin this route for quick reuse">📌 Pin Route</button>
       </div>
 
       <div class="fare-meta">
@@ -641,24 +719,25 @@ summary {
           <span id="driver-net-fare">RM 0.00</span>
         </div>
 
-        <p class="detail-note" id="fare-policy-note">
-          Minimum fare applies to transport charges before tolls.
-          Admin commission is 15% of transport fare excluding tolls,
-          or RM1.50 when the pre-minimum transport subtotal is below RM8.
-          Tolls are pass-through reimbursement, not driver profit.
-          Vehicle operating costs are not deducted.
-        </p>
+        <p class="detail-note" id="fare-policy-note"></p>
 
       </details>
 
-      <button class="share-btn" id="share-btn" type="button">
-        📋 Copy Itemised Receipt
-      </button>
+      <div class="share-actions">
+        <button class="share-btn" id="copy-customer-btn" type="button">
+          💬 Copy Customer Quote
+        </button>
+        <button class="share-btn secondary" id="share-btn" type="button">
+          📋 Copy Driver Log
+        </button>
+        <button class="share-btn whatsapp-full" id="whatsapp-customer-btn" type="button">
+          📲 Send Quote via WhatsApp
+        </button>
+      </div>
 
     </section>
 
     <!-- SETTINGS -->
-
     <details id="settings-panel">
       <summary>⚙️ Fare Settings</summary>
 
@@ -713,7 +792,13 @@ summary {
         </label>
 
         <label class="setting-field">
-          Flat commission below RM8 (RM)
+          Flat commission cutoff (RM)
+          <input class="setting-input" id="setting-admin-threshold"
+            type="number" min="0" step="0.50">
+        </label>
+
+        <label class="setting-field">
+          Flat commission fee (RM)
           <input class="setting-input" id="setting-admin-min"
             type="number" min="0" step="0.10">
         </label>
@@ -733,19 +818,19 @@ summary {
       <div class="settings-actions">
         <button id="save-settings-btn" type="button">Save settings</button>
         <button id="reset-settings-btn" type="button">Restore defaults</button>
+        <button id="clear-history-btn" type="button">Clear saved routes</button>
       </div>
 
       <p class="small-muted">
-        Settings are stored on this device only.
-        Commission is calculated on transport fare excluding tolls.
-        The flat commission applies below the RM8 pre-minimum threshold.
+        Settings and saved routes are stored locally on this device only.
+        Commission applies to transport fare excluding tolls.
       </p>
     </details>
 
     <p class="small-muted">
       Estimates are indicative. Confirm toll amounts and final fare before
       accepting a trip. HERE Maps, location search and routing require
-      internet access. Browser storage is local to this device.
+      internet access.
     </p>
 
   </main>
@@ -759,7 +844,7 @@ summary {
    1. CONFIGURATION & MALAYSIAN TOLL OPERATOR DIRECTORY
 ========================================================= */
 
-const APP_VERSION = '3.4.4';
+const APP_VERSION = '3.5.0';
 const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
 const DEFAULT_SETTINGS = Object.freeze({
@@ -771,13 +856,19 @@ const DEFAULT_SETTINGS = Object.freeze({
   longHaulPercent:20,
   longHaulCap:100,
   adminPercent:15,
+  adminFlatThreshold:8.00,
   adminMinimum:1.50,
   roundingUnit:1
 });
 
-const ADMIN_FLAT_THRESHOLD = 8;
-const SETTINGS_KEY = 'rideshareMY.personal.v3.1.settings';
-const LEGACY_SETTINGS_KEY = 'rideshareMY.personal.v3.0.settings';
+const SETTINGS_KEY = 'rideshareMY.personal.v3.5.settings';
+const LEGACY_SETTINGS_KEYS = [
+  'rideshareMY.personal.v3.1.settings',
+  'rideshareMY.personal.v3.0.settings'
+];
+const ROUTES_STORAGE_KEY = 'rideshareMY.personal.v3.5.routes';
+const MAX_PINNED_ROUTES = 6;
+const MAX_RECENT_ROUTES = 5;
 
 const GENTING_ROAD_CHARGE = 5.00;
 const GENTING_ROAD_CHARGE_NAME = 'Genting Highlands Road Charge';
@@ -885,10 +976,10 @@ const MALAYSIA_TOLL_OPERATORS = Object.freeze([
 ]);
 
 const HIGHLAND_ZONES = [
-  {lat:3.4241,lng:101.7933,radiusKm:10,name:'Genting Highlands & Gohtong'},
-  {lat:4.4715,lng:101.3787,radiusKm:22,name:'Cameron Highlands'},
-  {lat:3.7155,lng:101.7432,radiusKm:6,name:"Fraser's Hill"},
-  {lat:3.3533,lng:101.8385,radiusKm:8,name:'Bukit Tinggi & Colmar Tropicale'}
+  {lat:3.4241,lng:101.7933,radiusKm:8.5,name:'Genting Highlands & Gohtong',isGenting:true},
+  {lat:4.4715,lng:101.3787,radiusKm:22,name:'Cameron Highlands',isGenting:false},
+  {lat:3.7155,lng:101.7432,radiusKm:6,name:"Fraser's Hill",isGenting:false},
+  {lat:3.3533,lng:101.8385,radiusKm:7.5,name:'Bukit Tinggi & Colmar Tropicale',isGenting:false}
 ];
 
 const URBAN_POI_ZONES = [
@@ -904,18 +995,24 @@ const URBAN_POI_ZONES = [
 ];
 
 /* =========================================================
-   2. APPLICATION STATE
+   2. INTEGER-CENT MONEY ENGINE & APPLICATION STATE
 ========================================================= */
 
 const $ = id => document.getElementById(id);
 
-const money = value =>
-  `RM ${Number(value || 0).toFixed(2)}`;
+const toCents = rm => Math.round((Number(rm || 0) + Number.EPSILON) * 100);
+const fromCents = cents => Math.round(Number(cents || 0)) / 100;
+const moneyFromCents = cents => `RM ${fromCents(cents).toFixed(2)}`;
+const money = value => moneyFromCents(toCents(value));
 
-const roundMoney = value =>
-  Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+function roundCentsToUnit(cents, unitRm) {
+  const unitCents = toCents(unitRm);
+  if (unitCents <= 1) return Math.round(cents);
+  return Math.round(cents / unitCents) * unitCents;
+}
 
 let settings = loadSettings();
+let savedRoutes = loadSavedRoutes();
 
 let map = null;
 let platform = null;
@@ -949,7 +1046,7 @@ let autocompleteState = {
 };
 
 /* =========================================================
-   3. SETTINGS STORAGE & VALIDATION
+   3. SETTINGS & ROUTE HISTORY STORAGE
 ========================================================= */
 
 function sanitizeSettings(saved) {
@@ -971,10 +1068,13 @@ function sanitizeSettings(saved) {
 
 function loadSettings() {
   try {
-    const currentRaw = localStorage.getItem(SETTINGS_KEY);
-    const legacyRaw = currentRaw ? null : localStorage.getItem(LEGACY_SETTINGS_KEY);
-    const raw = currentRaw || legacyRaw;
-
+    let raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) {
+      for (const legacyKey of LEGACY_SETTINGS_KEYS) {
+        raw = localStorage.getItem(legacyKey);
+        if (raw) break;
+      }
+    }
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
@@ -997,6 +1097,141 @@ function persistSettings() {
   }
 }
 
+function loadSavedRoutes() {
+  try {
+    const raw = localStorage.getItem(ROUTES_STORAGE_KEY);
+    if (!raw) return {pinned:[],recent:[]};
+    const parsed = JSON.parse(raw);
+    return {
+      pinned:Array.isArray(parsed.pinned) ? parsed.pinned.slice(0,MAX_PINNED_ROUTES) : [],
+      recent:Array.isArray(parsed.recent) ? parsed.recent.slice(0,MAX_RECENT_ROUTES) : []
+    };
+  } catch (_) {
+    return {pinned:[],recent:[]};
+  }
+}
+
+function persistSavedRoutes() {
+  try {
+    localStorage.setItem(ROUTES_STORAGE_KEY,JSON.stringify(savedRoutes));
+  } catch (_) {}
+  renderQuickBar();
+}
+
+function shortPlaceName(label) {
+  const clean = String(label || '').trim();
+  if (!clean) return 'Unknown';
+  const firstPart = clean.split(',')[0].trim();
+  return firstPart.length > 22 ? firstPart.slice(0,21) + '…' : firstPart;
+}
+
+function makeRouteRecord(labelOverride) {
+  if (!pickupCoords || !dropoffCoords) return null;
+  const pLabel = $('pickup').value.trim();
+  const dLabel = $('dropoff').value.trim();
+  return {
+    id:`${pickupCoords.lat.toFixed(4)},${pickupCoords.lng.toFixed(4)}->${dropoffCoords.lat.toFixed(4)},${dropoffCoords.lng.toFixed(4)}`,
+    tag:labelOverride || `${shortPlaceName(pLabel)} → ${shortPlaceName(dLabel)}`,
+    pickupLabel:pLabel,
+    dropoffLabel:dLabel,
+    pickupCoords:{...pickupCoords},
+    dropoffCoords:{...dropoffCoords},
+    pickupCategories:pickupItem && Array.isArray(pickupItem.categories) ? pickupItem.categories : [],
+    dropoffCategories:dropoffItem && Array.isArray(dropoffItem.categories) ? dropoffItem.categories : []
+  };
+}
+
+function recordRecentRoute() {
+  const rec = makeRouteRecord();
+  if (!rec) return;
+  if (savedRoutes.pinned.some(r => r.id === rec.id)) return;
+  savedRoutes.recent = [
+    rec,
+    ...savedRoutes.recent.filter(r => r.id !== rec.id)
+  ].slice(0,MAX_RECENT_ROUTES);
+  persistSavedRoutes();
+}
+
+function pinCurrentRoute() {
+  const rec = makeRouteRecord();
+  if (!rec) return;
+  const existingIdx = savedRoutes.pinned.findIndex(r => r.id === rec.id);
+  if (existingIdx >= 0) {
+    savedRoutes.pinned.splice(existingIdx,1);
+    persistSavedRoutes();
+    updatePinButtonState();
+    setRouteStatus('Removed route from pinned shortcuts.');
+    return;
+  }
+  const customTag = prompt('Shortcut label for this route:',rec.tag);
+  if (customTag === null) return;
+  rec.tag = customTag.trim() || rec.tag;
+  savedRoutes.pinned = [rec,...savedRoutes.pinned].slice(0,MAX_PINNED_ROUTES);
+  savedRoutes.recent = savedRoutes.recent.filter(r => r.id !== rec.id);
+  persistSavedRoutes();
+  updatePinButtonState();
+  setRouteStatus(`Pinned "${rec.tag}" to quick bar.`);
+}
+
+function updatePinButtonState() {
+  const btn = $('pin-trip-btn');
+  if (!btn || !pickupCoords || !dropoffCoords) return;
+  const id = `${pickupCoords.lat.toFixed(4)},${pickupCoords.lng.toFixed(4)}->${dropoffCoords.lat.toFixed(4)},${dropoffCoords.lng.toFixed(4)}`;
+  const isPinned = savedRoutes.pinned.some(r => r.id === id);
+  btn.textContent = isPinned ? '★ Pinned' : '📌 Pin Route';
+}
+
+function applySavedRoute(rec) {
+  if (!rec || !rec.pickupCoords || !rec.dropoffCoords) return;
+  cancelGpsRequest();
+  invalidateRoute(true);
+
+  pickupCoords = {...rec.pickupCoords};
+  dropoffCoords = {...rec.dropoffCoords};
+  pickupItem = {address:{label:rec.pickupLabel},categories:rec.pickupCategories || []};
+  dropoffItem = {address:{label:rec.dropoffLabel},categories:rec.dropoffCategories || []};
+
+  $('pickup').value = rec.pickupLabel || '';
+  $('dropoff').value = rec.dropoffLabel || '';
+  $('pickup-suggestions').style.display = 'none';
+  $('dropoff-suggestions').style.display = 'none';
+
+  updateInputClearButton('pickup');
+  updateInputClearButton('dropoff');
+  updateMarker('pickup',pickupCoords);
+  updateMarker('dropoff',dropoffCoords);
+  clearError();
+  calculateRoute();
+}
+
+function renderQuickBar() {
+  const bar = $('quick-bar');
+  if (!bar) return;
+  bar.innerHTML = '';
+
+  const allChips = [
+    ...savedRoutes.pinned.map(r => ({...r,isPinned:true})),
+    ...savedRoutes.recent.map(r => ({...r,isPinned:false}))
+  ];
+
+  if (!allChips.length) {
+    bar.style.display = 'none';
+    return;
+  }
+
+  allChips.forEach(item => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = item.isPinned ? 'chip-btn' : 'chip-btn recent';
+    btn.textContent = `${item.isPinned ? '★' : '🕒'} ${item.tag}`;
+    btn.title = `${item.pickupLabel} → ${item.dropoffLabel}`;
+    btn.addEventListener('click',() => applySavedRoute(item));
+    bar.appendChild(btn);
+  });
+
+  bar.style.display = 'flex';
+}
+
 function readSettingsForm() {
   const fields = {
     ratePerKm:'setting-rate',
@@ -1007,6 +1242,7 @@ function readSettingsForm() {
     longHaulPercent:'setting-longhaul-percent',
     longHaulCap:'setting-longhaul-cap',
     adminPercent:'setting-admin-percent',
+    adminFlatThreshold:'setting-admin-threshold',
     adminMinimum:'setting-admin-min'
   };
 
@@ -1041,6 +1277,7 @@ function populateSettingsForm() {
   $('setting-longhaul-percent').value = settings.longHaulPercent;
   $('setting-longhaul-cap').value = settings.longHaulCap;
   $('setting-admin-percent').value = settings.adminPercent;
+  $('setting-admin-threshold').value = settings.adminFlatThreshold;
   $('setting-admin-min').value = settings.adminMinimum;
   $('setting-rounding').value = String(settings.roundingUnit);
 }
@@ -1049,15 +1286,17 @@ function populateSettingsForm() {
    4. STATUS AND ERROR HANDLING
 ========================================================= */
 
-function showError(message) {
+function showError(message, showRetry=false) {
   $('error-msg').textContent = message;
   $('error-msg').style.display = 'block';
   $('loading-msg').style.display = 'none';
+  $('retry-route-btn').style.display = showRetry && pickupCoords && dropoffCoords ? 'inline-block' : 'none';
 }
 
 function clearError() {
   $('error-msg').textContent = '';
   $('error-msg').style.display = 'none';
+  $('retry-route-btn').style.display = 'none';
 }
 
 function setLoading(active) {
@@ -1125,7 +1364,8 @@ function isRelevantPoi(item) {
   if (!item) return false;
   const categories = Array.isArray(item.categories) ? item.categories : [];
   const text = categories.map(c => `${c.name || ''} ${c.id || ''}`).join(' ').toLowerCase();
-  return /airport|shopping.?mall|shopping.?centre|shopping.?center|railway.?station|train.?station|bus.?station|convention.?centre|convention.?center|stadium|terminal/.test(text);
+  const label = ((item.address && item.address.label) || item.title || '').toLowerCase();
+  return /airport|shopping.?mall|shopping.?centre|shopping.?center|railway.?station|train.?station|bus.?station|convention.?centre|convention.?center|stadium|terminal|hospital|university/.test(`${text} ${label}`);
 }
 
 function getUrbanAssessment(pickup,dropoff,itemP,itemD) {
@@ -1335,7 +1575,7 @@ function setupAutocomplete(type) {
         );
 
         if (response.status === 429) {
-          throw new Error('Location search limit reached. Please wait and try again.');
+          throw new Error('Location search limit reached. Please wait a moment and try again.');
         }
         if (!response.ok) {
           throw new Error(`Location search failed (HTTP ${response.status}).`);
@@ -1501,11 +1741,11 @@ function requestCurrentLocation() {
         map.setZoom(15);
       }
 
-      const accuracyText = Number.isFinite(gpsAccuracy)
-        ? ` · GPS accuracy ±${Math.round(gpsAccuracy)}m`
-        : '';
+      const accuracyWarning = Number.isFinite(gpsAccuracy) && gpsAccuracy > 100
+        ? ` (low accuracy ±${Math.round(gpsAccuracy)}m — verify pin)`
+        : (Number.isFinite(gpsAccuracy) ? ` · GPS ±${Math.round(gpsAccuracy)}m` : '');
 
-      setRouteStatus(`GPS pickup set${accuracyText}.`);
+      setRouteStatus(`GPS pickup set${accuracyWarning}.`);
 
       if (pickupCoords && dropoffCoords) {
         calculateRoute();
@@ -1590,7 +1830,7 @@ function toggleAvoidTolls() {
 }
 
 /* =========================================================
-   11. CLEAN TOLL EXTRACTION ENGINE
+   11. CLEAN TOLL EXTRACTION ENGINE (INTEGER-CENT SAFE)
 ========================================================= */
 
 function matchMalaysiaOperator(label) {
@@ -1607,7 +1847,7 @@ function matchMalaysiaOperator(label) {
 function cleanTollLabel(rawLabel) {
   return String(rawLabel || '')
     .replace(/malaysian\s+highway\s+toll\s+rate\s+system/ig,'')
-    .replace(/\btoll\s+rate\s+system\b/ig,'')
+    .replace(/ toll\s+rate\s+system /ig,'')
     .replace(/\s+/g,' ')
     .trim();
 }
@@ -1637,14 +1877,18 @@ function extractMyrFare(toll) {
     );
     if (!price) return null;
 
+    const tag = String(fare.name || fare.id || fare.paymentMethods || '').toLowerCase();
+    const isCarPreferred = /car|class.?1|passenger|standard/.test(tag);
+
     return {
-      amount:roundMoney(Number(price.value)),
-      fareId:fare.id ? String(fare.id) : ''
+      cents:toCents(Number(price.value)),
+      fareId:fare.id ? String(fare.id) : '',
+      isCarPreferred
     };
   }).filter(Boolean);
 
   if (!valid.length) return null;
-  return valid[0];
+  return valid.find(v => v.isCarPreferred) || valid[0];
 }
 
 function getTollSystemLabel(section,toll) {
@@ -1674,8 +1918,8 @@ function getTollLocationName(toll) {
 }
 
 function extractTollCostsArray(costs,prefix,outItems,seenFareIds) {
-  if (!Array.isArray(costs)) return {resolved:0,unresolved:0};
-  let resolved = 0;
+  if (!Array.isArray(costs)) return {resolvedCents:0,unresolved:0};
+  let resolvedCents = 0;
   let unresolved = 0;
 
   costs.forEach((cost,idx) => {
@@ -1692,6 +1936,7 @@ function extractTollCostsArray(costs,prefix,outItems,seenFareIds) {
         plazaName:`${prefix} ${idx + 1}`,
         systemName:'',
         operator:'',
+        cents:null,
         amount:null,
         unresolved:true
       });
@@ -1702,17 +1947,19 @@ function extractTollCostsArray(costs,prefix,outItems,seenFareIds) {
     if (fareId && seenFareIds.has(fareId)) return;
     if (fareId) seenFareIds.add(fareId);
 
-    resolved++;
+    const cents = toCents(Number(price.value));
+    resolvedCents += cents;
     outItems.push({
       plazaName:`${prefix} ${idx + 1}`,
       systemName:'',
       operator:'',
-      amount:roundMoney(Number(price.value)),
+      cents,
+      amount:fromCents(cents),
       unresolved:false
     });
   });
 
-  return {resolved,unresolved};
+  return {resolvedCents,unresolved};
 }
 
 function detectPenangBridgeFromRoute(route) {
@@ -1741,7 +1988,7 @@ function evaluateRouteTolls(route) {
   const items = [];
   const seenFareIds = new Set();
 
-  let totalToll = 0;
+  let totalTollCents = 0;
   let itemisedSections = 0;
   let summarySections = 0;
   let unresolvedCount = 0;
@@ -1765,6 +2012,7 @@ function evaluateRouteTolls(route) {
             plazaName,
             systemName,
             operator:matchMalaysiaOperator(`${plazaName} ${systemName}`),
+            cents:null,
             amount:null,
             unresolved:true
           });
@@ -1774,13 +2022,14 @@ function evaluateRouteTolls(route) {
         if (picked.fareId && seenFareIds.has(picked.fareId)) return;
         if (picked.fareId) seenFareIds.add(picked.fareId);
 
-        totalToll = roundMoney(totalToll + picked.amount);
+        totalTollCents += picked.cents;
 
         items.push({
           plazaName,
           systemName,
           operator:matchMalaysiaOperator(`${plazaName} ${systemName}`),
-          amount:picked.amount,
+          cents:picked.cents,
+          amount:fromCents(picked.cents),
           unresolved:false
         });
       });
@@ -1791,9 +2040,7 @@ function evaluateRouteTolls(route) {
       summarySections++;
       const res = extractTollCostsArray(secCosts,`Toll Section ${sIdx + 1}`,items,seenFareIds);
       unresolvedCount += res.unresolved;
-      items.slice(-res.resolved).forEach(entry => {
-        if (!entry.unresolved) totalToll = roundMoney(totalToll + entry.amount);
-      });
+      totalTollCents += res.resolvedCents;
     }
   });
 
@@ -1802,28 +2049,31 @@ function evaluateRouteTolls(route) {
       route.summary.tollCosts.length) {
     const res = extractTollCostsArray(route.summary.tollCosts,'Toll Summary',items,seenFareIds);
     unresolvedCount += res.unresolved;
-    items.slice(-res.resolved).forEach(entry => {
-      if (!entry.unresolved) totalToll = roundMoney(totalToll + entry.amount);
-    });
+    totalTollCents += res.resolvedCents;
   }
 
-  // Genting Highlands Road Charge (RM 5.00 Class 1 entry charge, effective 28 May 2026)
+  // Genting Highlands Road Charge (RM 5.00 Class 1 entry charge)
+  // Trigger only when pickup/dropoff is inside the Genting zone OR a Genting toll plaza is in the route
   const highlandZone = getHighlandZone(pickupCoords,dropoffCoords);
-  const touchesGenting = Boolean(highlandZone && /genting/i.test(highlandZone.name || '')) ||
-    items.some(item => /genting|gohtong|sempah/i.test(`${item.plazaName || ''} ${item.systemName || ''}`));
+  const inGentingZone = Boolean(highlandZone && highlandZone.isGenting);
+  const routeMentionsGenting = items.some(item =>
+    /genting|gohtong|sempah/i.test(`${item.plazaName || ''} ${item.systemName || ''}`)
+  );
 
-  if (touchesGenting) {
+  if (inGentingZone || routeMentionsGenting) {
     const hasGentingItem = items.some(item =>
       !item.unresolved &&
       /genting|gohtong|sempah/i.test(`${item.plazaName || ''} ${item.systemName || ''} ${item.operator || ''}`)
     );
     if (!hasGentingItem) {
-      totalToll = roundMoney(totalToll + GENTING_ROAD_CHARGE);
+      const gentingCents = toCents(GENTING_ROAD_CHARGE);
+      totalTollCents += gentingCents;
       items.push({
         plazaName:GENTING_ROAD_CHARGE_NAME,
         systemName:'Jalan Genting Highlands',
         operator:'Lingkaran Cekap Sdn Bhd',
-        amount:GENTING_ROAD_CHARGE,
+        cents:gentingCents,
+        amount:fromCents(gentingCents),
         unresolved:false
       });
     }
@@ -1835,13 +2085,13 @@ function evaluateRouteTolls(route) {
   const bridgeRegex = /penang.*bridge|jambatan.*(pulau pinang|kedua|sultan abdul halim)|jksb|perai|bandar cassia|jk2pp/i;
 
   if (pickupIsland && !dropoffIsland) {
-    // Island -> Mainland is RM 0.00 on both Penang bridges; strip false bridge charges if returned
+    // Island -> Mainland is RM 0.00 on both Penang bridges
     for (let i = items.length - 1; i >= 0; i--) {
       const it = items[i];
       if (!it.unresolved &&
           bridgeRegex.test(`${it.plazaName || ''} ${it.systemName || ''} ${it.operator || ''}`) &&
-          Number(it.amount) >= 5.00) {
-        totalToll = roundMoney(Math.max(0,totalToll - Number(it.amount)));
+          it.cents >= 500) {
+        totalTollCents = Math.max(0,totalTollCents - it.cents);
         items.splice(i,1);
       }
     }
@@ -1849,27 +2099,31 @@ function evaluateRouteTolls(route) {
     // Mainland -> Penang Island (RM 5.74 Class 1 on 2nd Bridge / RM 7.00 on 1st Bridge)
     const hasBridgeItem = items.some(item =>
       !item.unresolved &&
-      Number(item.amount) >= 5.00 &&
+      item.cents >= 500 &&
       bridgeRegex.test(`${item.plazaName || ''} ${item.systemName || ''} ${item.operator || ''}`)
     );
     if (!hasBridgeItem) {
       const bridgeType = detectPenangBridgeFromRoute(route);
       if (bridgeType === 'second') {
-        totalToll = roundMoney(totalToll + PENANG_2ND_BRIDGE_RATE);
+        const c2 = toCents(PENANG_2ND_BRIDGE_RATE);
+        totalTollCents += c2;
         items.push({
           plazaName:'Bandar Cassia / JK2PP (Penang 2nd Bridge)',
           systemName:'Penang Second Bridge (E28)',
           operator:'Jambatan Kedua Sdn Bhd (JKSB)',
-          amount:PENANG_2ND_BRIDGE_RATE,
+          cents:c2,
+          amount:fromCents(c2),
           unresolved:false
         });
-      } else {
-        totalToll = roundMoney(totalToll + PENANG_1ST_BRIDGE_RATE);
+      } else if (bridgeType === 'first' || !avoidTolls) {
+        const c1 = toCents(PENANG_1ST_BRIDGE_RATE);
+        totalTollCents += c1;
         items.push({
           plazaName:'Perai (Penang 1st Bridge)',
           systemName:'Penang Bridge (E36)',
           operator:'PLUS Malaysia Berhad',
-          amount:PENANG_1ST_BRIDGE_RATE,
+          cents:c1,
+          amount:fromCents(c1),
           unresolved:false
         });
       }
@@ -1877,7 +2131,8 @@ function evaluateRouteTolls(route) {
   }
 
   return {
-    amount:roundMoney(totalToll),
+    cents:totalTollCents,
+    amount:fromCents(totalTollCents),
     items,
     unresolvedCount
   };
@@ -1908,11 +2163,12 @@ function calculateRoute() {
   }
 
   if (!isApiKeyConfigured()) {
-    showError('Configure your new HERE API key before calculating routes.');
+    showError('Configure your HERE API key before calculating routes.');
     return;
   }
 
-  invalidateRoute(true);
+  const hadPreviousCard = $('result-card').style.display === 'block';
+  invalidateRoute(!hadPreviousCard);
 
   const requestId = routeRequestId;
   const origin = {...pickupCoords};
@@ -1948,7 +2204,7 @@ function calculateRoute() {
         setLoading(false);
 
         if (!result || !Array.isArray(result.routes) || !result.routes.length) {
-          showError('No route found for the selected locations.');
+          showError('No route found for the selected locations.',true);
           return;
         }
 
@@ -1956,7 +2212,7 @@ function calculateRoute() {
           handleRouteResult(result.routes[0],result.routes.length,avoidTollSnapshot,requestId);
         } catch(error) {
           console.error('Route processing error:',error);
-          showError('Route was returned, but its details could not be processed.');
+          showError('Route was returned, but its details could not be processed.',true);
         }
       },
       error => {
@@ -1964,7 +2220,7 @@ function calculateRoute() {
         setLoading(false);
         console.error('HERE routing error:',error);
         const detail = (error && (error.message || error.title)) ? ` (${error.message || error.title})` : '';
-        showError(`Route calculation failed${detail}. Check internet access, API permissions and routing settings.`);
+        showError(`Route calculation failed${detail}. Check connection and retry.`,true);
       }
     );
   },180);
@@ -2030,6 +2286,8 @@ function handleRouteResult(route,routesReturnedCount,avoidTollsRequested,request
   });
 
   latestCalculation = calculation;
+  recordRecentRoute();
+  updatePinButtonState();
 
   setRouteStatus(
     `Route calculated · ${sections.length} section(s) · ` +
@@ -2039,69 +2297,66 @@ function handleRouteResult(route,routesReturnedCount,avoidTollsRequested,request
 }
 
 /* =========================================================
-   14. FARE CALCULATION ENGINE
+   14. FARE CALCULATION ENGINE (INTEGER-CENT ARITHMETIC)
 ========================================================= */
 
-function roundToUnit(value,unit) {
-  if (!(unit > 0)) return roundMoney(value);
-  return roundMoney(Math.round((value + Number.EPSILON) / unit) * unit);
-}
-
 function processCalculations(routeData) {
-  const distanceFare = roundMoney(routeData.distance * settings.ratePerKm);
+  const distanceFareCents = toCents(routeData.distance * settings.ratePerKm);
 
   const urban = getUrbanAssessment(pickupCoords,dropoffCoords,pickupItem,dropoffItem);
-  const urbanSurcharge = urban.applies ? roundMoney(settings.urbanSurcharge) : 0;
+  const urbanSurchargeCents = urban.applies ? toCents(settings.urbanSurcharge) : 0;
 
   const highlandZone = getHighlandZone(pickupCoords,dropoffCoords);
-  const hillApplies = Boolean(highlandZone);
-  const hillSurcharge = hillApplies ? roundMoney(settings.hillSurcharge) : 0;
+  const hillSurchargeCents = highlandZone ? toCents(settings.hillSurcharge) : 0;
 
   const longHaulApplies = settings.longHaulTriggerKm > 0 && routeData.distance >= settings.longHaulTriggerKm;
-  const longHaulIncentive = longHaulApplies
-    ? roundMoney(Math.min(settings.longHaulCap,distanceFare * settings.longHaulPercent / 100))
+  const longHaulCapCents = toCents(settings.longHaulCap);
+  const longHaulIncentiveCents = longHaulApplies
+    ? Math.min(longHaulCapCents,Math.round(distanceFareCents * settings.longHaulPercent / 100))
     : 0;
 
-  const transportSubtotal = roundMoney(distanceFare + urbanSurcharge + hillSurcharge + longHaulIncentive);
-  const transportFare = roundMoney(Math.max(settings.minimumFare,transportSubtotal));
+  const transportSubtotalCents = distanceFareCents + urbanSurchargeCents + hillSurchargeCents + longHaulIncentiveCents;
+  const minimumFareCents = toCents(settings.minimumFare);
+  const transportFareCents = Math.max(minimumFareCents,transportSubtotalCents);
 
-  const tollFee = roundMoney(routeData.tollResult.amount);
-  const exactTotal = roundMoney(transportFare + tollFee);
-  const customerTotal = roundMoney(roundToUnit(exactTotal,settings.roundingUnit));
+  const tollFeeCents = routeData.tollResult.cents;
+  const exactTotalCents = transportFareCents + tollFeeCents;
+  const customerTotalCents = roundCentsToUnit(exactTotalCents,settings.roundingUnit);
 
-  const usesFlatCommission = transportSubtotal < ADMIN_FLAT_THRESHOLD;
-  const proposedAdminDeduction = usesFlatCommission
-    ? roundMoney(settings.adminMinimum)
-    : roundMoney(transportFare * settings.adminPercent / 100);
-  const adminDeduction = roundMoney(Math.min(transportFare,proposedAdminDeduction));
+  const adminThresholdCents = toCents(settings.adminFlatThreshold);
+  const usesFlatCommission = transportSubtotalCents < adminThresholdCents;
+  const proposedAdminCents = usesFlatCommission
+    ? toCents(settings.adminMinimum)
+    : Math.round(transportFareCents * settings.adminPercent / 100);
+  const adminDeductionCents = Math.min(transportFareCents,proposedAdminCents);
 
-  const driverFareEarnings = roundMoney(Math.max(0,transportFare - adminDeduction));
-  const driverAmountAfterDeduction = roundMoney(Math.max(0,customerTotal - adminDeduction));
-  const roundingAdjustment = roundMoney(customerTotal - exactTotal);
+  const driverFareEarningsCents = Math.max(0,transportFareCents - adminDeductionCents);
+  const driverAmountAfterDeductionCents = Math.max(0,customerTotalCents - adminDeductionCents);
+  const roundingAdjustmentCents = customerTotalCents - exactTotalCents;
 
-  $('urban-surcharge-row').style.display = urbanSurcharge > 0 ? 'flex' : 'none';
+  $('urban-surcharge-row').style.display = urbanSurchargeCents > 0 ? 'flex' : 'none';
   $('urban-surcharge-label').textContent = urban.label ? `Urban / POI surcharge (${urban.label})` : 'Urban / POI surcharge';
 
-  $('hill-surcharge-row').style.display = hillSurcharge > 0 ? 'flex' : 'none';
+  $('hill-surcharge-row').style.display = hillSurchargeCents > 0 ? 'flex' : 'none';
   $('hill-surcharge-label').textContent = highlandZone ? `Highland surcharge (${highlandZone.name})` : 'Highland surcharge';
 
-  $('long-haul-incentive-row').style.display = longHaulIncentive > 0 ? 'flex' : 'none';
-  $('admin-deduction-row').style.display = adminDeduction > 0 ? 'flex' : 'none';
+  $('long-haul-incentive-row').style.display = longHaulIncentiveCents > 0 ? 'flex' : 'none';
+  $('admin-deduction-row').style.display = adminDeductionCents > 0 ? 'flex' : 'none';
 
-  $('total-fare').textContent = money(customerTotal);
+  $('total-fare').textContent = moneyFromCents(customerTotalCents);
   $('fare-distance').textContent = `${routeData.distance.toFixed(1)} km`;
   $('fare-duration').textContent = formatDuration(routeData.duration);
 
-  $('calc-distance-fare').textContent = money(distanceFare);
-  $('calc-urban-surcharge').textContent = money(urbanSurcharge);
-  $('calc-toll-fare').textContent = money(tollFee);
-  $('calc-hill-surcharge').textContent = money(hillSurcharge);
-  $('calc-long-haul-incentive').textContent = money(longHaulIncentive);
-  $('calc-grand').textContent = money(exactTotal);
-  $('calc-customer-total').textContent = money(customerTotal);
-  $('calc-deduction').textContent = `-${money(adminDeduction)}`;
-  $('driver-fare-net').textContent = money(driverFareEarnings);
-  $('driver-net-fare').textContent = money(driverAmountAfterDeduction);
+  $('calc-distance-fare').textContent = moneyFromCents(distanceFareCents);
+  $('calc-urban-surcharge').textContent = moneyFromCents(urbanSurchargeCents);
+  $('calc-toll-fare').textContent = moneyFromCents(tollFeeCents);
+  $('calc-hill-surcharge').textContent = moneyFromCents(hillSurchargeCents);
+  $('calc-long-haul-incentive').textContent = moneyFromCents(longHaulIncentiveCents);
+  $('calc-grand').textContent = moneyFromCents(exactTotalCents);
+  $('calc-customer-total').textContent = moneyFromCents(customerTotalCents);
+  $('calc-deduction').textContent = `-${moneyFromCents(adminDeductionCents)}`;
+  $('driver-fare-net').textContent = moneyFromCents(driverFareEarningsCents);
+  $('driver-net-fare').textContent = moneyFromCents(driverAmountAfterDeductionCents);
 
   const breakdownBox = $('toll-breakdown-box');
   if (routeData.tollResult.items.length) {
@@ -2119,7 +2374,7 @@ function processCalculations(routeData) {
       left.textContent = formatTollDisplayName(item);
 
       const right = document.createElement('span');
-      right.textContent = item.unresolved ? 'Unverified' : money(item.amount);
+      right.textContent = item.unresolved ? 'Unverified' : moneyFromCents(item.cents);
       if (item.unresolved) row.classList.add('fare-warning');
 
       row.append(left,right);
@@ -2135,11 +2390,9 @@ function processCalculations(routeData) {
     `Minimum transport fare: ${money(settings.minimumFare)}. ` +
     `Admin commission: ${settings.adminPercent}% of transport fare, ` +
     `or ${money(settings.adminMinimum)} when the pre-minimum subtotal ` +
-    `is below RM${ADMIN_FLAT_THRESHOLD.toFixed(2)}. ` +
+    `is below ${money(settings.adminFlatThreshold)}. ` +
     `Tolls are pass-through reimbursement, not driver profit. ` +
-    `Vehicle fuel, maintenance, depreciation and other operating costs ` +
-    `are not deducted. ` +
-    `Quotation rounding adjustment: ${money(roundingAdjustment)}.`;
+    `Quotation rounding adjustment: ${moneyFromCents(roundingAdjustmentCents)}.`;
 
   $('result-card').style.display = 'block';
 
@@ -2149,26 +2402,26 @@ function processCalculations(routeData) {
     dropoff:$('dropoff').value.trim(),
     distance:routeData.distance,
     duration:routeData.duration,
-    distanceFare,
-    urbanSurcharge,
+    distanceFare:fromCents(distanceFareCents),
+    urbanSurcharge:fromCents(urbanSurchargeCents),
     urbanLabel:urban.label,
-    tollFee,
+    tollFee:fromCents(tollFeeCents),
     tollItems:routeData.tollResult.items,
-    hillSurcharge,
+    hillSurcharge:fromCents(hillSurchargeCents),
     highlandZone:highlandZone ? highlandZone.name : '',
-    longHaulIncentive,
-    transportSubtotal,
-    transportFare,
-    exactTotal,
-    customerTotal,
-    roundingAdjustment,
-    adminDeduction,
+    longHaulIncentive:fromCents(longHaulIncentiveCents),
+    transportSubtotal:fromCents(transportSubtotalCents),
+    transportFare:fromCents(transportFareCents),
+    exactTotal:fromCents(exactTotalCents),
+    customerTotal:fromCents(customerTotalCents),
+    roundingAdjustment:fromCents(roundingAdjustmentCents),
+    adminDeduction:fromCents(adminDeductionCents),
     adminPercent:settings.adminPercent,
     adminFlatBelowThreshold:settings.adminMinimum,
-    adminFlatThreshold:ADMIN_FLAT_THRESHOLD,
+    adminFlatThreshold:settings.adminFlatThreshold,
     usesFlatCommission,
-    driverFareEarnings,
-    driverAmountAfterDeduction,
+    driverFareEarnings:fromCents(driverFareEarningsCents),
+    driverAmountAfterDeduction:fromCents(driverAmountAfterDeductionCents),
     routingMode:activeRoutingMode,
     avoidTolls:avoidTolls,
     settingsSnapshot:{...settings},
@@ -2190,18 +2443,36 @@ function formatDuration(minutes) {
 }
 
 /* =========================================================
-   16. RECEIPT GENERATION
+   16. CUSTOMER QUOTE & DRIVER RECEIPT GENERATION
 ========================================================= */
+
+function customerQuoteText(data) {
+  const tollNote = data.tollFee > 0
+    ? `Est. Tolls: ${money(data.tollFee)} (included)`
+    : (data.avoidTolls ? 'Route: Toll-free requested' : 'Est. Tolls: RM 0.00');
+
+  return [
+    '*TRIP FARE QUOTATION*',
+    `From: ${data.pickup}`,
+    `To: ${data.dropoff}`,
+    `Est. Distance: ${data.distance.toFixed(1)} km (~${formatDuration(data.duration)})`,
+    tollNote,
+    `*Total Fare: ${money(data.customerTotal)}*`,
+    '_Cashless (TnG eWallet / DuitNow QR) preferred._'
+  ].join('
+');
+}
 
 function receiptText(data) {
   const tollLines = Array.isArray(data.tollItems) && data.tollItems.length
     ? data.tollItems.map(t =>
         `  - ${formatTollDisplayName(t)}: ${t.unresolved ? 'UNVERIFIED — confirm manually' : money(t.amount)}`
-      ).join('\n')
+      ).join('
+')
     : '  - No toll records returned; verify before travel';
 
   return [
-    `TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v${APP_VERSION}`,
+    `DRIVER FARE LOG — RIDESHARE v${APP_VERSION}`,
     '------------------------------------------------',
     `From: ${data.pickup}`,
     `To: ${data.dropoff}`,
@@ -2230,15 +2501,13 @@ function receiptText(data) {
     `Driver transport earnings: ${money(data.driverFareEarnings)}`,
     `Driver collection after commission (incl. tolls): ${money(data.driverAmountAfterDeduction)}`,
     '------------------------------------------------',
-    'Tolls are reimbursement, not driver profit.',
-    'Driver earnings exclude fuel, maintenance, depreciation and other operating costs.',
-    'Estimate only. Verify tolls and final fare before travel.',
-    `Generated by Rideshare MY Personal Edition v${APP_VERSION}`
-  ].join('\n');
+    `Generated by Rideshare v${APP_VERSION}`
+  ].join('
+');
 }
 
 /* =========================================================
-   17. CLIPBOARD
+   17. CLIPBOARD & WHATSAPP DISPATCH
 ========================================================= */
 
 async function copyText(text) {
@@ -2276,21 +2545,23 @@ async function copyText(text) {
   }
 }
 
-async function copyReceipt() {
+async function copyFormatted(buttonId, formatter, successLabel) {
   if (!latestCalculation) return;
-
-  const button = $('share-btn');
+  const button = $(buttonId);
   const original = button.textContent;
-
   try {
-    await copyText(receiptText(latestCalculation));
-    button.textContent = '✓ Receipt copied';
-    setTimeout(() => {
-      button.textContent = original;
-    },1800);
+    await copyText(formatter(latestCalculation));
+    button.textContent = successLabel;
+    setTimeout(() => { button.textContent = original; },1800);
   } catch(error) {
-    showError(`Unable to copy receipt: ${error.message}`);
+    showError(`Unable to copy: ${error.message}`);
   }
+}
+
+function sendCustomerWhatsApp() {
+  if (!latestCalculation) return;
+  const text = encodeURIComponent(customerQuoteText(latestCalculation));
+  window.open(`https://wa.me/?text=${text}`,'_blank','noopener');
 }
 
 /* =========================================================
@@ -2350,8 +2621,16 @@ function bindEvents() {
   $('btn-mode-fast').addEventListener('click',() => setRoutingMode('fast'));
   $('btn-mode-short').addEventListener('click',() => setRoutingMode('short'));
   $('btn-avoid-tolls').addEventListener('click',toggleAvoidTolls);
+  $('retry-route-btn').addEventListener('click',calculateRoute);
+  $('pin-trip-btn').addEventListener('click',pinCurrentRoute);
 
-  $('share-btn').addEventListener('click',copyReceipt);
+  $('copy-customer-btn').addEventListener('click',() =>
+    copyFormatted('copy-customer-btn',customerQuoteText,'✓ Quote Copied')
+  );
+  $('share-btn').addEventListener('click',() =>
+    copyFormatted('share-btn',receiptText,'✓ Log Copied')
+  );
+  $('whatsapp-customer-btn').addEventListener('click',sendCustomerWhatsApp);
 
   $('save-settings-btn').addEventListener('click',() => {
     try {
@@ -2376,6 +2655,14 @@ function bindEvents() {
     clearError();
   });
 
+  $('clear-history-btn').addEventListener('click',() => {
+    if (!confirm('Clear all pinned and recent routes on this device?')) return;
+    savedRoutes = {pinned:[],recent:[]};
+    persistSavedRoutes();
+    updatePinButtonState();
+    setRouteStatus('Saved routes cleared.');
+  });
+
   document.addEventListener('click',event => {
     ['pickup','dropoff'].forEach(type => {
       const box = $(`${type}-suggestions`);
@@ -2393,6 +2680,7 @@ function bindEvents() {
 
 function boot() {
   populateSettingsForm();
+  renderQuickBar();
   bindEvents();
   initMap();
 
