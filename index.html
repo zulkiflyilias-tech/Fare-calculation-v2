@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare MY - Personal Edition v3.4.2</title>
+<title>Rideshare MY - Personal Edition v3.4.3</title>
 
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 
@@ -209,17 +209,15 @@ button {touch-action:manipulation}
 
 .route-controls {
   display:flex;
-  flex-direction:column;
-  gap:7px;
-  margin:3px 0 8px;
-}
-
-.route-mode-container {
-  display:flex;
+  flex-direction:row;
+  align-items:stretch;
   gap:6px;
+  margin:4px 0 8px;
 }
 
 .mode-btn,.toggle-btn {
+  flex:1;
+  min-width:0;
   border:1px solid var(--border);
   border-radius:8px;
   background:#fff;
@@ -227,22 +225,19 @@ button {touch-action:manipulation}
   font-size:11px;
   font-weight:650;
   cursor:pointer;
-  padding:8px 5px;
+  padding:8px 4px;
   display:flex;
   align-items:center;
   justify-content:center;
-  gap:5px;
+  gap:3px;
+  white-space:nowrap;
 }
-
-.mode-btn {flex:1}
 
 .mode-btn.active {
   background:#f3e5f5;
   border-color:var(--primary);
   color:var(--primary);
 }
-
-.toggle-btn {font-size:12px}
 
 .toggle-btn.active {
   background:#fff3e0;
@@ -491,6 +486,7 @@ summary {
   #search-panel {padding:10px}
   .settings-grid {gap:6px}
   .fare-header {font-size:24px}
+  .mode-btn,.toggle-btn {font-size:10px;padding:7px 3px}
 }
 </style>
 
@@ -509,7 +505,7 @@ summary {
 
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.4.2</span>
+      <span class="version">PERSONAL EDITION v3.4.3</span>
     </div>
 
     <!-- LOCATION INPUTS -->
@@ -560,21 +556,17 @@ summary {
     <!-- ROUTING CONTROLS -->
 
     <div class="route-controls">
-
-      <div class="route-mode-container">
-        <button class="mode-btn active" id="btn-mode-fast" type="button">
-          ⚡ Fastest Route
-        </button>
-
-        <button class="mode-btn" id="btn-mode-short" type="button">
-          📏 Shortest Route
-        </button>
-      </div>
-
-      <button class="toggle-btn" id="btn-avoid-tolls" type="button">
-        🛑 Avoid Tolls: OFF
+      <button class="mode-btn active" id="btn-mode-fast" type="button">
+        ⚡ Fastest
       </button>
 
+      <button class="mode-btn" id="btn-mode-short" type="button">
+        📏 Shortest
+      </button>
+
+      <button class="toggle-btn" id="btn-avoid-tolls" type="button">
+        🛑 No Toll: OFF
+      </button>
     </div>
 
     <div id="loading-msg">Calculating route and tolls…</div>
@@ -767,7 +759,7 @@ summary {
    1. CONFIGURATION & MALAYSIAN TOLL OPERATOR DIRECTORY
 ========================================================= */
 
-const APP_VERSION = '3.4.2';
+const APP_VERSION = '3.4.3';
 const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
 const DEFAULT_SETTINGS = Object.freeze({
@@ -822,7 +814,7 @@ const MALAYSIA_TOLL_OPERATORS = Object.freeze([
     tier:'independent',
     operator:'Jambatan Kedua Sdn Bhd (JKSB)',
     highways:['Penang Second Bridge (E28)'],
-    keywords:['jksb','2nd bridge','second bridge','jambatan kedua','sultan abdul halim','bandar cassia','jk2pp','batu kawan']
+    keywords:['jksb','2nd bridge','second bridge','jambatan kedua','sultan abdul halim','bandar cassia','jk2pp','batu kawan','simpang ampat']
   },
   {
     tier:'independent',
@@ -1590,7 +1582,7 @@ function setRoutingMode(mode) {
 function toggleAvoidTolls() {
   avoidTolls = !avoidTolls;
   $('btn-avoid-tolls').classList.toggle('active',avoidTolls);
-  $('btn-avoid-tolls').textContent = `🛑 Avoid Tolls: ${avoidTolls ? 'ON' : 'OFF'}`;
+  $('btn-avoid-tolls').textContent = `🛑 No Toll: ${avoidTolls ? 'ON' : 'OFF'}`;
 
   if (pickupCoords && dropoffCoords) {
     calculateRoute();
