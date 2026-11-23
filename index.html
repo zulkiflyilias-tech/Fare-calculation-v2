@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare v3.6.2</title>
+<title>Rideshare MY Personal Edition v3.7.0</title>
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 <style>
   :root {
@@ -658,7 +658,7 @@
 
       <div id="toll-breakdown-box" class="toll-breakdown-box" style="display:none">
         <div id="toll-warning-banner" class="estimated-warning-banner" style="display:none">
-          ⚠️ Some toll entries are unverified or corridor-estimated. Confirm before travel.
+          ⚠️ Toll data may be incomplete or estimated. Local reference rates are not live official tariff verification; confirm before travel.
         </div>
       </div>
 
@@ -673,9 +673,13 @@
           <span id="calc-urban-surcharge">RM 0.00</span>
         </div>
         <div class="detail-row" id="toll-fare-row">
-          <span>Toll charges</span>
+          <span>Toll charges (identified + manual adjustment)</span>
           <span id="calc-toll-fare">RM 0.00</span>
         </div>
+        <label class="detail-row" style="align-items:center;gap:10px">
+          <span>Manual toll adjustment (RM)</span>
+          <input id="manual-toll-adjustment" type="number" min="0" step="0.10" value="0" inputmode="decimal" style="width:105px;padding:6px;border-radius:6px;border:1px solid #aaa;text-align:right">
+        </label>
         <div class="detail-row" id="hill-surcharge-row" style="display:none">
           <span id="hill-surcharge-label">Highland surcharge</span>
           <span id="calc-hill-surcharge">RM 0.00</span>
@@ -692,16 +696,12 @@
           <span>Rounded customer quotation</span>
           <span id="calc-customer-total">RM 0.00</span>
         </div>
-        <div class="detail-row" id="admin-deduction-row">
-          <span>Admin commission (excluding tolls)</span>
-          <span id="calc-deduction">RM 0.00</span>
-        </div>
         <div class="detail-row">
-          <span>Driver fare earnings (excluding tolls)</span>
+          <span>Driver fare (excluding tolls)</span>
           <span id="driver-fare-net">RM 0.00</span>
         </div>
         <div class="detail-row driver-net-highlight">
-          <span>Driver collection after commission (incl. tolls)</span>
+          <span>Driver collection (including tolls)</span>
           <span id="driver-net-fare">RM 0.00</span>
         </div>
         <p class="detail-note" id="fare-policy-note"></p>
@@ -753,18 +753,6 @@
           <input class="setting-input" id="setting-longhaul-cap" type="number" min="0" step="1">
         </label>
         <label class="setting-field">
-          Admin commission (%)
-          <input class="setting-input" id="setting-admin-percent" type="number" min="0" max="100" step="0.5">
-        </label>
-        <label class="setting-field">
-          Flat commission cutoff (RM)
-          <input class="setting-input" id="setting-admin-threshold" type="number" min="0" step="0.50">
-        </label>
-        <label class="setting-field">
-          Flat commission fee (RM)
-          <input class="setting-input" id="setting-admin-min" type="number" min="0" step="0.10">
-        </label>
-        <label class="setting-field">
           Fare rounding
           <select class="setting-input" id="setting-rounding">
             <option value="1">Nearest RM1</option>
@@ -780,21 +768,12 @@
         <button id="clear-history-btn" type="button">Clear saved routes</button>
       </div>
       <p class="small-muted">
-        Settings and saved routes are stored locally on this device only. Commission applies to transport fare excluding tolls.
-      </p>
-    </details>
-
-    <!-- MALAYSIAN TOLL OPERATOR DIRECTORY -->
-    <details id="operators-panel">
-      <summary>🛣️ Malaysian Toll, Highway &amp; Bridge Operators (19)</summary>
-      <div id="operator-directory-list" class="operator-directory"></div>
-      <p class="small-muted">
-        Includes LLM-regulated major, independent, and private concessionaires plus Genting Highlands private road charge.
+        Settings and saved routes are stored locally on this device only. Toll amounts may require manual confirmation.
       </p>
     </details>
 
     <p class="small-muted">
-      Estimates are indicative. Toll plazas and Class 1 rates are cross-verified against official LLM &amp; concessionaire schedules.
+      Estimates are indicative. HERE toll data and local reference rates are not a substitute for current official Class 1 tariff confirmation.
     </p>
   </main>
 </div>
@@ -806,7 +785,7 @@
   /* =========================================================
      1. CONFIGURATION & COMPREHENSIVE MALAYSIAN TOLL DIRECTORY
      ========================================================= */
-  const APP_VERSION = '3.6.2';
+  const APP_VERSION = '3.7.0';
   const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
   const DEFAULT_SETTINGS = Object.freeze({
@@ -817,26 +796,28 @@
     longHaulTriggerKm:100,
     longHaulPercent:20,
     longHaulCap:100,
-    adminPercent:15,
-    adminFlatThreshold:8.00,
-    adminMinimum:1.50,
     roundingUnit:1
   });
 
-  const SETTINGS_KEY = 'rideshareMY.personal.v3.6.settings';
+  const SETTINGS_KEY = 'rideshareMY.personal.v3.7.settings';
   const LEGACY_SETTINGS_KEYS = [
+    'rideshareMY.personal.v3.6.settings',
     'rideshareMY.personal.v3.5.settings',
     'rideshareMY.personal.v3.1.settings',
     'rideshareMY.personal.v3.0.settings'
   ];
-  const ROUTES_STORAGE_KEY = 'rideshareMY.personal.v3.6.routes';
+  const ROUTES_STORAGE_KEY = 'rideshareMY.personal.v3.7.routes';
+  const LEGACY_ROUTES_STORAGE_KEYS = [
+    'rideshareMY.personal.v3.6.routes',
+    'rideshareMY.personal.v3.5.routes'
+  ];
   const MAX_PINNED_ROUTES = 6;
   const MAX_RECENT_ROUTES = 5;
 
   const GENTING_ROAD_CHARGE = 5.00;
   const GENTING_ROAD_CHARGE_NAME = 'Plaza Tol Genting Highlands (Private Road Charge)';
-  const PENANG_1ST_BRIDGE_RATE = 5.74; // Updated to official PLUS 18%-reduced Class 1 rate
-  const PENANG_2ND_BRIDGE_RATE = 5.74;
+  const PENANG_1ST_BRIDGE_RATE = 5.74; // Embedded local reference; confirm against current official Class 1 tariff
+  const PENANG_2ND_BRIDGE_RATE = 5.74; // Embedded local reference; confirm separately against JKSB tariff
   const WCE_SELANGOR_BBR_ASSAM_JAWA_RATE = 4.12;
   const WCE_PERAK_HUTAN_MELINTANG_TELUK_INTAN_RATE = 2.90;
 
@@ -1038,8 +1019,8 @@
   ]);
 
   /* =========================================================
-     1B. OFFICIAL OPERATOR TOLL PLAZA NAMELIST & CLASS 1 TARIFF VERIFIER
-     Maps HERE raw labels -> Official Concessionaire Plaza Name + Verified Class 1 Rate
+     1B. LOCAL PLAZA REFERENCE REGISTRY — NOT LIVE TARIFF VERIFICATION
+     Maps HERE labels to local plaza names and embedded reference rates; values require current official confirmation
      (null verifiedRate = distance-based closed system; retain HERE MYR fare)
      ========================================================= */
   const MALAYSIA_TOLL_PLAZA_REGISTRY = Object.freeze([
@@ -1645,7 +1626,6 @@
   let map = null;
   let platform = null;
   let router = null;
-  let ui = null;
 
   let pickupCoords = null;
   let dropoffCoords = null;
@@ -1661,6 +1641,8 @@
   let routeRequestId = 0;
   let routeDebounce = null;
   let latestCalculation = null;
+  let latestRouteData = null;
+  let manualTollAdjustmentCents = 0;
   let gpsAccuracy = null;
   let gpsRequestId = 0;
 
@@ -1682,7 +1664,6 @@
       }
     });
     if (merged.longHaulPercent > 100) merged.longHaulPercent = DEFAULT_SETTINGS.longHaulPercent;
-    if (merged.adminPercent > 100) merged.adminPercent = DEFAULT_SETTINGS.adminPercent;
     if (![1,0.5,0.1,0.01].includes(merged.roundingUnit)) merged.roundingUnit = DEFAULT_SETTINGS.roundingUnit;
     return merged;
   }
@@ -1718,34 +1699,15 @@
     }
   }
 
-  function renderOperatorDirectory() {
-    const container = $('operator-directory-list');
-    if (!container) return;
-    container.innerHTML = '';
-    MALAYSIA_TOLL_OPERATORS.forEach((op,idx) => {
-      const card = document.createElement('div');
-      card.className = 'op-card';
-      const header = document.createElement('div');
-      header.className = 'op-card-header';
-      const title = document.createElement('span');
-      title.textContent = `${idx + 1}. ${op.operator}`;
-      const badge = document.createElement('span');
-      badge.className = `op-badge ${op.tier}`;
-      badge.textContent = op.tier;
-      header.append(title,badge);
-
-      const hw = document.createElement('div');
-      hw.className = 'op-highways';
-      hw.textContent = op.highways.join(' · ');
-
-      card.append(header,hw);
-      container.appendChild(card);
-    });
-  }
-
   function loadSavedRoutes() {
     try {
-      const raw = localStorage.getItem(ROUTES_STORAGE_KEY);
+      let raw = localStorage.getItem(ROUTES_STORAGE_KEY);
+      if (!raw) {
+        for (const legacyKey of LEGACY_ROUTES_STORAGE_KEYS) {
+          raw = localStorage.getItem(legacyKey);
+          if (raw) break;
+        }
+      }
       if (!raw) return {pinned:[],recent:[]};
       const parsed = JSON.parse(raw);
       return {
@@ -1879,10 +1841,7 @@
       hillSurcharge:'setting-hill',
       longHaulTriggerKm:'setting-longhaul-km',
       longHaulPercent:'setting-longhaul-percent',
-      longHaulCap:'setting-longhaul-cap',
-      adminPercent:'setting-admin-percent',
-      adminFlatThreshold:'setting-admin-threshold',
-      adminMinimum:'setting-admin-min'
+      longHaulCap:'setting-longhaul-cap'
     };
     const next = {};
     for (const [key,id] of Object.entries(fields)) {
@@ -1892,8 +1851,8 @@
       if (!Number.isFinite(value) || value < 0) throw new Error(`Invalid non-negative value for ${key}.`);
       next[key] = value;
     }
-    if (next.longHaulPercent > 100 || next.adminPercent > 100) {
-      throw new Error('Percentage values cannot exceed 100%.');
+    if (next.longHaulPercent > 100) {
+      throw new Error('Return contribution percentage cannot exceed 100%.');
     }
     next.roundingUnit = Number($('setting-rounding').value);
     if (![1,0.5,0.1,0.01].includes(next.roundingUnit)) {
@@ -1910,9 +1869,6 @@
     $('setting-longhaul-km').value = settings.longHaulTriggerKm;
     $('setting-longhaul-percent').value = settings.longHaulPercent;
     $('setting-longhaul-cap').value = settings.longHaulCap;
-    $('setting-admin-percent').value = settings.adminPercent;
-    $('setting-admin-threshold').value = settings.adminFlatThreshold;
-    $('setting-admin-min').value = settings.adminMinimum;
     $('setting-rounding').value = String(settings.roundingUnit);
   }
 
@@ -2440,60 +2396,53 @@
     const cleanedPlaza = cleanTollLabel(rawItem && rawItem.plazaName);
     const cleanedSystem = cleanTollLabel(rawItem && rawItem.systemName);
     const searchBlob = `${cleanedPlaza} ${cleanedSystem} ${rawItem && rawItem.operator ? rawItem.operator : ''}`.toLowerCase();
-
-    // 1. Check against the official plaza namelist & Class 1 tariff registry
-    let bestMatch = null;
-    let bestScore = 0;
+    const normalize = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+    const normalizedBlob = ` ${normalize(searchBlob)} `;
+    const candidates = [];
 
     for (const entry of MALAYSIA_TOLL_PLAZA_REGISTRY) {
-      const aliasHit = entry.aliases.some(alias => searchBlob.includes(alias));
-      if (!aliasHit) continue;
-
-      const contextHits = entry.contextKeywords.filter(ctx => searchBlob.includes(ctx)).length;
-      const score = 10 + contextHits * 5;
-      if (score > bestScore) {
-        bestScore = score;
-        bestMatch = entry;
-      }
+      const aliasHits = entry.aliases.filter(alias => {
+        const a = normalize(alias);
+        return a && normalizedBlob.includes(` ${a} `);
+      });
+      if (!aliasHits.length) continue;
+      const contextHits = entry.contextKeywords.filter(ctx => normalizedBlob.includes(` ${normalize(ctx)} `)).length;
+      const specificity = Math.max(...aliasHits.map(a => normalize(a).split(' ').length * 10 + normalize(a).length));
+      candidates.push({entry,score:specificity + contextHits * 5,aliasHits});
     }
+    candidates.sort((a,b) => b.score - a.score);
+    const best = candidates[0] || null;
+    const ambiguous = Boolean(best && candidates.length > 1 && candidates[1].score === best.score);
 
-    if (bestMatch) {
-      const verifiedCents = bestMatch.verifiedRate !== null
-        ? toCents(bestMatch.verifiedRate)
-        : rawItem.cents;
-
+    // Prefer HERE's explicit MYR Class-1 candidate. Embedded local rates are fallback references only, not live official tariff verification.
+    if (best && !ambiguous) {
+      const entry = best.entry;
+      const cents = rawItem.cents !== null && rawItem.cents !== undefined
+        ? rawItem.cents
+        : (entry.verifiedRate !== null ? toCents(entry.verifiedRate) : null);
       return {
-        ...rawItem,
-        operator:bestMatch.operator,
-        systemName:bestMatch.highway,
-        plazaName:bestMatch.officialName,
-        cents:verifiedCents,
-        amount:verifiedCents !== null ? fromCents(verifiedCents) : null,
-        unresolved:verifiedCents === null,
-        verificationStatus:verifiedCents !== null ? 'verified' : 'unverified'
+        ...rawItem, operator:entry.operator, systemName:entry.highway, plazaName:entry.officialName,
+        cents, amount:cents !== null ? fromCents(cents) : null,
+        unresolved:cents === null, verificationStatus:cents !== null
+          ? (rawItem.cents !== null && rawItem.cents !== undefined ? 'here-class1' : 'registry')
+          : 'unverified',
+        sourceType:rawItem.cents !== null && rawItem.cents !== undefined
+          ? 'HERE-API-Class-1-candidate'
+          : (entry.verifiedRate !== null ? 'local-registry-reference-fallback' : 'HERE-API-unresolved'),
+        matchConfidence:'unique-alias-match', tariffVerified:false
       };
     }
 
-    // 2. Fallback: Match concessionaire from 19-operator directory & normalize to "Plaza Tol <Name>"
     const opEntry = matchMalaysiaOperatorEntry(searchBlob);
-    const operator = opEntry ? opEntry.operator : (rawItem.operator || 'LLM Concessionaire');
-    const shortOp = opEntry ? opEntry.shortName : '';
-
-    let formattedPlaza = cleanedPlaza || cleanedSystem || 'Toll Plaza';
-    if (formattedPlaza && !/^plaza\s+tol/i.test(formattedPlaza) && !/^toll\s+section/i.test(formattedPlaza) && !/^toll\s+summary/i.test(formattedPlaza)) {
-      formattedPlaza = `Plaza Tol ${formattedPlaza}`;
-    }
-    if (shortOp && !formattedPlaza.toLowerCase().includes(shortOp.toLowerCase())) {
-      formattedPlaza = `${formattedPlaza} (${shortOp})`;
-    }
-
-    const isVerified = !rawItem.unresolved && Number.isFinite(rawItem.cents) && rawItem.cents >= 0;
-
+    const operator = opEntry ? opEntry.operator : (rawItem.operator || 'Unknown operator');
+    let formattedPlaza = cleanedPlaza || cleanedSystem || 'Unidentified toll charge';
+    if (formattedPlaza && !/^plaza\s+tol/i.test(formattedPlaza) && !/^toll\s+(section|summary)/i.test(formattedPlaza)) formattedPlaza = `Plaza Tol ${formattedPlaza}`;
     return {
-      ...rawItem,
-      operator,
-      plazaName:formattedPlaza,
-      verificationStatus:rawItem.verificationStatus || (isVerified ? 'verified' : 'unverified')
+      ...rawItem, operator, plazaName:formattedPlaza,
+      cents:ambiguous ? null : rawItem.cents, amount:ambiguous ? null : rawItem.amount,
+      unresolved:ambiguous || Boolean(rawItem.unresolved),
+      verificationStatus:'unverified', sourceType:ambiguous ? 'ambiguous-registry-match' : (rawItem.sourceType || 'HERE-API'),
+      matchConfidence:ambiguous ? 'ambiguous' : 'unmatched', tariffVerified:false
     };
   }
 
@@ -2518,8 +2467,11 @@
         String(p.currency || fare.currency || '').toUpperCase() === 'MYR'
       );
       if (!price) return null;
-      const tag = String(fare.name || fare.id || fare.paymentMethods || '').toLowerCase();
-      const isCarPreferred = /car|class.?1|passenger|standard/.test(tag);
+      const tag = [fare.name,fare.id,fare.paymentMethods,fare.vehicleType,fare.vehicleCategory,fare.vehicle,fare.type]
+        .filter(value => value !== undefined && value !== null)
+        .map(value => typeof value === 'string' ? value : JSON.stringify(value))
+        .join(' ').toLowerCase();
+      const isCarPreferred = /\bcar\b|class[\s_-]?1|passenger|standard/.test(tag);
       return {
         cents:toCents(Number(price.value)),
         fareId:fare.id ? String(fare.id) : '',
@@ -2527,7 +2479,7 @@
       };
     }).filter(Boolean);
     if (!valid.length) return null;
-    return valid.find(v => v.isCarPreferred) || valid[0];
+    return valid.find(v => v.isCarPreferred) || null;
   }
 
   function getTollSystemLabel(section,toll) {
@@ -2652,12 +2604,12 @@
   function evaluateRouteTolls(route) {
     const sections = Array.isArray(route && route.sections) ? route.sections : [];
     const rawItems = [];
-    const seenFareIds = new Set();
     let itemisedSections = 0;
     let summarySections = 0;
     let hasEstimatedTolls = false;
 
     sections.forEach((section,sIdx) => {
+      const sectionFareIds = new Set();
       const tolls = Array.isArray(section.tolls) ? section.tolls : [];
       const secCosts = section.summary && Array.isArray(section.summary.tollCosts)
         ? section.summary.tollCosts
@@ -2681,8 +2633,8 @@
             }));
             return;
           }
-          if (picked.fareId && seenFareIds.has(picked.fareId)) return;
-          if (picked.fareId) seenFareIds.add(picked.fareId);
+          if (picked.fareId && sectionFareIds.has(picked.fareId)) return;
+          if (picked.fareId) sectionFareIds.add(picked.fareId);
           rawItems.push(verifyAndStandardizeTollItem({
             plazaName,
             systemName,
@@ -2697,12 +2649,12 @@
       }
       if (secCosts.length) {
         summarySections++;
-        extractTollCostsArray(secCosts,`Toll Section ${sIdx + 1}`,rawItems,seenFareIds);
+        extractTollCostsArray(secCosts,`Toll Section ${sIdx + 1}`,rawItems,sectionFareIds);
       }
     });
 
     if (itemisedSections === 0 && summarySections === 0 && route && route.summary && Array.isArray(route.summary.tollCosts) && route.summary.tollCosts.length) {
-      extractTollCostsArray(route.summary.tollCosts,'Toll Summary',rawItems,seenFareIds);
+      extractTollCostsArray(route.summary.tollCosts,'Toll Summary',rawItems,new Set());
     }
 
     const corridors = analyzeRoutePolylineCorridors(route);
@@ -2811,7 +2763,7 @@
             unresolved:false,
             verificationStatus:'corridor'
           });
-        } else if (corridors.penangBridge === 'first' || !avoidTolls) {
+        } else if (corridors.penangBridge === 'first') {
           const c1 = toCents(PENANG_1ST_BRIDGE_RATE);
           hasEstimatedTolls = true;
           rawItems.push({
@@ -2822,6 +2774,17 @@
             amount:fromCents(c1),
             unresolved:false,
             verificationStatus:'corridor'
+          });
+        } else {
+          rawItems.push({
+            plazaName:'Penang mainland-to-island bridge charge (bridge not identified)',
+            systemName:'Penang Bridge corridor',
+            operator:'Unknown — confirm First vs Second Bridge',
+            cents:null,
+            amount:null,
+            unresolved:true,
+            verificationStatus:'unverified',
+            sourceType:'ambiguous-bridge-corridor'
           });
         }
       }
@@ -2861,7 +2824,10 @@
       amount:fromCents(totalTollCents),
       items:finalItems,
       unresolvedCount,
-      hasEstimatedTolls
+      hasEstimatedTolls,
+      hasUnresolved:unresolvedCount > 0,
+      status:unresolvedCount > 0 ? 'incomplete' : (finalItems.length ? 'identified' : 'no-records'),
+      dataSource:'HERE Routing API + local reference rules'
     };
   }
 
@@ -2927,7 +2893,7 @@
             return;
           }
           try {
-            handleRouteResult(result.routes[0],result.routes.length,avoidTollSnapshot,requestId);
+            handleRouteResult(result.routes[0],avoidTollSnapshot,requestId);
           } catch(error) {
             console.error('Route processing error:',error);
             showError('Route was returned, but its details could not be processed.',true);
@@ -2947,7 +2913,7 @@
   /* =========================================================
      13. ROUTE RESULT PROCESSING
      ========================================================= */
-  function handleRouteResult(route,routesReturnedCount,avoidTollsRequested,requestId) {
+  function handleRouteResult(route,avoidTollsRequested,requestId) {
     if (requestId !== routeRequestId) return;
     const sections = Array.isArray(route.sections) ? route.sections : [];
     if (!sections.length) {
@@ -2989,22 +2955,24 @@
       }
     }
 
-    const calculation = processCalculations({
+    const calculationData = {
       distance:distanceKm,
       duration:durationMins,
       tollResult,
-      avoidTollsRequested,
-      sectionsCount:sections.length,
-      alternativesCount:Math.max(0,routesReturnedCount - 1)
-    });
+      avoidTollsRequested
+    };
+    latestRouteData = calculationData;
+    manualTollAdjustmentCents = 0;
+    $('manual-toll-adjustment').value = '0';
+    const calculation = processCalculations(calculationData);
 
     latestCalculation = calculation;
     recordRecentRoute();
     updatePinButtonState();
 
     let statusText = `Route calculated · ${sections.length} section(s) · ${activeRoutingMode === 'fast' ? 'Fastest' : 'Shortest'}`;
-    if (avoidTollsRequested) statusText += ' · Toll-free requested';
-    statusText += ` · ${tollResult.items.length} toll plaza(s)`;
+    if (avoidTollsRequested) statusText += ' · Avoid tolls requested (not guaranteed)';
+    statusText += ` · Toll status: ${tollResult.status}`;
 
     setRouteStatus(statusText);
   }
@@ -3031,20 +2999,12 @@
     const minimumFareCents = toCents(settings.minimumFare);
     const transportFareCents = Math.max(minimumFareCents,transportSubtotalCents);
 
-    const tollFeeCents = routeData.tollResult.cents;
+    const tollFeeCents = routeData.tollResult.cents + manualTollAdjustmentCents;
     const exactTotalCents = transportFareCents + tollFeeCents;
     const customerTotalCents = roundCentsToUnit(exactTotalCents,settings.roundingUnit);
 
-    const adminThresholdCents = toCents(settings.adminFlatThreshold);
-    const usesFlatCommission = transportFareCents < adminThresholdCents;
-
-    const proposedAdminCents = usesFlatCommission
-      ? toCents(settings.adminMinimum)
-      : Math.round(transportFareCents * settings.adminPercent / 100);
-    const adminDeductionCents = Math.min(transportFareCents,proposedAdminCents);
-
-    const driverFareEarningsCents = Math.max(0,transportFareCents - adminDeductionCents);
-    const driverAmountAfterDeductionCents = Math.max(0,customerTotalCents - adminDeductionCents);
+    const driverFareEarningsCents = transportFareCents;
+    const driverAmountAfterDeductionCents = customerTotalCents;
     const roundingAdjustmentCents = customerTotalCents - exactTotalCents;
 
     $('urban-surcharge-row').style.display = urbanSurchargeCents > 0 ? 'flex' : 'none';
@@ -3052,7 +3012,6 @@
     $('hill-surcharge-row').style.display = hillSurchargeCents > 0 ? 'flex' : 'none';
     $('hill-surcharge-label').textContent = highlandZone ? `Highland surcharge (${highlandZone.name})` : 'Highland surcharge';
     $('long-haul-incentive-row').style.display = longHaulIncentiveCents > 0 ? 'flex' : 'none';
-    $('admin-deduction-row').style.display = adminDeductionCents > 0 ? 'flex' : 'none';
 
     $('total-fare').textContent = moneyFromCents(customerTotalCents);
     $('fare-distance').textContent = `${routeData.distance.toFixed(1)} km`;
@@ -3064,14 +3023,13 @@
     $('calc-long-haul-incentive').textContent = moneyFromCents(longHaulIncentiveCents);
     $('calc-grand').textContent = moneyFromCents(exactTotalCents);
     $('calc-customer-total').textContent = moneyFromCents(customerTotalCents);
-    $('calc-deduction').textContent = `-${moneyFromCents(adminDeductionCents)}`;
     $('driver-fare-net').textContent = moneyFromCents(driverFareEarningsCents);
     $('driver-net-fare').textContent = moneyFromCents(driverAmountAfterDeductionCents);
 
     const breakdownBox = $('toll-breakdown-box');
     const warningBanner = $('toll-warning-banner');
 
-    if (routeData.tollResult.items.length) {
+    if (routeData.tollResult.items.length || routeData.tollResult.status === 'no-records') {
       Array.from(breakdownBox.children).forEach(child => {
         if (child.id !== 'toll-warning-banner') {
           child.remove();
@@ -3081,9 +3039,15 @@
       const title = document.createElement('div');
       title.className = 'toll-breakdown-title';
       const titleText = document.createElement('span');
-      titleText.textContent = `Operator-Verified Tolls (${routeData.tollResult.items.length} plaza${routeData.tollResult.items.length > 1 ? 's' : ''})`;
+      titleText.textContent = `Toll details (${routeData.tollResult.items.length} record${routeData.tollResult.items.length > 1 ? 's' : ''})`;
       title.appendChild(titleText);
       breakdownBox.appendChild(title);
+      if (!routeData.tollResult.items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'toll-item-plaza';
+        empty.textContent = 'No toll records were returned. This is not confirmation that the route is toll-free.';
+        breakdownBox.appendChild(empty);
+      }
 
       routeData.tollResult.items.forEach(item => {
         const row = document.createElement('div');
@@ -3117,9 +3081,15 @@
         } else if (item.verificationStatus === 'corridor') {
           badge.className = 'toll-badge corridor';
           badge.textContent = 'Corridor';
+        } else if (item.verificationStatus === 'registry') {
+          badge.className = 'toll-badge corridor';
+          badge.textContent = 'Local ref.';
+        } else if (item.verificationStatus === 'here-class1') {
+          badge.className = 'toll-badge unverified';
+          badge.textContent = 'HERE Class 1';
         } else {
-          badge.className = 'toll-badge verified';
-          badge.textContent = '✓ Verified';
+          badge.className = 'toll-badge unverified';
+          badge.textContent = 'HERE data';
         }
 
         right.append(amountSpan,badge);
@@ -3127,7 +3097,7 @@
         breakdownBox.appendChild(row);
       });
 
-      if (routeData.tollResult.hasEstimatedTolls || routeData.tollResult.unresolvedCount > 0) {
+      if (routeData.tollResult.hasEstimatedTolls || routeData.tollResult.unresolvedCount > 0 || routeData.tollResult.status === 'no-records') {
         warningBanner.style.display = 'flex';
       } else {
         warningBanner.style.display = 'none';
@@ -3140,10 +3110,8 @@
 
     $('fare-policy-note').textContent =
       `Minimum transport fare: ${money(settings.minimumFare)}. ` +
-      `Admin commission: ${settings.adminPercent}% of transport fare, ` +
-      `or ${money(settings.adminMinimum)} when the final transport fare ` +
-      `is below ${money(settings.adminFlatThreshold)}. ` +
-      `Tolls are pass-through reimbursement, not driver profit. ` +
+      `No platform commission is deducted in this personal edition. ` +
+      `Tolls are pass-through reimbursement, not transport fare. ` +
       `Quotation rounding adjustment: ${moneyFromCents(roundingAdjustmentCents)}.`;
 
     $('result-card').style.display = 'block';
@@ -3167,11 +3135,9 @@
       exactTotal:fromCents(exactTotalCents),
       customerTotal:fromCents(customerTotalCents),
       roundingAdjustment:fromCents(roundingAdjustmentCents),
-      adminDeduction:fromCents(adminDeductionCents),
-      adminPercent:settings.adminPercent,
-      adminFlatBelowThreshold:settings.adminMinimum,
-      adminFlatThreshold:settings.adminFlatThreshold,
-      usesFlatCommission,
+      manualTollAdjustment:fromCents(manualTollAdjustmentCents),
+      tollStatus:routeData.tollResult.status,
+      tollUnresolvedCount:routeData.tollResult.unresolvedCount,
       driverFareEarnings:fromCents(driverFareEarningsCents),
       driverAmountAfterDeduction:fromCents(driverAmountAfterDeductionCents),
       routingMode:activeRoutingMode,
@@ -3196,9 +3162,9 @@
      16. CUSTOMER QUOTE & DRIVER RECEIPT GENERATION
      ========================================================= */
   function customerQuoteText(data) {
-    const tollNote = data.tollFee > 0
-      ? `Est. Tolls: ${money(data.tollFee)} (included)`
-      : (data.avoidTolls ? 'Route: Toll-free requested' : 'Est. Tolls: RM 0.00');
+    const tollNote = data.tollStatus === 'no-records' || data.tollUnresolvedCount > 0
+      ? `Tolls: ${money(data.tollFee)} identified/adjusted so far; toll data incomplete — confirm all tolls before finalising fare`
+      : (data.tollFee > 0 ? `Est. Tolls: ${money(data.tollFee)} (included)` : (data.avoidTolls ? 'Tolls: none identified; toll-free not guaranteed' : 'Tolls: none identified by HERE; verify route'));
     return [
       '*TRIP FARE QUOTATION*',
       `From: ${data.pickup}`,
@@ -3213,13 +3179,13 @@
   function receiptText(data) {
     const tollLines = Array.isArray(data.tollItems) && data.tollItems.length
       ? data.tollItems.map(t => {
-          const tag = t.unresolved ? '[UNVERIFIED]' : (t.verificationStatus === 'corridor' ? '[CORRIDOR]' : '[VERIFIED]');
+          const tag = t.unresolved ? '[UNRESOLVED]' : (t.verificationStatus === 'corridor' ? '[CORRIDOR ESTIMATE]' : (t.verificationStatus === 'registry' ? '[LOCAL REFERENCE]' : (t.verificationStatus === 'here-class1' ? '[HERE CLASS 1 FARE]' : '[HERE API]')));
           return ` - ${formatTollDisplayName(t)} ${tag}: ${t.unresolved ? 'Confirm manually' : money(t.amount)}`;
         }).join('\n')
-      : ' - No toll records returned; verify before travel';
+      : ' - No toll records returned by HERE; this does NOT prove the route is toll-free';
 
     return [
-      `DRIVER FARE LOG — RIDESHARE v${APP_VERSION}`,
+      `DRIVER FARE LOG — RIDESHARE MY v${APP_VERSION}`,
       '------------------------------------------------',
       `From: ${data.pickup}`,
       `To: ${data.dropoff}`,
@@ -3236,19 +3202,19 @@
       `Transport subtotal: ${money(data.transportSubtotal)}`,
       `Minimum-adjusted transport fare: ${money(data.transportFare)}`,
       `Toll charges: ${money(data.tollFee)}`,
-      'Operator-Verified Toll Plazas:',
+      'Toll records (registry/HERE/corridor labels are not live tariff verification):',
       tollLines,
       '------------------------------------------------',
       `Exact calculated total: ${money(data.exactTotal)}`,
       `Quotation rounding adjustment: ${money(data.roundingAdjustment)}`,
       `CUSTOMER QUOTATION: ${money(data.customerTotal)}`,
       '------------------------------------------------',
-      `Admin commission: -${money(data.adminDeduction)}`,
-      `Commission method: ${data.usesFlatCommission ? 'Flat commission' : 'Percentage commission'}`,
+      `Manual toll adjustment: ${money(data.manualTollAdjustment || 0)}`,
+      `Toll data status: ${data.tollStatus || 'unknown'} (${data.tollUnresolvedCount || 0} unresolved record(s))`,
       `Driver transport earnings: ${money(data.driverFareEarnings)}`,
-      `Driver collection after commission (incl. tolls): ${money(data.driverAmountAfterDeduction)}`,
+      `Driver collection including identified tolls: ${money(data.driverAmountAfterDeduction)}`,
       '------------------------------------------------',
-      `Generated by Rideshare v${APP_VERSION}`
+      `Generated by Rideshare MY Personal Edition v${APP_VERSION}`
     ].join('\n');
   }
 
@@ -3332,7 +3298,7 @@
         if (map) map.getViewPort().resize();
       });
       new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
-      ui = H.ui.UI.createDefault(map,layers);
+      H.ui.UI.createDefault(map,layers);
       router = platform.getRoutingService(null,8);
       return true;
     } catch(error) {
@@ -3363,6 +3329,21 @@
       copyFormatted('share-btn',receiptText,'✓ Log Copied')
     );
     $('whatsapp-customer-btn').addEventListener('click',sendCustomerWhatsApp);
+    $('manual-toll-adjustment').addEventListener('change',() => {
+      const raw = $('manual-toll-adjustment').value.trim();
+      const value = raw === '' ? 0 : Number(raw);
+      if (!Number.isFinite(value) || value < 0) {
+        $('manual-toll-adjustment').value = moneyFromCents(manualTollAdjustmentCents).replace('RM ','');
+        showError('Manual toll adjustment must be a valid non-negative amount.');
+        return;
+      }
+      manualTollAdjustmentCents = toCents(value);
+      if (latestRouteData) {
+        latestCalculation = processCalculations(latestRouteData);
+        clearError();
+        setRouteStatus('Manual toll adjustment applied to this route.');
+      }
+    });
 
     $('save-settings-btn').addEventListener('click',() => {
       try {
@@ -3411,7 +3392,6 @@
      ========================================================= */
   function boot() {
     populateSettingsForm();
-    renderOperatorDirectory();
     renderQuickBar();
     bindEvents();
     initMap();
