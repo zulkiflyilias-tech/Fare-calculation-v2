@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare v3.6.0</title>
+<title>Rideshare v3.6.1</title>
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 <style>
   :root {
@@ -349,6 +349,15 @@
   .toll-item-line span:last-child {
     white-space:nowrap;
   }
+  .estimated-warning-banner {
+    color:#f57c00;
+    font-size:10px;
+    font-weight:600;
+    margin-bottom:6px;
+    display:flex;
+    align-items:center;
+    gap:4px;
+  }
   details {
     border-top:1px dashed #3a3a3c;
     padding-top:8px;
@@ -545,7 +554,7 @@
   <main id="search-panel">
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.6.0</span>
+      <span class="version">PERSONAL EDITION v3.6.1</span>
     </div>
 
     <!-- QUICK PINS & RECENT ROUTES -->
@@ -606,7 +615,11 @@
         <span id="fare-duration">0 mins</span>
       </div>
 
-      <div id="toll-breakdown-box" class="toll-breakdown-box" style="display:none"></div>
+      <div id="toll-breakdown-box" class="toll-breakdown-box" style="display:none">
+        <div id="toll-warning-banner" class="estimated-warning-banner" style="display:none">
+          ⚠️ Some toll rates are estimated due to incomplete API data. Verify manually.
+        </div>
+      </div>
 
       <details open>
         <summary>Detailed Fare Calculation</summary>
@@ -752,7 +765,7 @@
   /* =========================================================
      1. CONFIGURATION & COMPREHENSIVE MALAYSIAN TOLL DIRECTORY
      ========================================================= */
-  const APP_VERSION = '3.6.0';
+  const APP_VERSION = '3.6.1';
   const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
   const DEFAULT_SETTINGS = Object.freeze({
@@ -812,7 +825,7 @@
         'Western KL Traffic Dispersal Scheme — SPRINT (E23)',
         'Stormwater Management & Road Tunnel — SMART (E38)'
       ],
-      keywords:['alr','ldp','litrak','kesas','sprint','smart','penchala','damansara','pantai','petaling jaya','sunway','awan besar']
+      keywords:['alr','ldp','litrak','kesas','sprint','smart','penchala','damansara','pantai dalam','pantai baru','petaling jaya','sunway','awan besar']
     },
     {
       tier:'major',
@@ -896,7 +909,7 @@
       highways:[
         'Duta–Ulu Kelang Expressway — DUKE Phase 1 & 2 (E33)'
       ],
-      keywords:['duke','kesturi','ekovest','batu','sentul pasar','ayer panas','segambut']
+      keywords:['duke','kesturi','ekovest','batu caves','sentul pasar','ayer panas','segambut','batu 9']
     },
     {
       tier:'private',
@@ -1772,7 +1785,11 @@
     const lower = String(label || '').toLowerCase();
     if (!lower) return '';
     for (const entry of MALAYSIA_TOLL_OPERATORS) {
-      if (entry.keywords.some(kw => lower.includes(kw))) {
+      if (entry.keywords.some(kw => {
+        // Ignore overly short keywords to prevent false positives
+        if (kw.length <= 3) return false;
+        return lower.includes(kw);
+      })) {
         return entry.operator;
       }
     }
@@ -1916,18 +1933,20 @@
           }
 
           // WCE (E32) Section 6: Bandar Bukit Raja Utara (3.115,101.430) <-> Assam Jawa (3.268,101.350)
-          if (pt.lat >= 3.110 && pt.lat <= 3.145 && pt.lng >= 101.405 && pt.lng <= 101.440) {
+          // WIDENED BOUNDS TO PREVENT MISSES
+          if (pt.lat >= 3.100 && pt.lat <= 3.160 && pt.lng >= 101.390 && pt.lng <= 101.450) {
             bbrSouthHit = true;
           }
-          if (pt.lat >= 3.245 && pt.lat <= 3.285 && pt.lng >= 101.335 && pt.lng <= 101.375) {
+          if (pt.lat >= 3.230 && pt.lat <= 3.300 && pt.lng >= 101.320 && pt.lng <= 101.390) {
             assamJawaNorthHit = true;
           }
 
           // WCE (E32) Section 8: Hutan Melintang (3.880,100.935) <-> Teluk Intan (4.015,101.020)
-          if (pt.lat >= 3.875 && pt.lat <= 3.915 && pt.lng >= 100.920 && pt.lng <= 100.965) {
+          // WIDENED BOUNDS TO PREVENT MISSES
+          if (pt.lat >= 3.860 && pt.lat <= 3.930 && pt.lng >= 100.900 && pt.lng <= 100.980) {
             hutanMelintangHit = true;
           }
-          if (pt.lat >= 3.995 && pt.lat <= 4.035 && pt.lng >= 100.995 && pt.lng <= 101.045) {
+          if (pt.lat >= 3.980 && pt.lat <= 4.050 && pt.lng >= 100.980 && pt.lng <= 101.060) {
             telukIntanHit = true;
           }
         }
@@ -1941,12 +1960,11 @@
 
   function evaluateRouteTolls(route) {
     const sections = Array.isArray(route && route.sections) ? route.sections : [];
-    const items = [];
+    const rawItems = [];
     const seenFareIds = new Set();
-    let totalTollCents = 0;
     let itemisedSections = 0;
     let summarySections = 0;
-    let unresolvedCount = 0;
+    let hasEstimatedTolls = false;
 
     sections.forEach((section,sIdx) => {
       const tolls = Array.isArray(section.tolls) ? section.tolls : [];
@@ -1961,8 +1979,7 @@
           const plazaName = locationName || systemName || `Toll Plaza ${sIdx + 1}.${tIdx + 1}`;
           const picked = extractMyrFare(toll);
           if (!picked) {
-            unresolvedCount++;
-            items.push({
+            rawItems.push({
               plazaName,
               systemName,
               operator:matchMalaysiaOperator(`${plazaName} ${systemName}`),
@@ -1974,8 +1991,7 @@
           }
           if (picked.fareId && seenFareIds.has(picked.fareId)) return;
           if (picked.fareId) seenFareIds.add(picked.fareId);
-          totalTollCents += picked.cents;
-          items.push({
+          rawItems.push({
             plazaName,
             systemName,
             operator:matchMalaysiaOperator(`${plazaName} ${systemName}`),
@@ -1988,16 +2004,12 @@
       }
       if (secCosts.length) {
         summarySections++;
-        const res = extractTollCostsArray(secCosts,`Toll Section ${sIdx + 1}`,items,seenFareIds);
-        unresolvedCount += res.unresolved;
-        totalTollCents += res.resolvedCents;
+        extractTollCostsArray(secCosts,`Toll Section ${sIdx + 1}`,rawItems,seenFareIds);
       }
     });
 
     if (itemisedSections === 0 && summarySections === 0 && route && route.summary && Array.isArray(route.summary.tollCosts) && route.summary.tollCosts.length) {
-      const res = extractTollCostsArray(route.summary.tollCosts,'Toll Summary',items,seenFareIds);
-      unresolvedCount += res.unresolved;
-      totalTollCents += res.resolvedCents;
+      extractTollCostsArray(route.summary.tollCosts,'Toll Summary',rawItems,seenFareIds);
     }
 
     const corridors = analyzeRoutePolylineCorridors(route);
@@ -2005,15 +2017,15 @@
     // WCE (E32) Missing Tariff Compensation (Selangor Sec 6 & Perak Sec 8)
     if (!avoidTolls) {
       if (corridors.wceSelangorBbrAssamJawa) {
-        const hasWceSel = items.some(it =>
+        const hasWceSel = rawItems.some(it =>
           !it.unresolved &&
           /assam jawa|bukit raja utara|kapar/i.test(`${it.plazaName || ''} ${it.systemName || ''}`) &&
           it.cents >= 350
         );
         if (!hasWceSel) {
           const cSel = toCents(WCE_SELANGOR_BBR_ASSAM_JAWA_RATE);
-          totalTollCents += cSel;
-          items.unshift({
+          hasEstimatedTolls = true;
+          rawItems.unshift({
             plazaName:'Bandar Bukit Raja Utara – Assam Jawa (WCE Sec 6)',
             systemName:'West Coast Expressway (E32)',
             operator:'West Coast Expressway Sdn Bhd (WCE)',
@@ -2025,15 +2037,15 @@
       }
 
       if (corridors.wcePerakHutanMelintangTelukIntan) {
-        const hasWcePrk8 = items.some(it =>
+        const hasWcePrk8 = rawItems.some(it =>
           !it.unresolved &&
           /hutan melintang|teluk intan/i.test(`${it.plazaName || ''} ${it.systemName || ''}`) &&
           it.cents >= 250
         );
         if (!hasWcePrk8) {
           const cPrk = toCents(WCE_PERAK_HUTAN_MELINTANG_TELUK_INTAN_RATE);
-          totalTollCents += cPrk;
-          items.push({
+          hasEstimatedTolls = true;
+          rawItems.push({
             plazaName:'Hutan Melintang – Teluk Intan (WCE Sec 8)',
             systemName:'West Coast Expressway (E32)',
             operator:'West Coast Expressway Sdn Bhd (WCE)',
@@ -2048,18 +2060,18 @@
     // Genting Highlands Road Charge (RM 5.00 Class 1 entry charge)
     const highlandZone = getHighlandZone(pickupCoords,dropoffCoords);
     const inGentingZone = Boolean(highlandZone && highlandZone.isGenting);
-    const routeMentionsGenting = items.some(item =>
+    const routeMentionsGenting = rawItems.some(item =>
       /genting|gohtong|sempah/i.test(`${item.plazaName || ''} ${item.systemName || ''}`)
     );
     if (inGentingZone || routeMentionsGenting) {
-      const hasGentingItem = items.some(item =>
+      const hasGentingItem = rawItems.some(item =>
         !item.unresolved &&
         /genting|gohtong|sempah/i.test(`${item.plazaName || ''} ${item.systemName || ''} ${item.operator || ''}`)
       );
       if (!hasGentingItem) {
         const gentingCents = toCents(GENTING_ROAD_CHARGE);
-        totalTollCents += gentingCents;
-        items.push({
+        hasEstimatedTolls = true;
+        rawItems.push({
           plazaName:GENTING_ROAD_CHARGE_NAME,
           systemName:'Jalan Genting Highlands',
           operator:'Lingkaran Cekap Sdn Bhd (Genting Malaysia)',
@@ -2077,16 +2089,15 @@
 
     if (pickupIsland && !dropoffIsland) {
       // Island -> Mainland is RM 0.00 on both Penang bridges
-      for (let i = items.length - 1; i >= 0; i--) {
-        const it = items[i];
+      for (let i = rawItems.length - 1; i >= 0; i--) {
+        const it = rawItems[i];
         if (!it.unresolved && bridgeRegex.test(`${it.plazaName || ''} ${it.systemName || ''} ${it.operator || ''}`) && it.cents >= 500) {
-          totalTollCents = Math.max(0,totalTollCents - it.cents);
-          items.splice(i,1);
+          rawItems.splice(i,1);
         }
       }
     } else if (!pickupIsland && dropoffIsland) {
       // Mainland -> Penang Island (RM 5.74 Class 1 on 2nd Bridge / RM 7.00 on 1st Bridge)
-      const hasBridgeItem = items.some(item =>
+      const hasBridgeItem = rawItems.some(item =>
         !item.unresolved &&
         item.cents >= 500 &&
         bridgeRegex.test(`${item.plazaName || ''} ${item.systemName || ''} ${item.operator || ''}`)
@@ -2094,8 +2105,8 @@
       if (!hasBridgeItem) {
         if (corridors.penangBridge === 'second') {
           const c2 = toCents(PENANG_2ND_BRIDGE_RATE);
-          totalTollCents += c2;
-          items.push({
+          hasEstimatedTolls = true;
+          rawItems.push({
             plazaName:'Bandar Cassia / JK2PP (Penang 2nd Bridge)',
             systemName:'Penang Second Bridge (E28)',
             operator:'Jambatan Kedua Sdn Bhd (JKSB)',
@@ -2105,8 +2116,8 @@
           });
         } else if (corridors.penangBridge === 'first' || !avoidTolls) {
           const c1 = toCents(PENANG_1ST_BRIDGE_RATE);
-          totalTollCents += c1;
-          items.push({
+          hasEstimatedTolls = true;
+          rawItems.push({
             plazaName:'Perai (Penang 1st Bridge)',
             systemName:'Penang Bridge (E36)',
             operator:'PLUS Malaysia Berhad',
@@ -2118,11 +2129,43 @@
       }
     }
 
+    // AGGREGATION STEP: Group by Operator + System + Plaza to fix duplicate API entries
+    const aggregatedMap = new Map();
+    let totalTollCents = 0;
+    let unresolvedCount = 0;
+
+    rawItems.forEach(item => {
+      if (item.unresolved) {
+        unresolvedCount++;
+        const key = `UNRESOLVED|${item.plazaName}`;
+        if (!aggregatedMap.has(key)) {
+          aggregatedMap.set(key, { ...item, isUnresolvedGroup: true });
+        }
+        return;
+      }
+
+      // Create a unique key for the physical toll plaza
+      const key = `${item.operator || 'Unknown'}|${item.systemName || 'Unknown'}|${item.plazaName || 'Unknown'}`;
+      
+      if (aggregatedMap.has(key)) {
+        const existing = aggregatedMap.get(key);
+        existing.cents += item.cents;
+        existing.amount = fromCents(existing.cents);
+      } else {
+        aggregatedMap.set(key, { ...item });
+      }
+      
+      totalTollCents += item.cents;
+    });
+
+    const finalItems = Array.from(aggregatedMap.values());
+
     return {
       cents:totalTollCents,
       amount:fromCents(totalTollCents),
-      items,
-      unresolvedCount
+      items:finalItems,
+      unresolvedCount,
+      hasEstimatedTolls
     };
   }
 
@@ -2263,11 +2306,11 @@
     recordRecentRoute();
     updatePinButtonState();
 
-    setRouteStatus(
-      `Route calculated · ${sections.length} section(s) · ` +
-      `${activeRoutingMode === 'fast' ? 'Fastest' : 'Shortest'} · ` +
-      `${tollResult.items.length} toll item(s)`
-    );
+    let statusText = `Route calculated · ${sections.length} section(s) · ${activeRoutingMode === 'fast' ? 'Fastest' : 'Shortest'}`;
+    if (avoidTollsRequested) statusText += ' · Toll-free requested';
+    statusText += ` · ${tollResult.items.length} toll item(s)`;
+    
+    setRouteStatus(statusText);
   }
 
   /* =========================================================
@@ -2296,8 +2339,10 @@
     const exactTotalCents = transportFareCents + tollFeeCents;
     const customerTotalCents = roundCentsToUnit(exactTotalCents,settings.roundingUnit);
 
+    // FIXED: Commission threshold now evaluates the FINAL transport fare, not the subtotal
     const adminThresholdCents = toCents(settings.adminFlatThreshold);
-    const usesFlatCommission = transportSubtotalCents < adminThresholdCents;
+    const usesFlatCommission = transportFareCents < adminThresholdCents;
+    
     const proposedAdminCents = usesFlatCommission
       ? toCents(settings.adminMinimum)
       : Math.round(transportFareCents * settings.adminPercent / 100);
@@ -2329,12 +2374,21 @@
     $('driver-net-fare').textContent = moneyFromCents(driverAmountAfterDeductionCents);
 
     const breakdownBox = $('toll-breakdown-box');
+    const warningBanner = $('toll-warning-banner');
+    
     if (routeData.tollResult.items.length) {
-      breakdownBox.innerHTML = '';
+      // Clear existing items except the warning banner
+      Array.from(breakdownBox.children).forEach(child => {
+        if (child.id !== 'toll-warning-banner') {
+          child.remove();
+        }
+      });
+
       const title = document.createElement('div');
       title.className = 'toll-breakdown-title';
       title.textContent = `Toll Breakdown (${routeData.tollResult.items.length} item${routeData.tollResult.items.length > 1 ? 's' : ''})`;
       breakdownBox.appendChild(title);
+
       routeData.tollResult.items.forEach(item => {
         const row = document.createElement('div');
         row.className = 'toll-item-line';
@@ -2346,6 +2400,13 @@
         row.append(left,right);
         breakdownBox.appendChild(row);
       });
+
+      if (routeData.tollResult.hasEstimatedTolls || routeData.tollResult.unresolvedCount > 0) {
+        warningBanner.style.display = 'flex';
+      } else {
+        warningBanner.style.display = 'none';
+      }
+
       breakdownBox.style.display = 'block';
     } else {
       breakdownBox.style.display = 'none';
@@ -2354,7 +2415,7 @@
     $('fare-policy-note').textContent =
       `Minimum transport fare: ${money(settings.minimumFare)}. ` +
       `Admin commission: ${settings.adminPercent}% of transport fare, ` +
-      `or ${money(settings.adminMinimum)} when the pre-minimum subtotal ` +
+      `or ${money(settings.adminMinimum)} when the final transport fare ` +
       `is below ${money(settings.adminFlatThreshold)}. ` +
       `Tolls are pass-through reimbursement, not driver profit. ` +
       `Quotation rounding adjustment: ${moneyFromCents(roundingAdjustmentCents)}.`;
