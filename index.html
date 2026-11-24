@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare MY Personal Edition v3.9.2</title>
+<title>Rideshare MY Personal Edition v3.9.3</title>
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 <style>
   :root {
@@ -540,7 +540,7 @@
   <main id="search-panel">
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.9.2</span>
+      <span class="version">PERSONAL EDITION v3.9.3</span>
     </div>
 
     <!-- QUICK PINS & RECENT ROUTES -->
@@ -727,7 +727,7 @@
      1. CONFIGURATION & NATIONWIDE GEOSPATIAL TOLL TABLE
         Class 1 (Passenger Cars) — Touch 'n Go / SmartTAG Only
      ========================================================= */
-  const APP_VERSION = '3.9.2';
+  const APP_VERSION = '3.9.3';
   const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
   const DEFAULT_SETTINGS = Object.freeze({
@@ -741,8 +741,9 @@
     roundingUnit:1
   });
 
-  const SETTINGS_KEY = 'rideshareMY.personal.v3.9.2.settings';
+  const SETTINGS_KEY = 'rideshareMY.personal.v3.9.3.settings';
   const LEGACY_SETTINGS_KEYS = [
+    'rideshareMY.personal.v3.9.2.settings',
     'rideshareMY.personal.v3.9.1.settings',
     'rideshareMY.personal.v3.9.settings',
     'rideshareMY.personal.v3.8.settings',
@@ -752,8 +753,9 @@
     'rideshareMY.personal.v3.1.settings',
     'rideshareMY.personal.v3.0.settings'
   ];
-  const ROUTES_STORAGE_KEY = 'rideshareMY.personal.v3.9.2.routes';
+  const ROUTES_STORAGE_KEY = 'rideshareMY.personal.v3.9.3.routes';
   const LEGACY_ROUTES_STORAGE_KEYS = [
+    'rideshareMY.personal.v3.9.2.routes',
     'rideshareMY.personal.v3.9.1.routes',
     'rideshareMY.personal.v3.9.routes',
     'rideshareMY.personal.v3.8.routes',
@@ -920,7 +922,7 @@
     { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Sungai Dua', lat:5.4455, lon:100.4355, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
     { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Juru', lat:5.3293, lon:100.4356, radiusKm:0.90, system:'closed', network:'PLUS_NSE' },
     { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bukit Tambun', lat:5.2755, lon:100.4555, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bandar Cassia / Batu Kawan', lat:5.2425, lon:100.4455, radiusKm:0.95, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bandar Cassia / Batu Kawan', lat:5.2390, lon:100.4465, radiusKm:1.25, system:'closed', network:'PLUS_NSE' },
     { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Jawi', lat:5.2055, lon:100.4955, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
     { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bandar Baharu', lat:5.1255, lon:100.5155, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
     { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Alor Pongsu', lat:5.0455, lon:100.5955, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
@@ -1024,7 +1026,7 @@
     { operator:'SKVE Holdings Sdn Bhd', highway:'SKVE (E26)', plaza:'Plaza Tol Pulau Indah (SKVE)', lat:2.9325, lon:101.3485, radiusKm:0.70, system:'closed', network:'SKVE_E26' },
 
     /* --- CLOSED-SYSTEM PLAZAS: WCE PERAK (E32) --- */
-    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Hutan Melintang (WCE)', lat:3.8545, lon:100.9165, radiusKm:1.25, system:'closed', network:'WCE_PERAK' },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Hutan Melintang (WCE)', lat:3.8618, lon:100.9182, radiusKm:1.45, system:'closed', network:'WCE_PERAK' },
     { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Teluk Intan (WCE)', lat:4.0155, lon:101.0225, radiusKm:0.90, system:'closed', network:'WCE_PERAK' },
     { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Kampung Lekir (WCE)', lat:4.1655, lon:100.7555, radiusKm:0.85, system:'closed', network:'WCE_PERAK' },
     { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Sitiawan (WCE)', lat:4.2255, lon:100.7155, radiusKm:0.85, system:'closed', network:'WCE_PERAK' },
@@ -1907,10 +1909,10 @@
         crossesPenang2nd = true;
       }
 
-      const minLat = Math.min(p1.lat, p2.lat) - 0.018;
-      const maxLat = Math.max(p1.lat, p2.lat) + 0.018;
-      const minLon = Math.min(p1.lng, p2.lng) - 0.018;
-      const maxLon = Math.max(p1.lng, p2.lng) + 0.018;
+      const minLat = Math.min(p1.lat, p2.lat) - 0.022;
+      const maxLat = Math.max(p1.lat, p2.lat) + 0.022;
+      const minLon = Math.min(p1.lng, p2.lng) - 0.022;
+      const maxLon = Math.max(p1.lng, p2.lng) + 0.022;
 
       for (let idx = 0; idx < MALAYSIA_TOLL_PLAZA_TABLE.length; idx++) {
         const plaza = MALAYSIA_TOLL_PLAZA_TABLE[idx];
