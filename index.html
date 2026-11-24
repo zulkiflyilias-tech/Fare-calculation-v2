@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare MY Personal Edition v3.9.3</title>
+<title>Rideshare v3.9.3</title>
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 <style>
   :root {
@@ -740,29 +740,6 @@
     longHaulCap:100,
     roundingUnit:1
   });
-
-  const SETTINGS_KEY = 'rideshareMY.personal.v3.9.3.settings';
-  const LEGACY_SETTINGS_KEYS = [
-    'rideshareMY.personal.v3.9.2.settings',
-    'rideshareMY.personal.v3.9.1.settings',
-    'rideshareMY.personal.v3.9.settings',
-    'rideshareMY.personal.v3.8.settings',
-    'rideshareMY.personal.v3.7.settings',
-    'rideshareMY.personal.v3.6.settings',
-    'rideshareMY.personal.v3.5.settings',
-    'rideshareMY.personal.v3.1.settings',
-    'rideshareMY.personal.v3.0.settings'
-  ];
-  const ROUTES_STORAGE_KEY = 'rideshareMY.personal.v3.9.3.routes';
-  const LEGACY_ROUTES_STORAGE_KEYS = [
-    'rideshareMY.personal.v3.9.2.routes',
-    'rideshareMY.personal.v3.9.1.routes',
-    'rideshareMY.personal.v3.9.routes',
-    'rideshareMY.personal.v3.8.routes',
-    'rideshareMY.personal.v3.7.routes',
-    'rideshareMY.personal.v3.6.routes',
-    'rideshareMY.personal.v3.5.routes'
-  ];
   const MAX_PINNED_ROUTES = 6;
   const MAX_RECENT_ROUTES = 5;
 
@@ -2605,7 +2582,7 @@
     const pLabel = $('pickup').value.trim() || 'Pickup';
     const dLabel = $('dropoff').value.trim() || 'Drop-off';
     const lines = [];
-    lines.push('*Rideshare MY — Fare Quote*');
+    lines.push('*Rideshare — Fare Quote*');
     lines.push(`${pLabel} → ${dLabel}`);
     lines.push('');
     lines.push(`Distance: ${calc.distanceKm.toFixed(1)} km`);
@@ -2624,7 +2601,7 @@
     const pLabel = $('pickup').value.trim() || 'Pickup';
     const dLabel = $('dropoff').value.trim() || 'Drop-off';
     const lines = [];
-    lines.push('Rideshare MY — Driver Log');
+    lines.push('Rideshare — Driver Log');
     lines.push(`${pLabel} → ${dLabel}`);
     lines.push('');
     lines.push(`Distance: ${calc.distanceKm.toFixed(1)} km`);
