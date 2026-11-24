@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare MY Personal Edition v3.8.0</title>
+<title>Rideshare MY Personal Edition v3.9.0</title>
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 <style>
   :root {
@@ -540,7 +540,7 @@
   <main id="search-panel">
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.8.0</span>
+      <span class="version">PERSONAL EDITION v3.9.0</span>
     </div>
 
     <!-- QUICK PINS & RECENT ROUTES -->
@@ -714,7 +714,7 @@
     </details>
 
     <p class="small-muted">
-      Estimates are indicative. Toll calculations use Class 1 (TnG / SmartTAG) geospatial plaza coordinates.
+      Estimates are indicative. Toll calculations use Class 1 (TnG / SmartTAG) nationwide geospatial plaza coordinates &amp; corridor spans.
     </p>
   </main>
 </div>
@@ -724,10 +724,10 @@
   'use strict';
 
   /* =========================================================
-     1. CONFIGURATION & GEOSPATIAL MALAYSIAN TOLL TABLE
+     1. CONFIGURATION & NATIONWIDE GEOSPATIAL TOLL TABLE
         Class 1 (Passenger Cars) — Touch 'n Go / SmartTAG Only
      ========================================================= */
-  const APP_VERSION = '3.8.0';
+  const APP_VERSION = '3.9.0';
   const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
   const DEFAULT_SETTINGS = Object.freeze({
@@ -741,16 +741,18 @@
     roundingUnit:1
   });
 
-  const SETTINGS_KEY = 'rideshareMY.personal.v3.8.settings';
+  const SETTINGS_KEY = 'rideshareMY.personal.v3.9.settings';
   const LEGACY_SETTINGS_KEYS = [
+    'rideshareMY.personal.v3.8.settings',
     'rideshareMY.personal.v3.7.settings',
     'rideshareMY.personal.v3.6.settings',
     'rideshareMY.personal.v3.5.settings',
     'rideshareMY.personal.v3.1.settings',
     'rideshareMY.personal.v3.0.settings'
   ];
-  const ROUTES_STORAGE_KEY = 'rideshareMY.personal.v3.8.routes';
+  const ROUTES_STORAGE_KEY = 'rideshareMY.personal.v3.9.routes';
   const LEGACY_ROUTES_STORAGE_KEYS = [
+    'rideshareMY.personal.v3.8.routes',
     'rideshareMY.personal.v3.7.routes',
     'rideshareMY.personal.v3.6.routes',
     'rideshareMY.personal.v3.5.routes'
@@ -768,235 +770,232 @@
     EKVE_E27:   { operator: 'EKVE Sdn Bhd (AZRB)', highway: 'East Klang Valley Expressway EKVE (E27)', ratePerKm: 0.2530, minRate: 1.50 }
   });
 
-  /* Comprehensive Toll Plaza Table:
-     - system: 'open' (flat rate when route passes within radiusKm) or 'closed' (paired entry/exit per system)
-     - dir: optional bearing filter ('eastbound' | 'westbound' | 'northbound' | 'southbound' | 'toIsland')
-     - rate: Class 1 TnG / SmartTAG fare in RM (null for closed-system plazas) */
+  /* Nationwide Toll Plaza Table (lat, lon, radiusKm, system, dir, rate) */
   const MALAYSIA_TOLL_PLAZA_TABLE = Object.freeze([
     /* --- PLUS MALAYSIA BERHAD (OPEN & BRIDGES) --- */
-    { operator:'PLUS Malaysia Berhad', highway:'Penang 1st Bridge (E36)', plaza:'Plaza Tol Jambatan Pulau Pinang (Perai)', lat:5.3789, lon:100.3831, radiusKm:0.45, system:'open', dir:'toIsland', rate:5.74 },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Jitra', lat:6.2995, lon:100.4184, radiusKm:0.35, system:'open', rate:1.31 },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Kempas', lat:1.5453, lon:103.7247, radiusKm:0.35, system:'open', rate:1.72 },
-    { operator:'PLUS Malaysia Berhad', highway:'BKE (E15)', plaza:'Plaza Tol Kubang Semang', lat:5.4055, lon:100.4614, radiusKm:0.35, system:'open', rate:1.31 },
-    { operator:'PLUS Malaysia Berhad', highway:'BKE (E15)', plaza:'Plaza Tol Lunas', lat:5.4241, lon:100.5432, radiusKm:0.35, system:'open', rate:1.31 },
-    { operator:'PLUS Malaysia Berhad', highway:'Linkedua (E3)', plaza:'Plaza Tol Tanjung Kupang', lat:1.3785, lon:103.6119, radiusKm:0.40, system:'open', rate:6.14 },
-    { operator:'PLUS Malaysia Berhad', highway:'Linkedua (E3)', plaza:'Plaza Tol Lima Kedai', lat:1.5008, lon:103.6214, radiusKm:0.35, system:'open', rate:3.19 },
-    { operator:'PLUS Malaysia Berhad', highway:'Linkedua (E3)', plaza:'Plaza Tol Perling', lat:1.4882, lon:103.6845, radiusKm:0.35, system:'open', rate:1.88 },
-    { operator:'PLUS Malaysia Berhad', highway:'SPDH (E29)', plaza:'Plaza Tol Mambau', lat:2.6713, lon:101.9038, radiusKm:0.35, system:'open', rate:2.62 },
-    { operator:'PLUS Malaysia Berhad', highway:'SPDH (E29)', plaza:'Plaza Tol Lukut', lat:2.5736, lon:101.8252, radiusKm:0.35, system:'open', rate:0.65 },
+    { operator:'PLUS Malaysia Berhad', highway:'Penang 1st Bridge (E36)', plaza:'Plaza Tol Jambatan Pulau Pinang (Perai)', lat:5.3789, lon:100.3831, radiusKm:0.85, system:'open', dir:'toIsland', rate:5.74 },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Jitra', lat:6.2995, lon:100.4184, radiusKm:0.65, system:'open', rate:1.31 },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Kempas', lat:1.5453, lon:103.7247, radiusKm:0.65, system:'open', rate:1.72 },
+    { operator:'PLUS Malaysia Berhad', highway:'BKE (E15)', plaza:'Plaza Tol Kubang Semang', lat:5.4055, lon:100.4614, radiusKm:0.65, system:'open', rate:1.31 },
+    { operator:'PLUS Malaysia Berhad', highway:'BKE (E15)', plaza:'Plaza Tol Lunas', lat:5.4241, lon:100.5432, radiusKm:0.65, system:'open', rate:1.31 },
+    { operator:'PLUS Malaysia Berhad', highway:'Linkedua (E3)', plaza:'Plaza Tol Tanjung Kupang', lat:1.3785, lon:103.6119, radiusKm:0.75, system:'open', rate:6.14 },
+    { operator:'PLUS Malaysia Berhad', highway:'Linkedua (E3)', plaza:'Plaza Tol Lima Kedai', lat:1.5008, lon:103.6214, radiusKm:0.65, system:'open', rate:3.19 },
+    { operator:'PLUS Malaysia Berhad', highway:'Linkedua (E3)', plaza:'Plaza Tol Perling', lat:1.4882, lon:103.6845, radiusKm:0.65, system:'open', rate:1.88 },
+    { operator:'PLUS Malaysia Berhad', highway:'SPDH (E29)', plaza:'Plaza Tol Mambau', lat:2.6713, lon:101.9038, radiusKm:0.65, system:'open', rate:2.62 },
+    { operator:'PLUS Malaysia Berhad', highway:'SPDH (E29)', plaza:'Plaza Tol Lukut', lat:2.5736, lon:101.8252, radiusKm:0.65, system:'open', rate:0.65 },
 
     /* --- AMANAT LEBUHRAYA RAKYAT (ALR: LDP, KESAS, SPRINT, SMART) --- */
-    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'LDP (E11)', plaza:'Plaza Tol Penchala (LDP)', lat:3.1642, lon:101.6177, radiusKm:0.30, system:'open', rate:2.10 },
-    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'LDP (E11)', plaza:'Plaza Tol Petaling Jaya (LDP)', lat:3.1112, lon:101.6085, radiusKm:0.30, system:'open', rate:2.10 },
-    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'LDP (E11)', plaza:'Plaza Tol Puchong Barat (LDP)', lat:3.0531, lon:101.6089, radiusKm:0.30, system:'open', rate:2.10 },
-    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'LDP (E11)', plaza:'Plaza Tol Puchong Selatan (LDP)', lat:3.0014, lon:101.6223, radiusKm:0.30, system:'open', rate:2.10 },
-    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'KESAS (E5)', plaza:'Plaza Tol Awan Besar Timur (KESAS)', lat:3.0587, lon:101.6649, radiusKm:0.30, system:'open', rate:2.00 },
-    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'KESAS (E5)', plaza:'Plaza Tol Awan Besar Barat (KESAS)', lat:3.0636, lon:101.6793, radiusKm:0.30, system:'open', rate:2.00 },
-    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'KESAS (E5)', plaza:'Plaza Tol Sunway (KESAS)', lat:3.0587, lon:101.6083, radiusKm:0.30, system:'open', rate:2.00 },
-    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'KESAS (E5)', plaza:'Plaza Tol Kemuning (KESAS)', lat:2.9973, lon:101.5221, radiusKm:0.30, system:'open', rate:2.00 },
-    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'SPRINT (E23)', plaza:'Plaza Tol Bukit Kiara (SPRINT)', lat:3.1539, lon:101.6448, radiusKm:0.28, system:'open', rate:3.00 },
-    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'SPRINT (E23)', plaza:'Plaza Tol Damansara (SPRINT)', lat:3.1328, lon:101.6295, radiusKm:0.28, system:'open', rate:2.00 },
-    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'SPRINT (E23)', plaza:'Plaza Tol Pantai (SPRINT)', lat:3.1235, lon:101.6641, radiusKm:0.28, system:'open', rate:2.50 },
-    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'SMART (E38)', plaza:'Plaza Tol Terowong SMART', lat:3.1232, lon:101.7115, radiusKm:0.25, system:'open', rate:3.00 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'LDP (E11)', plaza:'Plaza Tol Penchala (LDP)', lat:3.1642, lon:101.6177, radiusKm:0.55, system:'open', rate:2.10 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'LDP (E11)', plaza:'Plaza Tol Petaling Jaya (LDP)', lat:3.1112, lon:101.6085, radiusKm:0.55, system:'open', rate:2.10 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'LDP (E11)', plaza:'Plaza Tol Puchong Barat (LDP)', lat:3.0531, lon:101.6089, radiusKm:0.55, system:'open', rate:2.10 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'LDP (E11)', plaza:'Plaza Tol Puchong Selatan (LDP)', lat:3.0014, lon:101.6223, radiusKm:0.55, system:'open', rate:2.10 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'KESAS (E5)', plaza:'Plaza Tol Awan Besar Timur (KESAS)', lat:3.0587, lon:101.6649, radiusKm:0.55, system:'open', rate:2.00 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'KESAS (E5)', plaza:'Plaza Tol Awan Besar Barat (KESAS)', lat:3.0636, lon:101.6793, radiusKm:0.55, system:'open', rate:2.00 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'KESAS (E5)', plaza:'Plaza Tol Sunway (KESAS)', lat:3.0587, lon:101.6083, radiusKm:0.55, system:'open', rate:2.00 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'KESAS (E5)', plaza:'Plaza Tol Kemuning (KESAS)', lat:2.9973, lon:101.5221, radiusKm:0.55, system:'open', rate:2.00 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'SPRINT (E23)', plaza:'Plaza Tol Bukit Kiara (SPRINT)', lat:3.1539, lon:101.6448, radiusKm:0.50, system:'open', rate:3.00 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'SPRINT (E23)', plaza:'Plaza Tol Damansara (SPRINT)', lat:3.1328, lon:101.6295, radiusKm:0.50, system:'open', rate:2.00 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'SPRINT (E23)', plaza:'Plaza Tol Pantai (SPRINT)', lat:3.1235, lon:101.6641, radiusKm:0.50, system:'open', rate:2.50 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'SMART (E38)', plaza:'Plaza Tol Terowong SMART', lat:3.1232, lon:101.7115, radiusKm:0.45, system:'open', rate:3.00 },
 
     /* --- PROLINTAS (AKLEH, GCE, LKSA, SILK, DASH, SUKE) --- */
-    { operator:'PROLINTAS', highway:'AKLEH (E12)', plaza:'Plaza Tol Dato\' Keramat (AKLEH)', lat:3.1665, lon:101.7318, radiusKm:0.28, system:'open', rate:2.13 },
-    { operator:'PROLINTAS', highway:'GCE (E35)', plaza:'Plaza Tol Bukit Jelutong (GCE)', lat:3.1051, lon:101.5318, radiusKm:0.30, system:'open', rate:1.75 },
-    { operator:'PROLINTAS', highway:'GCE (E35)', plaza:'Plaza Tol Elmina (GCE)', lat:3.1752, lon:101.5165, radiusKm:0.30, system:'open', rate:1.75 },
-    { operator:'PROLINTAS', highway:'GCE (E35)', plaza:'Plaza Tol Lagong (GCE)', lat:3.2685, lon:101.5472, radiusKm:0.30, system:'open', rate:1.75 },
-    { operator:'PROLINTAS', highway:'LKSA (E13)', plaza:'Plaza Tol Seri Muda (LKSA)', lat:3.0250, lon:101.5303, radiusKm:0.28, system:'open', rate:1.56 },
-    { operator:'PROLINTAS', highway:'LKSA (E13)', plaza:'Plaza Tol Alam Impian (LKSA)', lat:3.0115, lon:101.5198, radiusKm:0.28, system:'open', rate:0.83 },
-    { operator:'PROLINTAS', highway:'Kajang SILK (E18)', plaza:'Plaza Tol Sungai Ramal (SILK)', lat:2.9772, lon:101.7585, radiusKm:0.28, system:'open', rate:1.66 },
-    { operator:'PROLINTAS', highway:'Kajang SILK (E18)', plaza:'Plaza Tol Sungai Long (SILK)', lat:3.0335, lon:101.7875, radiusKm:0.28, system:'open', rate:1.66 },
-    { operator:'PROLINTAS', highway:'Kajang SILK (E18)', plaza:'Plaza Tol Sungai Balak (SILK)', lat:3.0218, lon:101.7712, radiusKm:0.28, system:'open', rate:1.66 },
-    { operator:'PROLINTAS', highway:'Kajang SILK (E18)', plaza:'Plaza Tol Bukit Kajang (SILK)', lat:2.9905, lon:101.7745, radiusKm:0.28, system:'open', rate:1.66 },
-    { operator:'PROLINTAS', highway:'DASH (E31)', plaza:'Plaza Tol Denai Alam (DASH)', lat:3.1538, lon:101.5222, radiusKm:0.28, system:'open', rate:2.30 },
-    { operator:'PROLINTAS', highway:'DASH (E31)', plaza:'Plaza Tol RRIM / Kwasa Damansara (DASH)', lat:3.1732, lon:101.5625, radiusKm:0.28, system:'open', rate:2.30 },
-    { operator:'PROLINTAS', highway:'DASH (E31)', plaza:'Plaza Tol Kota Damansara (DASH)', lat:3.1628, lon:101.5945, radiusKm:0.28, system:'open', rate:2.30 },
-    { operator:'PROLINTAS', highway:'SUKE (E19)', plaza:'Plaza Tol Alam Damai (SUKE)', lat:3.0635, lon:101.7412, radiusKm:0.28, system:'open', rate:2.30 },
-    { operator:'PROLINTAS', highway:'SUKE (E19)', plaza:'Plaza Tol Bukit Teratai (SUKE)', lat:3.1128, lon:101.7668, radiusKm:0.28, system:'open', rate:2.30 },
-    { operator:'PROLINTAS', highway:'SUKE (E19)', plaza:'Plaza Tol Ampang (SUKE)', lat:3.1502, lon:101.7685, radiusKm:0.28, system:'open', rate:2.30 },
+    { operator:'PROLINTAS', highway:'AKLEH (E12)', plaza:'Plaza Tol Dato\' Keramat (AKLEH)', lat:3.1665, lon:101.7318, radiusKm:0.50, system:'open', rate:2.13 },
+    { operator:'PROLINTAS', highway:'GCE (E35)', plaza:'Plaza Tol Bukit Jelutong (GCE)', lat:3.1051, lon:101.5318, radiusKm:0.55, system:'open', rate:1.75 },
+    { operator:'PROLINTAS', highway:'GCE (E35)', plaza:'Plaza Tol Elmina (GCE)', lat:3.1752, lon:101.5165, radiusKm:0.55, system:'open', rate:1.75 },
+    { operator:'PROLINTAS', highway:'GCE (E35)', plaza:'Plaza Tol Lagong (GCE)', lat:3.2685, lon:101.5472, radiusKm:0.55, system:'open', rate:1.75 },
+    { operator:'PROLINTAS', highway:'LKSA (E13)', plaza:'Plaza Tol Seri Muda (LKSA)', lat:3.0250, lon:101.5303, radiusKm:0.50, system:'open', rate:1.56 },
+    { operator:'PROLINTAS', highway:'LKSA (E13)', plaza:'Plaza Tol Alam Impian (LKSA)', lat:3.0115, lon:101.5198, radiusKm:0.50, system:'open', rate:0.83 },
+    { operator:'PROLINTAS', highway:'Kajang SILK (E18)', plaza:'Plaza Tol Sungai Ramal (SILK)', lat:2.9772, lon:101.7585, radiusKm:0.50, system:'open', rate:1.66 },
+    { operator:'PROLINTAS', highway:'Kajang SILK (E18)', plaza:'Plaza Tol Sungai Long (SILK)', lat:3.0335, lon:101.7875, radiusKm:0.50, system:'open', rate:1.66 },
+    { operator:'PROLINTAS', highway:'Kajang SILK (E18)', plaza:'Plaza Tol Sungai Balak (SILK)', lat:3.0218, lon:101.7712, radiusKm:0.50, system:'open', rate:1.66 },
+    { operator:'PROLINTAS', highway:'Kajang SILK (E18)', plaza:'Plaza Tol Bukit Kajang (SILK)', lat:2.9905, lon:101.7745, radiusKm:0.50, system:'open', rate:1.66 },
+    { operator:'PROLINTAS', highway:'DASH (E31)', plaza:'Plaza Tol Denai Alam (DASH)', lat:3.1538, lon:101.5222, radiusKm:0.50, system:'open', rate:2.30 },
+    { operator:'PROLINTAS', highway:'DASH (E31)', plaza:'Plaza Tol RRIM / Kwasa Damansara (DASH)', lat:3.1732, lon:101.5625, radiusKm:0.50, system:'open', rate:2.30 },
+    { operator:'PROLINTAS', highway:'DASH (E31)', plaza:'Plaza Tol Kota Damansara (DASH)', lat:3.1628, lon:101.5945, radiusKm:0.50, system:'open', rate:2.30 },
+    { operator:'PROLINTAS', highway:'SUKE (E19)', plaza:'Plaza Tol Alam Damai (SUKE)', lat:3.0635, lon:101.7412, radiusKm:0.50, system:'open', rate:2.30 },
+    { operator:'PROLINTAS', highway:'SUKE (E19)', plaza:'Plaza Tol Bukit Teratai (SUKE)', lat:3.1128, lon:101.7668, radiusKm:0.50, system:'open', rate:2.30 },
+    { operator:'PROLINTAS', highway:'SUKE (E19)', plaza:'Plaza Tol Ampang (SUKE)', lat:3.1502, lon:101.7685, radiusKm:0.50, system:'open', rate:2.30 },
 
     /* --- IJM CORPORATION (NPE, BESRAYA, LEKAS OPEN) --- */
-    { operator:'IJM Corporation Berhad', highway:'NPE (E10)', plaza:'Plaza Tol Pantai Dalam (NPE)', lat:3.1025, lon:101.6682, radiusKm:0.28, system:'open', rate:2.30 },
-    { operator:'IJM Corporation Berhad', highway:'NPE (E10)', plaza:'Plaza Tol PJS 5 (NPE)', lat:3.0815, lon:101.6225, radiusKm:0.28, system:'open', rate:2.30 },
-    { operator:'IJM Corporation Berhad', highway:'NPE (E10)', plaza:'Plaza Tol PJS 2 (NPE)', lat:3.0812, lon:101.6378, radiusKm:0.25, system:'open', rate:1.00 },
-    { operator:'IJM Corporation Berhad', highway:'BESRAYA (E9)', plaza:'Plaza Tol Mines (BESRAYA)', lat:3.0332, lon:101.7088, radiusKm:0.28, system:'open', rate:1.85 },
-    { operator:'IJM Corporation Berhad', highway:'BESRAYA (E9)', plaza:'Plaza Tol Loke Yew (BESRAYA)', lat:3.1245, lon:101.7178, radiusKm:0.25, system:'open', rate:1.85 },
-    { operator:'IJM Corporation Berhad', highway:'LEKAS (E21)', plaza:'Plaza Tol Ampangan (LEKAS)', lat:2.7285, lon:101.9965, radiusKm:0.32, system:'open', rate:2.30 },
+    { operator:'IJM Corporation Berhad', highway:'NPE (E10)', plaza:'Plaza Tol Pantai Dalam (NPE)', lat:3.1025, lon:101.6682, radiusKm:0.50, system:'open', rate:2.30 },
+    { operator:'IJM Corporation Berhad', highway:'NPE (E10)', plaza:'Plaza Tol PJS 5 (NPE)', lat:3.0815, lon:101.6225, radiusKm:0.50, system:'open', rate:2.30 },
+    { operator:'IJM Corporation Berhad', highway:'NPE (E10)', plaza:'Plaza Tol PJS 2 (NPE)', lat:3.0812, lon:101.6378, radiusKm:0.45, system:'open', rate:1.00 },
+    { operator:'IJM Corporation Berhad', highway:'BESRAYA (E9)', plaza:'Plaza Tol Mines (BESRAYA)', lat:3.0332, lon:101.7088, radiusKm:0.50, system:'open', rate:1.85 },
+    { operator:'IJM Corporation Berhad', highway:'BESRAYA (E9)', plaza:'Plaza Tol Loke Yew (BESRAYA)', lat:3.1245, lon:101.7178, radiusKm:0.45, system:'open', rate:1.85 },
+    { operator:'IJM Corporation Berhad', highway:'LEKAS (E21)', plaza:'Plaza Tol Ampangan (LEKAS)', lat:2.7285, lon:101.9965, radiusKm:0.55, system:'open', rate:2.30 },
 
     /* --- REGIONAL & INDEPENDENT OPERATORS --- */
-    { operator:'Jambatan Kedua Sdn Bhd (JKSB)', highway:'Penang 2nd Bridge (E28)', plaza:'Plaza Tol Bandar Cassia / JK2PP', lat:5.2395, lon:100.4282, radiusKm:0.45, system:'open', dir:'toIsland', rate:5.74 },
-    { operator:'AFA Prime Berhad', highway:'KL–Karak Expressway (E8)', plaza:'Plaza Tol Gombak (KLK)', lat:3.2490, lon:101.7311, radiusKm:0.35, system:'open', rate:6.00 },
-    { operator:'AFA Prime Berhad', highway:'KL–Karak Expressway (E8)', plaza:'Plaza Tol Bentong (KLK)', lat:3.4697, lon:101.9051, radiusKm:0.35, system:'open', rate:3.50 },
-    { operator:'LATAR Berhad', highway:'LATAR (E25)', plaza:'Plaza Tol Ijok (LATAR)', lat:3.3215, lon:101.4182, radiusKm:0.30, system:'open', rate:2.50 },
-    { operator:'LATAR Berhad', highway:'LATAR (E25)', plaza:'Plaza Tol Kuang Barat / Timur (LATAR)', lat:3.2748, lon:101.5435, radiusKm:0.30, system:'open', rate:2.50 },
-    { operator:'LATAR Berhad', highway:'LATAR (E25)', plaza:'Plaza Tol Taman Rimba Templer (LATAR)', lat:3.2975, lon:101.6178, radiusKm:0.30, system:'open', rate:2.50 },
-    { operator:'LATAR Berhad', highway:'LATAR (E25)', plaza:'Plaza Tol Kundang (LATAR)', lat:3.2805, lon:101.5125, radiusKm:0.28, system:'open', rate:1.30 },
-    { operator:'LATAR Berhad', highway:'LATAR (E25)', plaza:'Plaza Tol Eco Grandeur (LATAR)', lat:3.2682, lon:101.4562, radiusKm:0.28, system:'open', rate:1.15 },
-    { operator:'Senai–Desaru Expressway (SDE)', highway:'SDE (E22)', plaza:'Plaza Tol Senai (SDE)', lat:1.6085, lon:103.6885, radiusKm:0.35, system:'open', rate:1.85 },
-    { operator:'Senai–Desaru Expressway (SDE)', highway:'SDE (E22)', plaza:'Plaza Tol Ulu Tiram (SDE)', lat:1.6025, lon:103.8225, radiusKm:0.35, system:'open', rate:3.20 },
-    { operator:'Senai–Desaru Expressway (SDE)', highway:'SDE (E22)', plaza:'Plaza Tol Cahaya Baru (SDE)', lat:1.5245, lon:103.9285, radiusKm:0.35, system:'open', rate:4.50 },
-    { operator:'Senai–Desaru Expressway (SDE)', highway:'SDE (E22)', plaza:'Plaza Tol Penawar (SDE)', lat:1.5585, lon:104.2185, radiusKm:0.35, system:'open', rate:6.40 },
+    { operator:'Jambatan Kedua Sdn Bhd (JKSB)', highway:'Penang 2nd Bridge (E28)', plaza:'Plaza Tol Bandar Cassia / JK2PP', lat:5.2395, lon:100.4282, radiusKm:0.85, system:'open', dir:'toIsland', rate:5.74 },
+    { operator:'AFA Prime Berhad', highway:'KL–Karak Expressway (E8)', plaza:'Plaza Tol Gombak (KLK)', lat:3.2490, lon:101.7311, radiusKm:0.65, system:'open', rate:6.00 },
+    { operator:'AFA Prime Berhad', highway:'KL–Karak Expressway (E8)', plaza:'Plaza Tol Bentong (KLK)', lat:3.4697, lon:101.9051, radiusKm:0.65, system:'open', rate:3.50 },
+    { operator:'LATAR Berhad', highway:'LATAR (E25)', plaza:'Plaza Tol Ijok (LATAR)', lat:3.3215, lon:101.4182, radiusKm:0.55, system:'open', rate:2.50 },
+    { operator:'LATAR Berhad', highway:'LATAR (E25)', plaza:'Plaza Tol Kuang Barat / Timur (LATAR)', lat:3.2748, lon:101.5435, radiusKm:0.55, system:'open', rate:2.50 },
+    { operator:'LATAR Berhad', highway:'LATAR (E25)', plaza:'Plaza Tol Taman Rimba Templer (LATAR)', lat:3.2975, lon:101.6178, radiusKm:0.55, system:'open', rate:2.50 },
+    { operator:'LATAR Berhad', highway:'LATAR (E25)', plaza:'Plaza Tol Kundang (LATAR)', lat:3.2805, lon:101.5125, radiusKm:0.50, system:'open', rate:1.30 },
+    { operator:'LATAR Berhad', highway:'LATAR (E25)', plaza:'Plaza Tol Eco Grandeur (LATAR)', lat:3.2682, lon:101.4562, radiusKm:0.50, system:'open', rate:1.15 },
+    { operator:'Senai–Desaru Expressway (SDE)', highway:'SDE (E22)', plaza:'Plaza Tol Senai (SDE)', lat:1.6085, lon:103.6885, radiusKm:0.65, system:'open', rate:1.85 },
+    { operator:'Senai–Desaru Expressway (SDE)', highway:'SDE (E22)', plaza:'Plaza Tol Ulu Tiram (SDE)', lat:1.6025, lon:103.8225, radiusKm:0.65, system:'open', rate:3.20 },
+    { operator:'Senai–Desaru Expressway (SDE)', highway:'SDE (E22)', plaza:'Plaza Tol Cahaya Baru (SDE)', lat:1.5245, lon:103.9285, radiusKm:0.65, system:'open', rate:4.50 },
+    { operator:'Senai–Desaru Expressway (SDE)', highway:'SDE (E22)', plaza:'Plaza Tol Penawar (SDE)', lat:1.5585, lon:104.2185, radiusKm:0.65, system:'open', rate:6.40 },
 
     /* --- PRIVATE / SINGLE-HIGHWAY / BRIDGE OPERATORS --- */
-    { operator:'KESTURI (Ekovest)', highway:'DUKE (E33)', plaza:'Plaza Tol Ayer Panas (DUKE)', lat:3.1925, lon:101.7208, radiusKm:0.28, system:'open', rate:2.50 },
-    { operator:'KESTURI (Ekovest)', highway:'DUKE (E33)', plaza:'Plaza Tol Sentul Pasar (DUKE)', lat:3.1965, lon:101.6938, radiusKm:0.28, system:'open', rate:2.50 },
-    { operator:'KESTURI (Ekovest)', highway:'DUKE (E33)', plaza:'Plaza Tol Batu (DUKE)', lat:3.2145, lon:101.6815, radiusKm:0.28, system:'open', rate:2.50 },
-    { operator:'KESTURI (Ekovest)', highway:'DUKE (E33)', plaza:'Plaza Tol Segambut (DUKE)', lat:3.1908, lon:101.6559, radiusKm:0.28, system:'open', rate:2.50 },
-    { operator:'SPE (Ekovest)', highway:'SPE / DUKE 3 (E39)', plaza:'Plaza Tol Chan Sow Lin (SPE)', lat:3.1285, lon:101.7165, radiusKm:0.28, system:'open', rate:3.50 },
-    { operator:'SPE (Ekovest)', highway:'SPE / DUKE 3 (E39)', plaza:'Plaza Tol Ampang (SPE)', lat:3.1535, lon:101.7485, radiusKm:0.28, system:'open', rate:3.50 },
-    { operator:'SPE (Ekovest)', highway:'SPE / DUKE 3 (E39)', plaza:'Plaza Tol Setiawangsa / Wangsa Maju (SPE)', lat:3.1885, lon:101.7425, radiusKm:0.28, system:'open', rate:3.50 },
-    { operator:'Maju Expressway Sdn Bhd (MESB)', highway:'MEX (E20)', plaza:'Plaza Tol Salak Selatan (MEX)', lat:3.0955, lon:101.6982, radiusKm:0.28, system:'open', rate:2.00 },
-    { operator:'Maju Expressway Sdn Bhd (MESB)', highway:'MEX (E20)', plaza:'Plaza Tol Seri Kembangan (MEX)', lat:3.0125, lon:101.6855, radiusKm:0.28, system:'open', rate:2.20 },
-    { operator:'Maju Expressway Sdn Bhd (MESB)', highway:'MEX (E20)', plaza:'Plaza Tol Putrajaya (MEX)', lat:2.9525, lon:101.6745, radiusKm:0.32, system:'open', rate:3.50 },
-    { operator:'Grand Saga Sdn Bhd', highway:'Cheras–Kajang CKE (E7)', plaza:'Plaza Tol Batu 9 (Grand Saga)', lat:3.0685, lon:101.7635, radiusKm:0.28, system:'open', dir:'southbound', rate:1.30 },
-    { operator:'Grand Saga Sdn Bhd', highway:'Cheras–Kajang CKE (E7)', plaza:'Plaza Tol Batu 11 (Grand Saga)', lat:3.0452, lon:101.7712, radiusKm:0.28, system:'open', dir:'northbound', rate:1.30 },
-    { operator:'NNKSB (Taliworks)', highway:'Shapadu (E30)', plaza:'Plaza Tol Bukit Raja (NNKSB)', lat:3.0655, lon:101.4682, radiusKm:0.28, system:'open', rate:0.60 },
-    { operator:'NNKSB (Taliworks)', highway:'Shapadu (E30)', plaza:'Plaza Tol Kapar (NNKSB)', lat:3.1285, lon:101.3852, radiusKm:0.28, system:'open', rate:2.70 },
-    { operator:'NNKSB (Taliworks)', highway:'Shapadu (E30)', plaza:'Plaza Tol MOC B / Rantau Panjang (NNKSB)', lat:3.0585, lon:101.4025, radiusKm:0.28, system:'open', rate:1.40 },
-    { operator:'Lingkaran Luar Butterworth (LLB)', highway:'BORR (E17)', plaza:'Plaza Tol Perai (BORR)', lat:5.3885, lon:100.3912, radiusKm:0.28, system:'open', rate:1.50 },
-    { operator:'Lingkaran Luar Butterworth (LLB)', highway:'BORR (E17)', plaza:'Plaza Tol Bagan Ajam (BORR)', lat:5.4412, lon:100.3825, radiusKm:0.28, system:'open', rate:1.50 },
-    { operator:'Lingkaran Luar Butterworth (LLB)', highway:'BORR (E17)', plaza:'Plaza Tol Sungai Nyior (BORR)', lat:5.4085, lon:100.3765, radiusKm:0.28, system:'open', rate:1.20 },
-    { operator:'Lingkaran Cekap (Genting)', highway:'Jalan Genting Highlands', plaza:'Plaza Tol Genting Highlands (Private Road)', lat:3.4015, lon:101.7785, radiusKm:0.45, system:'open', rate:5.00 },
+    { operator:'KESTURI (Ekovest)', highway:'DUKE (E33)', plaza:'Plaza Tol Ayer Panas (DUKE)', lat:3.1925, lon:101.7208, radiusKm:0.50, system:'open', rate:2.50 },
+    { operator:'KESTURI (Ekovest)', highway:'DUKE (E33)', plaza:'Plaza Tol Sentul Pasar (DUKE)', lat:3.1965, lon:101.6938, radiusKm:0.50, system:'open', rate:2.50 },
+    { operator:'KESTURI (Ekovest)', highway:'DUKE (E33)', plaza:'Plaza Tol Batu (DUKE)', lat:3.2145, lon:101.6815, radiusKm:0.50, system:'open', rate:2.50 },
+    { operator:'KESTURI (Ekovest)', highway:'DUKE (E33)', plaza:'Plaza Tol Segambut (DUKE)', lat:3.1908, lon:101.6559, radiusKm:0.50, system:'open', rate:2.50 },
+    { operator:'SPE (Ekovest)', highway:'SPE / DUKE 3 (E39)', plaza:'Plaza Tol Chan Sow Lin (SPE)', lat:3.1285, lon:101.7165, radiusKm:0.50, system:'open', rate:3.50 },
+    { operator:'SPE (Ekovest)', highway:'SPE / DUKE 3 (E39)', plaza:'Plaza Tol Ampang (SPE)', lat:3.1535, lon:101.7485, radiusKm:0.50, system:'open', rate:3.50 },
+    { operator:'SPE (Ekovest)', highway:'SPE / DUKE 3 (E39)', plaza:'Plaza Tol Setiawangsa / Wangsa Maju (SPE)', lat:3.1885, lon:101.7425, radiusKm:0.50, system:'open', rate:3.50 },
+    { operator:'Maju Expressway Sdn Bhd (MESB)', highway:'MEX (E20)', plaza:'Plaza Tol Salak Selatan (MEX)', lat:3.0955, lon:101.6982, radiusKm:0.50, system:'open', rate:2.00 },
+    { operator:'Maju Expressway Sdn Bhd (MESB)', highway:'MEX (E20)', plaza:'Plaza Tol Seri Kembangan (MEX)', lat:3.0125, lon:101.6855, radiusKm:0.50, system:'open', rate:2.20 },
+    { operator:'Maju Expressway Sdn Bhd (MESB)', highway:'MEX (E20)', plaza:'Plaza Tol Putrajaya (MEX)', lat:2.9525, lon:101.6745, radiusKm:0.55, system:'open', rate:3.50 },
+    { operator:'Grand Saga Sdn Bhd', highway:'Cheras–Kajang CKE (E7)', plaza:'Plaza Tol Batu 9 (Grand Saga)', lat:3.0685, lon:101.7635, radiusKm:0.50, system:'open', dir:'southbound', rate:1.30 },
+    { operator:'Grand Saga Sdn Bhd', highway:'Cheras–Kajang CKE (E7)', plaza:'Plaza Tol Batu 11 (Grand Saga)', lat:3.0452, lon:101.7712, radiusKm:0.50, system:'open', dir:'northbound', rate:1.30 },
+    { operator:'NNKSB (Taliworks)', highway:'Shapadu (E30)', plaza:'Plaza Tol Bukit Raja (NNKSB)', lat:3.0655, lon:101.4682, radiusKm:0.55, system:'open', rate:0.60 },
+    { operator:'NNKSB (Taliworks)', highway:'Shapadu (E30)', plaza:'Plaza Tol Kapar (NNKSB)', lat:3.1285, lon:101.3852, radiusKm:0.55, system:'open', rate:2.70 },
+    { operator:'NNKSB (Taliworks)', highway:'Shapadu (E30)', plaza:'Plaza Tol MOC B / Rantau Panjang (NNKSB)', lat:3.0585, lon:101.4025, radiusKm:0.55, system:'open', rate:1.40 },
+    { operator:'Lingkaran Luar Butterworth (LLB)', highway:'BORR (E17)', plaza:'Plaza Tol Perai (BORR)', lat:5.3885, lon:100.3912, radiusKm:0.55, system:'open', rate:1.50 },
+    { operator:'Lingkaran Luar Butterworth (LLB)', highway:'BORR (E17)', plaza:'Plaza Tol Bagan Ajam (BORR)', lat:5.4412, lon:100.3825, radiusKm:0.55, system:'open', rate:1.50 },
+    { operator:'Lingkaran Luar Butterworth (LLB)', highway:'BORR (E17)', plaza:'Plaza Tol Sungai Nyior (BORR)', lat:5.4085, lon:100.3765, radiusKm:0.55, system:'open', rate:1.20 },
+    { operator:'Lingkaran Cekap (Genting)', highway:'Jalan Genting Highlands', plaza:'Plaza Tol Genting Highlands (Private Road)', lat:3.4015, lon:101.7785, radiusKm:0.85, system:'open', rate:5.00 },
 
     /* --- WCE SELANGOR FIXED SECTION PLAZAS (E32) --- */
-    { operator:'West Coast Expressway (WCE)', highway:'WCE Selangor (E32)', plaza:'Plaza Tol Banting (WCE Sec 1)', lat:2.8155, lon:101.5385, radiusKm:0.35, system:'open', rate:2.34 },
-    { operator:'West Coast Expressway (WCE)', highway:'WCE Selangor (E32)', plaza:'Plaza Tol Bandar Bukit Raja Selatan (WCE Sec 5)', lat:3.0815, lon:101.4255, radiusKm:0.35, system:'open', rate:1.50 },
-    { operator:'West Coast Expressway (WCE)', highway:'WCE Selangor (E32)', plaza:'Plaza Tol Bandar Bukit Raja Utara – Assam Jawa (WCE Sec 6)', lat:3.1355, lon:101.4185, radiusKm:0.35, system:'open', rate:4.12 },
-    { operator:'West Coast Expressway (WCE)', highway:'WCE Selangor (E32)', plaza:'Plaza Tol Assam Jawa (WCE Sec 6)', lat:3.3134, lon:101.3738, radiusKm:0.35, system:'open', rate:4.12 },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Selangor (E32)', plaza:'Plaza Tol Banting (WCE Sec 1)', lat:2.8155, lon:101.5385, radiusKm:0.65, system:'open', rate:2.34 },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Selangor (E32)', plaza:'Plaza Tol Bandar Bukit Raja Selatan (WCE Sec 5)', lat:3.0815, lon:101.4255, radiusKm:0.65, system:'open', rate:1.50 },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Selangor (E32)', plaza:'Plaza Tol Bandar Bukit Raja Utara – Assam Jawa (WCE Sec 6)', lat:3.1355, lon:101.4185, radiusKm:0.65, system:'open', rate:4.12 },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Selangor (E32)', plaza:'Plaza Tol Assam Jawa (WCE Sec 6)', lat:3.3134, lon:101.3738, radiusKm:0.65, system:'open', rate:4.12 },
 
     /* --- CLOSED-SYSTEM PLAZAS: PLUS NSE / NKVE / ELITE (E1 / E2 / E6) --- */
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bukit Kayu Hitam', lat:6.5125, lon:100.4182, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Hutan Kampung', lat:6.1685, lon:100.4055, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Alor Setar Utara', lat:6.1355, lon:100.3955, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Alor Setar Selatan', lat:6.0855, lon:100.3755, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Pendang', lat:5.9955, lon:100.4555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Gurun', lat:5.8185, lon:100.4855, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Sungai Petani Utara', lat:5.6755, lon:100.4955, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Sungai Petani Selatan', lat:5.6055, lon:100.4855, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bertam', lat:5.5255, lon:100.4555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Sungai Dua', lat:5.4455, lon:100.4355, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Juru', lat:5.3293, lon:100.4356, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bukit Tambun', lat:5.2755, lon:100.4555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Jawi', lat:5.2055, lon:100.4955, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bandar Baharu', lat:5.1255, lon:100.5155, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Alor Pongsu', lat:5.0455, lon:100.5955, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bukit Merah', lat:5.0155, lon:100.6555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Taiping Utara', lat:4.9155, lon:100.7055, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Changkat Jering', lat:4.7855, lon:100.7355, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Kuala Kangsar', lat:4.7855, lon:100.9155, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Ipoh Utara (Jelapang)', lat:4.6555, lon:101.0755, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Ipoh Selatan', lat:4.5832, lon:101.1255, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Simpang Pulai', lat:4.5255, lon:101.1455, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Gopeng', lat:4.4555, lon:101.1555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Tapah', lat:4.1955, lon:101.2455, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bidor', lat:4.1055, lon:101.2755, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Sungkai', lat:3.9955, lon:101.3055, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Slim River', lat:3.8355, lon:101.3955, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Behrang', lat:3.7555, lon:101.4555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Tanjung Malim', lat:3.6855, lon:101.5155, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Lembah Beringin', lat:3.5655, lon:101.5355, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bukit Tagar', lat:3.4855, lon:101.5255, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bukit Beruntung', lat:3.4155, lon:101.5555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Sungai Buaya', lat:3.3655, lon:101.5555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Rawang', lat:3.3155, lon:101.5555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Rawang Selatan', lat:3.2855, lon:101.5555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Sungai Buloh', lat:3.2155, lon:101.5755, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NKVE (E1)', plaza:'Plaza Tol Jalan Duta', lat:3.1757, lon:101.6572, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NKVE (E1)', plaza:'Plaza Tol Kota Damansara', lat:3.1555, lon:101.5855, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NKVE (E1)', plaza:'Plaza Tol Damansara', lat:3.1355, lon:101.5955, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NKVE (E1)', plaza:'Plaza Tol Subang', lat:3.1155, lon:101.5755, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NKVE (E1)', plaza:'Plaza Tol Shah Alam', lat:3.0955, lon:101.5555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NKVE (E1)', plaza:'Plaza Tol Setia Alam', lat:3.0855, lon:101.4755, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NKVE (E1)', plaza:'Plaza Tol Bukit Raja', lat:3.0735, lon:101.4750, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'ELITE (E6)', plaza:'Plaza Tol Ebor / Seafield', lat:3.0555, lon:101.5655, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'ELITE (E6)', plaza:'Plaza Tol USJ', lat:3.0255, lon:101.5755, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'ELITE (E6)', plaza:'Plaza Tol Putra Heights', lat:2.9955, lon:101.5755, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'ELITE (E6)', plaza:'Plaza Tol Bandar Saujana Putra', lat:2.9555, lon:101.5855, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'ELITE (E6)', plaza:'Plaza Tol Putrajaya', lat:2.9255, lon:101.6255, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'ELITE (E6)', plaza:'Plaza Tol KLIA', lat:2.8152, lon:101.6925, radiusKm:0.50, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'ELITE (E6)', plaza:'Plaza Tol Bandar Serenia', lat:2.8555, lon:101.7255, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Sungai Besi', lat:3.0458, lon:101.7038, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol UPM', lat:3.0055, lon:101.7255, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Kajang', lat:2.9855, lon:101.7455, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Bangi', lat:2.9255, lon:101.7655, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Southville City', lat:2.8955, lon:101.7655, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Putra Mahkota', lat:2.8755, lon:101.7855, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Nilai', lat:2.8255, lon:101.8055, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Bandar Ainsdale', lat:2.7455, lon:101.8955, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Seremban', lat:2.7155, lon:101.9155, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Port Dickson', lat:2.6955, lon:101.9255, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Senawang', lat:2.6755, lon:101.9855, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Pedas / Linggi', lat:2.5555, lon:102.0455, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Simpang Ampat', lat:2.4455, lon:102.1855, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Ayer Keroh', lat:2.2965, lon:102.3135, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Jasin', lat:2.2455, lon:102.4255, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Tangkak', lat:2.2655, lon:102.5355, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Bukit Gambir', lat:2.1855, lon:102.6355, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Pagoh', lat:2.1455, lon:102.7555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Yong Peng Utara', lat:2.0355, lon:103.0555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Yong Peng Selatan', lat:1.9855, lon:103.0755, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Ayer Hitam', lat:1.9255, lon:103.1655, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Machap', lat:1.8755, lon:103.2455, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Simpang Renggam', lat:1.8255, lon:103.3055, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Sedenak', lat:1.7155, lon:103.4855, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Kulai', lat:1.6455, lon:103.5855, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Senai Utara', lat:1.6155, lon:103.6455, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
-    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Skudai', lat:1.5655, lon:103.6582, radiusKm:0.50, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bukit Kayu Hitam', lat:6.5125, lon:100.4182, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Hutan Kampung', lat:6.1685, lon:100.4055, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Alor Setar Utara', lat:6.1355, lon:100.3955, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Alor Setar Selatan', lat:6.0855, lon:100.3755, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Pendang', lat:5.9955, lon:100.4555, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Gurun', lat:5.8185, lon:100.4855, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Sungai Petani Utara', lat:5.6755, lon:100.4955, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Sungai Petani Selatan', lat:5.6055, lon:100.4855, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bertam', lat:5.5255, lon:100.4555, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Sungai Dua', lat:5.4455, lon:100.4355, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Juru', lat:5.3293, lon:100.4356, radiusKm:0.95, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bukit Tambun', lat:5.2755, lon:100.4555, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Jawi', lat:5.2055, lon:100.4955, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bandar Baharu', lat:5.1255, lon:100.5155, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Alor Pongsu', lat:5.0455, lon:100.5955, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bukit Merah', lat:5.0155, lon:100.6555, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Taiping Utara', lat:4.9155, lon:100.7055, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Changkat Jering', lat:4.7855, lon:100.7355, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Kuala Kangsar', lat:4.7855, lon:100.9155, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Ipoh Utara (Jelapang)', lat:4.6555, lon:101.0755, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Ipoh Selatan', lat:4.5832, lon:101.1255, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Simpang Pulai', lat:4.5255, lon:101.1455, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Gopeng', lat:4.4555, lon:101.1555, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Tapah', lat:4.1955, lon:101.2455, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bidor', lat:4.1055, lon:101.2755, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Sungkai', lat:3.9955, lon:101.3055, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Slim River', lat:3.8355, lon:101.3955, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Behrang', lat:3.7555, lon:101.4555, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Tanjung Malim', lat:3.6855, lon:101.5155, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Lembah Beringin', lat:3.5655, lon:101.5355, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bukit Tagar', lat:3.4855, lon:101.5255, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bukit Beruntung', lat:3.4155, lon:101.5555, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Sungai Buaya', lat:3.3655, lon:101.5555, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Rawang', lat:3.3155, lon:101.5555, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Rawang Selatan', lat:3.2855, lon:101.5555, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Sungai Buloh', lat:3.2155, lon:101.5755, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NKVE (E1)', plaza:'Plaza Tol Jalan Duta', lat:3.1757, lon:101.6572, radiusKm:0.80, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NKVE (E1)', plaza:'Plaza Tol Kota Damansara', lat:3.1555, lon:101.5855, radiusKm:0.75, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NKVE (E1)', plaza:'Plaza Tol Damansara', lat:3.1355, lon:101.5955, radiusKm:0.75, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NKVE (E1)', plaza:'Plaza Tol Subang', lat:3.1155, lon:101.5755, radiusKm:0.75, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NKVE (E1)', plaza:'Plaza Tol Shah Alam', lat:3.0955, lon:101.5555, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NKVE (E1)', plaza:'Plaza Tol Setia Alam', lat:3.0855, lon:101.4755, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NKVE (E1)', plaza:'Plaza Tol Bukit Raja', lat:3.0735, lon:101.4750, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'ELITE (E6)', plaza:'Plaza Tol Ebor / Seafield', lat:3.0555, lon:101.5655, radiusKm:0.80, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'ELITE (E6)', plaza:'Plaza Tol USJ', lat:3.0255, lon:101.5755, radiusKm:0.75, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'ELITE (E6)', plaza:'Plaza Tol Putra Heights', lat:2.9955, lon:101.5755, radiusKm:0.75, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'ELITE (E6)', plaza:'Plaza Tol Bandar Saujana Putra', lat:2.9555, lon:101.5855, radiusKm:0.75, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'ELITE (E6)', plaza:'Plaza Tol Putrajaya', lat:2.9255, lon:101.6255, radiusKm:0.75, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'ELITE (E6)', plaza:'Plaza Tol KLIA', lat:2.8152, lon:101.6925, radiusKm:0.90, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'ELITE (E6)', plaza:'Plaza Tol Bandar Serenia', lat:2.8555, lon:101.7255, radiusKm:0.80, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Sungai Besi', lat:3.0458, lon:101.7038, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol UPM', lat:3.0055, lon:101.7255, radiusKm:0.75, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Kajang', lat:2.9855, lon:101.7455, radiusKm:0.75, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Bangi', lat:2.9255, lon:101.7655, radiusKm:0.75, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Southville City', lat:2.8955, lon:101.7655, radiusKm:0.75, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Putra Mahkota', lat:2.8755, lon:101.7855, radiusKm:0.75, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Nilai', lat:2.8255, lon:101.8055, radiusKm:0.80, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Bandar Ainsdale', lat:2.7455, lon:101.8955, radiusKm:0.75, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Seremban', lat:2.7155, lon:101.9155, radiusKm:0.80, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Port Dickson', lat:2.6955, lon:101.9255, radiusKm:0.75, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Senawang', lat:2.6755, lon:101.9855, radiusKm:0.80, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Pedas / Linggi', lat:2.5555, lon:102.0455, radiusKm:0.80, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Simpang Ampat', lat:2.4455, lon:102.1855, radiusKm:0.80, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Ayer Keroh', lat:2.2965, lon:102.3135, radiusKm:0.85, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Jasin', lat:2.2455, lon:102.4255, radiusKm:0.80, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Tangkak', lat:2.2655, lon:102.5355, radiusKm:0.80, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Bukit Gambir', lat:2.1855, lon:102.6355, radiusKm:0.80, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Pagoh', lat:2.1455, lon:102.7555, radiusKm:0.80, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Yong Peng Utara', lat:2.0355, lon:103.0555, radiusKm:0.80, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Yong Peng Selatan', lat:1.9855, lon:103.0755, radiusKm:0.80, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Ayer Hitam', lat:1.9255, lon:103.1655, radiusKm:0.80, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Machap', lat:1.8755, lon:103.2455, radiusKm:0.80, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Simpang Renggam', lat:1.8255, lon:103.3055, radiusKm:0.80, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Sedenak', lat:1.7155, lon:103.4855, radiusKm:0.80, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Kulai', lat:1.6455, lon:103.5855, radiusKm:0.80, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Senai Utara', lat:1.6155, lon:103.6455, radiusKm:0.80, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Skudai', lat:1.5655, lon:103.6582, radiusKm:0.90, system:'closed', network:'PLUS_NSE' },
 
     /* --- CLOSED-SYSTEM PLAZAS: LPT1 & LPT2 (E8) --- */
-    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Karak', lat:3.4285, lon:102.0285, radiusKm:0.45, system:'closed', network:'LPT_E8' },
-    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Lanchang', lat:3.4955, lon:102.1855, radiusKm:0.45, system:'closed', network:'LPT_E8' },
-    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Temerloh', lat:3.4955, lon:102.4155, radiusKm:0.45, system:'closed', network:'LPT_E8' },
-    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Chenor', lat:3.5355, lon:102.5855, radiusKm:0.45, system:'closed', network:'LPT_E8' },
-    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Maran', lat:3.6155, lon:102.7755, radiusKm:0.45, system:'closed', network:'LPT_E8' },
-    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Sri Jaya', lat:3.6755, lon:102.8855, radiusKm:0.45, system:'closed', network:'LPT_E8' },
-    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Gambang', lat:3.7255, lon:103.1155, radiusKm:0.45, system:'closed', network:'LPT_E8' },
-    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Kuantan', lat:3.8455, lon:103.2455, radiusKm:0.45, system:'closed', network:'LPT_E8' },
-    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Jabor', lat:3.9285, lon:103.3085, radiusKm:0.45, system:'closed', network:'LPT_E8' },
-    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Cheneh', lat:4.1355, lon:103.2655, radiusKm:0.45, system:'closed', network:'LPT_E8' },
-    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Chukai', lat:4.2455, lon:103.3555, radiusKm:0.45, system:'closed', network:'LPT_E8' },
-    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Kijal', lat:4.3455, lon:103.4155, radiusKm:0.45, system:'closed', network:'LPT_E8' },
-    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Kerteh', lat:4.5155, lon:103.4055, radiusKm:0.45, system:'closed', network:'LPT_E8' },
-    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Paka', lat:4.6255, lon:103.3855, radiusKm:0.45, system:'closed', network:'LPT_E8' },
-    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Dungun', lat:4.7455, lon:103.3355, radiusKm:0.45, system:'closed', network:'LPT_E8' },
-    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Bukit Besi', lat:4.7755, lon:103.1855, radiusKm:0.45, system:'closed', network:'LPT_E8' },
-    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Ajil', lat:5.0655, lon:103.0955, radiusKm:0.45, system:'closed', network:'LPT_E8' },
-    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Telemung', lat:5.2055, lon:103.0455, radiusKm:0.45, system:'closed', network:'LPT_E8' },
-    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Kuala Terengganu', lat:5.2685, lon:103.0585, radiusKm:0.45, system:'closed', network:'LPT_E8' },
+    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Karak', lat:3.4285, lon:102.0285, radiusKm:0.85, system:'closed', network:'LPT_E8' },
+    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Lanchang', lat:3.4955, lon:102.1855, radiusKm:0.80, system:'closed', network:'LPT_E8' },
+    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Temerloh', lat:3.4955, lon:102.4155, radiusKm:0.80, system:'closed', network:'LPT_E8' },
+    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Chenor', lat:3.5355, lon:102.5855, radiusKm:0.80, system:'closed', network:'LPT_E8' },
+    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Maran', lat:3.6155, lon:102.7755, radiusKm:0.80, system:'closed', network:'LPT_E8' },
+    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Sri Jaya', lat:3.6755, lon:102.8855, radiusKm:0.80, system:'closed', network:'LPT_E8' },
+    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Gambang', lat:3.7255, lon:103.1155, radiusKm:0.80, system:'closed', network:'LPT_E8' },
+    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Kuantan', lat:3.8455, lon:103.2455, radiusKm:0.80, system:'closed', network:'LPT_E8' },
+    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Jabor', lat:3.9285, lon:103.3085, radiusKm:0.85, system:'closed', network:'LPT_E8' },
+    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Cheneh', lat:4.1355, lon:103.2655, radiusKm:0.80, system:'closed', network:'LPT_E8' },
+    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Chukai', lat:4.2455, lon:103.3555, radiusKm:0.80, system:'closed', network:'LPT_E8' },
+    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Kijal', lat:4.3455, lon:103.4155, radiusKm:0.80, system:'closed', network:'LPT_E8' },
+    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Kerteh', lat:4.5155, lon:103.4055, radiusKm:0.80, system:'closed', network:'LPT_E8' },
+    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Paka', lat:4.6255, lon:103.3855, radiusKm:0.80, system:'closed', network:'LPT_E8' },
+    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Dungun', lat:4.7455, lon:103.3355, radiusKm:0.80, system:'closed', network:'LPT_E8' },
+    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Bukit Besi', lat:4.7755, lon:103.1855, radiusKm:0.80, system:'closed', network:'LPT_E8' },
+    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Ajil', lat:5.0655, lon:103.0955, radiusKm:0.80, system:'closed', network:'LPT_E8' },
+    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Telemung', lat:5.2055, lon:103.0455, radiusKm:0.80, system:'closed', network:'LPT_E8' },
+    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Kuala Terengganu', lat:5.2685, lon:103.0585, radiusKm:0.85, system:'closed', network:'LPT_E8' },
 
     /* --- CLOSED-SYSTEM PLAZAS: LEKAS (E21) --- */
-    { operator:'IJM Corporation Berhad', highway:'LEKAS (E21)', plaza:'Plaza Tol Kajang Selatan', lat:2.9565, lon:101.8385, radiusKm:0.40, system:'closed', network:'LEKAS_E21' },
-    { operator:'IJM Corporation Berhad', highway:'LEKAS (E21)', plaza:'Plaza Tol Semenyih', lat:2.9355, lon:101.8555, radiusKm:0.40, system:'closed', network:'LEKAS_E21' },
-    { operator:'IJM Corporation Berhad', highway:'LEKAS (E21)', plaza:'Plaza Tol Eco Majestic', lat:2.9155, lon:101.8655, radiusKm:0.40, system:'closed', network:'LEKAS_E21' },
-    { operator:'IJM Corporation Berhad', highway:'LEKAS (E21)', plaza:'Plaza Tol Pajam', lat:2.8455, lon:101.8755, radiusKm:0.40, system:'closed', network:'LEKAS_E21' },
-    { operator:'IJM Corporation Berhad', highway:'LEKAS (E21)', plaza:'Plaza Tol Mantin', lat:2.8255, lon:101.9055, radiusKm:0.40, system:'closed', network:'LEKAS_E21' },
-    { operator:'IJM Corporation Berhad', highway:'LEKAS (E21)', plaza:'Plaza Tol Setul', lat:2.7985, lon:101.9485, radiusKm:0.40, system:'closed', network:'LEKAS_E21' },
+    { operator:'IJM Corporation Berhad', highway:'LEKAS (E21)', plaza:'Plaza Tol Kajang Selatan', lat:2.9565, lon:101.8385, radiusKm:0.70, system:'closed', network:'LEKAS_E21' },
+    { operator:'IJM Corporation Berhad', highway:'LEKAS (E21)', plaza:'Plaza Tol Semenyih', lat:2.9355, lon:101.8555, radiusKm:0.70, system:'closed', network:'LEKAS_E21' },
+    { operator:'IJM Corporation Berhad', highway:'LEKAS (E21)', plaza:'Plaza Tol Eco Majestic', lat:2.9155, lon:101.8655, radiusKm:0.70, system:'closed', network:'LEKAS_E21' },
+    { operator:'IJM Corporation Berhad', highway:'LEKAS (E21)', plaza:'Plaza Tol Pajam', lat:2.8455, lon:101.8755, radiusKm:0.70, system:'closed', network:'LEKAS_E21' },
+    { operator:'IJM Corporation Berhad', highway:'LEKAS (E21)', plaza:'Plaza Tol Mantin', lat:2.8255, lon:101.9055, radiusKm:0.70, system:'closed', network:'LEKAS_E21' },
+    { operator:'IJM Corporation Berhad', highway:'LEKAS (E21)', plaza:'Plaza Tol Setul', lat:2.7985, lon:101.9485, radiusKm:0.70, system:'closed', network:'LEKAS_E21' },
 
     /* --- CLOSED-SYSTEM PLAZAS: SKVE (E26) --- */
-    { operator:'SKVE Holdings Sdn Bhd', highway:'SKVE (E26)', plaza:'Plaza Tol Ayer Hitam (SKVE)', lat:2.9815, lon:101.6585, radiusKm:0.40, system:'closed', network:'SKVE_E26' },
-    { operator:'SKVE Holdings Sdn Bhd', highway:'SKVE (E26)', plaza:'Plaza Tol Saujana Putra (SKVE)', lat:2.9485, lon:101.5885, radiusKm:0.40, system:'closed', network:'SKVE_E26' },
-    { operator:'SKVE Holdings Sdn Bhd', highway:'SKVE (E26)', plaza:'Plaza Tol Tanjung Dua Belas (SKVE)', lat:2.9185, lon:101.5355, radiusKm:0.40, system:'closed', network:'SKVE_E26' },
-    { operator:'SKVE Holdings Sdn Bhd', highway:'SKVE (E26)', plaza:'Plaza Tol Teluk Panglima Garang (SKVE)', lat:2.9125, lon:101.4785, radiusKm:0.40, system:'closed', network:'SKVE_E26' },
-    { operator:'SKVE Holdings Sdn Bhd', highway:'SKVE (E26)', plaza:'Plaza Tol Pulau Indah (SKVE)', lat:2.9325, lon:101.3485, radiusKm:0.40, system:'closed', network:'SKVE_E26' },
+    { operator:'SKVE Holdings Sdn Bhd', highway:'SKVE (E26)', plaza:'Plaza Tol Ayer Hitam (SKVE)', lat:2.9815, lon:101.6585, radiusKm:0.70, system:'closed', network:'SKVE_E26' },
+    { operator:'SKVE Holdings Sdn Bhd', highway:'SKVE (E26)', plaza:'Plaza Tol Saujana Putra (SKVE)', lat:2.9485, lon:101.5885, radiusKm:0.70, system:'closed', network:'SKVE_E26' },
+    { operator:'SKVE Holdings Sdn Bhd', highway:'SKVE (E26)', plaza:'Plaza Tol Tanjung Dua Belas (SKVE)', lat:2.9185, lon:101.5355, radiusKm:0.70, system:'closed', network:'SKVE_E26' },
+    { operator:'SKVE Holdings Sdn Bhd', highway:'SKVE (E26)', plaza:'Plaza Tol Teluk Panglima Garang (SKVE)', lat:2.9125, lon:101.4785, radiusKm:0.70, system:'closed', network:'SKVE_E26' },
+    { operator:'SKVE Holdings Sdn Bhd', highway:'SKVE (E26)', plaza:'Plaza Tol Pulau Indah (SKVE)', lat:2.9325, lon:101.3485, radiusKm:0.70, system:'closed', network:'SKVE_E26' },
 
     /* --- CLOSED-SYSTEM PLAZAS: WCE PERAK (E32) --- */
-    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Hutan Melintang (WCE)', lat:3.8955, lon:100.9425, radiusKm:0.40, system:'closed', network:'WCE_PERAK' },
-    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Teluk Intan (WCE)', lat:4.0155, lon:101.0225, radiusKm:0.40, system:'closed', network:'WCE_PERAK' },
-    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Lekir (WCE)', lat:4.1655, lon:100.7555, radiusKm:0.40, system:'closed', network:'WCE_PERAK' },
-    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Sitiawan (WCE)', lat:4.2255, lon:100.7155, radiusKm:0.40, system:'closed', network:'WCE_PERAK' },
-    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Sitiawan Utara (WCE)', lat:4.2655, lon:100.7055, radiusKm:0.40, system:'closed', network:'WCE_PERAK' },
-    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Changkat Cermin (WCE)', lat:4.3655, lon:100.8155, radiusKm:0.40, system:'closed', network:'WCE_PERAK' },
-    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Beruas (WCE)', lat:4.5055, lon:100.7855, radiusKm:0.40, system:'closed', network:'WCE_PERAK' },
-    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Trong (WCE)', lat:4.6855, lon:100.7155, radiusKm:0.40, system:'closed', network:'WCE_PERAK' },
-    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Taiping Selatan (WCE)', lat:4.7725, lon:100.7285, radiusKm:0.40, system:'closed', network:'WCE_PERAK' },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Hutan Melintang (WCE)', lat:3.8955, lon:100.9425, radiusKm:0.70, system:'closed', network:'WCE_PERAK' },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Teluk Intan (WCE)', lat:4.0155, lon:101.0225, radiusKm:0.70, system:'closed', network:'WCE_PERAK' },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Lekir (WCE)', lat:4.1655, lon:100.7555, radiusKm:0.70, system:'closed', network:'WCE_PERAK' },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Sitiawan (WCE)', lat:4.2255, lon:100.7155, radiusKm:0.70, system:'closed', network:'WCE_PERAK' },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Sitiawan Utara (WCE)', lat:4.2655, lon:100.7055, radiusKm:0.70, system:'closed', network:'WCE_PERAK' },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Changkat Cermin (WCE)', lat:4.3655, lon:100.8155, radiusKm:0.70, system:'closed', network:'WCE_PERAK' },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Beruas (WCE)', lat:4.5055, lon:100.7855, radiusKm:0.70, system:'closed', network:'WCE_PERAK' },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Trong (WCE)', lat:4.6855, lon:100.7155, radiusKm:0.70, system:'closed', network:'WCE_PERAK' },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Taiping Selatan (WCE)', lat:4.7725, lon:100.7285, radiusKm:0.70, system:'closed', network:'WCE_PERAK' },
 
     /* --- CLOSED-SYSTEM PLAZAS: EKVE (E27) --- */
-    { operator:'EKVE Sdn Bhd (AZRB)', highway:'EKVE (E27)', plaza:'Plaza Tol Sungai Long (EKVE)', lat:3.0415, lon:101.8085, radiusKm:0.35, system:'closed', network:'EKVE_E27' },
-    { operator:'EKVE Sdn Bhd (AZRB)', highway:'EKVE (E27)', plaza:'Plaza Tol Bandar Mahkota Cheras (EKVE)', lat:3.0585, lon:101.7985, radiusKm:0.35, system:'closed', network:'EKVE_E27' },
-    { operator:'EKVE Sdn Bhd (AZRB)', highway:'EKVE (E27)', plaza:'Plaza Tol Hulu Langat (EKVE)', lat:3.1125, lon:101.8125, radiusKm:0.35, system:'closed', network:'EKVE_E27' },
-    { operator:'EKVE Sdn Bhd (AZRB)', highway:'EKVE (E27)', plaza:'Plaza Tol Ampang (EKVE)', lat:3.1485, lon:101.7785, radiusKm:0.35, system:'closed', network:'EKVE_E27' }
+    { operator:'EKVE Sdn Bhd (AZRB)', highway:'EKVE (E27)', plaza:'Plaza Tol Sungai Long (EKVE)', lat:3.0415, lon:101.8085, radiusKm:0.60, system:'closed', network:'EKVE_E27' },
+    { operator:'EKVE Sdn Bhd (AZRB)', highway:'EKVE (E27)', plaza:'Plaza Tol Bandar Mahkota Cheras (EKVE)', lat:3.0585, lon:101.7985, radiusKm:0.60, system:'closed', network:'EKVE_E27' },
+    { operator:'EKVE Sdn Bhd (AZRB)', highway:'EKVE (E27)', plaza:'Plaza Tol Hulu Langat (EKVE)', lat:3.1125, lon:101.8125, radiusKm:0.60, system:'closed', network:'EKVE_E27' },
+    { operator:'EKVE Sdn Bhd (AZRB)', highway:'EKVE (E27)', plaza:'Plaza Tol Ampang (EKVE)', lat:3.1485, lon:101.7785, radiusKm:0.60, system:'closed', network:'EKVE_E27' }
   ]);
 
   const HIGHLAND_ZONES = [
@@ -1771,8 +1770,7 @@
   }
 
   /* =========================================================
-     11. PURE LAT/LON GEOSPATIAL TOLL MATCHING ENGINE
-         Compares route polyline coordinates vs MALAYSIA_TOLL_PLAZA_TABLE
+     11. NATIONWIDE LAT/LON GEOSPATIAL & CORRIDOR TOLL ENGINE
          Class 1 (Passenger Cars) — Touch 'n Go / SmartTAG Only
      ========================================================= */
   function pointToSegmentDistanceKm(pLat, pLon, aLat, aLon, bLat, bLon) {
@@ -1798,7 +1796,7 @@
     if (!dirRule) return true;
     const dLat = p2.lat - p1.lat;
     const dLon = p2.lng - p1.lng;
-    if (dirRule === 'toIsland') return dLon < 0;      // Penang Mainland -> Island (East to West)
+    if (dirRule === 'toIsland') return dLon < 0;
     if (dirRule === 'southbound') return dLat < 0;
     if (dirRule === 'northbound') return dLat > 0;
     if (dirRule === 'eastbound') return dLon > 0;
@@ -1806,7 +1804,21 @@
     return true;
   }
 
+  function isOnPenangIslandPoint(pt) {
+    if (!pt || !Number.isFinite(pt.lat) || !Number.isFinite(pt.lng)) return false;
+    return pt.lat >= 5.24 && pt.lat <= 5.49 && pt.lng >= 100.18 && pt.lng <= 100.36;
+  }
+
   function evaluateRouteTolls(route) {
+    if (avoidTolls) {
+      return {
+        cents: 0,
+        amount: 0,
+        items: [],
+        status: 'toll-free'
+      };
+    }
+
     const sections = Array.isArray(route && route.sections) ? route.sections : [];
     const routePoints = [];
     let cumulativeKm = 0;
@@ -1834,16 +1846,28 @@
       };
     }
 
-    // Track closest approach along route segments for every toll plaza in table
     const plazaHits = new Map();
+    let crossesPenang1st = false;
+    let crossesPenang2nd = false;
 
     for (let i = 0; i < routePoints.length - 1; i++) {
       const p1 = routePoints[i];
       const p2 = routePoints[i + 1];
-      const minLat = Math.min(p1.lat, p2.lat) - 0.01;
-      const maxLat = Math.max(p1.lat, p2.lat) + 0.01;
-      const minLon = Math.min(p1.lng, p2.lng) - 0.01;
-      const maxLon = Math.max(p1.lng, p2.lng) + 0.01;
+
+      // Bridge crossing corridor checks
+      if (p1.lat >= 5.345 && p1.lat <= 5.375 && p1.lng >= 100.350 && p1.lng <= 100.385 &&
+          p2.lat >= 5.345 && p2.lat <= 5.375 && p2.lng >= 100.320 && p2.lng <= 100.350) {
+        crossesPenang1st = true;
+      }
+      if (p1.lat >= 5.240 && p1.lat <= 5.290 && p1.lng >= 100.380 && p1.lng <= 100.430 &&
+          p2.lat >= 5.240 && p2.lat <= 5.290 && p2.lng >= 100.310 && p2.lng <= 100.380) {
+        crossesPenang2nd = true;
+      }
+
+      const minLat = Math.min(p1.lat, p2.lat) - 0.015;
+      const maxLat = Math.max(p1.lat, p2.lat) + 0.015;
+      const minLon = Math.min(p1.lng, p2.lng) - 0.015;
+      const maxLon = Math.max(p1.lng, p2.lng) + 0.015;
 
       for (let idx = 0; idx < MALAYSIA_TOLL_PLAZA_TABLE.length; idx++) {
         const plaza = MALAYSIA_TOLL_PLAZA_TABLE[idx];
@@ -1851,7 +1875,7 @@
           continue;
         }
         const distKm = pointToSegmentDistanceKm(plaza.lat, plaza.lon, p1.lat, p1.lng, p2.lat, p2.lng);
-        const radius = plaza.radiusKm || 0.35;
+        const radius = plaza.radiusKm || 0.65;
         if (distKm <= radius && checkDirectionMatch(plaza.dir, p1, p2)) {
           const existing = plazaHits.get(idx);
           if (!existing || distKm < existing.minDist) {
@@ -1865,7 +1889,6 @@
       }
     }
 
-    // Order hits sequentially along the route
     const orderedHits = Array.from(plazaHits.values()).sort((a, b) => a.cumKm - b.cumKm);
     const finalItems = [];
     const closedGroups = new Map();
@@ -1890,20 +1913,33 @@
       }
     });
 
-    // Pair Entry & Exit plazas for Closed-System Highways
+    // Resolve Closed-System Highways (handles multi-point spans & single-anchor corridor entries)
     closedGroups.forEach((hits, networkKey) => {
-      if (hits.length < 2) return;
-      const entry = hits[0];
-      const exit = hits[hits.length - 1];
-      const spanKm = Math.max(0, exit.cumKm - entry.cumKm);
-      if (spanKm < 1.5) return;
-
       const cfg = CLOSED_SYSTEM_RATES[networkKey];
       if (!cfg) return;
 
+      let entry = hits[0];
+      let exit = hits[hits.length - 1];
+      let spanKm = Math.max(0, exit.cumKm - entry.cumKm);
+
+      // Fallback corridor span if route touches only one registered plaza on a long-haul network
+      if (spanKm < 1.5 && cumulativeKm > 45) {
+        const corridorPoints = routePoints.filter(pt =>
+          MALAYSIA_TOLL_PLAZA_TABLE.some(p =>
+            p.system === 'closed' &&
+            p.network === networkKey &&
+            calculateHaversineDistance(pt.lat, pt.lng, p.lat, p.lon) <= 18
+          )
+        );
+        if (corridorPoints.length >= 2) {
+          spanKm = Math.max(spanKm, corridorPoints[corridorPoints.length - 1].cumKm - corridorPoints[0].cumKm);
+        }
+      }
+
+      if (spanKm < 1.5) return;
+
       let rateRm = Math.max(cfg.minRate, spanKm * cfg.ratePerKm);
 
-      // Exact SKVE matrix overrides
       if (networkKey === 'SKVE_E26') {
         const pair = `${entry.plaza.plaza}|${exit.plaza.plaza}`;
         if (/Ayer Hitam/.test(pair) && /Saujana Putra/.test(pair)) rateRm = 2.40;
@@ -1914,7 +1950,6 @@
         else if (/Teluk Panglima Garang/.test(pair) && /Pulau Indah/.test(pair)) rateRm = 4.20;
       }
 
-      // Exact WCE Perak Hutan Melintang <-> Teluk Intan rate
       if (networkKey === 'WCE_PERAK') {
         const pair = `${entry.plaza.plaza}|${exit.plaza.plaza}`;
         if (/Hutan Melintang/.test(pair) && /Teluk Intan/.test(pair)) rateRm = 2.90;
@@ -1930,6 +1965,34 @@
         systemType: 'closed'
       });
     });
+
+    // Penang Bridge mainland-to-island check
+    const pickupIsland = isOnPenangIslandPoint(pickupCoords);
+    const dropoffIsland = isOnPenangIslandPoint(dropoffCoords);
+    const hasBridgeAlready = finalItems.some(it => /jambatan pulau pinang|bandar cassia|jk2pp/i.test(it.plazaName));
+    if (!pickupIsland && dropoffIsland && !hasBridgeAlready) {
+      if (crossesPenang2nd) {
+        const c = toCents(5.74);
+        finalItems.push({
+          operator: 'Jambatan Kedua Sdn Bhd (JKSB)',
+          highway: 'Penang 2nd Bridge (E28)',
+          plazaName: 'Plaza Tol Bandar Cassia / JK2PP',
+          cents: c,
+          amount: fromCents(c),
+          systemType: 'open'
+        });
+      } else if (crossesPenang1st || routePoints.some(pt => pt.lat >= 5.34 && pt.lat <= 5.38 && pt.lng >= 100.32 && pt.lng <= 100.39)) {
+        const c = toCents(5.74);
+        finalItems.push({
+          operator: 'PLUS Malaysia Berhad',
+          highway: 'Penang 1st Bridge (E36)',
+          plazaName: 'Plaza Tol Jambatan Pulau Pinang (Perai)',
+          cents: c,
+          amount: fromCents(c),
+          systemType: 'open'
+        });
+      }
+    }
 
     const totalTollCents = finalItems.reduce((sum, item) => sum + item.cents, 0);
 
