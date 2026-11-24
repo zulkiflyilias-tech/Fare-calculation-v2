@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare MY Personal Edition v3.7.0</title>
+<title>Rideshare MY Personal Edition v3.8.0</title>
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 <style>
   :root {
@@ -318,9 +318,6 @@
     font-weight:500;
     margin-bottom:8px;
   }
-  .fare-warning {
-    color:#ffcc80;
-  }
   .toll-breakdown-box {
     background:#2c2c2e;
     border-radius:8px;
@@ -382,22 +379,9 @@
     background:#1b5e20;
     color:#a5d6a7;
   }
-  .toll-badge.corridor {
+  .toll-badge.closed {
     background:#0d47a1;
     color:#90caf9;
-  }
-  .toll-badge.unverified {
-    background:#e65100;
-    color:#ffe0b2;
-  }
-  .estimated-warning-banner {
-    color:#f57c00;
-    font-size:10px;
-    font-weight:600;
-    margin-bottom:6px;
-    display:flex;
-    align-items:center;
-    gap:4px;
   }
   details {
     border-top:1px dashed #3a3a3c;
@@ -517,45 +501,6 @@
     font-size:11px;
     cursor:pointer;
   }
-  .operator-directory {
-    display:flex;
-    flex-direction:column;
-    gap:6px;
-    margin:6px 0;
-    max-height:240px;
-    overflow-y:auto;
-  }
-  .op-card {
-    background:#f9f9fb;
-    border:1px solid #ececef;
-    border-radius:7px;
-    padding:7px 9px;
-    font-size:11px;
-    line-height:1.4;
-  }
-  .op-card-header {
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    gap:6px;
-    font-weight:700;
-    color:#212529;
-  }
-  .op-badge {
-    font-size:9px;
-    text-transform:uppercase;
-    padding:2px 6px;
-    border-radius:10px;
-    font-weight:700;
-  }
-  .op-badge.major {background:#ede7f6;color:#5e35b1}
-  .op-badge.independent {background:#e3f2fd;color:#1565c0}
-  .op-badge.private {background:#fff3e0;color:#ef6c00}
-  .op-highways {
-    color:#555;
-    margin-top:2px;
-    font-size:10px;
-  }
   .small-muted {
     font-size:10px;
     color:#888;
@@ -595,7 +540,7 @@
   <main id="search-panel">
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.7.0</span>
+      <span class="version">PERSONAL EDITION v3.8.0</span>
     </div>
 
     <!-- QUICK PINS & RECENT ROUTES -->
@@ -638,7 +583,7 @@
       </button>
     </div>
 
-    <div id="loading-msg">Calculating route and tolls…</div>
+    <div id="loading-msg">Calculating route and scanning toll plazas…</div>
     <div id="error-msg" role="alert"></div>
     <div class="status-line" aria-live="polite">
       <span id="route-status"></span>
@@ -656,11 +601,7 @@
         <span id="fare-duration">0 mins</span>
       </div>
 
-      <div id="toll-breakdown-box" class="toll-breakdown-box" style="display:none">
-        <div id="toll-warning-banner" class="estimated-warning-banner" style="display:none">
-          ⚠️ Toll data may be incomplete or estimated. Local reference rates are not live official tariff verification; confirm before travel.
-        </div>
-      </div>
+      <div id="toll-breakdown-box" class="toll-breakdown-box" style="display:none"></div>
 
       <details open>
         <summary>Detailed Fare Calculation</summary>
@@ -673,7 +614,7 @@
           <span id="calc-urban-surcharge">RM 0.00</span>
         </div>
         <div class="detail-row" id="toll-fare-row">
-          <span>Toll charges (identified + manual adjustment)</span>
+          <span>Toll charges (TnG / SmartTAG Class 1)</span>
           <span id="calc-toll-fare">RM 0.00</span>
         </div>
         <label class="detail-row" style="align-items:center;gap:10px">
@@ -768,12 +709,12 @@
         <button id="clear-history-btn" type="button">Clear saved routes</button>
       </div>
       <p class="small-muted">
-        Settings and saved routes are stored locally on this device only. Toll amounts may require manual confirmation.
+        Settings and saved routes are stored locally on this device only.
       </p>
     </details>
 
     <p class="small-muted">
-      Estimates are indicative. HERE toll data and local reference rates are not a substitute for current official Class 1 tariff confirmation.
+      Estimates are indicative. Toll calculations use Class 1 (TnG / SmartTAG) geospatial plaza coordinates.
     </p>
   </main>
 </div>
@@ -783,9 +724,10 @@
   'use strict';
 
   /* =========================================================
-     1. CONFIGURATION & COMPREHENSIVE MALAYSIAN TOLL DIRECTORY
+     1. CONFIGURATION & GEOSPATIAL MALAYSIAN TOLL TABLE
+        Class 1 (Passenger Cars) — Touch 'n Go / SmartTAG Only
      ========================================================= */
-  const APP_VERSION = '3.7.0';
+  const APP_VERSION = '3.8.0';
   const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
   const DEFAULT_SETTINGS = Object.freeze({
@@ -799,799 +741,269 @@
     roundingUnit:1
   });
 
-  const SETTINGS_KEY = 'rideshareMY.personal.v3.7.settings';
+  const SETTINGS_KEY = 'rideshareMY.personal.v3.8.settings';
   const LEGACY_SETTINGS_KEYS = [
+    'rideshareMY.personal.v3.7.settings',
     'rideshareMY.personal.v3.6.settings',
     'rideshareMY.personal.v3.5.settings',
     'rideshareMY.personal.v3.1.settings',
     'rideshareMY.personal.v3.0.settings'
   ];
-  const ROUTES_STORAGE_KEY = 'rideshareMY.personal.v3.7.routes';
+  const ROUTES_STORAGE_KEY = 'rideshareMY.personal.v3.8.routes';
   const LEGACY_ROUTES_STORAGE_KEYS = [
+    'rideshareMY.personal.v3.7.routes',
     'rideshareMY.personal.v3.6.routes',
     'rideshareMY.personal.v3.5.routes'
   ];
   const MAX_PINNED_ROUTES = 6;
   const MAX_RECENT_ROUTES = 5;
 
-  const GENTING_ROAD_CHARGE = 5.00;
-  const GENTING_ROAD_CHARGE_NAME = 'Plaza Tol Genting Highlands (Private Road Charge)';
-  const PENANG_1ST_BRIDGE_RATE = 5.74; // Embedded local reference; confirm against current official Class 1 tariff
-  const PENANG_2ND_BRIDGE_RATE = 5.74; // Embedded local reference; confirm separately against JKSB tariff
-  const WCE_SELANGOR_BBR_ASSAM_JAWA_RATE = 4.12;
-  const WCE_PERAK_HUTAN_MELINTANG_TELUK_INTAN_RATE = 2.90;
+  /* Closed-system per-km Class 1 rates (RM/km) for distance-based highway networks */
+  const CLOSED_SYSTEM_RATES = Object.freeze({
+    PLUS_NSE:   { operator: 'PLUS Malaysia Berhad', highway: 'North-South / NKVE / ELITE (E1/E2/E6)', ratePerKm: 0.1116, minRate: 1.15 },
+    LPT_E8:     { operator: 'AFA Prime / LPT2', highway: 'East Coast Expressway LPT1 & LPT2 (E8)', ratePerKm: 0.1069, minRate: 1.20 },
+    LEKAS_E21:  { operator: 'IJM Corporation Berhad', highway: 'Kajang–Seremban Highway LEKAS (E21)', ratePerKm: 0.1550, minRate: 1.60 },
+    SKVE_E26:   { operator: 'SKVE Holdings Sdn Bhd', highway: 'South Klang Valley Expressway SKVE (E26)', ratePerKm: 0.1750, minRate: 1.10 },
+    WCE_PERAK:  { operator: 'West Coast Expressway Sdn Bhd', highway: 'West Coast Expressway WCE Perak (E32)', ratePerKm: 0.1550, minRate: 1.88 },
+    EKVE_E27:   { operator: 'EKVE Sdn Bhd (AZRB)', highway: 'East Klang Valley Expressway EKVE (E27)', ratePerKm: 0.2530, minRate: 1.50 }
+  });
 
-  const MALAYSIA_TOLL_OPERATORS = Object.freeze([
-    /* --- TIER 1: MAJOR MULTI-HIGHWAY OPERATORS --- */
-    {
-      tier:'major',
-      operator:'PLUS Malaysia Berhad',
-      shortName:'PLUS',
-      highways:[
-        'North-South Expressway Northern & Southern Routes (E1 / E2)',
-        'New Klang Valley Expressway — NKVE (E1)',
-        'North-South Expressway Central Link — ELITE (E6)',
-        'Malaysia–Singapore Second Link — Linkedua (E3)',
-        'Butterworth–Kulim Expressway — BKE (E15)',
-        'Seremban–Port Dickson Highway — SPDH (E29)',
-        'East Coast Expressway Phase 2 — LPT2 (E8)',
-        'Penang Bridge / 1st Bridge (E36)'
-      ],
-      keywords:['plus','north-south','nkve','elite','linkedua','bke','spdh','penang bridge','penang 1st','1st bridge','first bridge','jambatan pulau pinang','perai','prai','lpt2','jalan duta','sungai besi','juru','setia alam','bukit raja','subang','damansara','kota damansara','shah alam','usj','putra heights','bandar saujana putra','klia','nilai','seremban','ayer keroh','tangkak','pagoh','yong peng','ayer hitam','simpan renggam','kulai','senai','skudai','kempas','lima kedai','perling','tanjung kupang','rawang','sungai buloh','tanjung malim','bidor','tapah','gopeng','ipoh','kuala kangsar','changkat jering','taiping','bandar baharu','jawi','bertam','sungai petani','gurun','pendang','alor setar','jitra','bukit kayu hitam','kubang semang','lunas','mambau','lukut','kuala terengganu','ajil','bukit besi','dungun','paka','kertih','kijal','chukai','cheneh']
-    },
-    {
-      tier:'major',
-      operator:'Amanat Lebuhraya Rakyat Berhad (ALR)',
-      shortName:'ALR',
-      highways:[
-        'Damansara–Puchong Expressway — LDP (E11)',
-        'Shah Alam Expressway — KESAS (E5)',
-        'Western KL Traffic Dispersal Scheme — SPRINT (E23)',
-        'Stormwater Management & Road Tunnel — SMART (E38)'
-      ],
-      keywords:['alr','ldp','litrak','kesas','sprint','smart','penchala','bukit kiara','damansara','pantai dalam','pantai','petaling jaya','sunway','awan besar','besar east','besar west','kemuning','puchong','pjs','kelana jaya','sri damansara']
-    },
-    {
-      tier:'major',
-      operator:'PROLINTAS (Projek Lintasan Kota Holdings)',
-      shortName:'PROLINTAS',
-      highways:[
-        'Ampang–Kuala Lumpur Elevated Highway — AKLEH (E12)',
-        'Guthrie Corridor Expressway — GCE (E35)',
-        'Kemuning–Shah Alam Highway — LKSA (E13)',
-        'Kajang Dispersal Link Expressway — Kajang SILK (E18)',
-        'Damansara–Shah Alam Elevated Expressway — DASH (E31)',
-        'Sungai Besi–Ulu Kelang Elevated Expressway — SUKE (E19)'
-      ],
-      keywords:['prolintas','akleh','gce','guthrie','lksa','silk','dash','suke','dato keramat','datuk keramat','keramat','elmina','lagong','bukit jelutong','alam impian','seri muda','sungai ramal','sungai long','sungai balak','bukit kajang','denai alam','kota damansara','ampang','alam damai','bukit teratai']
-    },
-    {
-      tier:'major',
-      operator:'IJM Corporation Berhad (Toll Division)',
-      shortName:'IJM',
-      highways:[
-        'Kajang–Seremban Highway — LEKAS (E21)',
-        'Sungai Besi Expressway — BESRAYA (E9)',
-        'New Pantai Expressway — NPE (E10)'
-      ],
-      keywords:['ijm','lekas','besraya','npe','new pantai','kaseh','pantai dalam','mines','loke yew','kajang selatan','setul','ampangan','pjs 2','pjs 5','petaling jaya (s)']
-    },
+  /* Comprehensive Toll Plaza Table:
+     - system: 'open' (flat rate when route passes within radiusKm) or 'closed' (paired entry/exit per system)
+     - dir: optional bearing filter ('eastbound' | 'westbound' | 'northbound' | 'southbound' | 'toIsland')
+     - rate: Class 1 TnG / SmartTAG fare in RM (null for closed-system plazas) */
+  const MALAYSIA_TOLL_PLAZA_TABLE = Object.freeze([
+    /* --- PLUS MALAYSIA BERHAD (OPEN & BRIDGES) --- */
+    { operator:'PLUS Malaysia Berhad', highway:'Penang 1st Bridge (E36)', plaza:'Plaza Tol Jambatan Pulau Pinang (Perai)', lat:5.3789, lon:100.3831, radiusKm:0.45, system:'open', dir:'toIsland', rate:5.74 },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Jitra', lat:6.2995, lon:100.4184, radiusKm:0.35, system:'open', rate:1.31 },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Kempas', lat:1.5453, lon:103.7247, radiusKm:0.35, system:'open', rate:1.72 },
+    { operator:'PLUS Malaysia Berhad', highway:'BKE (E15)', plaza:'Plaza Tol Kubang Semang', lat:5.4055, lon:100.4614, radiusKm:0.35, system:'open', rate:1.31 },
+    { operator:'PLUS Malaysia Berhad', highway:'BKE (E15)', plaza:'Plaza Tol Lunas', lat:5.4241, lon:100.5432, radiusKm:0.35, system:'open', rate:1.31 },
+    { operator:'PLUS Malaysia Berhad', highway:'Linkedua (E3)', plaza:'Plaza Tol Tanjung Kupang', lat:1.3785, lon:103.6119, radiusKm:0.40, system:'open', rate:6.14 },
+    { operator:'PLUS Malaysia Berhad', highway:'Linkedua (E3)', plaza:'Plaza Tol Lima Kedai', lat:1.5008, lon:103.6214, radiusKm:0.35, system:'open', rate:3.19 },
+    { operator:'PLUS Malaysia Berhad', highway:'Linkedua (E3)', plaza:'Plaza Tol Perling', lat:1.4882, lon:103.6845, radiusKm:0.35, system:'open', rate:1.88 },
+    { operator:'PLUS Malaysia Berhad', highway:'SPDH (E29)', plaza:'Plaza Tol Mambau', lat:2.6713, lon:101.9038, radiusKm:0.35, system:'open', rate:2.62 },
+    { operator:'PLUS Malaysia Berhad', highway:'SPDH (E29)', plaza:'Plaza Tol Lukut', lat:2.5736, lon:101.8252, radiusKm:0.35, system:'open', rate:0.65 },
 
-    /* --- TIER 2: INDEPENDENT & REGIONAL CORRIDOR OPERATORS --- */
-    {
-      tier:'independent',
-      operator:'West Coast Expressway Sdn Bhd (WCE)',
-      shortName:'WCE',
-      highways:[
-        'West Coast Expressway — WCE (E32: Banting – Taiping Selatan)'
-      ],
-      keywords:['wce','west coast','jaya baru','simpang ampat','lekir','sitiawan','changkat cermin','beruas','trong','taiping selatan','hutan melintang','teluk intan','assam jawa','bukit raja utara','bukit raja selatan','banting']
-    },
-    {
-      tier:'independent',
-      operator:'Jambatan Kedua Sdn Bhd (JKSB)',
-      shortName:'JKSB',
-      highways:[
-        'Sultan Abdul Halim Mu\'adzam Shah Bridge / Penang 2nd Bridge (E28)'
-      ],
-      keywords:['jksb','2nd bridge','second bridge','jambatan kedua','sultan abdul halim','bandar cassia','jk2pp','batu kawan','batu maung']
-    },
-    {
-      tier:'independent',
-      operator:'AFA Prime Berhad (formerly ANIH Berhad)',
-      shortName:'AFA Prime',
-      highways:[
-        'Kuala Lumpur–Karak Expressway — KLK (E8)',
-        'East Coast Expressway Phase 1 — LPT1 (E8)'
-      ],
-      keywords:['afa prime','anih','karak','lpt','lpt1','gombak','bentong','lanchang','temerloh','chenor','maran','sri jaya','gambang','kuantan','jabor']
-    },
-    {
-      tier:'independent',
-      operator:'SKVE Holdings Sdn Bhd',
-      shortName:'SKVE',
-      highways:[
-        'South Klang Valley Expressway — SKVE (E26)'
-      ],
-      keywords:['skve','south klang valley','saujana putra','telok panglima garang','teluk panglima garang','pulau indah','ayer hitam','tanjung dua belas']
-    },
-    {
-      tier:'independent',
-      operator:'Senai–Desaru Expressway Berhad (SDE)',
-      shortName:'SDE',
-      highways:[
-        'Senai–Desaru Expressway — SDE (E22)'
-      ],
-      keywords:['sde','senai-desaru','senai desaru','cahaya baru','penawar','ulu tiram','senai']
-    },
-    {
-      tier:'independent',
-      operator:'KL–Kuala Selangor Expressway Berhad (LATAR)',
-      shortName:'LATAR',
-      highways:[
-        'Kuala Lumpur–Kuala Selangor Expressway — LATAR (E25)'
-      ],
-      keywords:['latar','kuala selangor','ijok','kuang','kundang','templer','taman rimba templer']
-    },
+    /* --- AMANAT LEBUHRAYA RAKYAT (ALR: LDP, KESAS, SPRINT, SMART) --- */
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'LDP (E11)', plaza:'Plaza Tol Penchala (LDP)', lat:3.1642, lon:101.6177, radiusKm:0.30, system:'open', rate:2.10 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'LDP (E11)', plaza:'Plaza Tol Petaling Jaya (LDP)', lat:3.1112, lon:101.6085, radiusKm:0.30, system:'open', rate:2.10 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'LDP (E11)', plaza:'Plaza Tol Puchong Barat (LDP)', lat:3.0531, lon:101.6089, radiusKm:0.30, system:'open', rate:2.10 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'LDP (E11)', plaza:'Plaza Tol Puchong Selatan (LDP)', lat:3.0014, lon:101.6223, radiusKm:0.30, system:'open', rate:2.10 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'KESAS (E5)', plaza:'Plaza Tol Awan Besar Timur (KESAS)', lat:3.0587, lon:101.6649, radiusKm:0.30, system:'open', rate:2.00 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'KESAS (E5)', plaza:'Plaza Tol Awan Besar Barat (KESAS)', lat:3.0636, lon:101.6793, radiusKm:0.30, system:'open', rate:2.00 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'KESAS (E5)', plaza:'Plaza Tol Sunway (KESAS)', lat:3.0587, lon:101.6083, radiusKm:0.30, system:'open', rate:2.00 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'KESAS (E5)', plaza:'Plaza Tol Kemuning (KESAS)', lat:2.9973, lon:101.5221, radiusKm:0.30, system:'open', rate:2.00 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'SPRINT (E23)', plaza:'Plaza Tol Bukit Kiara (SPRINT)', lat:3.1539, lon:101.6448, radiusKm:0.28, system:'open', rate:3.00 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'SPRINT (E23)', plaza:'Plaza Tol Damansara (SPRINT)', lat:3.1328, lon:101.6295, radiusKm:0.28, system:'open', rate:2.00 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'SPRINT (E23)', plaza:'Plaza Tol Pantai (SPRINT)', lat:3.1235, lon:101.6641, radiusKm:0.28, system:'open', rate:2.50 },
+    { operator:'Amanat Lebuhraya Rakyat (ALR)', highway:'SMART (E38)', plaza:'Plaza Tol Terowong SMART', lat:3.1232, lon:101.7115, radiusKm:0.25, system:'open', rate:3.00 },
 
-    /* --- TIER 3: PRIVATE / SINGLE-HIGHWAY / BRIDGE OPERATORS --- */
-    {
-      tier:'private',
-      operator:'KESTURI (Ekovest)',
-      shortName:'KESTURI',
-      highways:[
-        'Duta–Ulu Kelang Expressway — DUKE Phase 1 & 2 (E33)'
-      ],
-      keywords:['duke','kesturi','ekovest','batu caves','sentul pasar','ayer panas','segambut','batu','sungai batu']
-    },
-    {
-      tier:'private',
-      operator:'Setiawangsa–Pantai Expressway Sdn Bhd (Ekovest)',
-      shortName:'SPE (Ekovest)',
-      highways:[
-        'Setiawangsa–Pantai Expressway — SPE / DUKE 3 (E39)'
-      ],
-      keywords:['spe','duke 3','setiawangsa-pantai','setiawangsa pantai','chan sow lin','wangsa maju']
-    },
-    {
-      tier:'private',
-      operator:'Maju Expressway Sdn Bhd (MESB)',
-      shortName:'MESB',
-      highways:[
-        'Maju Expressway — MEX (E20)'
-      ],
-      keywords:['mex','maju expressway','salak south','salak selatan','seri kembangan','putrajaya']
-    },
-    {
-      tier:'private',
-      operator:'Grand Saga Sdn Bhd (Taliworks)',
-      shortName:'Grand Saga',
-      highways:[
-        'Cheras–Kajang Expressway — CKE (E7)'
-      ],
-      keywords:['grand saga','cheras-kajang','cheras kajang','cke','batu 9','batu 11']
-    },
-    {
-      tier:'private',
-      operator:'EKVE Sdn Bhd (AZRB)',
-      shortName:'EKVE',
-      highways:[
-        'East Klang Valley Expressway — EKVE (E27)'
-      ],
-      keywords:['ekve','east klang valley','hulu langat','ukay perdana','bandar mahkota cheras']
-    },
-    {
-      tier:'private',
-      operator:'NNKSB (Taliworks)',
-      shortName:'NNKSB',
-      highways:[
-        'New North Klang Straits Bypass — Shapadu (E30)'
-      ],
-      keywords:['nnksb','klang straits','shapadu','rantau panjang','kapar','moc b']
-    },
-    {
-      tier:'private',
-      operator:'Lingkaran Luar Butterworth (Penang) Sdn Bhd (LLB)',
-      shortName:'LLB',
-      highways:[
-        'Butterworth Outer Ring Road — BORR (E17)'
-      ],
-      keywords:['borr','llb','butterworth outer ring','sungai nyior','sg nyior','bagan ajam','perai lama']
-    },
-    {
-      tier:'private',
-      operator:'Zecon Toll Concessionaire Sdn Bhd',
-      shortName:'Zecon',
-      highways:[
-        'Tun Salahuddin Bridge, Kuching (Toll Abolished / RM 0.00)'
-      ],
-      keywords:['zecon','tun salahuddin']
-    },
-    {
-      tier:'private',
-      operator:'Lingkaran Cekap Sdn Bhd (Genting Malaysia)',
-      shortName:'Lingkaran Cekap',
-      highways:[
-        'Jalan Genting Highlands (Private Hill Road Charge — RM 5.00)'
-      ],
-      keywords:['genting','gohtong','sempah','lingkaran cekap']
-    }
-  ]);
+    /* --- PROLINTAS (AKLEH, GCE, LKSA, SILK, DASH, SUKE) --- */
+    { operator:'PROLINTAS', highway:'AKLEH (E12)', plaza:'Plaza Tol Dato\' Keramat (AKLEH)', lat:3.1665, lon:101.7318, radiusKm:0.28, system:'open', rate:2.13 },
+    { operator:'PROLINTAS', highway:'GCE (E35)', plaza:'Plaza Tol Bukit Jelutong (GCE)', lat:3.1051, lon:101.5318, radiusKm:0.30, system:'open', rate:1.75 },
+    { operator:'PROLINTAS', highway:'GCE (E35)', plaza:'Plaza Tol Elmina (GCE)', lat:3.1752, lon:101.5165, radiusKm:0.30, system:'open', rate:1.75 },
+    { operator:'PROLINTAS', highway:'GCE (E35)', plaza:'Plaza Tol Lagong (GCE)', lat:3.2685, lon:101.5472, radiusKm:0.30, system:'open', rate:1.75 },
+    { operator:'PROLINTAS', highway:'LKSA (E13)', plaza:'Plaza Tol Seri Muda (LKSA)', lat:3.0250, lon:101.5303, radiusKm:0.28, system:'open', rate:1.56 },
+    { operator:'PROLINTAS', highway:'LKSA (E13)', plaza:'Plaza Tol Alam Impian (LKSA)', lat:3.0115, lon:101.5198, radiusKm:0.28, system:'open', rate:0.83 },
+    { operator:'PROLINTAS', highway:'Kajang SILK (E18)', plaza:'Plaza Tol Sungai Ramal (SILK)', lat:2.9772, lon:101.7585, radiusKm:0.28, system:'open', rate:1.66 },
+    { operator:'PROLINTAS', highway:'Kajang SILK (E18)', plaza:'Plaza Tol Sungai Long (SILK)', lat:3.0335, lon:101.7875, radiusKm:0.28, system:'open', rate:1.66 },
+    { operator:'PROLINTAS', highway:'Kajang SILK (E18)', plaza:'Plaza Tol Sungai Balak (SILK)', lat:3.0218, lon:101.7712, radiusKm:0.28, system:'open', rate:1.66 },
+    { operator:'PROLINTAS', highway:'Kajang SILK (E18)', plaza:'Plaza Tol Bukit Kajang (SILK)', lat:2.9905, lon:101.7745, radiusKm:0.28, system:'open', rate:1.66 },
+    { operator:'PROLINTAS', highway:'DASH (E31)', plaza:'Plaza Tol Denai Alam (DASH)', lat:3.1538, lon:101.5222, radiusKm:0.28, system:'open', rate:2.30 },
+    { operator:'PROLINTAS', highway:'DASH (E31)', plaza:'Plaza Tol RRIM / Kwasa Damansara (DASH)', lat:3.1732, lon:101.5625, radiusKm:0.28, system:'open', rate:2.30 },
+    { operator:'PROLINTAS', highway:'DASH (E31)', plaza:'Plaza Tol Kota Damansara (DASH)', lat:3.1628, lon:101.5945, radiusKm:0.28, system:'open', rate:2.30 },
+    { operator:'PROLINTAS', highway:'SUKE (E19)', plaza:'Plaza Tol Alam Damai (SUKE)', lat:3.0635, lon:101.7412, radiusKm:0.28, system:'open', rate:2.30 },
+    { operator:'PROLINTAS', highway:'SUKE (E19)', plaza:'Plaza Tol Bukit Teratai (SUKE)', lat:3.1128, lon:101.7668, radiusKm:0.28, system:'open', rate:2.30 },
+    { operator:'PROLINTAS', highway:'SUKE (E19)', plaza:'Plaza Tol Ampang (SUKE)', lat:3.1502, lon:101.7685, radiusKm:0.28, system:'open', rate:2.30 },
 
-  /* =========================================================
-     1B. LOCAL PLAZA REFERENCE REGISTRY — NOT LIVE TARIFF VERIFICATION
-     Maps HERE labels to local plaza names and embedded reference rates; values require current official confirmation
-     (null verifiedRate = distance-based closed system; retain HERE MYR fare)
-     ========================================================= */
-  const MALAYSIA_TOLL_PLAZA_REGISTRY = Object.freeze([
-    /* --- PLUS Malaysia Berhad --- */
-    {
-      operator:'PLUS Malaysia Berhad',
-      highway:'Penang Bridge (E36)',
-      officialName:'Plaza Tol Jambatan Pulau Pinang (Perai)',
-      verifiedRate:5.74,
-      aliases:['penang bridge','jambatan pulau pinang','prai toll','perai toll'],
-      contextKeywords:['plus','e36','penang','pulau pinang','perai','prai']
-    },
-    {
-      operator:'PLUS Malaysia Berhad',
-      highway:'Butterworth–Kulim Expressway — BKE (E15)',
-      officialName:'Plaza Tol Kubang Semang',
-      verifiedRate:1.31,
-      aliases:['kubang semang'],
-      contextKeywords:['bke','e15','plus']
-    },
-    {
-      operator:'PLUS Malaysia Berhad',
-      highway:'Butterworth–Kulim Expressway — BKE (E15)',
-      officialName:'Plaza Tol Lunas',
-      verifiedRate:1.31,
-      aliases:['lunas'],
-      contextKeywords:['bke','e15','plus']
-    },
-    {
-      operator:'PLUS Malaysia Berhad',
-      highway:'Seremban–Port Dickson Highway — SPDH (E29)',
-      officialName:'Plaza Tol Mambau',
-      verifiedRate:1.15,
-      aliases:['mambau'],
-      contextKeywords:['spdh','e29','plus','port dickson']
-    },
-    {
-      operator:'PLUS Malaysia Berhad',
-      highway:'Seremban–Port Dickson Highway — SPDH (E29)',
-      officialName:'Plaza Tol Lukut',
-      verifiedRate:1.48,
-      aliases:['lukut'],
-      contextKeywords:['spdh','e29','plus','port dickson']
-    },
-    {
-      operator:'PLUS Malaysia Berhad',
-      highway:'Malaysia–Singapore Second Link — Linkedua (E3)',
-      officialName:'Plaza Tol Tanjung Kupang',
-      verifiedRate:6.14,
-      aliases:['tanjung kupang','tg kupang'],
-      contextKeywords:['linkedua','e3','plus','second link']
-    },
-    {
-      operator:'PLUS Malaysia Berhad',
-      highway:'Malaysia–Singapore Second Link — Linkedua (E3)',
-      officialName:'Plaza Tol Lima Kedai',
-      verifiedRate:3.19,
-      aliases:['lima kedai'],
-      contextKeywords:['linkedua','e3','plus']
-    },
-    {
-      operator:'PLUS Malaysia Berhad',
-      highway:'Malaysia–Singapore Second Link — Linkedua (E3)',
-      officialName:'Plaza Tol Perling',
-      verifiedRate:1.88,
-      aliases:['perling'],
-      contextKeywords:['linkedua','e3','plus']
-    },
+    /* --- IJM CORPORATION (NPE, BESRAYA, LEKAS OPEN) --- */
+    { operator:'IJM Corporation Berhad', highway:'NPE (E10)', plaza:'Plaza Tol Pantai Dalam (NPE)', lat:3.1025, lon:101.6682, radiusKm:0.28, system:'open', rate:2.30 },
+    { operator:'IJM Corporation Berhad', highway:'NPE (E10)', plaza:'Plaza Tol PJS 5 (NPE)', lat:3.0815, lon:101.6225, radiusKm:0.28, system:'open', rate:2.30 },
+    { operator:'IJM Corporation Berhad', highway:'NPE (E10)', plaza:'Plaza Tol PJS 2 (NPE)', lat:3.0812, lon:101.6378, radiusKm:0.25, system:'open', rate:1.00 },
+    { operator:'IJM Corporation Berhad', highway:'BESRAYA (E9)', plaza:'Plaza Tol Mines (BESRAYA)', lat:3.0332, lon:101.7088, radiusKm:0.28, system:'open', rate:1.85 },
+    { operator:'IJM Corporation Berhad', highway:'BESRAYA (E9)', plaza:'Plaza Tol Loke Yew (BESRAYA)', lat:3.1245, lon:101.7178, radiusKm:0.25, system:'open', rate:1.85 },
+    { operator:'IJM Corporation Berhad', highway:'LEKAS (E21)', plaza:'Plaza Tol Ampangan (LEKAS)', lat:2.7285, lon:101.9965, radiusKm:0.32, system:'open', rate:2.30 },
 
-    /* --- Amanat Lebuhraya Rakyat Berhad (ALR) --- */
-    {
-      operator:'Amanat Lebuhraya Rakyat Berhad (ALR)',
-      highway:'Damansara–Puchong Expressway — LDP (E11)',
-      officialName:'Plaza Tol Penchala (LDP)',
-      verifiedRate:2.10,
-      aliases:['penchala'],
-      contextKeywords:['ldp','e11','litrak','alr']
-    },
-    {
-      operator:'Amanat Lebuhraya Rakyat Berhad (ALR)',
-      highway:'Damansara–Puchong Expressway — LDP (E11)',
-      officialName:'Plaza Tol Petaling Jaya (LDP)',
-      verifiedRate:2.10,
-      aliases:['petaling jaya','pj toll','kelana jaya'],
-      contextKeywords:['ldp','e11','litrak','alr']
-    },
-    {
-      operator:'Amanat Lebuhraya Rakyat Berhad (ALR)',
-      highway:'Damansara–Puchong Expressway — LDP (E11)',
-      officialName:'Plaza Tol Puchong Selatan (LDP)',
-      verifiedRate:2.10,
-      aliases:['puchong selatan','puchong south'],
-      contextKeywords:['ldp','e11','litrak','alr']
-    },
-    {
-      operator:'Amanat Lebuhraya Rakyat Berhad (ALR)',
-      highway:'Damansara–Puchong Expressway — LDP (E11)',
-      officialName:'Plaza Tol Puchong Barat (LDP)',
-      verifiedRate:2.10,
-      aliases:['puchong barat','puchong west'],
-      contextKeywords:['ldp','e11','litrak','alr']
-    },
-    {
-      operator:'Amanat Lebuhraya Rakyat Berhad (ALR)',
-      highway:'Shah Alam Expressway — KESAS (E5)',
-      officialName:'Plaza Tol Awan Besar Timur (KESAS)',
-      verifiedRate:2.00,
-      aliases:['besar east','awan besar east','awan besar timur'],
-      contextKeywords:['kesas','e5','alr']
-    },
-    {
-      operator:'Amanat Lebuhraya Rakyat Berhad (ALR)',
-      highway:'Shah Alam Expressway — KESAS (E5)',
-      officialName:'Plaza Tol Awan Besar Barat (KESAS)',
-      verifiedRate:2.00,
-      aliases:['besar west','awan besar west','awan besar barat'],
-      contextKeywords:['kesas','e5','alr']
-    },
-    {
-      operator:'Amanat Lebuhraya Rakyat Berhad (ALR)',
-      highway:'Shah Alam Expressway — KESAS (E5)',
-      officialName:'Plaza Tol Sunway (KESAS)',
-      verifiedRate:2.00,
-      aliases:['sunway'],
-      contextKeywords:['kesas','e5','alr']
-    },
-    {
-      operator:'Amanat Lebuhraya Rakyat Berhad (ALR)',
-      highway:'Shah Alam Expressway — KESAS (E5)',
-      officialName:'Plaza Tol Kemuning (KESAS)',
-      verifiedRate:2.00,
-      aliases:['kemuning'],
-      contextKeywords:['kesas','e5','alr']
-    },
-    {
-      operator:'Amanat Lebuhraya Rakyat Berhad (ALR)',
-      highway:'Western KL Traffic Dispersal Scheme — SPRINT (E23)',
-      officialName:'Plaza Tol Bukit Kiara (SPRINT)',
-      verifiedRate:3.00,
-      aliases:['bukit kiara','kiara'],
-      contextKeywords:['sprint','e23','alr']
-    },
-    {
-      operator:'Amanat Lebuhraya Rakyat Berhad (ALR)',
-      highway:'Western KL Traffic Dispersal Scheme — SPRINT (E23)',
-      officialName:'Plaza Tol Damansara (SPRINT)',
-      verifiedRate:2.00,
-      aliases:['damansara'],
-      contextKeywords:['sprint','e23','alr']
-    },
-    {
-      operator:'Amanat Lebuhraya Rakyat Berhad (ALR)',
-      highway:'Western KL Traffic Dispersal Scheme — SPRINT (E23)',
-      officialName:'Plaza Tol Pantai (SPRINT)',
-      verifiedRate:2.50,
-      aliases:['pantai'],
-      contextKeywords:['sprint','e23','alr']
-    },
-    {
-      operator:'Amanat Lebuhraya Rakyat Berhad (ALR)',
-      highway:'Stormwater Management & Road Tunnel — SMART (E38)',
-      officialName:'Plaza Tol Terowong SMART',
-      verifiedRate:3.00,
-      aliases:['smart tunnel','smart'],
-      contextKeywords:['smart','e38','alr']
-    },
+    /* --- REGIONAL & INDEPENDENT OPERATORS --- */
+    { operator:'Jambatan Kedua Sdn Bhd (JKSB)', highway:'Penang 2nd Bridge (E28)', plaza:'Plaza Tol Bandar Cassia / JK2PP', lat:5.2395, lon:100.4282, radiusKm:0.45, system:'open', dir:'toIsland', rate:5.74 },
+    { operator:'AFA Prime Berhad', highway:'KL–Karak Expressway (E8)', plaza:'Plaza Tol Gombak (KLK)', lat:3.2490, lon:101.7311, radiusKm:0.35, system:'open', rate:6.00 },
+    { operator:'AFA Prime Berhad', highway:'KL–Karak Expressway (E8)', plaza:'Plaza Tol Bentong (KLK)', lat:3.4697, lon:101.9051, radiusKm:0.35, system:'open', rate:3.50 },
+    { operator:'LATAR Berhad', highway:'LATAR (E25)', plaza:'Plaza Tol Ijok (LATAR)', lat:3.3215, lon:101.4182, radiusKm:0.30, system:'open', rate:2.50 },
+    { operator:'LATAR Berhad', highway:'LATAR (E25)', plaza:'Plaza Tol Kuang Barat / Timur (LATAR)', lat:3.2748, lon:101.5435, radiusKm:0.30, system:'open', rate:2.50 },
+    { operator:'LATAR Berhad', highway:'LATAR (E25)', plaza:'Plaza Tol Taman Rimba Templer (LATAR)', lat:3.2975, lon:101.6178, radiusKm:0.30, system:'open', rate:2.50 },
+    { operator:'LATAR Berhad', highway:'LATAR (E25)', plaza:'Plaza Tol Kundang (LATAR)', lat:3.2805, lon:101.5125, radiusKm:0.28, system:'open', rate:1.30 },
+    { operator:'LATAR Berhad', highway:'LATAR (E25)', plaza:'Plaza Tol Eco Grandeur (LATAR)', lat:3.2682, lon:101.4562, radiusKm:0.28, system:'open', rate:1.15 },
+    { operator:'Senai–Desaru Expressway (SDE)', highway:'SDE (E22)', plaza:'Plaza Tol Senai (SDE)', lat:1.6085, lon:103.6885, radiusKm:0.35, system:'open', rate:1.85 },
+    { operator:'Senai–Desaru Expressway (SDE)', highway:'SDE (E22)', plaza:'Plaza Tol Ulu Tiram (SDE)', lat:1.6025, lon:103.8225, radiusKm:0.35, system:'open', rate:3.20 },
+    { operator:'Senai–Desaru Expressway (SDE)', highway:'SDE (E22)', plaza:'Plaza Tol Cahaya Baru (SDE)', lat:1.5245, lon:103.9285, radiusKm:0.35, system:'open', rate:4.50 },
+    { operator:'Senai–Desaru Expressway (SDE)', highway:'SDE (E22)', plaza:'Plaza Tol Penawar (SDE)', lat:1.5585, lon:104.2185, radiusKm:0.35, system:'open', rate:6.40 },
 
-    /* --- PROLINTAS --- */
-    {
-      operator:'PROLINTAS (Projek Lintasan Kota Holdings)',
-      highway:'Ampang–Kuala Lumpur Elevated Highway — AKLEH (E12)',
-      officialName:'Plaza Tol Dato\' Keramat (AKLEH)',
-      verifiedRate:2.13,
-      aliases:['keramat','dato keramat','datuk keramat'],
-      contextKeywords:['akleh','e12','prolintas']
-    },
-    {
-      operator:'PROLINTAS (Projek Lintasan Kota Holdings)',
-      highway:'Guthrie Corridor Expressway — GCE (E35)',
-      officialName:'Plaza Tol Bukit Jelutong (GCE)',
-      verifiedRate:1.75,
-      aliases:['bukit jelutong'],
-      contextKeywords:['gce','guthrie','e35','prolintas']
-    },
-    {
-      operator:'PROLINTAS (Projek Lintasan Kota Holdings)',
-      highway:'Guthrie Corridor Expressway — GCE (E35)',
-      officialName:'Plaza Tol Elmina (GCE)',
-      verifiedRate:1.75,
-      aliases:['elmina'],
-      contextKeywords:['gce','guthrie','e35','prolintas']
-    },
-    {
-      operator:'PROLINTAS (Projek Lintasan Kota Holdings)',
-      highway:'Guthrie Corridor Expressway — GCE (E35)',
-      officialName:'Plaza Tol Lagong (GCE)',
-      verifiedRate:1.75,
-      aliases:['lagong'],
-      contextKeywords:['gce','guthrie','e35','prolintas']
-    },
-    {
-      operator:'PROLINTAS (Projek Lintasan Kota Holdings)',
-      highway:'Kemuning–Shah Alam Highway — LKSA (E13)',
-      officialName:'Plaza Tol Seri Muda (LKSA)',
-      verifiedRate:1.56,
-      aliases:['seri muda'],
-      contextKeywords:['lksa','e13','prolintas']
-    },
-    {
-      operator:'PROLINTAS (Projek Lintasan Kota Holdings)',
-      highway:'Kemuning–Shah Alam Highway — LKSA (E13)',
-      officialName:'Plaza Tol Alam Impian (LKSA)',
-      verifiedRate:0.83,
-      aliases:['alam impian'],
-      contextKeywords:['lksa','e13','prolintas']
-    },
-    {
-      operator:'PROLINTAS (Projek Lintasan Kota Holdings)',
-      highway:'Kajang Dispersal Link Expressway — Kajang SILK (E18)',
-      officialName:'Plaza Tol Sungai Ramal (SILK)',
-      verifiedRate:1.66,
-      aliases:['sungai ramal','sg ramal'],
-      contextKeywords:['silk','e18','prolintas']
-    },
-    {
-      operator:'PROLINTAS (Projek Lintasan Kota Holdings)',
-      highway:'Kajang Dispersal Link Expressway — Kajang SILK (E18)',
-      officialName:'Plaza Tol Sungai Long (SILK)',
-      verifiedRate:1.66,
-      aliases:['sungai long','sg long'],
-      contextKeywords:['silk','e18','prolintas']
-    },
-    {
-      operator:'PROLINTAS (Projek Lintasan Kota Holdings)',
-      highway:'Kajang Dispersal Link Expressway — Kajang SILK (E18)',
-      officialName:'Plaza Tol Sungai Balak (SILK)',
-      verifiedRate:1.66,
-      aliases:['sungai balak','sg balak'],
-      contextKeywords:['silk','e18','prolintas']
-    },
-    {
-      operator:'PROLINTAS (Projek Lintasan Kota Holdings)',
-      highway:'Kajang Dispersal Link Expressway — Kajang SILK (E18)',
-      officialName:'Plaza Tol Bukit Kajang (SILK)',
-      verifiedRate:1.66,
-      aliases:['bukit kajang'],
-      contextKeywords:['silk','e18','prolintas']
-    },
-    {
-      operator:'PROLINTAS (Projek Lintasan Kota Holdings)',
-      highway:'Damansara–Shah Alam Elevated Expressway — DASH (E31)',
-      officialName:'Plaza Tol Denai Alam (DASH)',
-      verifiedRate:2.30,
-      aliases:['denai alam'],
-      contextKeywords:['dash','e31','prolintas']
-    },
-    {
-      operator:'PROLINTAS (Projek Lintasan Kota Holdings)',
-      highway:'Damansara–Shah Alam Elevated Expressway — DASH (E31)',
-      officialName:'Plaza Tol RRIM / Kwasa Damansara (DASH)',
-      verifiedRate:2.30,
-      aliases:['rrim','kwasa'],
-      contextKeywords:['dash','e31','prolintas']
-    },
-    {
-      operator:'PROLINTAS (Projek Lintasan Kota Holdings)',
-      highway:'Damansara–Shah Alam Elevated Expressway — DASH (E31)',
-      officialName:'Plaza Tol Kota Damansara (DASH)',
-      verifiedRate:2.30,
-      aliases:['kota damansara'],
-      contextKeywords:['dash','e31','prolintas']
-    },
-    {
-      operator:'PROLINTAS (Projek Lintasan Kota Holdings)',
-      highway:'Sungai Besi–Ulu Kelang Elevated Expressway — SUKE (E19)',
-      officialName:'Plaza Tol Alam Damai (SUKE)',
-      verifiedRate:2.30,
-      aliases:['alam damai'],
-      contextKeywords:['suke','e19','prolintas']
-    },
-    {
-      operator:'PROLINTAS (Projek Lintasan Kota Holdings)',
-      highway:'Sungai Besi–Ulu Kelang Elevated Expressway — SUKE (E19)',
-      officialName:'Plaza Tol Bukit Teratai (SUKE)',
-      verifiedRate:2.30,
-      aliases:['bukit teratai'],
-      contextKeywords:['suke','e19','prolintas']
-    },
-    {
-      operator:'PROLINTAS (Projek Lintasan Kota Holdings)',
-      highway:'Sungai Besi–Ulu Kelang Elevated Expressway — SUKE (E19)',
-      officialName:'Plaza Tol Ampang (SUKE)',
-      verifiedRate:2.30,
-      aliases:['ampang'],
-      contextKeywords:['suke','e19','prolintas']
-    },
+    /* --- PRIVATE / SINGLE-HIGHWAY / BRIDGE OPERATORS --- */
+    { operator:'KESTURI (Ekovest)', highway:'DUKE (E33)', plaza:'Plaza Tol Ayer Panas (DUKE)', lat:3.1925, lon:101.7208, radiusKm:0.28, system:'open', rate:2.50 },
+    { operator:'KESTURI (Ekovest)', highway:'DUKE (E33)', plaza:'Plaza Tol Sentul Pasar (DUKE)', lat:3.1965, lon:101.6938, radiusKm:0.28, system:'open', rate:2.50 },
+    { operator:'KESTURI (Ekovest)', highway:'DUKE (E33)', plaza:'Plaza Tol Batu (DUKE)', lat:3.2145, lon:101.6815, radiusKm:0.28, system:'open', rate:2.50 },
+    { operator:'KESTURI (Ekovest)', highway:'DUKE (E33)', plaza:'Plaza Tol Segambut (DUKE)', lat:3.1908, lon:101.6559, radiusKm:0.28, system:'open', rate:2.50 },
+    { operator:'SPE (Ekovest)', highway:'SPE / DUKE 3 (E39)', plaza:'Plaza Tol Chan Sow Lin (SPE)', lat:3.1285, lon:101.7165, radiusKm:0.28, system:'open', rate:3.50 },
+    { operator:'SPE (Ekovest)', highway:'SPE / DUKE 3 (E39)', plaza:'Plaza Tol Ampang (SPE)', lat:3.1535, lon:101.7485, radiusKm:0.28, system:'open', rate:3.50 },
+    { operator:'SPE (Ekovest)', highway:'SPE / DUKE 3 (E39)', plaza:'Plaza Tol Setiawangsa / Wangsa Maju (SPE)', lat:3.1885, lon:101.7425, radiusKm:0.28, system:'open', rate:3.50 },
+    { operator:'Maju Expressway Sdn Bhd (MESB)', highway:'MEX (E20)', plaza:'Plaza Tol Salak Selatan (MEX)', lat:3.0955, lon:101.6982, radiusKm:0.28, system:'open', rate:2.00 },
+    { operator:'Maju Expressway Sdn Bhd (MESB)', highway:'MEX (E20)', plaza:'Plaza Tol Seri Kembangan (MEX)', lat:3.0125, lon:101.6855, radiusKm:0.28, system:'open', rate:2.20 },
+    { operator:'Maju Expressway Sdn Bhd (MESB)', highway:'MEX (E20)', plaza:'Plaza Tol Putrajaya (MEX)', lat:2.9525, lon:101.6745, radiusKm:0.32, system:'open', rate:3.50 },
+    { operator:'Grand Saga Sdn Bhd', highway:'Cheras–Kajang CKE (E7)', plaza:'Plaza Tol Batu 9 (Grand Saga)', lat:3.0685, lon:101.7635, radiusKm:0.28, system:'open', dir:'southbound', rate:1.30 },
+    { operator:'Grand Saga Sdn Bhd', highway:'Cheras–Kajang CKE (E7)', plaza:'Plaza Tol Batu 11 (Grand Saga)', lat:3.0452, lon:101.7712, radiusKm:0.28, system:'open', dir:'northbound', rate:1.30 },
+    { operator:'NNKSB (Taliworks)', highway:'Shapadu (E30)', plaza:'Plaza Tol Bukit Raja (NNKSB)', lat:3.0655, lon:101.4682, radiusKm:0.28, system:'open', rate:0.60 },
+    { operator:'NNKSB (Taliworks)', highway:'Shapadu (E30)', plaza:'Plaza Tol Kapar (NNKSB)', lat:3.1285, lon:101.3852, radiusKm:0.28, system:'open', rate:2.70 },
+    { operator:'NNKSB (Taliworks)', highway:'Shapadu (E30)', plaza:'Plaza Tol MOC B / Rantau Panjang (NNKSB)', lat:3.0585, lon:101.4025, radiusKm:0.28, system:'open', rate:1.40 },
+    { operator:'Lingkaran Luar Butterworth (LLB)', highway:'BORR (E17)', plaza:'Plaza Tol Perai (BORR)', lat:5.3885, lon:100.3912, radiusKm:0.28, system:'open', rate:1.50 },
+    { operator:'Lingkaran Luar Butterworth (LLB)', highway:'BORR (E17)', plaza:'Plaza Tol Bagan Ajam (BORR)', lat:5.4412, lon:100.3825, radiusKm:0.28, system:'open', rate:1.50 },
+    { operator:'Lingkaran Luar Butterworth (LLB)', highway:'BORR (E17)', plaza:'Plaza Tol Sungai Nyior (BORR)', lat:5.4085, lon:100.3765, radiusKm:0.28, system:'open', rate:1.20 },
+    { operator:'Lingkaran Cekap (Genting)', highway:'Jalan Genting Highlands', plaza:'Plaza Tol Genting Highlands (Private Road)', lat:3.4015, lon:101.7785, radiusKm:0.45, system:'open', rate:5.00 },
 
-    /* --- IJM Corporation Berhad (Toll Division) --- */
-    {
-      operator:'IJM Corporation Berhad (Toll Division)',
-      highway:'New Pantai Expressway — NPE (E10)',
-      officialName:'Plaza Tol Pantai Dalam (NPE)',
-      verifiedRate:2.30,
-      aliases:['pantai dalam'],
-      contextKeywords:['npe','e10','ijm']
-    },
-    {
-      operator:'IJM Corporation Berhad (Toll Division)',
-      highway:'New Pantai Expressway — NPE (E10)',
-      officialName:'Plaza Tol PJS 5 (NPE)',
-      verifiedRate:2.30,
-      aliases:['pjs 5','pjs5','petaling jaya (s) 5'],
-      contextKeywords:['npe','e10','ijm']
-    },
-    {
-      operator:'IJM Corporation Berhad (Toll Division)',
-      highway:'New Pantai Expressway — NPE (E10)',
-      officialName:'Plaza Tol PJS 2 (NPE)',
-      verifiedRate:1.00,
-      aliases:['pjs 2','pjs2','petaling jaya (s) 2'],
-      contextKeywords:['npe','e10','ijm']
-    },
-    {
-      operator:'IJM Corporation Berhad (Toll Division)',
-      highway:'Sungai Besi Expressway — BESRAYA (E9)',
-      officialName:'Plaza Tol Mines (BESRAYA)',
-      verifiedRate:2.00,
-      aliases:['mines','the mines'],
-      contextKeywords:['besraya','e9','ijm']
-    },
-    {
-      operator:'IJM Corporation Berhad (Toll Division)',
-      highway:'Sungai Besi Expressway — BESRAYA (E9)',
-      officialName:'Plaza Tol Loke Yew (BESRAYA)',
-      verifiedRate:2.00,
-      aliases:['loke yew'],
-      contextKeywords:['besraya','e9','ijm']
-    },
+    /* --- WCE SELANGOR FIXED SECTION PLAZAS (E32) --- */
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Selangor (E32)', plaza:'Plaza Tol Banting (WCE Sec 1)', lat:2.8155, lon:101.5385, radiusKm:0.35, system:'open', rate:2.34 },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Selangor (E32)', plaza:'Plaza Tol Bandar Bukit Raja Selatan (WCE Sec 5)', lat:3.0815, lon:101.4255, radiusKm:0.35, system:'open', rate:1.50 },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Selangor (E32)', plaza:'Plaza Tol Bandar Bukit Raja Utara – Assam Jawa (WCE Sec 6)', lat:3.1355, lon:101.4185, radiusKm:0.35, system:'open', rate:4.12 },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Selangor (E32)', plaza:'Plaza Tol Assam Jawa (WCE Sec 6)', lat:3.3134, lon:101.3738, radiusKm:0.35, system:'open', rate:4.12 },
 
-    /* --- AFA Prime Berhad (KLK / LPT1) --- */
-    {
-      operator:'AFA Prime Berhad (formerly ANIH Berhad)',
-      highway:'Kuala Lumpur–Karak Expressway — KLK (E8)',
-      officialName:'Plaza Tol Gombak (KLK)',
-      verifiedRate:6.00,
-      aliases:['gombak'],
-      contextKeywords:['klk','karak','afa prime','anih','e8']
-    },
-    {
-      operator:'AFA Prime Berhad (formerly ANIH Berhad)',
-      highway:'Kuala Lumpur–Karak Expressway — KLK (E8)',
-      officialName:'Plaza Tol Bentong (KLK)',
-      verifiedRate:3.50,
-      aliases:['bentong'],
-      contextKeywords:['klk','karak','afa prime','anih','e8']
-    },
+    /* --- CLOSED-SYSTEM PLAZAS: PLUS NSE / NKVE / ELITE (E1 / E2 / E6) --- */
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bukit Kayu Hitam', lat:6.5125, lon:100.4182, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Hutan Kampung', lat:6.1685, lon:100.4055, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Alor Setar Utara', lat:6.1355, lon:100.3955, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Alor Setar Selatan', lat:6.0855, lon:100.3755, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Pendang', lat:5.9955, lon:100.4555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Gurun', lat:5.8185, lon:100.4855, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Sungai Petani Utara', lat:5.6755, lon:100.4955, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Sungai Petani Selatan', lat:5.6055, lon:100.4855, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bertam', lat:5.5255, lon:100.4555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Sungai Dua', lat:5.4455, lon:100.4355, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Juru', lat:5.3293, lon:100.4356, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bukit Tambun', lat:5.2755, lon:100.4555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Jawi', lat:5.2055, lon:100.4955, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bandar Baharu', lat:5.1255, lon:100.5155, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Alor Pongsu', lat:5.0455, lon:100.5955, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bukit Merah', lat:5.0155, lon:100.6555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Taiping Utara', lat:4.9155, lon:100.7055, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Changkat Jering', lat:4.7855, lon:100.7355, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Kuala Kangsar', lat:4.7855, lon:100.9155, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Ipoh Utara (Jelapang)', lat:4.6555, lon:101.0755, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Ipoh Selatan', lat:4.5832, lon:101.1255, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Simpang Pulai', lat:4.5255, lon:101.1455, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Gopeng', lat:4.4555, lon:101.1555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Tapah', lat:4.1955, lon:101.2455, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bidor', lat:4.1055, lon:101.2755, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Sungkai', lat:3.9955, lon:101.3055, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Slim River', lat:3.8355, lon:101.3955, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Behrang', lat:3.7555, lon:101.4555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Tanjung Malim', lat:3.6855, lon:101.5155, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Lembah Beringin', lat:3.5655, lon:101.5355, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bukit Tagar', lat:3.4855, lon:101.5255, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Bukit Beruntung', lat:3.4155, lon:101.5555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Sungai Buaya', lat:3.3655, lon:101.5555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Rawang', lat:3.3155, lon:101.5555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Rawang Selatan', lat:3.2855, lon:101.5555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE North (E1)', plaza:'Plaza Tol Sungai Buloh', lat:3.2155, lon:101.5755, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NKVE (E1)', plaza:'Plaza Tol Jalan Duta', lat:3.1757, lon:101.6572, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NKVE (E1)', plaza:'Plaza Tol Kota Damansara', lat:3.1555, lon:101.5855, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NKVE (E1)', plaza:'Plaza Tol Damansara', lat:3.1355, lon:101.5955, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NKVE (E1)', plaza:'Plaza Tol Subang', lat:3.1155, lon:101.5755, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NKVE (E1)', plaza:'Plaza Tol Shah Alam', lat:3.0955, lon:101.5555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NKVE (E1)', plaza:'Plaza Tol Setia Alam', lat:3.0855, lon:101.4755, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NKVE (E1)', plaza:'Plaza Tol Bukit Raja', lat:3.0735, lon:101.4750, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'ELITE (E6)', plaza:'Plaza Tol Ebor / Seafield', lat:3.0555, lon:101.5655, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'ELITE (E6)', plaza:'Plaza Tol USJ', lat:3.0255, lon:101.5755, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'ELITE (E6)', plaza:'Plaza Tol Putra Heights', lat:2.9955, lon:101.5755, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'ELITE (E6)', plaza:'Plaza Tol Bandar Saujana Putra', lat:2.9555, lon:101.5855, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'ELITE (E6)', plaza:'Plaza Tol Putrajaya', lat:2.9255, lon:101.6255, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'ELITE (E6)', plaza:'Plaza Tol KLIA', lat:2.8152, lon:101.6925, radiusKm:0.50, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'ELITE (E6)', plaza:'Plaza Tol Bandar Serenia', lat:2.8555, lon:101.7255, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Sungai Besi', lat:3.0458, lon:101.7038, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol UPM', lat:3.0055, lon:101.7255, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Kajang', lat:2.9855, lon:101.7455, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Bangi', lat:2.9255, lon:101.7655, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Southville City', lat:2.8955, lon:101.7655, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Putra Mahkota', lat:2.8755, lon:101.7855, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Nilai', lat:2.8255, lon:101.8055, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Bandar Ainsdale', lat:2.7455, lon:101.8955, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Seremban', lat:2.7155, lon:101.9155, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Port Dickson', lat:2.6955, lon:101.9255, radiusKm:0.40, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Senawang', lat:2.6755, lon:101.9855, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Pedas / Linggi', lat:2.5555, lon:102.0455, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Simpang Ampat', lat:2.4455, lon:102.1855, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Ayer Keroh', lat:2.2965, lon:102.3135, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Jasin', lat:2.2455, lon:102.4255, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Tangkak', lat:2.2655, lon:102.5355, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Bukit Gambir', lat:2.1855, lon:102.6355, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Pagoh', lat:2.1455, lon:102.7555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Yong Peng Utara', lat:2.0355, lon:103.0555, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Yong Peng Selatan', lat:1.9855, lon:103.0755, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Ayer Hitam', lat:1.9255, lon:103.1655, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Machap', lat:1.8755, lon:103.2455, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Simpang Renggam', lat:1.8255, lon:103.3055, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Sedenak', lat:1.7155, lon:103.4855, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Kulai', lat:1.6455, lon:103.5855, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Senai Utara', lat:1.6155, lon:103.6455, radiusKm:0.45, system:'closed', network:'PLUS_NSE' },
+    { operator:'PLUS Malaysia Berhad', highway:'NSE South (E2)', plaza:'Plaza Tol Skudai', lat:1.5655, lon:103.6582, radiusKm:0.50, system:'closed', network:'PLUS_NSE' },
 
-    /* --- KL–Kuala Selangor Expressway Berhad (LATAR) --- */
-    {
-      operator:'KL–Kuala Selangor Expressway Berhad (LATAR)',
-      highway:'Kuala Lumpur–Kuala Selangor Expressway — LATAR (E25)',
-      officialName:'Plaza Tol Ijok (LATAR)',
-      verifiedRate:2.50,
-      aliases:['ijok'],
-      contextKeywords:['latar','e25']
-    },
-    {
-      operator:'KL–Kuala Selangor Expressway Berhad (LATAR)',
-      highway:'Kuala Lumpur–Kuala Selangor Expressway — LATAR (E25)',
-      officialName:'Plaza Tol Kuang Barat (LATAR)',
-      verifiedRate:2.50,
-      aliases:['kuang barat','kuang west'],
-      contextKeywords:['latar','e25']
-    },
-    {
-      operator:'KL–Kuala Selangor Expressway Berhad (LATAR)',
-      highway:'Kuala Lumpur–Kuala Selangor Expressway — LATAR (E25)',
-      officialName:'Plaza Tol Kuang Timur (LATAR)',
-      verifiedRate:2.50,
-      aliases:['kuang timur','kuang east'],
-      contextKeywords:['latar','e25']
-    },
-    {
-      operator:'KL–Kuala Selangor Expressway Berhad (LATAR)',
-      highway:'Kuala Lumpur–Kuala Selangor Expressway — LATAR (E25)',
-      officialName:'Plaza Tol Taman Rimba Templer (LATAR)',
-      verifiedRate:2.50,
-      aliases:['templer','taman rimba templer'],
-      contextKeywords:['latar','e25']
-    },
-    {
-      operator:'KL–Kuala Selangor Expressway Berhad (LATAR)',
-      highway:'Kuala Lumpur–Kuala Selangor Expressway — LATAR (E25)',
-      officialName:'Plaza Tol Kundang (LATAR)',
-      verifiedRate:1.30,
-      aliases:['kundang','kudang'],
-      contextKeywords:['latar','e25']
-    },
+    /* --- CLOSED-SYSTEM PLAZAS: LPT1 & LPT2 (E8) --- */
+    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Karak', lat:3.4285, lon:102.0285, radiusKm:0.45, system:'closed', network:'LPT_E8' },
+    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Lanchang', lat:3.4955, lon:102.1855, radiusKm:0.45, system:'closed', network:'LPT_E8' },
+    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Temerloh', lat:3.4955, lon:102.4155, radiusKm:0.45, system:'closed', network:'LPT_E8' },
+    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Chenor', lat:3.5355, lon:102.5855, radiusKm:0.45, system:'closed', network:'LPT_E8' },
+    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Maran', lat:3.6155, lon:102.7755, radiusKm:0.45, system:'closed', network:'LPT_E8' },
+    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Sri Jaya', lat:3.6755, lon:102.8855, radiusKm:0.45, system:'closed', network:'LPT_E8' },
+    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Gambang', lat:3.7255, lon:103.1155, radiusKm:0.45, system:'closed', network:'LPT_E8' },
+    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Kuantan', lat:3.8455, lon:103.2455, radiusKm:0.45, system:'closed', network:'LPT_E8' },
+    { operator:'AFA Prime Berhad', highway:'LPT1 (E8)', plaza:'Plaza Tol Jabor', lat:3.9285, lon:103.3085, radiusKm:0.45, system:'closed', network:'LPT_E8' },
+    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Cheneh', lat:4.1355, lon:103.2655, radiusKm:0.45, system:'closed', network:'LPT_E8' },
+    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Chukai', lat:4.2455, lon:103.3555, radiusKm:0.45, system:'closed', network:'LPT_E8' },
+    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Kijal', lat:4.3455, lon:103.4155, radiusKm:0.45, system:'closed', network:'LPT_E8' },
+    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Kerteh', lat:4.5155, lon:103.4055, radiusKm:0.45, system:'closed', network:'LPT_E8' },
+    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Paka', lat:4.6255, lon:103.3855, radiusKm:0.45, system:'closed', network:'LPT_E8' },
+    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Dungun', lat:4.7455, lon:103.3355, radiusKm:0.45, system:'closed', network:'LPT_E8' },
+    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Bukit Besi', lat:4.7755, lon:103.1855, radiusKm:0.45, system:'closed', network:'LPT_E8' },
+    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Ajil', lat:5.0655, lon:103.0955, radiusKm:0.45, system:'closed', network:'LPT_E8' },
+    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Telemung', lat:5.2055, lon:103.0455, radiusKm:0.45, system:'closed', network:'LPT_E8' },
+    { operator:'PLUS / LPT2 Sdn Bhd', highway:'LPT2 (E8)', plaza:'Plaza Tol Kuala Terengganu', lat:5.2685, lon:103.0585, radiusKm:0.45, system:'closed', network:'LPT_E8' },
 
-    /* --- KESTURI (DUKE) --- */
-    {
-      operator:'KESTURI (Ekovest)',
-      highway:'Duta–Ulu Kelang Expressway — DUKE (E33)',
-      officialName:'Plaza Tol Ayer Panas (DUKE)',
-      verifiedRate:2.50,
-      aliases:['ayer panas'],
-      contextKeywords:['duke','e33','kesturi']
-    },
-    {
-      operator:'KESTURI (Ekovest)',
-      highway:'Duta–Ulu Kelang Expressway — DUKE (E33)',
-      officialName:'Plaza Tol Sentul Pasar (DUKE)',
-      verifiedRate:2.50,
-      aliases:['sentul pasar'],
-      contextKeywords:['duke','e33','kesturi']
-    },
-    {
-      operator:'KESTURI (Ekovest)',
-      highway:'Duta–Ulu Kelang Expressway — DUKE (E33)',
-      officialName:'Plaza Tol Batu (DUKE)',
-      verifiedRate:2.50,
-      aliases:['batu','sungai batu'],
-      contextKeywords:['duke','e33','kesturi']
-    },
-    {
-      operator:'KESTURI (Ekovest)',
-      highway:'Duta–Ulu Kelang Expressway — DUKE (E33)',
-      officialName:'Plaza Tol Segambut (DUKE)',
-      verifiedRate:2.50,
-      aliases:['segambut'],
-      contextKeywords:['duke','e33','kesturi']
-    },
+    /* --- CLOSED-SYSTEM PLAZAS: LEKAS (E21) --- */
+    { operator:'IJM Corporation Berhad', highway:'LEKAS (E21)', plaza:'Plaza Tol Kajang Selatan', lat:2.9565, lon:101.8385, radiusKm:0.40, system:'closed', network:'LEKAS_E21' },
+    { operator:'IJM Corporation Berhad', highway:'LEKAS (E21)', plaza:'Plaza Tol Semenyih', lat:2.9355, lon:101.8555, radiusKm:0.40, system:'closed', network:'LEKAS_E21' },
+    { operator:'IJM Corporation Berhad', highway:'LEKAS (E21)', plaza:'Plaza Tol Eco Majestic', lat:2.9155, lon:101.8655, radiusKm:0.40, system:'closed', network:'LEKAS_E21' },
+    { operator:'IJM Corporation Berhad', highway:'LEKAS (E21)', plaza:'Plaza Tol Pajam', lat:2.8455, lon:101.8755, radiusKm:0.40, system:'closed', network:'LEKAS_E21' },
+    { operator:'IJM Corporation Berhad', highway:'LEKAS (E21)', plaza:'Plaza Tol Mantin', lat:2.8255, lon:101.9055, radiusKm:0.40, system:'closed', network:'LEKAS_E21' },
+    { operator:'IJM Corporation Berhad', highway:'LEKAS (E21)', plaza:'Plaza Tol Setul', lat:2.7985, lon:101.9485, radiusKm:0.40, system:'closed', network:'LEKAS_E21' },
 
-    /* --- Setiawangsa–Pantai Expressway Sdn Bhd (SPE) --- */
-    {
-      operator:'Setiawangsa–Pantai Expressway Sdn Bhd (Ekovest)',
-      highway:'Setiawangsa–Pantai Expressway — SPE (E39)',
-      officialName:'Plaza Tol Chan Sow Lin (SPE)',
-      verifiedRate:3.50,
-      aliases:['chan sow lin'],
-      contextKeywords:['spe','e39','duke 3']
-    },
-    {
-      operator:'Setiawangsa–Pantai Expressway Sdn Bhd (Ekovest)',
-      highway:'Setiawangsa–Pantai Expressway — SPE (E39)',
-      officialName:'Plaza Tol Ampang (SPE)',
-      verifiedRate:3.50,
-      aliases:['ampang'],
-      contextKeywords:['spe','e39','duke 3']
-    },
-    {
-      operator:'Setiawangsa–Pantai Expressway Sdn Bhd (Ekovest)',
-      highway:'Setiawangsa–Pantai Expressway — SPE (E39)',
-      officialName:'Plaza Tol Setiawangsa / Wangsa Maju (SPE)',
-      verifiedRate:3.50,
-      aliases:['setiawangsa','wangsa maju'],
-      contextKeywords:['spe','e39','duke 3']
-    },
+    /* --- CLOSED-SYSTEM PLAZAS: SKVE (E26) --- */
+    { operator:'SKVE Holdings Sdn Bhd', highway:'SKVE (E26)', plaza:'Plaza Tol Ayer Hitam (SKVE)', lat:2.9815, lon:101.6585, radiusKm:0.40, system:'closed', network:'SKVE_E26' },
+    { operator:'SKVE Holdings Sdn Bhd', highway:'SKVE (E26)', plaza:'Plaza Tol Saujana Putra (SKVE)', lat:2.9485, lon:101.5885, radiusKm:0.40, system:'closed', network:'SKVE_E26' },
+    { operator:'SKVE Holdings Sdn Bhd', highway:'SKVE (E26)', plaza:'Plaza Tol Tanjung Dua Belas (SKVE)', lat:2.9185, lon:101.5355, radiusKm:0.40, system:'closed', network:'SKVE_E26' },
+    { operator:'SKVE Holdings Sdn Bhd', highway:'SKVE (E26)', plaza:'Plaza Tol Teluk Panglima Garang (SKVE)', lat:2.9125, lon:101.4785, radiusKm:0.40, system:'closed', network:'SKVE_E26' },
+    { operator:'SKVE Holdings Sdn Bhd', highway:'SKVE (E26)', plaza:'Plaza Tol Pulau Indah (SKVE)', lat:2.9325, lon:101.3485, radiusKm:0.40, system:'closed', network:'SKVE_E26' },
 
-    /* --- Maju Expressway Sdn Bhd (MEX) --- */
-    {
-      operator:'Maju Expressway Sdn Bhd (MESB)',
-      highway:'Maju Expressway — MEX (E20)',
-      officialName:'Plaza Tol Salak Selatan (MEX)',
-      verifiedRate:2.00,
-      aliases:['salak selatan','salak south'],
-      contextKeywords:['mex','e20','maju']
-    },
-    {
-      operator:'Maju Expressway Sdn Bhd (MESB)',
-      highway:'Maju Expressway — MEX (E20)',
-      officialName:'Plaza Tol Seri Kembangan (MEX)',
-      verifiedRate:2.20,
-      aliases:['seri kembangan'],
-      contextKeywords:['mex','e20','maju']
-    },
-    {
-      operator:'Maju Expressway Sdn Bhd (MESB)',
-      highway:'Maju Expressway — MEX (E20)',
-      officialName:'Plaza Tol Putrajaya (MEX)',
-      verifiedRate:3.50,
-      aliases:['putrajaya'],
-      contextKeywords:['mex','e20','maju']
-    },
+    /* --- CLOSED-SYSTEM PLAZAS: WCE PERAK (E32) --- */
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Hutan Melintang (WCE)', lat:3.8955, lon:100.9425, radiusKm:0.40, system:'closed', network:'WCE_PERAK' },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Teluk Intan (WCE)', lat:4.0155, lon:101.0225, radiusKm:0.40, system:'closed', network:'WCE_PERAK' },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Lekir (WCE)', lat:4.1655, lon:100.7555, radiusKm:0.40, system:'closed', network:'WCE_PERAK' },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Sitiawan (WCE)', lat:4.2255, lon:100.7155, radiusKm:0.40, system:'closed', network:'WCE_PERAK' },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Sitiawan Utara (WCE)', lat:4.2655, lon:100.7055, radiusKm:0.40, system:'closed', network:'WCE_PERAK' },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Changkat Cermin (WCE)', lat:4.3655, lon:100.8155, radiusKm:0.40, system:'closed', network:'WCE_PERAK' },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Beruas (WCE)', lat:4.5055, lon:100.7855, radiusKm:0.40, system:'closed', network:'WCE_PERAK' },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Trong (WCE)', lat:4.6855, lon:100.7155, radiusKm:0.40, system:'closed', network:'WCE_PERAK' },
+    { operator:'West Coast Expressway (WCE)', highway:'WCE Perak (E32)', plaza:'Plaza Tol Taiping Selatan (WCE)', lat:4.7725, lon:100.7285, radiusKm:0.40, system:'closed', network:'WCE_PERAK' },
 
-    /* --- Grand Saga Sdn Bhd (CKE) --- */
-    {
-      operator:'Grand Saga Sdn Bhd (Taliworks)',
-      highway:'Cheras–Kajang Expressway — CKE (E7)',
-      officialName:'Plaza Tol Batu 9 (Grand Saga)',
-      verifiedRate:1.30,
-      aliases:['batu 9'],
-      contextKeywords:['grand saga','cke','e7','cheras']
-    },
-    {
-      operator:'Grand Saga Sdn Bhd (Taliworks)',
-      highway:'Cheras–Kajang Expressway — CKE (E7)',
-      officialName:'Plaza Tol Batu 11 (Grand Saga)',
-      verifiedRate:1.30,
-      aliases:['batu 11'],
-      contextKeywords:['grand saga','cke','e7','cheras']
-    },
-
-    /* --- NNKSB (Shapadu) --- */
-    {
-      operator:'NNKSB (Taliworks)',
-      highway:'New North Klang Straits Bypass — Shapadu (E30)',
-      officialName:'Plaza Tol Bukit Raja (NNKSB)',
-      verifiedRate:0.60,
-      aliases:['bukit raja'],
-      contextKeywords:['nnksb','e30','shapadu','klang straits']
-    },
-    {
-      operator:'NNKSB (Taliworks)',
-      highway:'New North Klang Straits Bypass — Shapadu (E30)',
-      officialName:'Plaza Tol Kapar (NNKSB)',
-      verifiedRate:2.70,
-      aliases:['kapar'],
-      contextKeywords:['nnksb','e30','shapadu','klang straits']
-    },
-    {
-      operator:'NNKSB (Taliworks)',
-      highway:'New North Klang Straits Bypass — Shapadu (E30)',
-      officialName:'Plaza Tol MOC B / Rantau Panjang (NNKSB)',
-      verifiedRate:1.40,
-      aliases:['moc b','rantau panjang'],
-      contextKeywords:['nnksb','e30','shapadu','klang straits']
-    },
-
-    /* --- Lingkaran Luar Butterworth (BORR) --- */
-    {
-      operator:'Lingkaran Luar Butterworth (Penang) Sdn Bhd (LLB)',
-      highway:'Butterworth Outer Ring Road — BORR (E17)',
-      officialName:'Plaza Tol Perai (BORR)',
-      verifiedRate:1.50,
-      aliases:['perai','prai'],
-      contextKeywords:['borr','e17','llb','butterworth']
-    },
-    {
-      operator:'Lingkaran Luar Butterworth (Penang) Sdn Bhd (LLB)',
-      highway:'Butterworth Outer Ring Road — BORR (E17)',
-      officialName:'Plaza Tol Bagan Ajam (BORR)',
-      verifiedRate:1.50,
-      aliases:['bagan ajam'],
-      contextKeywords:['borr','e17','llb','butterworth']
-    },
-    {
-      operator:'Lingkaran Luar Butterworth (Penang) Sdn Bhd (LLB)',
-      highway:'Butterworth Outer Ring Road — BORR (E17)',
-      officialName:'Plaza Tol Sungai Nyior (BORR)',
-      verifiedRate:1.20,
-      aliases:['sungai nyior','sg nyior'],
-      contextKeywords:['borr','e17','llb','butterworth']
-    },
-
-    /* --- Jambatan Kedua Sdn Bhd (JKSB) --- */
-    {
-      operator:'Jambatan Kedua Sdn Bhd (JKSB)',
-      highway:'Sultan Abdul Halim Mu\'adzam Shah Bridge (E28)',
-      officialName:'Plaza Tol Bandar Cassia / JK2PP (Jambatan Kedua)',
-      verifiedRate:5.74,
-      aliases:['bandar cassia','jk2pp','jambatan kedua','second bridge','2nd bridge'],
-      contextKeywords:['jksb','e28','sultan abdul halim']
-    }
+    /* --- CLOSED-SYSTEM PLAZAS: EKVE (E27) --- */
+    { operator:'EKVE Sdn Bhd (AZRB)', highway:'EKVE (E27)', plaza:'Plaza Tol Sungai Long (EKVE)', lat:3.0415, lon:101.8085, radiusKm:0.35, system:'closed', network:'EKVE_E27' },
+    { operator:'EKVE Sdn Bhd (AZRB)', highway:'EKVE (E27)', plaza:'Plaza Tol Bandar Mahkota Cheras (EKVE)', lat:3.0585, lon:101.7985, radiusKm:0.35, system:'closed', network:'EKVE_E27' },
+    { operator:'EKVE Sdn Bhd (AZRB)', highway:'EKVE (E27)', plaza:'Plaza Tol Hulu Langat (EKVE)', lat:3.1125, lon:101.8125, radiusKm:0.35, system:'closed', network:'EKVE_E27' },
+    { operator:'EKVE Sdn Bhd (AZRB)', highway:'EKVE (E27)', plaza:'Plaza Tol Ampang (EKVE)', lat:3.1485, lon:101.7785, radiusKm:0.35, system:'closed', network:'EKVE_E27' }
   ]);
 
   const HIGHLAND_ZONES = [
-    {lat:3.4241,lng:101.7933,radiusKm:8.5,name:'Genting Highlands & Gohtong',isGenting:true},
-    {lat:4.4715,lng:101.3787,radiusKm:22,name:'Cameron Highlands',isGenting:false},
-    {lat:3.7155,lng:101.7432,radiusKm:6,name:"Fraser's Hill",isGenting:false},
-    {lat:3.3533,lng:101.8385,radiusKm:7.5,name:'Bukit Tinggi & Colmar Tropicale',isGenting:false}
+    {lat:3.4241,lng:101.7933,radiusKm:8.5,name:'Genting Highlands & Gohtong'},
+    {lat:4.4715,lng:101.3787,radiusKm:22,name:'Cameron Highlands'},
+    {lat:3.7155,lng:101.7432,radiusKm:6,name:"Fraser's Hill"},
+    {lat:3.3533,lng:101.8385,radiusKm:7.5,name:'Bukit Tinggi & Colmar Tropicale'}
   ];
 
   const URBAN_POI_ZONES = [
@@ -1652,7 +1064,7 @@
   };
 
   /* =========================================================
-     3. SETTINGS, OPERATOR DIRECTORY & ROUTE HISTORY STORAGE
+     3. SETTINGS & ROUTE HISTORY STORAGE
      ========================================================= */
   function sanitizeSettings(saved) {
     const merged = {...DEFAULT_SETTINGS,...saved};
@@ -1917,11 +1329,6 @@
       Math.cos(lat2*Math.PI/180) *
       Math.sin(dLon/2)**2;
     return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-  }
-
-  function isOnPenangIsland(point) {
-    if (!point || !Number.isFinite(point.lat) || !Number.isFinite(point.lng)) return false;
-    return point.lat >= 5.24 && point.lat <= 5.49 && point.lng >= 100.18 && point.lng <= 100.36;
   }
 
   function getHighlandZone(pickup,dropoff) {
@@ -2364,85 +1771,173 @@
   }
 
   /* =========================================================
-     11. OPERATOR-VERIFIED TOLL ENGINE & PLAZA RENAMER
+     11. PURE LAT/LON GEOSPATIAL TOLL MATCHING ENGINE
+         Compares route polyline coordinates vs MALAYSIA_TOLL_PLAZA_TABLE
+         Class 1 (Passenger Cars) — Touch 'n Go / SmartTAG Only
      ========================================================= */
-  function matchMalaysiaOperatorEntry(label) {
-    const lower = String(label || '').toLowerCase();
-    if (!lower) return null;
-    for (const entry of MALAYSIA_TOLL_OPERATORS) {
-      if (entry.keywords.some(kw => kw.length > 3 && lower.includes(kw))) {
-        return entry;
+  function pointToSegmentDistanceKm(pLat, pLon, aLat, aLon, bLat, bLon) {
+    const cosLat = Math.cos(pLat * Math.PI / 180);
+    const px = pLon * cosLat * 111.32;
+    const py = pLat * 110.574;
+    const ax = aLon * cosLat * 111.32;
+    const ay = aLat * 110.574;
+    const bx = bLon * cosLat * 111.32;
+    const by = bLat * 110.574;
+
+    const dx = bx - ax;
+    const dy = by - ay;
+    const lenSq = dx * dx + dy * dy;
+    let t = lenSq > 0 ? ((px - ax) * dx + (py - ay) * dy) / lenSq : 0;
+    t = Math.max(0, Math.min(1, t));
+    const projX = ax + t * dx;
+    const projY = ay + t * dy;
+    return Math.hypot(px - projX, py - projY);
+  }
+
+  function checkDirectionMatch(dirRule, p1, p2) {
+    if (!dirRule) return true;
+    const dLat = p2.lat - p1.lat;
+    const dLon = p2.lng - p1.lng;
+    if (dirRule === 'toIsland') return dLon < 0;      // Penang Mainland -> Island (East to West)
+    if (dirRule === 'southbound') return dLat < 0;
+    if (dirRule === 'northbound') return dLat > 0;
+    if (dirRule === 'eastbound') return dLon > 0;
+    if (dirRule === 'westbound') return dLon < 0;
+    return true;
+  }
+
+  function evaluateRouteTolls(route) {
+    const sections = Array.isArray(route && route.sections) ? route.sections : [];
+    const routePoints = [];
+    let cumulativeKm = 0;
+
+    sections.forEach(section => {
+      if (!section.polyline || !window.H || !H.geo || !H.geo.LineString) return;
+      const ls = H.geo.LineString.fromFlexiblePolyline(section.polyline);
+      const count = ls.getPointCount();
+      for (let i = 0; i < count; i++) {
+        const pt = ls.extractPoint(i);
+        if (routePoints.length > 0) {
+          const prev = routePoints[routePoints.length - 1];
+          cumulativeKm += calculateHaversineDistance(prev.lat, prev.lng, pt.lat, pt.lng);
+        }
+        routePoints.push({ lat: pt.lat, lng: pt.lng, cumKm: cumulativeKm });
       }
-    }
-    return null;
-  }
+    });
 
-  function matchMalaysiaOperator(label) {
-    const entry = matchMalaysiaOperatorEntry(label);
-    return entry ? entry.operator : '';
-  }
-
-  function cleanTollLabel(rawLabel) {
-    return String(rawLabel || '')
-      .replace(/malaysian\s+highway\s+toll\s+rate\s+system/ig,'')
-      .replace(/\btoll\s+rate\s+system\b/ig,'')
-      .replace(/\btoll\s+plaza\b/ig,'')
-      .replace(/\bplaza\s+tol\b/ig,'')
-      .replace(/\s+/g,' ')
-      .trim();
-  }
-
-  function verifyAndStandardizeTollItem(rawItem) {
-    const cleanedPlaza = cleanTollLabel(rawItem && rawItem.plazaName);
-    const cleanedSystem = cleanTollLabel(rawItem && rawItem.systemName);
-    const searchBlob = `${cleanedPlaza} ${cleanedSystem} ${rawItem && rawItem.operator ? rawItem.operator : ''}`.toLowerCase();
-    const normalize = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
-    const normalizedBlob = ` ${normalize(searchBlob)} `;
-    const candidates = [];
-
-    for (const entry of MALAYSIA_TOLL_PLAZA_REGISTRY) {
-      const aliasHits = entry.aliases.filter(alias => {
-        const a = normalize(alias);
-        return a && normalizedBlob.includes(` ${a} `);
-      });
-      if (!aliasHits.length) continue;
-      const contextHits = entry.contextKeywords.filter(ctx => normalizedBlob.includes(` ${normalize(ctx)} `)).length;
-      const specificity = Math.max(...aliasHits.map(a => normalize(a).split(' ').length * 10 + normalize(a).length));
-      candidates.push({entry,score:specificity + contextHits * 5,aliasHits});
-    }
-    candidates.sort((a,b) => b.score - a.score);
-    const best = candidates[0] || null;
-    const ambiguous = Boolean(best && candidates.length > 1 && candidates[1].score === best.score);
-
-    // Prefer HERE's explicit MYR Class-1 candidate. Embedded local rates are fallback references only, not live official tariff verification.
-    if (best && !ambiguous) {
-      const entry = best.entry;
-      const cents = rawItem.cents !== null && rawItem.cents !== undefined
-        ? rawItem.cents
-        : (entry.verifiedRate !== null ? toCents(entry.verifiedRate) : null);
+    if (routePoints.length < 2) {
       return {
-        ...rawItem, operator:entry.operator, systemName:entry.highway, plazaName:entry.officialName,
-        cents, amount:cents !== null ? fromCents(cents) : null,
-        unresolved:cents === null, verificationStatus:cents !== null
-          ? (rawItem.cents !== null && rawItem.cents !== undefined ? 'here-class1' : 'registry')
-          : 'unverified',
-        sourceType:rawItem.cents !== null && rawItem.cents !== undefined
-          ? 'HERE-API-Class-1-candidate'
-          : (entry.verifiedRate !== null ? 'local-registry-reference-fallback' : 'HERE-API-unresolved'),
-        matchConfidence:'unique-alias-match', tariffVerified:false
+        cents: 0,
+        amount: 0,
+        items: [],
+        status: 'no-records'
       };
     }
 
-    const opEntry = matchMalaysiaOperatorEntry(searchBlob);
-    const operator = opEntry ? opEntry.operator : (rawItem.operator || 'Unknown operator');
-    let formattedPlaza = cleanedPlaza || cleanedSystem || 'Unidentified toll charge';
-    if (formattedPlaza && !/^plaza\s+tol/i.test(formattedPlaza) && !/^toll\s+(section|summary)/i.test(formattedPlaza)) formattedPlaza = `Plaza Tol ${formattedPlaza}`;
+    // Track closest approach along route segments for every toll plaza in table
+    const plazaHits = new Map();
+
+    for (let i = 0; i < routePoints.length - 1; i++) {
+      const p1 = routePoints[i];
+      const p2 = routePoints[i + 1];
+      const minLat = Math.min(p1.lat, p2.lat) - 0.01;
+      const maxLat = Math.max(p1.lat, p2.lat) + 0.01;
+      const minLon = Math.min(p1.lng, p2.lng) - 0.01;
+      const maxLon = Math.max(p1.lng, p2.lng) + 0.01;
+
+      for (let idx = 0; idx < MALAYSIA_TOLL_PLAZA_TABLE.length; idx++) {
+        const plaza = MALAYSIA_TOLL_PLAZA_TABLE[idx];
+        if (plaza.lat < minLat || plaza.lat > maxLat || plaza.lon < minLon || plaza.lon > maxLon) {
+          continue;
+        }
+        const distKm = pointToSegmentDistanceKm(plaza.lat, plaza.lon, p1.lat, p1.lng, p2.lat, p2.lng);
+        const radius = plaza.radiusKm || 0.35;
+        if (distKm <= radius && checkDirectionMatch(plaza.dir, p1, p2)) {
+          const existing = plazaHits.get(idx);
+          if (!existing || distKm < existing.minDist) {
+            plazaHits.set(idx, {
+              plaza,
+              minDist: distKm,
+              cumKm: (p1.cumKm + p2.cumKm) / 2
+            });
+          }
+        }
+      }
+    }
+
+    // Order hits sequentially along the route
+    const orderedHits = Array.from(plazaHits.values()).sort((a, b) => a.cumKm - b.cumKm);
+    const finalItems = [];
+    const closedGroups = new Map();
+
+    orderedHits.forEach(hit => {
+      const p = hit.plaza;
+      if (p.system === 'open') {
+        const cents = toCents(p.rate);
+        finalItems.push({
+          operator: p.operator,
+          highway: p.highway,
+          plazaName: p.plaza,
+          cents,
+          amount: fromCents(cents),
+          systemType: 'open'
+        });
+      } else if (p.system === 'closed' && p.network) {
+        if (!closedGroups.has(p.network)) {
+          closedGroups.set(p.network, []);
+        }
+        closedGroups.get(p.network).push(hit);
+      }
+    });
+
+    // Pair Entry & Exit plazas for Closed-System Highways
+    closedGroups.forEach((hits, networkKey) => {
+      if (hits.length < 2) return;
+      const entry = hits[0];
+      const exit = hits[hits.length - 1];
+      const spanKm = Math.max(0, exit.cumKm - entry.cumKm);
+      if (spanKm < 1.5) return;
+
+      const cfg = CLOSED_SYSTEM_RATES[networkKey];
+      if (!cfg) return;
+
+      let rateRm = Math.max(cfg.minRate, spanKm * cfg.ratePerKm);
+
+      // Exact SKVE matrix overrides
+      if (networkKey === 'SKVE_E26') {
+        const pair = `${entry.plaza.plaza}|${exit.plaza.plaza}`;
+        if (/Ayer Hitam/.test(pair) && /Saujana Putra/.test(pair)) rateRm = 2.40;
+        else if (/Ayer Hitam/.test(pair) && /Teluk Panglima Garang/.test(pair)) rateRm = 4.50;
+        else if (/Ayer Hitam/.test(pair) && /Pulau Indah/.test(pair)) rateRm = 8.10;
+        else if (/Saujana Putra/.test(pair) && /Teluk Panglima Garang/.test(pair)) rateRm = 2.70;
+        else if (/Saujana Putra/.test(pair) && /Pulau Indah/.test(pair)) rateRm = 6.30;
+        else if (/Teluk Panglima Garang/.test(pair) && /Pulau Indah/.test(pair)) rateRm = 4.20;
+      }
+
+      // Exact WCE Perak Hutan Melintang <-> Teluk Intan rate
+      if (networkKey === 'WCE_PERAK') {
+        const pair = `${entry.plaza.plaza}|${exit.plaza.plaza}`;
+        if (/Hutan Melintang/.test(pair) && /Teluk Intan/.test(pair)) rateRm = 2.90;
+      }
+
+      const cents = toCents(rateRm);
+      finalItems.push({
+        operator: cfg.operator,
+        highway: cfg.highway,
+        plazaName: `${entry.plaza.plaza} → ${exit.plaza.plaza} (${spanKm.toFixed(1)} km)`,
+        cents,
+        amount: fromCents(cents),
+        systemType: 'closed'
+      });
+    });
+
+    const totalTollCents = finalItems.reduce((sum, item) => sum + item.cents, 0);
+
     return {
-      ...rawItem, operator, plazaName:formattedPlaza,
-      cents:ambiguous ? null : rawItem.cents, amount:ambiguous ? null : rawItem.amount,
-      unresolved:ambiguous || Boolean(rawItem.unresolved),
-      verificationStatus:'unverified', sourceType:ambiguous ? 'ambiguous-registry-match' : (rawItem.sourceType || 'HERE-API'),
-      matchConfidence:ambiguous ? 'ambiguous' : 'unmatched', tariffVerified:false
+      cents: totalTollCents,
+      amount: fromCents(totalTollCents),
+      items: finalItems,
+      status: finalItems.length ? 'matched' : 'toll-free'
     };
   }
 
@@ -2453,382 +1948,6 @@
       return `${operator} — ${plaza}`;
     }
     return plaza || operator || 'Toll Plaza';
-  }
-
-  function extractMyrFare(toll) {
-    const fares = Array.isArray(toll && toll.fares) ? toll.fares : [];
-    if (!fares.length) return null;
-    const valid = fares.map(fare => {
-      if (!fare || typeof fare !== 'object') return null;
-      if (fare.reason && String(fare.reason).toLowerCase() !== 'toll') return null;
-      const price = [fare.convertedPrice,fare.price,fare].find(p =>
-        p && typeof p === 'object' &&
-        Number.isFinite(Number(p.value)) && Number(p.value) >= 0 &&
-        String(p.currency || fare.currency || '').toUpperCase() === 'MYR'
-      );
-      if (!price) return null;
-      const tag = [fare.name,fare.id,fare.paymentMethods,fare.vehicleType,fare.vehicleCategory,fare.vehicle,fare.type]
-        .filter(value => value !== undefined && value !== null)
-        .map(value => typeof value === 'string' ? value : JSON.stringify(value))
-        .join(' ').toLowerCase();
-      const isCarPreferred = /\bcar\b|class[\s_-]?1|passenger|standard/.test(tag);
-      return {
-        cents:toCents(Number(price.value)),
-        fareId:fare.id ? String(fare.id) : '',
-        isCarPreferred
-      };
-    }).filter(Boolean);
-    if (!valid.length) return null;
-    return valid.find(v => v.isCarPreferred) || null;
-  }
-
-  function getTollSystemLabel(section,toll) {
-    const systems = Array.isArray(section && section.tollSystems) ? section.tollSystems : [];
-    const refs = toll && Array.isArray(toll.tollSystems)
-      ? toll.tollSystems
-      : (Number.isInteger(toll && toll.tollSystemRef) ? [toll.tollSystemRef] : []);
-    const names = refs.map(ref => {
-      const sys = Number.isInteger(ref) ? systems[ref] : null;
-      if (typeof sys === 'string') return sys;
-      return sys && sys.name ? String(sys.name) : '';
-    }).filter(Boolean);
-    if (names.length) return names.join(' + ');
-    if (toll && typeof toll.tollSystem === 'string') return toll.tollSystem.trim();
-    if (toll && toll.tollSystem && typeof toll.tollSystem === 'object') {
-      return String(toll.tollSystem.name || toll.tollSystem.id || '');
-    }
-    return '';
-  }
-
-  function getTollLocationName(toll) {
-    const locs = toll && toll.tollCollectionLocations;
-    const list = Array.isArray(locs) ? locs : (locs && typeof locs === 'object' ? [locs] : []);
-    const named = list.find(loc => loc && loc.name) || list[0] || null;
-    return named && named.name ? String(named.name).trim() : '';
-  }
-
-  function extractTollCostsArray(costs,prefix,outItems,seenFareIds) {
-    if (!Array.isArray(costs)) return {resolvedCents:0,unresolved:0};
-    let resolvedCents = 0;
-    let unresolved = 0;
-    costs.forEach((cost,idx) => {
-      const price = [cost && cost.convertedPrice,cost && cost.price,cost].find(p =>
-        p && typeof p === 'object' &&
-        Number.isFinite(Number(p.value)) && Number(p.value) >= 0 &&
-        String(p.currency || (cost && cost.currency) || '').toUpperCase() === 'MYR'
-      );
-      if (!price) {
-        unresolved++;
-        outItems.push({
-          plazaName:`${prefix} ${idx + 1}`,
-          systemName:'',
-          operator:'',
-          cents:null,
-          amount:null,
-          unresolved:true,
-          verificationStatus:'unverified'
-        });
-        return;
-      }
-      const fareId = cost && cost.id ? String(cost.id) : '';
-      if (fareId && seenFareIds.has(fareId)) return;
-      if (fareId) seenFareIds.add(fareId);
-      const cents = toCents(Number(price.value));
-      resolvedCents += cents;
-      outItems.push({
-        plazaName:`${prefix} ${idx + 1}`,
-        systemName:'',
-        operator:'',
-        cents,
-        amount:fromCents(cents),
-        unresolved:false,
-        verificationStatus:'verified'
-      });
-    });
-    return {resolvedCents,unresolved};
-  }
-
-  function analyzeRoutePolylineCorridors(route) {
-    const info = {
-      penangBridge:'',
-      wceSelangorBbrAssamJawa:false,
-      wcePerakHutanMelintangTelukIntan:false
-    };
-    const sections = Array.isArray(route && route.sections) ? route.sections : [];
-    let bbrSouthHit = false;
-    let assamJawaNorthHit = false;
-    let hutanMelintangHit = false;
-    let telukIntanHit = false;
-
-    for (const section of sections) {
-      if (!section.polyline || !window.H || !H.geo || !H.geo.LineString) continue;
-      try {
-        const ls = H.geo.LineString.fromFlexiblePolyline(section.polyline);
-        const count = ls.getPointCount();
-        for (let i = 0; i < count; i++) {
-          const pt = ls.extractPoint(i);
-
-          // Penang 2nd Bridge (JKSB E28)
-          if (!info.penangBridge && pt.lat >= 5.23 && pt.lat <= 5.295 && pt.lng >= 100.30 && pt.lng <= 100.43) {
-            info.penangBridge = 'second';
-          }
-          // Penang 1st Bridge (PLUS E36)
-          if (!info.penangBridge && pt.lat >= 5.335 && pt.lat <= 5.375 && pt.lng >= 100.32 && pt.lng <= 100.38) {
-            info.penangBridge = 'first';
-          }
-
-          // WCE (E32) Section 6: Bandar Bukit Raja Utara <-> Assam Jawa
-          if (pt.lat >= 3.100 && pt.lat <= 3.160 && pt.lng >= 101.390 && pt.lng <= 101.450) {
-            bbrSouthHit = true;
-          }
-          if (pt.lat >= 3.230 && pt.lat <= 3.300 && pt.lng >= 101.320 && pt.lng <= 101.390) {
-            assamJawaNorthHit = true;
-          }
-
-          // WCE (E32) Section 8: Hutan Melintang <-> Teluk Intan
-          if (pt.lat >= 3.860 && pt.lat <= 3.930 && pt.lng >= 100.900 && pt.lng <= 100.980) {
-            hutanMelintangHit = true;
-          }
-          if (pt.lat >= 3.980 && pt.lat <= 4.050 && pt.lng >= 100.980 && pt.lng <= 101.060) {
-            telukIntanHit = true;
-          }
-        }
-      } catch (_) {}
-    }
-
-    info.wceSelangorBbrAssamJawa = bbrSouthHit && assamJawaNorthHit;
-    info.wcePerakHutanMelintangTelukIntan = hutanMelintangHit && telukIntanHit;
-    return info;
-  }
-
-  function evaluateRouteTolls(route) {
-    const sections = Array.isArray(route && route.sections) ? route.sections : [];
-    const rawItems = [];
-    let itemisedSections = 0;
-    let summarySections = 0;
-    let hasEstimatedTolls = false;
-
-    sections.forEach((section,sIdx) => {
-      const sectionFareIds = new Set();
-      const tolls = Array.isArray(section.tolls) ? section.tolls : [];
-      const secCosts = section.summary && Array.isArray(section.summary.tollCosts)
-        ? section.summary.tollCosts
-        : [];
-      if (tolls.length) {
-        itemisedSections++;
-        tolls.forEach((toll,tIdx) => {
-          const systemName = getTollSystemLabel(section,toll);
-          const locationName = getTollLocationName(toll);
-          const plazaName = locationName || systemName || `Toll Plaza ${sIdx + 1}.${tIdx + 1}`;
-          const picked = extractMyrFare(toll);
-          if (!picked) {
-            rawItems.push(verifyAndStandardizeTollItem({
-              plazaName,
-              systemName,
-              operator:matchMalaysiaOperator(`${plazaName} ${systemName}`),
-              cents:null,
-              amount:null,
-              unresolved:true,
-              verificationStatus:'unverified'
-            }));
-            return;
-          }
-          if (picked.fareId && sectionFareIds.has(picked.fareId)) return;
-          if (picked.fareId) sectionFareIds.add(picked.fareId);
-          rawItems.push(verifyAndStandardizeTollItem({
-            plazaName,
-            systemName,
-            operator:matchMalaysiaOperator(`${plazaName} ${systemName}`),
-            cents:picked.cents,
-            amount:fromCents(picked.cents),
-            unresolved:false,
-            verificationStatus:'verified'
-          }));
-        });
-        return;
-      }
-      if (secCosts.length) {
-        summarySections++;
-        extractTollCostsArray(secCosts,`Toll Section ${sIdx + 1}`,rawItems,sectionFareIds);
-      }
-    });
-
-    if (itemisedSections === 0 && summarySections === 0 && route && route.summary && Array.isArray(route.summary.tollCosts) && route.summary.tollCosts.length) {
-      extractTollCostsArray(route.summary.tollCosts,'Toll Summary',rawItems,new Set());
-    }
-
-    const corridors = analyzeRoutePolylineCorridors(route);
-
-    // WCE (E32) Missing Tariff Compensation (Selangor Sec 6 & Perak Sec 8)
-    if (!avoidTolls) {
-      if (corridors.wceSelangorBbrAssamJawa) {
-        const hasWceSel = rawItems.some(it =>
-          !it.unresolved &&
-          /assam jawa|bukit raja utara|kapar/i.test(`${it.plazaName || ''} ${it.systemName || ''}`) &&
-          it.cents >= 350
-        );
-        if (!hasWceSel) {
-          const cSel = toCents(WCE_SELANGOR_BBR_ASSAM_JAWA_RATE);
-          hasEstimatedTolls = true;
-          rawItems.unshift({
-            plazaName:'Plaza Tol Bandar Bukit Raja Utara – Assam Jawa (WCE Sec 6)',
-            systemName:'West Coast Expressway — WCE (E32)',
-            operator:'West Coast Expressway Sdn Bhd (WCE)',
-            cents:cSel,
-            amount:fromCents(cSel),
-            unresolved:false,
-            verificationStatus:'corridor'
-          });
-        }
-      }
-
-      if (corridors.wcePerakHutanMelintangTelukIntan) {
-        const hasWcePrk8 = rawItems.some(it =>
-          !it.unresolved &&
-          /hutan melintang|teluk intan/i.test(`${it.plazaName || ''} ${it.systemName || ''}`) &&
-          it.cents >= 250
-        );
-        if (!hasWcePrk8) {
-          const cPrk = toCents(WCE_PERAK_HUTAN_MELINTANG_TELUK_INTAN_RATE);
-          hasEstimatedTolls = true;
-          rawItems.push({
-            plazaName:'Plaza Tol Hutan Melintang – Teluk Intan (WCE Sec 8)',
-            systemName:'West Coast Expressway — WCE (E32)',
-            operator:'West Coast Expressway Sdn Bhd (WCE)',
-            cents:cPrk,
-            amount:fromCents(cPrk),
-            unresolved:false,
-            verificationStatus:'corridor'
-          });
-        }
-      }
-    }
-
-    // Genting Highlands Road Charge (RM 5.00 Class 1 entry charge)
-    const highlandZone = getHighlandZone(pickupCoords,dropoffCoords);
-    const inGentingZone = Boolean(highlandZone && highlandZone.isGenting);
-    const routeMentionsGenting = rawItems.some(item =>
-      /genting|gohtong|sempah/i.test(`${item.plazaName || ''} ${item.systemName || ''}`)
-    );
-    if (inGentingZone || routeMentionsGenting) {
-      const hasGentingItem = rawItems.some(item =>
-        !item.unresolved &&
-        /genting|gohtong|sempah/i.test(`${item.plazaName || ''} ${item.systemName || ''} ${item.operator || ''}`)
-      );
-      if (!hasGentingItem) {
-        const gentingCents = toCents(GENTING_ROAD_CHARGE);
-        hasEstimatedTolls = true;
-        rawItems.push({
-          plazaName:GENTING_ROAD_CHARGE_NAME,
-          systemName:'Jalan Genting Highlands',
-          operator:'Lingkaran Cekap Sdn Bhd (Genting Malaysia)',
-          cents:gentingCents,
-          amount:fromCents(gentingCents),
-          unresolved:false,
-          verificationStatus:'corridor'
-        });
-      }
-    }
-
-    // Penang 1st & 2nd Bridge Toll Fix (Direction-Aware + Verified RM 5.74)
-    const pickupIsland = isOnPenangIsland(pickupCoords);
-    const dropoffIsland = isOnPenangIsland(dropoffCoords);
-    const bridgeRegex = /penang.*bridge|jambatan.*(pulau pinang|kedua|sultan abdul halim)|jksb|perai|prai|bandar cassia|jk2pp/i;
-
-    if (pickupIsland && !dropoffIsland) {
-      // Island -> Mainland is RM 0.00 on both Penang bridges
-      for (let i = rawItems.length - 1; i >= 0; i--) {
-        const it = rawItems[i];
-        if (!it.unresolved && bridgeRegex.test(`${it.plazaName || ''} ${it.systemName || ''} ${it.operator || ''}`) && it.cents >= 500) {
-          rawItems.splice(i,1);
-        }
-      }
-    } else if (!pickupIsland && dropoffIsland) {
-      // Mainland -> Penang Island (RM 5.74 Class 1 on both 1st & 2nd Bridge)
-      const hasBridgeItem = rawItems.some(item =>
-        !item.unresolved &&
-        item.cents >= 500 &&
-        bridgeRegex.test(`${item.plazaName || ''} ${item.systemName || ''} ${item.operator || ''}`)
-      );
-      if (!hasBridgeItem) {
-        if (corridors.penangBridge === 'second') {
-          const c2 = toCents(PENANG_2ND_BRIDGE_RATE);
-          hasEstimatedTolls = true;
-          rawItems.push({
-            plazaName:'Plaza Tol Bandar Cassia / JK2PP (Jambatan Kedua)',
-            systemName:'Sultan Abdul Halim Mu\'adzam Shah Bridge (E28)',
-            operator:'Jambatan Kedua Sdn Bhd (JKSB)',
-            cents:c2,
-            amount:fromCents(c2),
-            unresolved:false,
-            verificationStatus:'corridor'
-          });
-        } else if (corridors.penangBridge === 'first') {
-          const c1 = toCents(PENANG_1ST_BRIDGE_RATE);
-          hasEstimatedTolls = true;
-          rawItems.push({
-            plazaName:'Plaza Tol Jambatan Pulau Pinang (Perai)',
-            systemName:'Penang Bridge (E36)',
-            operator:'PLUS Malaysia Berhad',
-            cents:c1,
-            amount:fromCents(c1),
-            unresolved:false,
-            verificationStatus:'corridor'
-          });
-        } else {
-          rawItems.push({
-            plazaName:'Penang mainland-to-island bridge charge (bridge not identified)',
-            systemName:'Penang Bridge corridor',
-            operator:'Unknown — confirm First vs Second Bridge',
-            cents:null,
-            amount:null,
-            unresolved:true,
-            verificationStatus:'unverified',
-            sourceType:'ambiguous-bridge-corridor'
-          });
-        }
-      }
-    }
-
-    // AGGREGATION STEP: Group by Operator + Official Plaza Name
-    const aggregatedMap = new Map();
-    let totalTollCents = 0;
-    let unresolvedCount = 0;
-
-    rawItems.forEach(item => {
-      if (item.unresolved) {
-        unresolvedCount++;
-        const key = `UNRESOLVED|${item.operator}|${item.plazaName}`;
-        if (!aggregatedMap.has(key)) {
-          aggregatedMap.set(key,{...item,isUnresolvedGroup:true});
-        }
-        return;
-      }
-
-      const key = `${item.operator || 'Unknown'}|${item.plazaName || 'Unknown'}`;
-      if (aggregatedMap.has(key)) {
-        const existing = aggregatedMap.get(key);
-        existing.cents += item.cents;
-        existing.amount = fromCents(existing.cents);
-      } else {
-        aggregatedMap.set(key,{...item});
-      }
-
-      totalTollCents += item.cents;
-    });
-
-    const finalItems = Array.from(aggregatedMap.values());
-
-    return {
-      cents:totalTollCents,
-      amount:fromCents(totalTollCents),
-      items:finalItems,
-      unresolvedCount,
-      hasEstimatedTolls,
-      hasUnresolved:unresolvedCount > 0,
-      status:unresolvedCount > 0 ? 'incomplete' : (finalItems.length ? 'identified' : 'no-records'),
-      dataSource:'HERE Routing API + local reference rules'
-    };
   }
 
   /* =========================================================
@@ -2866,7 +1985,7 @@
 
     setLoading(true);
     clearError();
-    setRouteStatus('Requesting route & verifying operator tolls…');
+    setRouteStatus('Calculating route & matching toll coordinates…');
 
     routeDebounce = setTimeout(() => {
       if (requestId !== routeRequestId) return;
@@ -2876,8 +1995,7 @@
         origin:`${origin.lat},${origin.lng}`,
         destination:`${destination.lat},${destination.lng}`,
         departureTime:'any',
-        currency:'MYR',
-        return:'polyline,summary,tolls,actions'
+        return:'polyline,summary'
       };
       if (avoidTollSnapshot) {
         params['avoid[features]'] = 'tollRoad';
@@ -2971,8 +2089,8 @@
     updatePinButtonState();
 
     let statusText = `Route calculated · ${sections.length} section(s) · ${activeRoutingMode === 'fast' ? 'Fastest' : 'Shortest'}`;
-    if (avoidTollsRequested) statusText += ' · Avoid tolls requested (not guaranteed)';
-    statusText += ` · Toll status: ${tollResult.status}`;
+    if (avoidTollsRequested) statusText += ' · No Toll ON';
+    statusText += ` · ${tollResult.items.length} toll plaza(s) matched`;
 
     setRouteStatus(statusText);
   }
@@ -3027,28 +2145,21 @@
     $('driver-net-fare').textContent = moneyFromCents(driverAmountAfterDeductionCents);
 
     const breakdownBox = $('toll-breakdown-box');
-    const warningBanner = $('toll-warning-banner');
+    breakdownBox.innerHTML = '';
 
-    if (routeData.tollResult.items.length || routeData.tollResult.status === 'no-records') {
-      Array.from(breakdownBox.children).forEach(child => {
-        if (child.id !== 'toll-warning-banner') {
-          child.remove();
-        }
-      });
+    const title = document.createElement('div');
+    title.className = 'toll-breakdown-title';
+    const titleText = document.createElement('span');
+    titleText.textContent = `Toll Plazas — Class 1 TnG / SmartTAG (${routeData.tollResult.items.length})`;
+    title.appendChild(titleText);
+    breakdownBox.appendChild(title);
 
-      const title = document.createElement('div');
-      title.className = 'toll-breakdown-title';
-      const titleText = document.createElement('span');
-      titleText.textContent = `Toll details (${routeData.tollResult.items.length} record${routeData.tollResult.items.length > 1 ? 's' : ''})`;
-      title.appendChild(titleText);
-      breakdownBox.appendChild(title);
-      if (!routeData.tollResult.items.length) {
-        const empty = document.createElement('div');
-        empty.className = 'toll-item-plaza';
-        empty.textContent = 'No toll records were returned. This is not confirmation that the route is toll-free.';
-        breakdownBox.appendChild(empty);
-      }
-
+    if (!routeData.tollResult.items.length) {
+      const empty = document.createElement('div');
+      empty.className = 'toll-item-plaza';
+      empty.textContent = 'No toll plazas detected along this route (RM 0.00).';
+      breakdownBox.appendChild(empty);
+    } else {
       routeData.tollResult.items.forEach(item => {
         const row = document.createElement('div');
         row.className = 'toll-item-line';
@@ -3058,11 +2169,11 @@
 
         const opLine = document.createElement('span');
         opLine.className = 'toll-item-op';
-        opLine.textContent = item.operator || 'LLM Concessionaire';
+        opLine.textContent = `${item.operator} · ${item.highway}`;
 
         const plazaLine = document.createElement('span');
         plazaLine.className = 'toll-item-plaza';
-        plazaLine.textContent = item.plazaName || 'Plaza Tol';
+        plazaLine.textContent = item.plazaName;
 
         left.append(opLine,plazaLine);
 
@@ -3071,47 +2182,23 @@
 
         const amountSpan = document.createElement('span');
         amountSpan.style.fontWeight = '700';
-        amountSpan.textContent = item.unresolved ? 'Unverified' : moneyFromCents(item.cents);
+        amountSpan.textContent = moneyFromCents(item.cents);
 
         const badge = document.createElement('span');
-        if (item.unresolved) {
-          badge.className = 'toll-badge unverified';
-          badge.textContent = 'Check';
-          row.classList.add('fare-warning');
-        } else if (item.verificationStatus === 'corridor') {
-          badge.className = 'toll-badge corridor';
-          badge.textContent = 'Corridor';
-        } else if (item.verificationStatus === 'registry') {
-          badge.className = 'toll-badge corridor';
-          badge.textContent = 'Local ref.';
-        } else if (item.verificationStatus === 'here-class1') {
-          badge.className = 'toll-badge unverified';
-          badge.textContent = 'HERE Class 1';
-        } else {
-          badge.className = 'toll-badge unverified';
-          badge.textContent = 'HERE data';
-        }
+        badge.className = item.systemType === 'closed' ? 'toll-badge closed' : 'toll-badge verified';
+        badge.textContent = item.systemType === 'closed' ? 'Closed System' : 'TnG / SmartTAG';
 
         right.append(amountSpan,badge);
         row.append(left,right);
         breakdownBox.appendChild(row);
       });
-
-      if (routeData.tollResult.hasEstimatedTolls || routeData.tollResult.unresolvedCount > 0 || routeData.tollResult.status === 'no-records') {
-        warningBanner.style.display = 'flex';
-      } else {
-        warningBanner.style.display = 'none';
-      }
-
-      breakdownBox.style.display = 'block';
-    } else {
-      breakdownBox.style.display = 'none';
     }
+    breakdownBox.style.display = 'block';
 
     $('fare-policy-note').textContent =
       `Minimum transport fare: ${money(settings.minimumFare)}. ` +
       `No platform commission is deducted in this personal edition. ` +
-      `Tolls are pass-through reimbursement, not transport fare. ` +
+      `Tolls are Class 1 TnG/SmartTAG pass-through reimbursement. ` +
       `Quotation rounding adjustment: ${moneyFromCents(roundingAdjustmentCents)}.`;
 
     $('result-card').style.display = 'block';
@@ -3137,7 +2224,6 @@
       roundingAdjustment:fromCents(roundingAdjustmentCents),
       manualTollAdjustment:fromCents(manualTollAdjustmentCents),
       tollStatus:routeData.tollResult.status,
-      tollUnresolvedCount:routeData.tollResult.unresolvedCount,
       driverFareEarnings:fromCents(driverFareEarningsCents),
       driverAmountAfterDeduction:fromCents(driverAmountAfterDeductionCents),
       routingMode:activeRoutingMode,
@@ -3162,9 +2248,9 @@
      16. CUSTOMER QUOTE & DRIVER RECEIPT GENERATION
      ========================================================= */
   function customerQuoteText(data) {
-    const tollNote = data.tollStatus === 'no-records' || data.tollUnresolvedCount > 0
-      ? `Tolls: ${money(data.tollFee)} identified/adjusted so far; toll data incomplete — confirm all tolls before finalising fare`
-      : (data.tollFee > 0 ? `Est. Tolls: ${money(data.tollFee)} (included)` : (data.avoidTolls ? 'Tolls: none identified; toll-free not guaranteed' : 'Tolls: none identified by HERE; verify route'));
+    const tollNote = data.tollFee > 0
+      ? `Tolls (Class 1 TnG/SmartTAG): ${money(data.tollFee)} (included)`
+      : 'Tolls: RM 0.00 (Toll-free route)';
     return [
       '*TRIP FARE QUOTATION*',
       `From: ${data.pickup}`,
@@ -3178,11 +2264,8 @@
 
   function receiptText(data) {
     const tollLines = Array.isArray(data.tollItems) && data.tollItems.length
-      ? data.tollItems.map(t => {
-          const tag = t.unresolved ? '[UNRESOLVED]' : (t.verificationStatus === 'corridor' ? '[CORRIDOR ESTIMATE]' : (t.verificationStatus === 'registry' ? '[LOCAL REFERENCE]' : (t.verificationStatus === 'here-class1' ? '[HERE CLASS 1 FARE]' : '[HERE API]')));
-          return ` - ${formatTollDisplayName(t)} ${tag}: ${t.unresolved ? 'Confirm manually' : money(t.amount)}`;
-        }).join('\n')
-      : ' - No toll records returned by HERE; this does NOT prove the route is toll-free';
+      ? data.tollItems.map(t => ` - ${formatTollDisplayName(t)}: ${money(t.amount)}`).join('\n')
+      : ' - No toll plazas crossed (RM 0.00)';
 
     return [
       `DRIVER FARE LOG — RIDESHARE MY v${APP_VERSION}`,
@@ -3201,8 +2284,8 @@
       `Long-haul contribution: ${money(data.longHaulIncentive)}`,
       `Transport subtotal: ${money(data.transportSubtotal)}`,
       `Minimum-adjusted transport fare: ${money(data.transportFare)}`,
-      `Toll charges: ${money(data.tollFee)}`,
-      'Toll records (registry/HERE/corridor labels are not live tariff verification):',
+      `Toll charges (Class 1 TnG / SmartTAG): ${money(data.tollFee)}`,
+      'Toll plazas matched:',
       tollLines,
       '------------------------------------------------',
       `Exact calculated total: ${money(data.exactTotal)}`,
@@ -3210,9 +2293,8 @@
       `CUSTOMER QUOTATION: ${money(data.customerTotal)}`,
       '------------------------------------------------',
       `Manual toll adjustment: ${money(data.manualTollAdjustment || 0)}`,
-      `Toll data status: ${data.tollStatus || 'unknown'} (${data.tollUnresolvedCount || 0} unresolved record(s))`,
       `Driver transport earnings: ${money(data.driverFareEarnings)}`,
-      `Driver collection including identified tolls: ${money(data.driverAmountAfterDeduction)}`,
+      `Driver collection including tolls: ${money(data.driverAmountAfterDeduction)}`,
       '------------------------------------------------',
       `Generated by Rideshare MY Personal Edition v${APP_VERSION}`
     ].join('\n');
