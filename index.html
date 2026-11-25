@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare and toll estimator">
-<title>Rideshare MY Personal Edition v3.8.3</title>
+<title>Rideshare MY Personal Edition v3.8.4</title>
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 <style>
   :root {
@@ -252,6 +252,32 @@
     background:#f3e5f5;
     border-color:var(--primary);
     color:var(--primary);
+  }
+  .alt-routes-bar {
+    display:none;
+    flex-direction:row;
+    gap:6px;
+    overflow-x:auto;
+    margin-bottom:6px;
+    scrollbar-width:none;
+  }
+  .alt-routes-bar::-webkit-scrollbar {display:none}
+  .alt-pill {
+    flex:0 0 auto;
+    border:1px solid var(--border);
+    background:#fafafa;
+    color:#333;
+    border-radius:8px;
+    padding:5px 9px;
+    font-size:11px;
+    cursor:pointer;
+    text-align:left;
+  }
+  .alt-pill.active {
+    background:#f3e5f5;
+    border-color:var(--primary);
+    color:#4a148c;
+    font-weight:650;
   }
   .status-line {
     font-size:11px;
@@ -538,7 +564,7 @@
   <main id="search-panel">
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.8.3</span>
+      <span class="version">PERSONAL EDITION v3.8.4</span>
     </div>
 
     <!-- QUICK PINS & RECENT ROUTES -->
@@ -580,6 +606,9 @@
         🚫 Avoid Tolls
       </button>
     </div>
+
+    <!-- ROUTE ALTERNATIVE SELECTOR (LIKE TOLLGURU) -->
+    <div id="alt-routes-bar" class="alt-routes-bar" aria-label="Alternative routes"></div>
 
     <div id="loading-msg">Calculating route…</div>
     <div id="error-msg" role="alert"></div>
@@ -653,7 +682,7 @@
       </details>
 
       <!-- TOLL BREAKDOWN RECEIPT -->
-      <details id="toll-receipt-details">
+      <details open id="toll-receipt-details">
         <summary id="toll-receipt-summary">🛣️ Toll Receipt Breakdown (0 events · RM 0.00)</summary>
         <div id="toll-events-container" class="toll-event-list"></div>
         <div id="toll-operator-subtotals" class="toll-op-summary"></div>
@@ -756,7 +785,7 @@
   /* =========================================================
      1. CONFIGURATION & ZONES
      ========================================================= */
-  const APP_VERSION = '3.8.3';
+  const APP_VERSION = '3.8.4';
   const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
   const DEFAULT_SETTINGS = Object.freeze({
@@ -828,12 +857,10 @@
     OP_JKR_BORNEO: { name: 'JKR Sabah / JKR Sarawak (Toll-Free)', short: 'Borneo Toll-Free', regulator: 'JKRS_JKRSBH' }
   });
 
-  // Penang Island centroid for accurate bridge crossing direction detection
   const PENANG_ISLAND_CENTER = Object.freeze({ lat: 5.3650, lng: 100.2850 });
 
   const TOLL_PLAZAS = [
     // --- PENANG BRIDGES & BORR / BKE ---
-    // 1st Penang Bridge (E36): Class 1 = RM 7.00 (700 sen); 2nd Bridge (E28): Class 1 = RM 5.74 (574 sen)
     { id:'PLZ_E36_PERAI', code:'E36', name:'Penang Bridge (Perai)', op:'OP_PLUS', type:'BRIDGE', net:null, dir:'MAINLAND_TO_ISLAND', rateCents:700, lat:5.3792, lng:100.3863, radiusKm:0.75 },
     { id:'PLZ_E28_BDR_CASSIA_BRG', code:'E28', name:'Penang 2nd Bridge (Bandar Cassia)', op:'OP_JKSB', type:'BRIDGE', net:null, dir:'MAINLAND_TO_ISLAND', rateCents:574, lat:5.2442, lng:100.4316, radiusKm:0.85 },
     { id:'PLZ_E17_PERAI', code:'E17', name:'BORR Perai', op:'OP_BORR', type:'OPEN', net:null, dir:'ANY', rateCents:150, lat:5.3887, lng:100.3849, radiusKm:0.45 },
@@ -934,12 +961,16 @@
     { id:'PLZ_E19_ALAM_DAMAI', code:'E19', name:'Alam Damai (SUKE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.0745, lng:101.7445, radiusKm:0.45 },
     { id:'PLZ_E19_BKT_TERATAI', code:'E19', name:'Bukit Teratai (SUKE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1125, lng:101.7685, radiusKm:0.45 },
     { id:'PLZ_E19_AMPANG', code:'E19', name:'Ampang (SUKE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1485, lng:101.7665, radiusKm:0.45 },
-    { id:'PLZ_E33_BATU', code:'E33', name:'Batu (DUKE)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.2045, lng:101.6825, radiusKm:0.45 },
-    { id:'PLZ_E33_SENTUL_PASAR', code:'E33', name:'Sentul Pasar (DUKE)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1935, lng:101.6985, radiusKm:0.45 },
-    { id:'PLZ_E33_AYER_PANAS', code:'E33', name:'Ayer Panas (DUKE)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1865, lng:101.7225, radiusKm:0.45 },
-    { id:'PLZ_E33_SEGAMBUT', code:'E33', name:'Segambut (DUKE 2)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1885, lng:101.6625, radiusKm:0.45 },
+
+    // --- RECTIFIED DUKE / DUKE 2 / SPE (E33 / E39) ---
+    // Batu (E33 Northbound to Karak/Gombak) vs Sentul Pasar (E33 Eastbound to Ampang/Ulu Klang)
+    { id:'PLZ_E33_BATU', code:'E33', name:'Batu (DUKE)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.2089, lng:101.6822, radiusKm:0.45 },
+    { id:'PLZ_E33_SENTUL_PASAR', code:'E33', name:'Sentul Pasar (DUKE East)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1912, lng:101.7018, radiusKm:0.35 },
+    { id:'PLZ_E33_AYER_PANAS', code:'E33', name:'Ayer Panas (DUKE)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1865, lng:101.7225, radiusKm:0.40 },
+    { id:'PLZ_E33_SEGAMBUT', code:'E33', name:'Segambut (DUKE 2)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1856, lng:101.6621, radiusKm:0.45 },
     { id:'PLZ_E39_SETIAWANGSA', code:'E39', name:'Setiawangsa (SPE / DUKE 3)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:350, lat:3.1765, lng:101.7415, radiusKm:0.45 },
     { id:'PLZ_E39_CHAN_SOW_LIN', code:'E39', name:'Chan Sow Lin (SPE)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:350, lat:3.1285, lng:101.7165, radiusKm:0.45 },
+
     { id:'PLZ_E7_BATU9', code:'E7', name:'Batu 9 Cheras (Grand Saga)', op:'OP_GRAND_SAGA', type:'OPEN', net:null, dir:'ANY', rateCents:130, lat:3.0715, lng:101.7645, radiusKm:0.45 },
     { id:'PLZ_E7_BATU11', code:'E7', name:'Batu 11 Cheras (Grand Saga)', op:'OP_GRAND_SAGA', type:'OPEN', net:null, dir:'ANY', rateCents:130, lat:3.0465, lng:101.7735, radiusKm:0.45 },
     { id:'PLZ_E30_BUKIT_RAJA', code:'E30', name:'Bukit Raja (NNKSB)', op:'OP_GRAND_SEPADU', type:'OPEN', net:null, dir:'ANY', rateCents:60, lat:3.0685, lng:101.4565, radiusKm:0.45 },
@@ -948,9 +979,9 @@
     { id:'PLZ_E25_KUANG', code:'E25', name:'Kuang (LATAR)', op:'OP_LATAR', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.2685, lng:101.5545, radiusKm:0.50 },
     { id:'PLZ_E25_TEMPLER', code:'E25', name:'Taman Rimba Templer (LATAR)', op:'OP_LATAR', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.2985, lng:101.6245, radiusKm:0.50 },
 
-    // --- EAST COAST EXPRESSWAY: KL-KARAK (OPEN) + LPT1/LPT2 (CLOSED) & GENTING ACCESS ---
-    { id:'PLZ_GENTING_ACCESS', code:'GENTING', name:'Genting Highlands Road Entry (Class 1)', op:'OP_AFA_PRIME', type:'OPEN', net:null, dir:'ANY', rateCents:500, lat:3.4015, lng:101.7825, radiusKm:1.30 },
-    { id:'PLZ_E8_GOMBAK', code:'E8', name:'Gombak (KL–Karak Open)', op:'OP_AFA_PRIME', type:'OPEN', net:null, dir:'ANY', rateCents:600, lat:3.2585, lng:101.7345, radiusKm:0.70 },
+    // --- EAST COAST EXPRESSWAY: KL-KARAK (OPEN) + LPT1/LPT2 (CLOSED) ---
+    // Exact Gombak Toll Plaza coordinates (3.2528, 101.7278) — Genting resort road itself is toll-free
+    { id:'PLZ_E8_GOMBAK', code:'E8', name:'Gombak (KL–Karak Open)', op:'OP_AFA_PRIME', type:'OPEN', net:null, dir:'ANY', rateCents:600, lat:3.2528, lng:101.7278, radiusKm:0.75 },
     { id:'PLZ_E8_BENTONG', code:'E8', name:'Bentong (KL–Karak Open)', op:'OP_AFA_PRIME', type:'OPEN', net:null, dir:'ANY', rateCents:350, lat:3.5045, lng:101.9085, radiusKm:0.70 },
     { id:'PLZ_E8_KARAK', code:'E8', name:'Karak (LPT1 Closed)', op:'OP_AFA_PRIME', type:'CLOSED', net:'NET_LPT1', dir:'ANY', rateCents:0, lat:3.4285, lng:102.0445, radiusKm:0.75 },
     { id:'PLZ_E8_TEMERLOH', code:'E8', name:'Temerloh (LPT1)', op:'OP_AFA_PRIME', type:'CLOSED', net:'NET_LPT1', dir:'ANY', rateCents:0, lat:3.4885, lng:102.4145, radiusKm:0.70 },
@@ -975,7 +1006,6 @@
 
   // Rectified Class 1 closed-system matrix pairs (in sen)
   const CLOSED_MATRIX_RAW = [
-    // From Jalan Duta (KL North)
     ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_RAWANG', 295],
     ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_TG_MALIM', 779],
     ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_TAPAH', 1591],
@@ -990,20 +1020,17 @@
     ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_ALOR_SETAR_U', 4551],
     ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_HUTAN_KAMPUNG', 4617],
 
-    // From Sungai Buloh (KL North-West)
     ['NET_PLUS', 'PLZ_E1_SG_BULOH', 'PLZ_E1_IPOH_SEL', 2110],
     ['NET_PLUS', 'PLZ_E1_SG_BULOH', 'PLZ_E1_BDR_CASSIA', 3325],
     ['NET_PLUS', 'PLZ_E1_SG_BULOH', 'PLZ_E1_JURU', 3485],
     ['NET_PLUS', 'PLZ_E1_SG_BULOH', 'PLZ_E1_SG_DUA', 3595],
 
-    // From Subang / Kota Damansara / Damansara
     ['NET_PLUS', 'PLZ_E1_SUBANG', 'PLZ_E1_BDR_CASSIA', 3346],
     ['NET_PLUS', 'PLZ_E1_SUBANG', 'PLZ_E1_JURU', 3510],
     ['NET_PLUS', 'PLZ_E1_SUBANG', 'PLZ_E1_SG_DUA', 3620],
     ['NET_PLUS', 'PLZ_E1_KOTA_DAMANSARA', 'PLZ_E1_JURU', 3500],
     ['NET_PLUS', 'PLZ_E1_KOTA_DAMANSARA', 'PLZ_E1_BDR_CASSIA', 3340],
 
-    // From Bukit Raja & Setia Alam (Klang / Setia City)
     ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_JLN_DUTA', 295],
     ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_SG_BULOH', 230],
     ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_SETIA_ALAM', 75],
@@ -1026,7 +1053,6 @@
     ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E2_SKUDAI', 3725],
     ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E6_KLIA', 585],
 
-    // ELITE & NSE South
     ['NET_PLUS', 'PLZ_E1_SUBANG', 'PLZ_E6_KLIA', 525],
     ['NET_PLUS', 'PLZ_E1_SHAH_ALAM', 'PLZ_E6_KLIA', 565],
     ['NET_PLUS', 'PLZ_E6_USJ', 'PLZ_E6_KLIA', 455],
@@ -1048,14 +1074,12 @@
     ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E2_SKUDAI', 3780],
     ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E2_AYER_KEROH', 1745],
 
-    // LPT1 (Karak to Kuantan / Jabor)
     ['NET_LPT1', 'PLZ_E8_KARAK', 'PLZ_E8_TEMERLOH', 600],
     ['NET_LPT1', 'PLZ_E8_KARAK', 'PLZ_E8_MARAN', 1170],
     ['NET_LPT1', 'PLZ_E8_KARAK', 'PLZ_E8_GAMBANG', 1690],
     ['NET_LPT1', 'PLZ_E8_KARAK', 'PLZ_E8_KUANTAN', 1960],
     ['NET_LPT1', 'PLZ_E8_KARAK', 'PLZ_E8_JABOR', 2100],
 
-    // LEKAS (Kajang Selatan to Setul)
     ['NET_LEKAS', 'PLZ_E21_KAJANG_SEL', 'PLZ_E21_SEMENYIH', 160],
     ['NET_LEKAS', 'PLZ_E21_KAJANG_SEL', 'PLZ_E21_PAJAM', 380],
     ['NET_LEKAS', 'PLZ_E21_KAJANG_SEL', 'PLZ_E21_MANTIN', 530],
@@ -1109,6 +1133,8 @@
   let routePolylines = [];
 
   let activeRoutingMode = 'fast';
+  let availableRoutes = [];
+  let selectedRouteIndex = 0;
   let routeRequestId = 0;
   let routeDebounce = null;
   let latestCalculation = null;
@@ -1397,7 +1423,6 @@
     return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
   }
 
-  // Densify long polyline spans (> 0.25 km) so high-speed segments do not skip plazas
   function densifyPolyline(points, maxStepKm = 0.25) {
     if (!Array.isArray(points) || points.length < 2) return points || [];
     const out = [points[0]];
@@ -1687,6 +1712,10 @@
     if (clearResults) {
       clearRouteObjects();
       $('result-card').style.display = 'none';
+      $('alt-routes-bar').style.display = 'none';
+      $('alt-routes-bar').innerHTML = '';
+      availableRoutes = [];
+      selectedRouteIndex = 0;
       latestCalculation = null;
       setRouteStatus('');
     }
@@ -2168,7 +2197,7 @@
   }
 
   /* =========================================================
-     12. ROUTE CALCULATION (HERE ROUTING API v8)
+     12. ROUTE CALCULATION (HERE ROUTING API v8 + ALTERNATIVES)
      ========================================================= */
   function calculateRoute() {
     if (!pickupCoords || !dropoffCoords) return;
@@ -2201,7 +2230,7 @@
 
     setLoading(true);
     clearError();
-    setRouteStatus('Requesting route & evaluating toll events…');
+    setRouteStatus('Requesting routes & evaluating toll events…');
 
     routeDebounce = setTimeout(() => {
       if (requestId !== routeRequestId) return;
@@ -2210,6 +2239,7 @@
         transportMode:'car',
         origin:`${origin.lat},${origin.lng}`,
         destination:`${destination.lat},${destination.lng}`,
+        alternatives:2,
         departureTime:'any',
         return:'polyline,summary,actions'
       };
@@ -2227,7 +2257,12 @@
             return;
           }
           try {
-            handleRouteResult(result.routes[0],result.routes.length,requestId);
+            availableRoutes = result.routes.map((rt, idx) =>
+              analyzeSingleRoute(rt, idx, routingMode === 'notoll')
+            );
+            selectedRouteIndex = 0;
+            renderAlternativeRoutesBar();
+            applyAnalyzedRoute(0, requestId);
           } catch(error) {
             console.error('Route processing error:',error);
             showError('Route was returned, but its details could not be processed.',true);
@@ -2245,38 +2280,28 @@
   }
 
   /* =========================================================
-     13. ROUTE RESULT PROCESSING & TOLL EXTRACTION
+     13. ROUTE ANALYSIS & ALTERNATIVE SWITCHING
      ========================================================= */
-  function handleRouteResult(route,routesReturnedCount,requestId) {
-    if (requestId !== routeRequestId) return;
+  function analyzeSingleRoute(route, idx, avoidTollsSelected) {
     const sections = Array.isArray(route.sections) ? route.sections : [];
-    if (!sections.length) {
-      throw new Error('Route contains no sections.');
-    }
+    if (!sections.length) throw new Error('Route contains no sections.');
 
     let distanceMeters = 0;
     let durationSeconds = 0;
     const decodedPoints = [];
-
-    clearRouteObjects();
-    const group = new H.map.Group();
+    const lineStrings = [];
 
     sections.forEach(section => {
       distanceMeters += Number(section.summary && section.summary.length || 0);
       durationSeconds += Number(section.summary && section.summary.duration || 0);
-
       if (!section.polyline) return;
       const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
+      lineStrings.push(lineString);
       const count = lineString.getPointCount();
       for (let i = 0; i < count; i++) {
         const pt = lineString.extractPoint(i);
         decodedPoints.push({ lat: pt.lat, lng: pt.lng });
       }
-      const line = new H.map.Polyline(lineString,{
-        style:{strokeColor: activeRoutingMode === 'notoll' ? '#2e7d32' : '#8e24aa', lineWidth:5}
-      });
-      routePolylines.push(line);
-      group.addObject(line);
     });
 
     const distanceKm = distanceMeters / 1000;
@@ -2284,6 +2309,59 @@
     if (!(distanceKm > 0) || !Number.isFinite(durationMins) || durationMins < 0) {
       throw new Error('Invalid route summary.');
     }
+
+    const tollResult = evaluateRouteTolls(decodedPoints, avoidTollsSelected);
+    const viaHint = tollResult.events.length
+      ? tollResult.events.map(e => e.routeCode).filter((v, i, a) => a.indexOf(v) === i).join(' · ')
+      : 'Toll-free';
+
+    return {
+      idx,
+      distanceKm,
+      durationMins,
+      lineStrings,
+      tollResult,
+      viaHint
+    };
+  }
+
+  function renderAlternativeRoutesBar() {
+    const bar = $('alt-routes-bar');
+    bar.innerHTML = '';
+    if (availableRoutes.length <= 1) {
+      bar.style.display = 'none';
+      return;
+    }
+    availableRoutes.forEach((item, idx) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = idx === selectedRouteIndex ? 'alt-pill active' : 'alt-pill';
+      const tag = idx === 0 ? 'Primary' : `Alt ${idx}`;
+      btn.textContent = `${tag} (${item.viaHint}) · ${item.distanceKm.toFixed(1)} km · ${moneyFromCents(item.tollResult.totalTollCents)} toll`;
+      btn.addEventListener('click', () => {
+        selectedRouteIndex = idx;
+        renderAlternativeRoutesBar();
+        applyAnalyzedRoute(idx, routeRequestId);
+      });
+      bar.appendChild(btn);
+    });
+    bar.style.display = 'flex';
+  }
+
+  function applyAnalyzedRoute(idx, requestId) {
+    if (requestId !== routeRequestId) return;
+    const analyzed = availableRoutes[idx];
+    if (!analyzed) return;
+
+    clearRouteObjects();
+    const group = new H.map.Group();
+    analyzed.lineStrings.forEach(ls => {
+      const line = new H.map.Polyline(ls,{
+        style:{strokeColor: activeRoutingMode === 'notoll' ? '#2e7d32' : '#8e24aa', lineWidth:5}
+      });
+      routePolylines.push(line);
+      group.addObject(line);
+    });
 
     if (routePolylines.length) {
       map.addObjects(routePolylines);
@@ -2293,14 +2371,10 @@
       }
     }
 
-    const tollResult = evaluateRouteTolls(decodedPoints, activeRoutingMode === 'notoll');
-
     const calculation = processCalculations({
-      distance:distanceKm,
-      duration:durationMins,
-      sectionsCount:sections.length,
-      alternativesCount:Math.max(0,routesReturnedCount - 1),
-      tollResult
+      distance:analyzed.distanceKm,
+      duration:analyzed.durationMins,
+      tollResult:analyzed.tollResult
     });
 
     latestCalculation = calculation;
@@ -2310,10 +2384,10 @@
     const modeLabel = activeRoutingMode === 'fast'
       ? 'Fastest'
       : (activeRoutingMode === 'short' ? 'Shortest' : 'Avoid Tolls');
-    const tollLabel = tollResult.totalTollCents > 0
-      ? `${moneyFromCents(tollResult.totalTollCents)} toll`
+    const tollLabel = analyzed.tollResult.totalTollCents > 0
+      ? `${moneyFromCents(analyzed.tollResult.totalTollCents)} toll`
       : 'Toll-free';
-    setRouteStatus(`Route calculated · ${modeLabel} · ${tollLabel}`);
+    setRouteStatus(`Route ${idx + 1}/${availableRoutes.length} · ${modeLabel} · ${tollLabel}`);
   }
 
   /* =========================================================
