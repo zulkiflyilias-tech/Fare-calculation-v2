@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare and toll estimator">
-<title>Rideshare MY Personal Edition v3.8.1</title>
+<title>Rideshare MY Personal Edition v3.8.2</title>
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 <style>
   :root {
@@ -193,19 +193,28 @@
   }
   .quick-bar {
     display:flex;
+    flex-direction:row;
+    align-items:center;
+    flex-shrink:0;
+    min-height:36px;
     gap:6px;
     overflow-x:auto;
-    padding:2px 0 6px;
+    overflow-y:hidden;
+    padding:2px 0 8px;
+    margin-bottom:6px;
     scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
   }
   .quick-bar::-webkit-scrollbar {display:none}
   .chip-btn {
+    flex:0 0 auto;
     border:1px solid var(--border);
     background:#f5f3f7;
     color:#4a148c;
     border-radius:16px;
-    padding:5px 10px;
+    padding:5px 11px;
     font-size:11px;
+    line-height:1.25;
     font-weight:600;
     white-space:nowrap;
     cursor:pointer;
@@ -529,7 +538,7 @@
   <main id="search-panel">
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.8.1</span>
+      <span class="version">PERSONAL EDITION v3.8.2</span>
     </div>
 
     <!-- QUICK PINS & RECENT ROUTES -->
@@ -747,7 +756,7 @@
   /* =========================================================
      1. CONFIGURATION & ZONES
      ========================================================= */
-  const APP_VERSION = '3.8.1';
+  const APP_VERSION = '3.8.2';
   const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
   const DEFAULT_SETTINGS = Object.freeze({
@@ -935,7 +944,8 @@
     { id:'PLZ_E25_KUANG', code:'E25', name:'Kuang (LATAR)', op:'OP_LATAR', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.2685, lng:101.5545, radiusKm:0.50 },
     { id:'PLZ_E25_TEMPLER', code:'E25', name:'Taman Rimba Templer (LATAR)', op:'OP_LATAR', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.2985, lng:101.6245, radiusKm:0.50 },
 
-    // --- EAST COAST EXPRESSWAY: KL-KARAK (OPEN) + LPT1/LPT2 (CLOSED) ---
+    // --- EAST COAST EXPRESSWAY: KL-KARAK (OPEN) + LPT1/LPT2 (CLOSED) & GENTING ACCESS ---
+    { id:'PLZ_GENTING_ACCESS', code:'GENTING', name:'Genting Highlands Private Road Entry (Class 1)', op:'OP_AFA_PRIME', type:'OPEN', net:null, dir:'ANY', rateCents:500, lat:3.4015, lng:101.7825, radiusKm:1.20 },
     { id:'PLZ_E8_GOMBAK', code:'E8', name:'Gombak (KL–Karak Open)', op:'OP_AFA_PRIME', type:'OPEN', net:null, dir:'ANY', rateCents:600, lat:3.2585, lng:101.7345, radiusKm:0.60 },
     { id:'PLZ_E8_BENTONG', code:'E8', name:'Bentong (KL–Karak Open)', op:'OP_AFA_PRIME', type:'OPEN', net:null, dir:'ANY', rateCents:350, lat:3.5045, lng:101.9085, radiusKm:0.60 },
     { id:'PLZ_E8_KARAK', code:'E8', name:'Karak (LPT1 Closed)', op:'OP_AFA_PRIME', type:'CLOSED', net:'NET_LPT1', dir:'ANY', rateCents:0, lat:3.4285, lng:102.0445, radiusKm:0.65 },
@@ -1004,6 +1014,11 @@
     ['NET_PLUS', 'PLZ_E2_SG_BESI', 'PLZ_E2_SKUDAI', 3321],
     ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E2_SKUDAI', 3780],
     ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E2_AYER_KEROH', 1745],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_JLN_DUTA', 240],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_IPOH_SEL', 2335],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_JURU', 3710],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E2_SKUDAI', 3725],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E6_KLIA', 585],
     ['NET_LPT1', 'PLZ_E8_KARAK', 'PLZ_E8_TEMERLOH', 600],
     ['NET_LPT1', 'PLZ_E8_KARAK', 'PLZ_E8_MARAN', 1170],
     ['NET_LPT1', 'PLZ_E8_KARAK', 'PLZ_E8_GAMBANG', 1690],
