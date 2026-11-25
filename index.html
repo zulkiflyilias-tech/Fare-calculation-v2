@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare and toll estimator">
-<title>Rideshare MY Personal Edition v3.8.5</title>
+<title>Rideshare MY Personal Edition v3.8.2</title>
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 <style>
   :root {
@@ -252,32 +252,6 @@
     background:#f3e5f5;
     border-color:var(--primary);
     color:var(--primary);
-  }
-  .alt-routes-bar {
-    display:none;
-    flex-direction:row;
-    gap:6px;
-    overflow-x:auto;
-    margin-bottom:6px;
-    scrollbar-width:none;
-  }
-  .alt-routes-bar::-webkit-scrollbar {display:none}
-  .alt-pill {
-    flex:0 0 auto;
-    border:1px solid var(--border);
-    background:#fafafa;
-    color:#333;
-    border-radius:8px;
-    padding:5px 9px;
-    font-size:11px;
-    cursor:pointer;
-    text-align:left;
-  }
-  .alt-pill.active {
-    background:#f3e5f5;
-    border-color:var(--primary);
-    color:#4a148c;
-    font-weight:650;
   }
   .status-line {
     font-size:11px;
@@ -564,7 +538,7 @@
   <main id="search-panel">
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.8.5</span>
+      <span class="version">PERSONAL EDITION v3.8.2</span>
     </div>
 
     <!-- QUICK PINS & RECENT ROUTES -->
@@ -606,9 +580,6 @@
         🚫 Avoid Tolls
       </button>
     </div>
-
-    <!-- ROUTE ALTERNATIVE SELECTOR -->
-    <div id="alt-routes-bar" class="alt-routes-bar" aria-label="Alternative routes"></div>
 
     <div id="loading-msg">Calculating route…</div>
     <div id="error-msg" role="alert"></div>
@@ -682,7 +653,7 @@
       </details>
 
       <!-- TOLL BREAKDOWN RECEIPT -->
-      <details open id="toll-receipt-details">
+      <details id="toll-receipt-details">
         <summary id="toll-receipt-summary">🛣️ Toll Receipt Breakdown (0 events · RM 0.00)</summary>
         <div id="toll-events-container" class="toll-event-list"></div>
         <div id="toll-operator-subtotals" class="toll-op-summary"></div>
@@ -773,7 +744,7 @@
     </details>
 
     <p class="small-muted">
-      Estimates are indicative. Toll calculations use exact plaza coordinates with Class 1 operator matrices and open/bridge tariffs across Peninsular Malaysia, Sabah &amp; Sarawak.
+      Estimates are indicative. Toll calculations use Class 1 operator matrices and open/bridge tariffs across Peninsular Malaysia, Sabah &amp; Sarawak.
     </p>
   </main>
 </div>
@@ -785,7 +756,7 @@
   /* =========================================================
      1. CONFIGURATION & ZONES
      ========================================================= */
-  const APP_VERSION = '3.8.5';
+  const APP_VERSION = '3.8.2';
   const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
   const DEFAULT_SETTINGS = Object.freeze({
@@ -834,8 +805,8 @@
   ];
 
   /* =========================================================
-     2. EXACT-COORDINATE MALAYSIAN TOLL DATABASE (CLASS 1)
-     Every plaza pinned to its physical toll gantry coordinates
+     2. OPERATOR-CENTRIC MALAYSIAN TOLL DATABASE (CLASS 1)
+     Covers Peninsular Malaysia, Sabah & Sarawak (LLM & Non-LLM)
      ========================================================= */
   const TOLL_OPERATORS = Object.freeze({
     OP_PLUS: { name: 'PLUS Malaysia Berhad', short: 'PLUS', regulator: 'LLM' },
@@ -845,7 +816,6 @@
     OP_AFA_PRIME: { name: 'AFA Prime Berhad (KLK/LPT1)', short: 'AFA Prime (KLK/LPT1)', regulator: 'LLM' },
     OP_LPT2: { name: 'Lebuhraya Pantai Timur 2', short: 'LPT2 (PLUS)', regulator: 'LLM' },
     OP_IJM: { name: 'IJM Toll Division', short: 'IJM (BESRAYA/NPE/LEKAS/WCE)', regulator: 'LLM' },
-    OP_WCE: { name: 'West Coast Expressway Sdn Bhd', short: 'WCE', regulator: 'LLM' },
     OP_EKOVEST: { name: 'KESTURI (DUKE / SPE)', short: 'DUKE / SPE', regulator: 'LLM' },
     OP_MEX: { name: 'Maju Expressway Sdn Bhd', short: 'MEX', regulator: 'LLM' },
     OP_SKVE: { name: 'SKVE Holdings Sdn Bhd', short: 'SKVE', regulator: 'LLM' },
@@ -858,172 +828,140 @@
     OP_JKR_BORNEO: { name: 'JKR Sabah / JKR Sarawak (Toll-Free)', short: 'Borneo Toll-Free', regulator: 'JKRS_JKRSBH' }
   });
 
-  const PENANG_ISLAND_CENTER = Object.freeze({ lat: 5.3650, lng: 100.2850 });
-
   const TOLL_PLAZAS = [
-    // --- PENANG BRIDGES, BORR (E17) & BKE (E15) ---
-    { id:'PLZ_E36_PERAI', code:'E36', name:'Penang Bridge (Perai)', op:'OP_PLUS', type:'BRIDGE', net:null, dir:'MAINLAND_TO_ISLAND', rateCents:574, lat:5.3792, lng:100.3863, radiusKm:0.55 },
-    { id:'PLZ_E28_BDR_CASSIA_BRG', code:'E28', name:'Penang 2nd Bridge (Bandar Cassia)', op:'OP_JKSB', type:'BRIDGE', net:null, dir:'MAINLAND_TO_ISLAND', rateCents:574, lat:5.2427, lng:100.4319, radiusKm:0.55 },
-    { id:'PLZ_E17_PERAI', code:'E17', name:'BORR Perai', op:'OP_BORR', type:'OPEN', net:null, dir:'ANY', rateCents:150, lat:5.3887, lng:100.3849, radiusKm:0.35 },
-    { id:'PLZ_E17_BAGAN_AJAM', code:'E17', name:'BORR Bagan Ajam', op:'OP_BORR', type:'OPEN', net:null, dir:'ANY', rateCents:150, lat:5.4379, lng:100.3821, radiusKm:0.35 },
-    { id:'PLZ_E17_SG_NYIOR', code:'E17', name:'BORR Sungai Nyior', op:'OP_BORR', type:'OPEN', net:null, dir:'ANY', rateCents:120, lat:5.4088, lng:100.3736, radiusKm:0.35 },
-    { id:'PLZ_E15_KUBANG_SEMANG', code:'E15', name:'BKE Kubang Semang', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:131, lat:5.4055, lng:100.4648, radiusKm:0.40 },
-    { id:'PLZ_E15_LUNAS', code:'E15', name:'BKE Lunas', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:131, lat:5.4326, lng:100.5349, radiusKm:0.40 },
+    // --- PENANG BRIDGES & BORR / BKE ---
+    { id:'PLZ_E36_PERAI', code:'E36', name:'Penang Bridge (Perai)', op:'OP_PLUS', type:'BRIDGE', net:null, dir:'MAINLAND_TO_ISLAND', rateCents:574, lat:5.3792, lng:100.3863, radiusKm:0.65 },
+    { id:'PLZ_E28_BDR_CASSIA_BRG', code:'E28', name:'Penang 2nd Bridge (Bandar Cassia)', op:'OP_JKSB', type:'BRIDGE', net:null, dir:'MAINLAND_TO_ISLAND', rateCents:574, lat:5.2442, lng:100.4316, radiusKm:0.75 },
+    { id:'PLZ_E17_PERAI', code:'E17', name:'BORR Perai', op:'OP_BORR', type:'OPEN', net:null, dir:'ANY', rateCents:150, lat:5.3887, lng:100.3849, radiusKm:0.45 },
+    { id:'PLZ_E17_BAGAN_AJAM', code:'E17', name:'BORR Bagan Ajam', op:'OP_BORR', type:'OPEN', net:null, dir:'ANY', rateCents:150, lat:5.4379, lng:100.3821, radiusKm:0.45 },
+    { id:'PLZ_E17_SG_NYIOR', code:'E17', name:'BORR Sungai Nyior', op:'OP_BORR', type:'OPEN', net:null, dir:'ANY', rateCents:120, lat:5.4088, lng:100.3736, radiusKm:0.45 },
+    { id:'PLZ_E15_KUBANG_SEMANG', code:'E15', name:'BKE Kubang Semang', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:131, lat:5.4055, lng:100.4648, radiusKm:0.50 },
+    { id:'PLZ_E15_LUNAS', code:'E15', name:'BKE Lunas', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:131, lat:5.4326, lng:100.5349, radiusKm:0.50 },
 
-    // --- PLUS E1 NORTHERN & NKVE CLOSED SYSTEM GANTRIES ---
-    { id:'PLZ_E1_HUTAN_KAMPUNG', code:'E1', name:'Hutan Kampung (Alor Setar N)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:6.1731, lng:100.4046, radiusKm:0.50 },
-    { id:'PLZ_E1_ALOR_SETAR_U', code:'E1', name:'Alor Setar Utara', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:6.1438, lng:100.3958, radiusKm:0.45 },
-    { id:'PLZ_E1_ALOR_SETAR_S', code:'E1', name:'Alor Setar Selatan', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:6.0853, lng:100.3698, radiusKm:0.45 },
-    { id:'PLZ_E1_SG_PETANI_U', code:'E1', name:'Sungai Petani Utara', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:5.6754, lng:100.5042, radiusKm:0.45 },
-    { id:'PLZ_E1_SG_PETANI_S', code:'E1', name:'Sungai Petani Selatan', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:5.6119, lng:100.4832, radiusKm:0.45 },
-    { id:'PLZ_E1_SG_DUA', code:'E1', name:'Sungai Dua (Penang North)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:5.4475, lng:100.4321, radiusKm:0.55 },
-    { id:'PLZ_E1_JURU_OPEN', code:'E1', name:'Juru Barrier (Penang Hybrid)', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:110, lat:5.3315, lng:100.4310, radiusKm:0.45 },
-    { id:'PLZ_E1_JURU', code:'E1', name:'Juru (NSE Closed)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:5.3025, lng:100.4375, radiusKm:0.55 },
-    { id:'PLZ_E1_BDR_CASSIA', code:'E1', name:'Bandar Cassia / Batu Kawan', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:5.2421, lng:100.4495, radiusKm:0.50 },
-    { id:'PLZ_E1_TAIPING_U', code:'E1', name:'Taiping Utara', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:4.9124, lng:100.6921, radiusKm:0.50 },
-    { id:'PLZ_E1_KUALA_KANGSAR', code:'E1', name:'Kuala Kangsar', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:4.7891, lng:100.9168, radiusKm:0.50 },
-    { id:'PLZ_E1_IPOH_U', code:'E1', name:'Ipoh Utara (Jelapang)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:4.6594, lng:101.0772, radiusKm:0.55 },
-    { id:'PLZ_E1_IPOH_SEL', code:'E1', name:'Ipoh Selatan', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:4.5858, lng:101.1328, radiusKm:0.50 },
-    { id:'PLZ_E1_TAPAH', code:'E1', name:'Tapah', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:4.1972, lng:101.2496, radiusKm:0.50 },
-    { id:'PLZ_E1_TG_MALIM', code:'E1', name:'Tanjung Malim', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.6845, lng:101.5142, radiusKm:0.50 },
-    { id:'PLZ_E1_RAWANG', code:'E1', name:'Rawang', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.3132, lng:101.5562, radiusKm:0.50 },
-    { id:'PLZ_E1_SG_BULOH', code:'E1', name:'Sungai Buloh', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.2141, lng:101.5794, radiusKm:0.50 },
-    { id:'PLZ_E1_JLN_DUTA', code:'E1', name:'Jalan Duta (KL North)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.1758, lng:101.6634, radiusKm:0.60 },
-    { id:'PLZ_E1_KOTA_DAMANSARA', code:'E1', name:'Kota Damansara (NKVE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.1518, lng:101.5898, radiusKm:0.40 },
-    { id:'PLZ_E1_DAMANSARA', code:'E1', name:'Damansara (NKVE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.1285, lng:101.6085, radiusKm:0.40 },
-    { id:'PLZ_E1_SUBANG', code:'E1', name:'Subang (NKVE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.1095, lng:101.5824, radiusKm:0.45 },
-    { id:'PLZ_E1_SHAH_ALAM', code:'E1', name:'Shah Alam (NKVE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.0845, lng:101.5582, radiusKm:0.45 },
-    { id:'PLZ_E1_SETIA_ALAM', code:'E1', name:'Setia Alam (NKVE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.0955, lng:101.4748, radiusKm:0.50 },
-    { id:'PLZ_E1_BUKIT_RAJA', code:'E1', name:'Bukit Raja (NKVE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.0631, lng:101.4646, radiusKm:0.50 },
+    // --- PLUS E1/E2/E6 CLOSED SYSTEM NODES (NET_PLUS) ---
+    { id:'PLZ_E1_HUTAN_KAMPUNG', code:'E1', name:'Hutan Kampung (Alor Setar N)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:6.1731, lng:100.4046, radiusKm:0.65 },
+    { id:'PLZ_E1_ALOR_SETAR_U', code:'E1', name:'Alor Setar Utara', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:6.1438, lng:100.3958, radiusKm:0.55 },
+    { id:'PLZ_E1_ALOR_SETAR_S', code:'E1', name:'Alor Setar Selatan', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:6.0853, lng:100.3698, radiusKm:0.55 },
+    { id:'PLZ_E1_SG_PETANI_U', code:'E1', name:'Sungai Petani Utara', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:5.6754, lng:100.5042, radiusKm:0.55 },
+    { id:'PLZ_E1_SG_PETANI_S', code:'E1', name:'Sungai Petani Selatan', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:5.6119, lng:100.4832, radiusKm:0.55 },
+    { id:'PLZ_E1_SG_DUA', code:'E1', name:'Sungai Dua (Penang North)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:5.4475, lng:100.4321, radiusKm:0.65 },
+    { id:'PLZ_E1_JURU_OPEN', code:'E1', name:'Juru Barrier (Penang Hybrid)', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:110, lat:5.3315, lng:100.4310, radiusKm:0.55 },
+    { id:'PLZ_E1_JURU', code:'E1', name:'Juru (NSE Closed)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:5.3025, lng:100.4375, radiusKm:0.65 },
+    { id:'PLZ_E1_BDR_CASSIA', code:'E1', name:'Bandar Cassia / Batu Kawan', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:5.2421, lng:100.4495, radiusKm:0.65 },
+    { id:'PLZ_E1_TAIPING_U', code:'E1', name:'Taiping Utara', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:4.9124, lng:100.6921, radiusKm:0.60 },
+    { id:'PLZ_E1_KUALA_KANGSAR', code:'E1', name:'Kuala Kangsar', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:4.7891, lng:100.9168, radiusKm:0.60 },
+    { id:'PLZ_E1_IPOH_U', code:'E1', name:'Ipoh Utara (Jelapang)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:4.6594, lng:101.0772, radiusKm:0.65 },
+    { id:'PLZ_E1_IPOH_SEL', code:'E1', name:'Ipoh Selatan', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:4.5858, lng:101.1328, radiusKm:0.65 },
+    { id:'PLZ_E1_TAPAH', code:'E1', name:'Tapah', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:4.1972, lng:101.2496, radiusKm:0.60 },
+    { id:'PLZ_E1_TG_MALIM', code:'E1', name:'Tanjung Malim', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.6845, lng:101.5142, radiusKm:0.60 },
+    { id:'PLZ_E1_RAWANG', code:'E1', name:'Rawang', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.3132, lng:101.5562, radiusKm:0.60 },
+    { id:'PLZ_E1_SG_BULOH', code:'E1', name:'Sungai Buloh', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.2141, lng:101.5794, radiusKm:0.60 },
+    { id:'PLZ_E1_JLN_DUTA', code:'E1', name:'Jalan Duta (KL North)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.1758, lng:101.6634, radiusKm:0.65 },
+    { id:'PLZ_E1_KOTA_DAMANSARA', code:'E1', name:'Kota Damansara (NKVE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.1518, lng:101.5898, radiusKm:0.55 },
+    { id:'PLZ_E1_DAMANSARA', code:'E1', name:'Damansara (NKVE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.1285, lng:101.6085, radiusKm:0.55 },
+    { id:'PLZ_E1_SUBANG', code:'E1', name:'Subang (NKVE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.1095, lng:101.5824, radiusKm:0.60 },
+    { id:'PLZ_E1_SHAH_ALAM', code:'E1', name:'Shah Alam (NKVE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.0845, lng:101.5582, radiusKm:0.60 },
+    { id:'PLZ_E1_SETIA_ALAM', code:'E1', name:'Setia Alam (NKVE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.0955, lng:101.4748, radiusKm:0.60 },
+    { id:'PLZ_E1_BUKIT_RAJA', code:'E1', name:'Bukit Raja (NKVE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.0631, lng:101.4646, radiusKm:0.65 },
+    // ELITE E6
+    { id:'PLZ_E6_USJ', code:'E6', name:'USJ (ELITE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.0338, lng:101.5822, radiusKm:0.55 },
+    { id:'PLZ_E6_PUTRA_HEIGHTS', code:'E6', name:'Putra Heights (ELITE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.9942, lng:101.5648, radiusKm:0.55 },
+    { id:'PLZ_E6_SAUJANA_PUTRA', code:'E6', name:'Bandar Saujana Putra (ELITE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.9518, lng:101.5812, radiusKm:0.55 },
+    { id:'PLZ_E6_PUTRAJAYA', code:'E6', name:'Putrajaya / Cyberjaya (ELITE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.9125, lng:101.6224, radiusKm:0.55 },
+    { id:'PLZ_E6_KLIA', code:'E6', name:'KLIA / KLIA2 (ELITE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.8112, lng:101.7015, radiusKm:0.70 },
+    // NSE South E2
+    { id:'PLZ_E2_SG_BESI', code:'E2', name:'Sungai Besi (KL South)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.0468, lng:101.7058, radiusKm:0.65 },
+    { id:'PLZ_E2_KAJANG', code:'E2', name:'Kajang (PLUS)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.9812, lng:101.7518, radiusKm:0.55 },
+    { id:'PLZ_E2_BANGI', code:'E2', name:'Bangi (PLUS)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.9248, lng:101.7664, radiusKm:0.55 },
+    { id:'PLZ_E2_NILAI', code:'E2', name:'Nilai / Bandar Baru Nilai', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.8154, lng:101.8021, radiusKm:0.60 },
+    { id:'PLZ_E2_SEREMBAN', code:'E2', name:'Seremban', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.7165, lng:101.9162, radiusKm:0.65 },
+    { id:'PLZ_E2_SENAWANG', code:'E2', name:'Senawang', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.6712, lng:101.9845, radiusKm:0.60 },
+    { id:'PLZ_E2_SPG_AMPAT', code:'E2', name:'Simpang Ampat (Alor Gajah)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.4412, lng:102.1865, radiusKm:0.60 },
+    { id:'PLZ_E2_AYER_KEROH', code:'E2', name:'Ayer Keroh (Melaka)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.3018, lng:102.3125, radiusKm:0.65 },
+    { id:'PLZ_E2_PAGOH', code:'E2', name:'Pagoh', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.1415, lng:102.7618, radiusKm:0.60 },
+    { id:'PLZ_E2_YONG_PENG_U', code:'E2', name:'Yong Peng Utara', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.0214, lng:103.0512, radiusKm:0.60 },
+    { id:'PLZ_E2_MACHAP', code:'E2', name:'Machap', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:1.8745, lng:103.2614, radiusKm:0.60 },
+    { id:'PLZ_E2_KULAI', code:'E2', name:'Kulai', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:1.6382, lng:103.5842, radiusKm:0.60 },
+    { id:'PLZ_E2_SKUDAI', code:'E2', name:'Skudai (JB North)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:1.5562, lng:103.6584, radiusKm:0.70 },
+    // Hybrid Open Plazas on E1/E2 & Linkedua E3 & SPDH E29
+    { id:'PLZ_E1_JITRA', code:'E1', name:'Jitra (Kedah Open)', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:131, lat:6.2941, lng:100.4226, radiusKm:0.65 },
+    { id:'PLZ_E2_KEMPAS', code:'E2', name:'Kempas (JB Hybrid Open)', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:172, lat:1.5276, lng:103.7138, radiusKm:0.65 },
+    { id:'PLZ_E3_TG_KUPANG', code:'E3', name:'Tanjung Kupang (2nd Link CIQ)', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:614, lat:1.3789, lng:103.6062, radiusKm:0.70 },
+    { id:'PLZ_E3_LIMA_KEDAI', code:'E3', name:'Lima Kedai (Linkedua)', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:319, lat:1.4945, lng:103.6182, radiusKm:0.60 },
+    { id:'PLZ_E3_PERLING', code:'E3', name:'Perling (Linkedua)', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:188, lat:1.4748, lng:103.6745, radiusKm:0.60 },
+    { id:'PLZ_E29_MAMBAU', code:'E29', name:'Mambau (SPDH)', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:262, lat:2.6621, lng:101.8842, radiusKm:0.55 },
+    { id:'PLZ_E29_LUKUT', code:'E29', name:'Lukut (SPDH)', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:65, lat:2.5648, lng:101.8245, radiusKm:0.55 },
 
-    // --- ELITE (E6) CLOSED SYSTEM GANTRIES ---
-    { id:'PLZ_E6_USJ', code:'E6', name:'USJ (ELITE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.0338, lng:101.5822, radiusKm:0.40 },
-    { id:'PLZ_E6_PUTRA_HEIGHTS', code:'E6', name:'Putra Heights (ELITE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.9942, lng:101.5648, radiusKm:0.40 },
-    { id:'PLZ_E6_SAUJANA_PUTRA', code:'E6', name:'Bandar Saujana Putra (ELITE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.9518, lng:101.5812, radiusKm:0.45 },
-    { id:'PLZ_E6_PUTRAJAYA', code:'E6', name:'Putrajaya / Cyberjaya (ELITE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.9125, lng:101.6224, radiusKm:0.45 },
-    { id:'PLZ_E6_KLIA', code:'E6', name:'KLIA / KLIA2 (ELITE)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.8112, lng:101.7015, radiusKm:0.55 },
+    // --- KLANG VALLEY URBAN EXPRESSWAYS (OPEN SYSTEMS) ---
+    { id:'PLZ_E11_PENCHALA', code:'E11', name:'Penchala (LDP)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:210, lat:3.1632, lng:101.6176, radiusKm:0.50 },
+    { id:'PLZ_E11_PJS', code:'E11', name:'Petaling Jaya Selatan (LDP)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:210, lat:3.0815, lng:101.6138, radiusKm:0.50 },
+    { id:'PLZ_E11_PUCHONG_BRT', code:'E11', name:'Puchong Barat (LDP)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:210, lat:3.0478, lng:101.6085, radiusKm:0.50 },
+    { id:'PLZ_E11_PUCHONG_SEL', code:'E11', name:'Puchong Selatan (LDP)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:210, lat:2.9968, lng:101.6378, radiusKm:0.50 },
+    { id:'PLZ_E5_KEMUNING', code:'E5', name:'Kemuning (KESAS)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.0128, lng:101.5315, radiusKm:0.55 },
+    { id:'PLZ_E5_SUNWAY', code:'E5', name:'Sunway (KESAS)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.0585, lng:101.6042, radiusKm:0.55 },
+    { id:'PLZ_E5_AWAN_BESAR_W', code:'E5', name:'Awan Besar Barat (KESAS)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.0638, lng:101.6635, radiusKm:0.55 },
+    { id:'PLZ_E5_AWAN_BESAR_E', code:'E5', name:'Awan Besar Timur (KESAS)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.0642, lng:101.6745, radiusKm:0.55 },
+    { id:'PLZ_E23_BUKIT_KIARA', code:'E23', name:'Bukit Kiara (SPRINT)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:300, lat:3.1495, lng:101.6442, radiusKm:0.45 },
+    { id:'PLZ_E23_DAMANSARA', code:'E23', name:'Damansara (SPRINT)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.1325, lng:101.6248, radiusKm:0.45 },
+    { id:'PLZ_E23_PANTAI', code:'E23', name:'Pantai (SPRINT)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1225, lng:101.6625, radiusKm:0.45 },
+    { id:'PLZ_E38_SMART', code:'E38', name:'SMART Tunnel', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:300, lat:3.1285, lng:101.7145, radiusKm:0.50 },
+    { id:'PLZ_E10_PANTAI_DALAM', code:'E10', name:'Pantai Dalam (NPE)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1025, lng:101.6665, radiusKm:0.45 },
+    { id:'PLZ_E10_PJS2', code:'E10', name:'PJS 2 (NPE)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:100, lat:3.0812, lng:101.6445, radiusKm:0.40 },
+    { id:'PLZ_E10_PJS5', code:'E10', name:'PJS 5 (NPE)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.0768, lng:101.6228, radiusKm:0.45 },
+    { id:'PLZ_E9_MINES_U', code:'E9', name:'Mines Utara (BESRAYA)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:185, lat:3.0462, lng:101.7125, radiusKm:0.45 },
+    { id:'PLZ_E9_MINES_S', code:'E9', name:'Mines Selatan (BESRAYA)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:185, lat:3.0215, lng:101.7165, radiusKm:0.45 },
+    { id:'PLZ_E9_LOKE_YEW', code:'E9', name:'Loke Yew (BESRAYA)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:185, lat:3.1265, lng:101.7178, radiusKm:0.45 },
+    { id:'PLZ_E20_SALAK_SEL', code:'E20', name:'Salak Selatan (MEX)', op:'OP_MEX', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.0955, lng:101.6985, radiusKm:0.50 },
+    { id:'PLZ_E20_SERI_KEMBANGAN', code:'E20', name:'Seri Kembangan (MEX)', op:'OP_MEX', type:'OPEN', net:null, dir:'ANY', rateCents:220, lat:3.0125, lng:101.6785, radiusKm:0.50 },
+    { id:'PLZ_E20_PUTRAJAYA', code:'E20', name:'Putrajaya Utama (MEX)', op:'OP_MEX', type:'OPEN', net:null, dir:'ANY', rateCents:350, lat:2.9485, lng:101.6742, radiusKm:0.60 },
+    { id:'PLZ_E35_BKT_JELUTONG', code:'E35', name:'Bukit Jelutong (GCE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:175, lat:3.1055, lng:101.5312, radiusKm:0.50 },
+    { id:'PLZ_E35_ELMINA', code:'E35', name:'Elmina (GCE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:175, lat:3.1755, lng:101.5158, radiusKm:0.50 },
+    { id:'PLZ_E35_LAGONG', code:'E35', name:'Lagong (GCE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:175, lat:3.2512, lng:101.5468, radiusKm:0.50 },
+    { id:'PLZ_E31_KOTA_DAMANSARA', code:'E31', name:'Kota Damansara (DASH)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1628, lng:101.5885, radiusKm:0.45 },
+    { id:'PLZ_E31_RRIM', code:'E31', name:'Kwasa Damansara / RRIM (DASH)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1745, lng:101.5542, radiusKm:0.45 },
+    { id:'PLZ_E31_DENAI_ALAM', code:'E31', name:'Denai Alam (DASH)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1618, lng:101.5145, radiusKm:0.45 },
+    { id:'PLZ_E13_ALAM_IMPIAN', code:'E13', name:'Alam Impian (LKSA)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:83, lat:3.0445, lng:101.5125, radiusKm:0.45 },
+    { id:'PLZ_E13_SERI_MUDA', code:'E13', name:'Seri Muda (LKSA)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:156, lat:3.0255, lng:101.5315, radiusKm:0.45 },
+    { id:'PLZ_E12_DATUK_KERAMAT', code:'E12', name:'Datuk Keramat (AKLEH)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:213, lat:3.1645, lng:101.7345, radiusKm:0.45 },
+    { id:'PLZ_E18_SG_BALAK', code:'E18', name:'Sungai Balak (SILK)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:166, lat:3.0145, lng:101.7685, radiusKm:0.45 },
+    { id:'PLZ_E18_SG_RAMAL', code:'E18', name:'Sungai Ramal (SILK)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:166, lat:2.9865, lng:101.7568, radiusKm:0.45 },
+    { id:'PLZ_E18_BKT_KAJANG', code:'E18', name:'Bukit Kajang (SILK)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:166, lat:2.9925, lng:101.8025, radiusKm:0.45 },
+    { id:'PLZ_E18_SG_LONG', code:'E18', name:'Sungai Long (SILK)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:166, lat:3.0355, lng:101.7895, radiusKm:0.45 },
+    { id:'PLZ_E19_ALAM_DAMAI', code:'E19', name:'Alam Damai (SUKE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.0745, lng:101.7445, radiusKm:0.45 },
+    { id:'PLZ_E19_BKT_TERATAI', code:'E19', name:'Bukit Teratai (SUKE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1125, lng:101.7685, radiusKm:0.45 },
+    { id:'PLZ_E19_AMPANG', code:'E19', name:'Ampang (SUKE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1485, lng:101.7665, radiusKm:0.45 },
+    { id:'PLZ_E33_BATU', code:'E33', name:'Batu (DUKE)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.2045, lng:101.6825, radiusKm:0.45 },
+    { id:'PLZ_E33_SENTUL_PASAR', code:'E33', name:'Sentul Pasar (DUKE)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1935, lng:101.6985, radiusKm:0.45 },
+    { id:'PLZ_E33_AYER_PANAS', code:'E33', name:'Ayer Panas (DUKE)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1865, lng:101.7225, radiusKm:0.45 },
+    { id:'PLZ_E33_SEGAMBUT', code:'E33', name:'Segambut (DUKE 2)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1885, lng:101.6625, radiusKm:0.45 },
+    { id:'PLZ_E39_SETIAWANGSA', code:'E39', name:'Setiawangsa (SPE / DUKE 3)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:350, lat:3.1765, lng:101.7415, radiusKm:0.45 },
+    { id:'PLZ_E39_CHAN_SOW_LIN', code:'E39', name:'Chan Sow Lin (SPE)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:350, lat:3.1285, lng:101.7165, radiusKm:0.45 },
+    { id:'PLZ_E7_BATU9', code:'E7', name:'Batu 9 Cheras (Grand Saga)', op:'OP_GRAND_SAGA', type:'OPEN', net:null, dir:'ANY', rateCents:130, lat:3.0715, lng:101.7645, radiusKm:0.45 },
+    { id:'PLZ_E7_BATU11', code:'E7', name:'Batu 11 Cheras (Grand Saga)', op:'OP_GRAND_SAGA', type:'OPEN', net:null, dir:'ANY', rateCents:130, lat:3.0465, lng:101.7735, radiusKm:0.45 },
+    { id:'PLZ_E30_BUKIT_RAJA', code:'E30', name:'Bukit Raja (NNKSB)', op:'OP_GRAND_SEPADU', type:'OPEN', net:null, dir:'ANY', rateCents:60, lat:3.0685, lng:101.4565, radiusKm:0.45 },
+    { id:'PLZ_E30_KAPAR', code:'E30', name:'Kapar (NNKSB)', op:'OP_GRAND_SEPADU', type:'OPEN', net:null, dir:'ANY', rateCents:270, lat:3.0745, lng:101.4145, radiusKm:0.50 },
+    { id:'PLZ_E25_IJOK', code:'E25', name:'Ijok (LATAR)', op:'OP_LATAR', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.3145, lng:101.4165, radiusKm:0.50 },
+    { id:'PLZ_E25_KUANG', code:'E25', name:'Kuang (LATAR)', op:'OP_LATAR', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.2685, lng:101.5545, radiusKm:0.50 },
+    { id:'PLZ_E25_TEMPLER', code:'E25', name:'Taman Rimba Templer (LATAR)', op:'OP_LATAR', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.2985, lng:101.6245, radiusKm:0.50 },
 
-    // --- NSE SOUTH (E2) CLOSED SYSTEM GANTRIES ---
-    { id:'PLZ_E2_SG_BESI', code:'E2', name:'Sungai Besi (KL South)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:3.0468, lng:101.7058, radiusKm:0.55 },
-    { id:'PLZ_E2_KAJANG', code:'E2', name:'Kajang (PLUS)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.9812, lng:101.7518, radiusKm:0.45 },
-    { id:'PLZ_E2_BANGI', code:'E2', name:'Bangi (PLUS)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.9248, lng:101.7664, radiusKm:0.45 },
-    { id:'PLZ_E2_NILAI', code:'E2', name:'Nilai / Bandar Baru Nilai', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.8154, lng:101.8021, radiusKm:0.50 },
-    { id:'PLZ_E2_SEREMBAN', code:'E2', name:'Seremban', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.7165, lng:101.9162, radiusKm:0.50 },
-    { id:'PLZ_E2_SENAWANG', code:'E2', name:'Senawang', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.6712, lng:101.9845, radiusKm:0.50 },
-    { id:'PLZ_E2_SPG_AMPAT', code:'E2', name:'Simpang Ampat (Alor Gajah)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.4412, lng:102.1865, radiusKm:0.50 },
-    { id:'PLZ_E2_AYER_KEROH', code:'E2', name:'Ayer Keroh (Melaka)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.3018, lng:102.3125, radiusKm:0.50 },
-    { id:'PLZ_E2_PAGOH', code:'E2', name:'Pagoh', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.1415, lng:102.7618, radiusKm:0.50 },
-    { id:'PLZ_E2_YONG_PENG_U', code:'E2', name:'Yong Peng Utara', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:2.0214, lng:103.0512, radiusKm:0.50 },
-    { id:'PLZ_E2_MACHAP', code:'E2', name:'Machap', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:1.8745, lng:103.2614, radiusKm:0.50 },
-    { id:'PLZ_E2_KULAI', code:'E2', name:'Kulai', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:1.6382, lng:103.5842, radiusKm:0.50 },
-    { id:'PLZ_E2_SKUDAI', code:'E2', name:'Skudai (JB North)', op:'OP_PLUS', type:'CLOSED', net:'NET_PLUS', dir:'ANY', rateCents:0, lat:1.5562, lng:103.6584, radiusKm:0.55 },
-
-    // --- HYBRID OPEN PLAZAS ON E1/E2, LINKEDUA (E3) & SPDH (E29) ---
-    { id:'PLZ_E1_JITRA', code:'E1', name:'Jitra (Kedah Open)', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:131, lat:6.2941, lng:100.4226, radiusKm:0.50 },
-    { id:'PLZ_E2_KEMPAS', code:'E2', name:'Kempas (JB Hybrid Open)', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:172, lat:1.5276, lng:103.7138, radiusKm:0.50 },
-    { id:'PLZ_E3_TG_KUPANG', code:'E3', name:'Tanjung Kupang (2nd Link CIQ)', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:614, lat:1.3789, lng:103.6062, radiusKm:0.55 },
-    { id:'PLZ_E3_LIMA_KEDAI', code:'E3', name:'Lima Kedai (Linkedua)', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:319, lat:1.4945, lng:103.6182, radiusKm:0.45 },
-    { id:'PLZ_E3_PERLING', code:'E3', name:'Perling (Linkedua)', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:188, lat:1.4748, lng:103.6745, radiusKm:0.45 },
-    { id:'PLZ_E29_MAMBAU', code:'E29', name:'Mambau (SPDH)', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:262, lat:2.6621, lng:101.8842, radiusKm:0.40 },
-    { id:'PLZ_E29_LUKUT', code:'E29', name:'Lukut (SPDH)', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:65, lat:2.5648, lng:101.8245, radiusKm:0.40 },
-
-    // --- LDP (E11 — GOOGLE MAPS VERIFIED GANTRY COORDINATES) ---
-    { id:'PLZ_E11_PENCHALA', code:'E11', name:'Penchala (LDP)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:210, lat:3.1627, lng:101.6174, radiusKm:0.35 },
-    { id:'PLZ_E11_PJS', code:'E11', name:'Petaling Jaya Selatan (LDP)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:210, lat:3.0811, lng:101.6134, radiusKm:0.35 },
-    { id:'PLZ_E11_PUCHONG_BRT', code:'E11', name:'Puchong Barat (LDP)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:210, lat:3.0472, lng:101.6080, radiusKm:0.35 },
-    { id:'PLZ_E11_PUCHONG_SEL', code:'E11', name:'Puchong Selatan (LDP)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:210, lat:2.9963, lng:101.6373, radiusKm:0.35 },
-
-    // --- KESAS (E5 — GOOGLE MAPS VERIFIED GANTRY COORDINATES) ---
-    { id:'PLZ_E5_KEMUNING', code:'E5', name:'Kemuning (KESAS)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.0124, lng:101.5311, radiusKm:0.40 },
-    { id:'PLZ_E5_SUNWAY', code:'E5', name:'Sunway (KESAS)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.0581, lng:101.6038, radiusKm:0.40 },
-    { id:'PLZ_E5_AWAN_BESAR_W', code:'E5', name:'Awan Besar Barat (KESAS)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.0635, lng:101.6632, radiusKm:0.35 },
-    { id:'PLZ_E5_AWAN_BESAR_E', code:'E5', name:'Awan Besar Timur (KESAS)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.0639, lng:101.6741, radiusKm:0.35 },
-
-    // --- SPRINT (E23) & SMART TUNNEL (E38) ---
-    { id:'PLZ_E23_BUKIT_KIARA', code:'E23', name:'Bukit Kiara (SPRINT)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:300, lat:3.1491, lng:101.6438, radiusKm:0.35 },
-    { id:'PLZ_E23_DAMANSARA', code:'E23', name:'Damansara (SPRINT)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.1321, lng:101.6244, radiusKm:0.35 },
-    { id:'PLZ_E23_PANTAI', code:'E23', name:'Pantai (SPRINT)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1221, lng:101.6621, radiusKm:0.35 },
-    { id:'PLZ_E38_SMART', code:'E38', name:'SMART Tunnel', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:300, lat:3.1282, lng:101.7142, radiusKm:0.40 },
-
-    // --- NPE (E10) & BESRAYA (E9) ---
-    { id:'PLZ_E10_PANTAI_DALAM', code:'E10', name:'Pantai Dalam (NPE)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1021, lng:101.6661, radiusKm:0.35 },
-    { id:'PLZ_E10_PJS2', code:'E10', name:'PJS 2 (NPE)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:100, lat:3.0809, lng:101.6442, radiusKm:0.30 },
-    { id:'PLZ_E10_PJS5', code:'E10', name:'PJS 5 (NPE)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.0764, lng:101.6224, radiusKm:0.35 },
-    { id:'PLZ_E9_MINES_U', code:'E9', name:'Mines Utara (BESRAYA)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:185, lat:3.0458, lng:101.7121, radiusKm:0.35 },
-    { id:'PLZ_E9_MINES_S', code:'E9', name:'Mines Selatan (BESRAYA)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:185, lat:3.0211, lng:101.7161, radiusKm:0.35 },
-    { id:'PLZ_E9_LOKE_YEW', code:'E9', name:'Loke Yew (BESRAYA)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:185, lat:3.1261, lng:101.7174, radiusKm:0.35 },
-
-    // --- MEX (E20) ---
-    { id:'PLZ_E20_SALAK_SEL', code:'E20', name:'Salak Selatan (MEX)', op:'OP_MEX', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.0951, lng:101.6981, radiusKm:0.35 },
-    { id:'PLZ_E20_SERI_KEMBANGAN', code:'E20', name:'Seri Kembangan (MEX)', op:'OP_MEX', type:'OPEN', net:null, dir:'ANY', rateCents:220, lat:3.0121, lng:101.6781, radiusKm:0.35 },
-    { id:'PLZ_E20_PUTRAJAYA', code:'E20', name:'Putrajaya Utama (MEX)', op:'OP_MEX', type:'OPEN', net:null, dir:'ANY', rateCents:350, lat:2.9481, lng:101.6738, radiusKm:0.45 },
-
-    // --- PROLINTAS: GCE (E35), DASH (E31), LKSA (E13), AKLEH (E12), SILK (E18), SUKE (E19) ---
-    { id:'PLZ_E35_BKT_JELUTONG', code:'E35', name:'Bukit Jelutong (GCE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:175, lat:3.1051, lng:101.5308, radiusKm:0.35 },
-    { id:'PLZ_E35_ELMINA', code:'E35', name:'Elmina (GCE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:175, lat:3.1751, lng:101.5154, radiusKm:0.35 },
-    { id:'PLZ_E35_LAGONG', code:'E35', name:'Lagong (GCE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:175, lat:3.2508, lng:101.5464, radiusKm:0.35 },
-    { id:'PLZ_E31_KOTA_DAMANSARA', code:'E31', name:'Kota Damansara (DASH)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1624, lng:101.5881, radiusKm:0.35 },
-    { id:'PLZ_E31_RRIM', code:'E31', name:'Kwasa Damansara / RRIM (DASH)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1741, lng:101.5538, radiusKm:0.35 },
-    { id:'PLZ_E31_DENAI_ALAM', code:'E31', name:'Denai Alam (DASH)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1614, lng:101.5141, radiusKm:0.35 },
-    { id:'PLZ_E13_ALAM_IMPIAN', code:'E13', name:'Alam Impian (LKSA)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:83, lat:3.0441, lng:101.5121, radiusKm:0.35 },
-    { id:'PLZ_E13_SERI_MUDA', code:'E13', name:'Seri Muda (LKSA)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:156, lat:3.0251, lng:101.5311, radiusKm:0.35 },
-    { id:'PLZ_E12_DATUK_KERAMAT', code:'E12', name:'Datuk Keramat (AKLEH)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:213, lat:3.1641, lng:101.7341, radiusKm:0.35 },
-    { id:'PLZ_E18_SG_BALAK', code:'E18', name:'Sungai Balak (SILK)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:166, lat:3.0141, lng:101.7681, radiusKm:0.35 },
-    { id:'PLZ_E18_SG_RAMAL', code:'E18', name:'Sungai Ramal (SILK)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:166, lat:2.9861, lng:101.7564, radiusKm:0.35 },
-    { id:'PLZ_E18_BKT_KAJANG', code:'E18', name:'Bukit Kajang (SILK)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:166, lat:2.9921, lng:101.8021, radiusKm:0.35 },
-    { id:'PLZ_E18_SG_LONG', code:'E18', name:'Sungai Long (SILK)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:166, lat:3.0351, lng:101.7891, radiusKm:0.35 },
-    { id:'PLZ_E19_ALAM_DAMAI', code:'E19', name:'Alam Damai (SUKE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.0741, lng:101.7441, radiusKm:0.35 },
-    { id:'PLZ_E19_BKT_TERATAI', code:'E19', name:'Bukit Teratai (SUKE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1121, lng:101.7681, radiusKm:0.35 },
-    { id:'PLZ_E19_AMPANG', code:'E19', name:'Ampang (SUKE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1481, lng:101.7661, radiusKm:0.35 },
-
-    // --- DUKE / DUKE 2 / SPE (E33 / E39 — GOOGLE MAPS VERIFIED) ---
-    { id:'PLZ_E33_BATU', code:'E33', name:'Batu (DUKE)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.2089, lng:101.6822, radiusKm:0.35 },
-    { id:'PLZ_E33_SENTUL_PASAR', code:'E33', name:'Sentul Pasar (DUKE East)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1912, lng:101.7018, radiusKm:0.30 },
-    { id:'PLZ_E33_AYER_PANAS', code:'E33', name:'Ayer Panas (DUKE)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1865, lng:101.7225, radiusKm:0.35 },
-    { id:'PLZ_E33_SEGAMBUT', code:'E33', name:'Segambut (DUKE 2)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1856, lng:101.6621, radiusKm:0.35 },
-    { id:'PLZ_E39_SETIAWANGSA', code:'E39', name:'Setiawangsa (SPE / DUKE 3)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:350, lat:3.1765, lng:101.7415, radiusKm:0.35 },
-    { id:'PLZ_E39_CHAN_SOW_LIN', code:'E39', name:'Chan Sow Lin (SPE)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:350, lat:3.1285, lng:101.7165, radiusKm:0.35 },
-
-    // --- WCE (E32 — GOOGLE MAPS VERIFIED KLANG SECTION) ---
-    { id:'PLZ_E32_BDR_BUKIT_RAJA', code:'E32', name:'Bandar Bukit Raja (WCE)', op:'OP_WCE', type:'CLOSED', net:'NET_WCE', dir:'ANY', rateCents:0, lat:3.0912, lng:101.4418, radiusKm:0.45 },
-    { id:'PLZ_E32_SAE', code:'E32', name:'SAE / Johan Setia (WCE)', op:'OP_WCE', type:'CLOSED', net:'NET_WCE', dir:'ANY', rateCents:0, lat:2.9896, lng:101.4712, radiusKm:0.45 },
-
-    // --- GRAND SAGA (E7), GRAND SEPADU (E30), LATAR (E25), SKVE (E26) ---
-    { id:'PLZ_E7_BATU9', code:'E7', name:'Batu 9 Cheras (Grand Saga)', op:'OP_GRAND_SAGA', type:'OPEN', net:null, dir:'ANY', rateCents:130, lat:3.0715, lng:101.7645, radiusKm:0.35 },
-    { id:'PLZ_E7_BATU11', code:'E7', name:'Batu 11 Cheras (Grand Saga)', op:'OP_GRAND_SAGA', type:'OPEN', net:null, dir:'ANY', rateCents:130, lat:3.0465, lng:101.7735, radiusKm:0.35 },
-    { id:'PLZ_E30_BUKIT_RAJA', code:'E30', name:'Bukit Raja (NNKSB)', op:'OP_GRAND_SEPADU', type:'OPEN', net:null, dir:'ANY', rateCents:60, lat:3.0685, lng:101.4565, radiusKm:0.35 },
-    { id:'PLZ_E30_KAPAR', code:'E30', name:'Kapar (NNKSB)', op:'OP_GRAND_SEPADU', type:'OPEN', net:null, dir:'ANY', rateCents:270, lat:3.0745, lng:101.4145, radiusKm:0.40 },
-    { id:'PLZ_E25_IJOK', code:'E25', name:'Ijok (LATAR)', op:'OP_LATAR', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.3145, lng:101.4165, radiusKm:0.40 },
-    { id:'PLZ_E25_KUANG', code:'E25', name:'Kuang (LATAR)', op:'OP_LATAR', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.2685, lng:101.5545, radiusKm:0.40 },
-    { id:'PLZ_E25_TEMPLER', code:'E25', name:'Taman Rimba Templer (LATAR)', op:'OP_LATAR', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.2985, lng:101.6245, radiusKm:0.40 },
-    { id:'PLZ_E26_AYER_HITAM', code:'E26', name:'Ayer Hitam (SKVE)', op:'OP_SKVE', type:'OPEN', net:null, dir:'ANY', rateCents:145, lat:2.9685, lng:101.6485, radiusKm:0.40 },
-    { id:'PLZ_E26_SAUJANA_PUTRA', code:'E26', name:'Saujana Putra (SKVE)', op:'OP_SKVE', type:'OPEN', net:null, dir:'ANY', rateCents:180, lat:2.9445, lng:101.5765, radiusKm:0.40 },
-    { id:'PLZ_E26_TELOK_PANGLIMA', code:'E26', name:'Telok Panglima Garang (SKVE)', op:'OP_SKVE', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:2.9045, lng:101.4745, radiusKm:0.40 },
-    { id:'PLZ_E26_PULAU_INDAH', code:'E26', name:'Pulau Indah (SKVE)', op:'OP_SKVE', type:'OPEN', net:null, dir:'ANY', rateCents:350, lat:2.9265, lng:101.3545, radiusKm:0.45 },
-
-    // --- EAST COAST EXPRESSWAY: KL-KARAK (OPEN) + LPT1/LPT2 (CLOSED) ---
-    { id:'PLZ_E8_GOMBAK', code:'E8', name:'Gombak (KL–Karak Open)', op:'OP_AFA_PRIME', type:'OPEN', net:null, dir:'ANY', rateCents:600, lat:3.2528, lng:101.7278, radiusKm:0.55 },
-    { id:'PLZ_E8_BENTONG', code:'E8', name:'Bentong (KL–Karak Open)', op:'OP_AFA_PRIME', type:'OPEN', net:null, dir:'ANY', rateCents:350, lat:3.5045, lng:101.9085, radiusKm:0.55 },
-    { id:'PLZ_E8_KARAK', code:'E8', name:'Karak (LPT1 Closed)', op:'OP_AFA_PRIME', type:'CLOSED', net:'NET_LPT1', dir:'ANY', rateCents:0, lat:3.4285, lng:102.0445, radiusKm:0.55 },
-    { id:'PLZ_E8_TEMERLOH', code:'E8', name:'Temerloh (LPT1)', op:'OP_AFA_PRIME', type:'CLOSED', net:'NET_LPT1', dir:'ANY', rateCents:0, lat:3.4885, lng:102.4145, radiusKm:0.55 },
-    { id:'PLZ_E8_MARAN', code:'E8', name:'Maran (LPT1)', op:'OP_AFA_PRIME', type:'CLOSED', net:'NET_LPT1', dir:'ANY', rateCents:0, lat:3.5945, lng:102.7745, radiusKm:0.55 },
-    { id:'PLZ_E8_GAMBANG', code:'E8', name:'Gambang (LPT1)', op:'OP_AFA_PRIME', type:'CLOSED', net:'NET_LPT1', dir:'ANY', rateCents:0, lat:3.7245, lng:103.0945, radiusKm:0.55 },
-    { id:'PLZ_E8_KUANTAN', code:'E8', name:'Kuantan (LPT1)', op:'OP_AFA_PRIME', type:'CLOSED', net:'NET_LPT1', dir:'ANY', rateCents:0, lat:3.8645, lng:103.2445, radiusKm:0.55 },
-    { id:'PLZ_E8_JABOR', code:'E8', name:'Jabor (LPT1/LPT2)', op:'OP_LPT2', type:'CLOSED', net:'NET_LPT1', dir:'ANY', rateCents:0, lat:3.9445, lng:103.3245, radiusKm:0.55 },
+    // --- EAST COAST EXPRESSWAY: KL-KARAK (OPEN) + LPT1/LPT2 (CLOSED) & GENTING ACCESS ---
+    { id:'PLZ_GENTING_ACCESS', code:'GENTING', name:'Genting Highlands Private Road Entry (Class 1)', op:'OP_AFA_PRIME', type:'OPEN', net:null, dir:'ANY', rateCents:500, lat:3.4015, lng:101.7825, radiusKm:1.20 },
+    { id:'PLZ_E8_GOMBAK', code:'E8', name:'Gombak (KL–Karak Open)', op:'OP_AFA_PRIME', type:'OPEN', net:null, dir:'ANY', rateCents:600, lat:3.2585, lng:101.7345, radiusKm:0.60 },
+    { id:'PLZ_E8_BENTONG', code:'E8', name:'Bentong (KL–Karak Open)', op:'OP_AFA_PRIME', type:'OPEN', net:null, dir:'ANY', rateCents:350, lat:3.5045, lng:101.9085, radiusKm:0.60 },
+    { id:'PLZ_E8_KARAK', code:'E8', name:'Karak (LPT1 Closed)', op:'OP_AFA_PRIME', type:'CLOSED', net:'NET_LPT1', dir:'ANY', rateCents:0, lat:3.4285, lng:102.0445, radiusKm:0.65 },
+    { id:'PLZ_E8_TEMERLOH', code:'E8', name:'Temerloh (LPT1)', op:'OP_AFA_PRIME', type:'CLOSED', net:'NET_LPT1', dir:'ANY', rateCents:0, lat:3.4885, lng:102.4145, radiusKm:0.65 },
+    { id:'PLZ_E8_MARAN', code:'E8', name:'Maran (LPT1)', op:'OP_AFA_PRIME', type:'CLOSED', net:'NET_LPT1', dir:'ANY', rateCents:0, lat:3.5945, lng:102.7745, radiusKm:0.65 },
+    { id:'PLZ_E8_GAMBANG', code:'E8', name:'Gambang (LPT1)', op:'OP_AFA_PRIME', type:'CLOSED', net:'NET_LPT1', dir:'ANY', rateCents:0, lat:3.7245, lng:103.0945, radiusKm:0.65 },
+    { id:'PLZ_E8_KUANTAN', code:'E8', name:'Kuantan (LPT1)', op:'OP_AFA_PRIME', type:'CLOSED', net:'NET_LPT1', dir:'ANY', rateCents:0, lat:3.8645, lng:103.2445, radiusKm:0.65 },
+    { id:'PLZ_E8_JABOR', code:'E8', name:'Jabor (LPT1/LPT2)', op:'OP_LPT2', type:'CLOSED', net:'NET_LPT1', dir:'ANY', rateCents:0, lat:3.9445, lng:103.3245, radiusKm:0.70 },
 
     // --- LEKAS (E21 HYBRID) ---
-    { id:'PLZ_E21_KAJANG_SEL', code:'E21', name:'Kajang Selatan (LEKAS Closed)', op:'OP_IJM', type:'CLOSED', net:'NET_LEKAS', dir:'ANY', rateCents:0, lat:2.9685, lng:101.8245, radiusKm:0.45 },
-    { id:'PLZ_E21_SEMENYIH', code:'E21', name:'Semenyih (LEKAS)', op:'OP_IJM', type:'CLOSED', net:'NET_LEKAS', dir:'ANY', rateCents:0, lat:2.9345, lng:101.8545, radiusKm:0.45 },
-    { id:'PLZ_E21_PAJAM', code:'E21', name:'Pajam (LEKAS)', op:'OP_IJM', type:'CLOSED', net:'NET_LEKAS', dir:'ANY', rateCents:0, lat:2.8445, lng:101.8645, radiusKm:0.45 },
-    { id:'PLZ_E21_MANTIN', code:'E21', name:'Mantin (LEKAS)', op:'OP_IJM', type:'CLOSED', net:'NET_LEKAS', dir:'ANY', rateCents:0, lat:2.8145, lng:101.8945, radiusKm:0.45 },
-    { id:'PLZ_E21_SETUL', code:'E21', name:'Setul (LEKAS Closed)', op:'OP_IJM', type:'CLOSED', net:'NET_LEKAS', dir:'ANY', rateCents:0, lat:2.7545, lng:101.9445, radiusKm:0.45 },
-    { id:'PLZ_E21_AMPANGAN', code:'E21', name:'Ampangan (LEKAS Open)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:2.7245, lng:101.9845, radiusKm:0.45 },
-
-    // --- SENAI–DESARU EXPRESSWAY (SDE E22) ---
-    { id:'PLZ_E22_SENAI', code:'E22', name:'Senai (SDE)', op:'OP_SDE', type:'OPEN', net:null, dir:'ANY', rateCents:270, lat:1.6185, lng:103.6745, radiusKm:0.45 },
-    { id:'PLZ_E22_ULU_TIRAM', code:'E22', name:'Ulu Tiram (SDE)', op:'OP_SDE', type:'OPEN', net:null, dir:'ANY', rateCents:340, lat:1.5945, lng:103.8245, radiusKm:0.45 },
-    { id:'PLZ_E22_CAHAYA_BARU', code:'E22', name:'Cahaya Baru (SDE)', op:'OP_SDE', type:'OPEN', net:null, dir:'ANY', rateCents:470, lat:1.5445, lng:103.9345, radiusKm:0.45 },
-    { id:'PLZ_E22_PENAWAR', code:'E22', name:'Penawar / Desaru (SDE)', op:'OP_SDE', type:'OPEN', net:null, dir:'ANY', rateCents:640, lat:1.5545, lng:104.2145, radiusKm:0.50 },
+    { id:'PLZ_E21_KAJANG_SEL', code:'E21', name:'Kajang Selatan (LEKAS Closed)', op:'OP_IJM', type:'CLOSED', net:'NET_LEKAS', dir:'ANY', rateCents:0, lat:2.9685, lng:101.8245, radiusKm:0.60 },
+    { id:'PLZ_E21_SEMENYIH', code:'E21', name:'Semenyih (LEKAS)', op:'OP_IJM', type:'CLOSED', net:'NET_LEKAS', dir:'ANY', rateCents:0, lat:2.9345, lng:101.8545, radiusKm:0.55 },
+    { id:'PLZ_E21_PAJAM', code:'E21', name:'Pajam (LEKAS)', op:'OP_IJM', type:'CLOSED', net:'NET_LEKAS', dir:'ANY', rateCents:0, lat:2.8445, lng:101.8645, radiusKm:0.55 },
+    { id:'PLZ_E21_MANTIN', code:'E21', name:'Mantin (LEKAS)', op:'OP_IJM', type:'CLOSED', net:'NET_LEKAS', dir:'ANY', rateCents:0, lat:2.8145, lng:101.8945, radiusKm:0.55 },
+    { id:'PLZ_E21_SETUL', code:'E21', name:'Setul (LEKAS Closed)', op:'OP_IJM', type:'CLOSED', net:'NET_LEKAS', dir:'ANY', rateCents:0, lat:2.7545, lng:101.9445, radiusKm:0.60 },
+    { id:'PLZ_E21_AMPANGAN', code:'E21', name:'Ampangan (LEKAS Open)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:2.7245, lng:101.9845, radiusKm:0.55 },
 
     // --- SABAH & SARAWAK TOLL-FREE CORRIDORS ---
     { id:'PLZ_AH150_KUCHING', code:'AH150', name:'Pan Borneo Highway (Sarawak — Toll-Free)', op:'OP_JKR_BORNEO', type:'TOLL_FREE', net:null, dir:'ANY', rateCents:0, lat:1.5185, lng:110.3345, radiusKm:4.0 },
@@ -1031,35 +969,7 @@
     { id:'PLZ_AH150_KK', code:'AH150', name:'Pan Borneo Highway (Sabah — Toll-Free)', op:'OP_JKR_BORNEO', type:'TOLL_FREE', net:null, dir:'ANY', rateCents:0, lat:5.9445, lng:116.0845, radiusKm:4.0 }
   ];
 
-  // Deduplicated Class 1 closed-system matrix pairs (in sen)
   const CLOSED_MATRIX_RAW = [
-    // NKVE / Bukit Raja & Setia Alam corridors
-    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_JLN_DUTA', 295],
-    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_SG_BULOH', 230],
-    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_SETIA_ALAM', 75],
-    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_SHAH_ALAM', 115],
-    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_SUBANG', 165],
-    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_DAMANSARA', 235],
-    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_KOTA_DAMANSARA', 265],
-    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_IPOH_SEL', 2390],
-    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_IPOH_U', 2390],
-    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_BDR_CASSIA', 3605],
-    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_JURU', 3765],
-    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_SG_DUA', 3875],
-    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E2_AYER_KEROH', 1745],
-    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E2_SKUDAI', 3780],
-    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E6_KLIA', 640],
-
-    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_JLN_DUTA', 240],
-    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_SG_BULOH', 180],
-    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_IPOH_SEL', 2335],
-    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_BDR_CASSIA', 3550],
-    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_JURU', 3710],
-    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_SG_DUA', 3820],
-    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E2_SKUDAI', 3725],
-    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E6_KLIA', 585],
-
-    // Jalan Duta Northbound corridor
     ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_RAWANG', 295],
     ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_TG_MALIM', 779],
     ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_TAPAH', 1591],
@@ -1068,34 +978,28 @@
     ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_KUALA_KANGSAR', 2460],
     ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_TAIPING_U', 2878],
     ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_BDR_CASSIA', 3390],
-    ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_JURU', 3550],
+    ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_JURU', 3551],
     ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_SG_DUA', 3660],
     ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_SG_PETANI_U', 3920],
     ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_ALOR_SETAR_U', 4551],
     ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_HUTAN_KAMPUNG', 4617],
-
-    // Sungai Buloh, Subang, Shah Alam & Kota Damansara
-    ['NET_PLUS', 'PLZ_E1_SG_BULOH', 'PLZ_E1_IPOH_SEL', 2110],
-    ['NET_PLUS', 'PLZ_E1_SG_BULOH', 'PLZ_E1_BDR_CASSIA', 3325],
-    ['NET_PLUS', 'PLZ_E1_SG_BULOH', 'PLZ_E1_JURU', 3485],
-    ['NET_PLUS', 'PLZ_E1_SG_BULOH', 'PLZ_E1_SG_DUA', 3595],
-    ['NET_PLUS', 'PLZ_E1_SUBANG', 'PLZ_E1_JLN_DUTA', 340],
     ['NET_PLUS', 'PLZ_E1_SUBANG', 'PLZ_E1_BDR_CASSIA', 3346],
     ['NET_PLUS', 'PLZ_E1_SUBANG', 'PLZ_E1_JURU', 3510],
-    ['NET_PLUS', 'PLZ_E1_SUBANG', 'PLZ_E1_SG_DUA', 3620],
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_JLN_DUTA', 295],
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_SETIA_ALAM', 75],
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_SHAH_ALAM', 115],
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_SUBANG', 165],
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_DAMANSARA', 235],
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_KOTA_DAMANSARA', 265],
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_IPOH_SEL', 2390],
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_JURU', 3765],
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E6_KLIA', 640],
     ['NET_PLUS', 'PLZ_E1_SUBANG', 'PLZ_E6_KLIA', 525],
-    ['NET_PLUS', 'PLZ_E1_SHAH_ALAM', 'PLZ_E1_JLN_DUTA', 435],
     ['NET_PLUS', 'PLZ_E1_SHAH_ALAM', 'PLZ_E6_KLIA', 565],
-    ['NET_PLUS', 'PLZ_E1_KOTA_DAMANSARA', 'PLZ_E1_BDR_CASSIA', 3340],
-    ['NET_PLUS', 'PLZ_E1_KOTA_DAMANSARA', 'PLZ_E1_JURU', 3500],
-
-    // ELITE to KLIA
     ['NET_PLUS', 'PLZ_E6_USJ', 'PLZ_E6_KLIA', 455],
     ['NET_PLUS', 'PLZ_E6_PUTRA_HEIGHTS', 'PLZ_E6_KLIA', 385],
     ['NET_PLUS', 'PLZ_E6_SAUJANA_PUTRA', 'PLZ_E6_KLIA', 310],
     ['NET_PLUS', 'PLZ_E6_PUTRAJAYA', 'PLZ_E6_KLIA', 245],
-
-    // Sungai Besi Southbound corridor
     ['NET_PLUS', 'PLZ_E2_SG_BESI', 'PLZ_E2_KAJANG', 165],
     ['NET_PLUS', 'PLZ_E2_SG_BESI', 'PLZ_E2_BANGI', 230],
     ['NET_PLUS', 'PLZ_E2_SG_BESI', 'PLZ_E2_NILAI', 320],
@@ -1108,14 +1012,18 @@
     ['NET_PLUS', 'PLZ_E2_SG_BESI', 'PLZ_E2_MACHAP', 2673],
     ['NET_PLUS', 'PLZ_E2_SG_BESI', 'PLZ_E2_KULAI', 3182],
     ['NET_PLUS', 'PLZ_E2_SG_BESI', 'PLZ_E2_SKUDAI', 3321],
-
-    // LPT1 & LEKAS closed matrices
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E2_SKUDAI', 3780],
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E2_AYER_KEROH', 1745],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_JLN_DUTA', 240],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_IPOH_SEL', 2335],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_JURU', 3710],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E2_SKUDAI', 3725],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E6_KLIA', 585],
     ['NET_LPT1', 'PLZ_E8_KARAK', 'PLZ_E8_TEMERLOH', 600],
     ['NET_LPT1', 'PLZ_E8_KARAK', 'PLZ_E8_MARAN', 1170],
     ['NET_LPT1', 'PLZ_E8_KARAK', 'PLZ_E8_GAMBANG', 1690],
     ['NET_LPT1', 'PLZ_E8_KARAK', 'PLZ_E8_KUANTAN', 1960],
     ['NET_LPT1', 'PLZ_E8_KARAK', 'PLZ_E8_JABOR', 2100],
-
     ['NET_LEKAS', 'PLZ_E21_KAJANG_SEL', 'PLZ_E21_SEMENYIH', 160],
     ['NET_LEKAS', 'PLZ_E21_KAJANG_SEL', 'PLZ_E21_PAJAM', 380],
     ['NET_LEKAS', 'PLZ_E21_KAJANG_SEL', 'PLZ_E21_MANTIN', 530],
@@ -1131,317 +1039,372 @@
     return map;
   })();
 
-  const NETWORK_FALLBACK_SEN_PER_KM = Object.freeze({
-    NET_PLUS: 11.4,
-    NET_LPT1: 12.2,
-    NET_LEKAS: 14.5,
-    NET_WCE: 13.5
-  });
-
-  /* =========================================================
-     3. APPLICATION STATE & DOM REFERENCES
-     ========================================================= */
-  let settings = loadSettings();
-  let routeMemory = loadRouteMemory();
-  let map, routeGroup, ui;
-  let searchService;
-  let routingService;
-  let currentRouteMode = 'fastest';
-  let avoidTolls = false;
-  let activeRouteIndex = 0;
-  let availableRoutes = [];
-  let lastQuote = null;
-  let lastRouteRequest = null;
-  let isRoutingInFlight = false;
-  let debounceTimer;
-  let activeRequestId = 0;
-
-  let pickupLocation = null;
-  let dropoffLocation = null;
-  let pickupMarker = null;
-  let dropoffMarker = null;
-  let pickupMarkerIcon = null;
-  let dropoffMarkerIcon = null;
-
-  let watchId = null;
-  let isTrackingLocation = false;
-  let userSelectedLocation = false;
-
-  const dom = {
-    pickupInput: document.getElementById('pickup'),
-    dropoffInput: document.getElementById('dropoff'),
-    clearPickupBtn: document.getElementById('clear-pickup'),
-    clearDropoffBtn: document.getElementById('clear-dropoff'),
-    pickupSuggestions: document.getElementById('pickup-suggestions'),
-    dropoffSuggestions: document.getElementById('dropoff-suggestions'),
-    currentLocBtn: document.getElementById('current-loc-btn'),
-    swapBtn: document.getElementById('swap-locations-btn'),
-    quickBar: document.getElementById('quick-bar'),
-    altRoutesBar: document.getElementById('alt-routes-bar'),
-    btnFast: document.getElementById('btn-mode-fast'),
-    btnShort: document.getElementById('btn-mode-short'),
-    btnNoToll: document.getElementById('btn-mode-notoll'),
-    loadingMsg: document.getElementById('loading-msg'),
-    errorMsg: document.getElementById('error-msg'),
-    routeStatus: document.getElementById('route-status'),
-    retryRouteBtn: document.getElementById('retry-route-btn'),
-    resultCard: document.getElementById('result-card'),
-    pinTripBtn: document.getElementById('pin-trip-btn'),
-    totalFare: document.getElementById('total-fare'),
-    fareDistance: document.getElementById('fare-distance'),
-    fareDuration: document.getElementById('fare-duration'),
-    calcDistanceFare: document.getElementById('calc-distance-fare'),
-    urbanRow: document.getElementById('urban-surcharge-row'),
-    urbanLabel: document.getElementById('urban-surcharge-label'),
-    calcUrban: document.getElementById('calc-urban-surcharge'),
-    hillRow: document.getElementById('hill-surcharge-row'),
-    hillLabel: document.getElementById('hill-surcharge-label'),
-    calcHill: document.getElementById('calc-hill-surcharge'),
-    longHaulRow: document.getElementById('long-haul-incentive-row'),
-    calcLongHaul: document.getElementById('calc-long-haul-incentive'),
-    calcTransportFare: document.getElementById('calc-transport-fare'),
-    calcTollTotal: document.getElementById('calc-toll-total'),
-    calcGrand: document.getElementById('calc-grand'),
-    calcCustomerFareOnly: document.getElementById('calc-customer-fare-only'),
-    calcCustomerTotal: document.getElementById('calc-customer-total'),
-    adminRow: document.getElementById('admin-deduction-row'),
-    calcDeduction: document.getElementById('calc-deduction'),
-    driverFareNet: document.getElementById('driver-fare-net'),
-    driverNetFare: document.getElementById('driver-net-fare'),
-    farePolicyNote: document.getElementById('fare-policy-note'),
-    tollReceiptSummary: document.getElementById('toll-receipt-summary'),
-    tollEventsContainer: document.getElementById('toll-events-container'),
-    tollOperatorSubtotals: document.getElementById('toll-operator-subtotals'),
-    copyCustomerBtn: document.getElementById('copy-customer-btn'),
-    shareBtn: document.getElementById('share-btn'),
-    whatsappCustomerBtn: document.getElementById('whatsapp-customer-btn'),
-    settingRate: document.getElementById('setting-rate'),
-    settingMinimum: document.getElementById('setting-minimum'),
-    settingUrban: document.getElementById('setting-urban'),
-    settingHill: document.getElementById('setting-hill'),
-    settingLongHaulKm: document.getElementById('setting-longhaul-km'),
-    settingLongHaulPercent: document.getElementById('setting-longhaul-percent'),
-    settingLongHaulCap: document.getElementById('setting-longhaul-cap'),
-    settingAdminPercent: document.getElementById('setting-admin-percent'),
-    settingAdminThreshold: document.getElementById('setting-admin-threshold'),
-    settingAdminMin: document.getElementById('setting-admin-min'),
-    settingTollMode: document.getElementById('setting-toll-mode'),
-    settingRounding: document.getElementById('setting-rounding'),
-    saveSettingsBtn: document.getElementById('save-settings-btn'),
-    resetSettingsBtn: document.getElementById('reset-settings-btn'),
-    clearHistoryBtn: document.getElementById('clear-history-btn')
+  const NETWORK_FALLBACK_SEN_PER_KM = {
+    NET_PLUS: 11.2,
+    NET_LPT1: 11.8,
+    NET_LEKAS: 14.5
   };
 
   /* =========================================================
-     4. STORAGE, FORMATTING & GEOMETRY UTILITIES
+     3. INTEGER-CENT MONEY ENGINE & APPLICATION STATE
      ========================================================= */
+  const $ = id => document.getElementById(id);
+  const toCents = rm => Math.round((Number(rm || 0) + Number.EPSILON) * 100);
+  const fromCents = cents => Math.round(Number(cents || 0)) / 100;
+  const moneyFromCents = cents => `RM ${fromCents(cents).toFixed(2)}`;
+  const money = value => moneyFromCents(toCents(value));
+
+  function roundCentsToUnit(cents, unitRm) {
+    const unitCents = toCents(unitRm);
+    if (unitCents <= 1) return Math.round(cents);
+    return Math.round(cents / unitCents) * unitCents;
+  }
+
+  let settings = loadSettings();
+  let savedRoutes = loadSavedRoutes();
+  let map = null;
+  let platform = null;
+  let router = null;
+  let ui = null;
+
+  let pickupCoords = null;
+  let dropoffCoords = null;
+  let pickupItem = null;
+  let dropoffItem = null;
+
+  let pickupMarker = null;
+  let dropoffMarker = null;
+  let routePolylines = [];
+
+  let activeRoutingMode = 'fast';
+  let routeRequestId = 0;
+  let routeDebounce = null;
+  let latestCalculation = null;
+  let gpsAccuracy = null;
+  let gpsRequestId = 0;
+  let gpsActive = false;
+
+  const autocompleteState = {
+    pickup:{controller:null,sequence:0,timer:null},
+    dropoff:{controller:null,sequence:0,timer:null}
+  };
+
+  /* =========================================================
+     4. SETTINGS & ROUTE HISTORY STORAGE
+     ========================================================= */
+  function sanitizeSettings(saved) {
+    const merged = {...DEFAULT_SETTINGS,...saved};
+    Object.keys(DEFAULT_SETTINGS).forEach(key => {
+      if (key === 'tollQuoteMode') return;
+      if (!Number.isFinite(Number(merged[key])) || Number(merged[key]) < 0) {
+        merged[key] = DEFAULT_SETTINGS[key];
+      } else {
+        merged[key] = Number(merged[key]);
+      }
+    });
+    if (merged.longHaulPercent > 100) merged.longHaulPercent = DEFAULT_SETTINGS.longHaulPercent;
+    if (merged.adminPercent > 100) merged.adminPercent = DEFAULT_SETTINGS.adminPercent;
+    if (!['include','separate'].includes(merged.tollQuoteMode)) merged.tollQuoteMode = DEFAULT_SETTINGS.tollQuoteMode;
+    if (![1,0.5,0.1,0.01].includes(merged.roundingUnit)) merged.roundingUnit = DEFAULT_SETTINGS.roundingUnit;
+    return merged;
+  }
+
   function loadSettings() {
     try {
       let raw = localStorage.getItem(SETTINGS_KEY);
       if (!raw) {
-        for (const key of LEGACY_SETTINGS_KEYS) {
-          raw = localStorage.getItem(key);
+        for (const legacyKey of LEGACY_SETTINGS_KEYS) {
+          raw = localStorage.getItem(legacyKey);
           if (raw) break;
         }
       }
-      if (!raw) return { ...DEFAULT_SETTINGS };
-      const parsed = JSON.parse(raw);
-      return {
-        ratePerKm: nonNeg(parsed.ratePerKm, DEFAULT_SETTINGS.ratePerKm),
-        minimumFare: nonNeg(parsed.minimumFare, DEFAULT_SETTINGS.minimumFare),
-        urbanSurcharge: nonNeg(parsed.urbanSurcharge, DEFAULT_SETTINGS.urbanSurcharge),
-        hillSurcharge: nonNeg(parsed.hillSurcharge, DEFAULT_SETTINGS.hillSurcharge),
-        longHaulTriggerKm: nonNeg(parsed.longHaulTriggerKm, DEFAULT_SETTINGS.longHaulTriggerKm),
-        longHaulPercent: clampPct(parsed.longHaulPercent, DEFAULT_SETTINGS.longHaulPercent),
-        longHaulCap: nonNeg(parsed.longHaulCap, DEFAULT_SETTINGS.longHaulCap),
-        adminPercent: clampPct(parsed.adminPercent, DEFAULT_SETTINGS.adminPercent),
-        adminFlatThreshold: nonNeg(parsed.adminFlatThreshold, DEFAULT_SETTINGS.adminFlatThreshold),
-        adminMinimum: nonNeg(parsed.adminMinimum, DEFAULT_SETTINGS.adminMinimum),
-        tollQuoteMode: parsed.tollQuoteMode === 'separate' ? 'separate' : 'include',
-        roundingUnit: [1, 0.5, 0.1, 0.01].includes(Number(parsed.roundingUnit))
-          ? Number(parsed.roundingUnit)
-          : DEFAULT_SETTINGS.roundingUnit
-      };
-    } catch {
-      return { ...DEFAULT_SETTINGS };
-    }
-  }
-
-  function saveSettings(next) {
-    settings = { ...next };
-    try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-    } catch {}
-  }
-
-  function loadRouteMemory() {
-    try {
-      const raw = localStorage.getItem(ROUTES_STORAGE_KEY);
-      if (!raw) return { pinned: [], recent: [] };
-      const parsed = JSON.parse(raw);
-      return {
-        pinned: Array.isArray(parsed.pinned) ? parsed.pinned.slice(0, MAX_PINNED_ROUTES) : [],
-        recent: Array.isArray(parsed.recent) ? parsed.recent.slice(0, MAX_RECENT_ROUTES) : []
-      };
-    } catch {
-      return { pinned: [], recent: [] };
-    }
-  }
-
-  function saveRouteMemory() {
-    try {
-      localStorage.setItem(ROUTES_STORAGE_KEY, JSON.stringify(routeMemory));
-    } catch {}
-  }
-
-  function nonNeg(v, fallback) {
-    const n = Number(v);
-    return Number.isFinite(n) && n >= 0 ? n : fallback;
-  }
-
-  function clampPct(v, fallback) {
-    const n = Number(v);
-    return Number.isFinite(n) && n >= 0 && n <= 100 ? n : fallback;
-  }
-
-  function escapeHtml(value) {
-    return String(value ?? '').replace(/[&<>"']/g, ch => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;'
-    }[ch]));
-  }
-
-  function formatRM(amount) {
-    return `RM ${(Number(amount) || 0).toFixed(2)}`;
-  }
-
-  function roundByUnit(amount, unit) {
-    const u = Number(unit) || 0.01;
-    if (u <= 0.01) return Math.round(amount * 100) / 100;
-    return Math.round((Math.round(amount / u) * u) * 100) / 100;
-  }
-
-  function formatDuration(minutes) {
-    const mins = Math.max(1, Math.round(minutes));
-    if (mins < 60) return `${mins} min${mins === 1 ? '' : 's'}`;
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return m === 0 ? `${h} hr${h === 1 ? '' : 's'}` : `${h} hr ${m} min${m === 1 ? '' : 's'}`;
-  }
-
-  function calculateHaversineDistance(lat1, lng1, lat2, lng2) {
-    const R = 6371;
-    const toRad = d => d * Math.PI / 180;
-    const dLat = toRad(lat2 - lat1);
-    const dLng = toRad(lng2 - lng1);
-    const a = Math.sin(dLat / 2) ** 2 +
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  }
-
-  function densifyPolyline(points, stepKm = 0.25) {
-    if (!Array.isArray(points) || points.length < 2) return points || [];
-    const dense = [points[0]];
-    for (let i = 1; i < points.length; i++) {
-      const a = points[i - 1];
-      const b = points[i];
-      const segKm = calculateHaversineDistance(a.lat, a.lng, b.lat, b.lng);
-      if (segKm > stepKm) {
-        const steps = Math.ceil(segKm / stepKm);
-        for (let s = 1; s < steps; s++) {
-          const t = s / steps;
-          dense.push({
-            lat: a.lat + (b.lat - a.lat) * t,
-            lng: a.lng + (b.lng - a.lng) * t
-          });
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          return sanitizeSettings(parsed);
         }
       }
-      dense.push(b);
+    } catch (error) {
+      console.warn('Settings could not be loaded; defaults will be used:',error);
     }
-    return dense;
+    return {...DEFAULT_SETTINGS};
   }
 
-  function findZoneMatch(point, zones) {
-    if (!point) return null;
-    for (const z of zones) {
-      if (calculateHaversineDistance(point.lat, point.lng, z.lat, z.lng) <= z.radiusKm) {
-        return z;
+  function persistSettings() {
+    try {
+      localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings));
+      return true;
+    } catch (error) {
+      showError('Unable to save settings. Browser storage may be unavailable.');
+      return false;
+    }
+  }
+
+  function loadSavedRoutes() {
+    try {
+      const raw = localStorage.getItem(ROUTES_STORAGE_KEY);
+      if (!raw) return {pinned:[],recent:[]};
+      const parsed = JSON.parse(raw);
+      return {
+        pinned:Array.isArray(parsed.pinned) ? parsed.pinned.slice(0,MAX_PINNED_ROUTES) : [],
+        recent:Array.isArray(parsed.recent) ? parsed.recent.slice(0,MAX_RECENT_ROUTES) : []
+      };
+    } catch (_) {
+      return {pinned:[],recent:[]};
+    }
+  }
+
+  function persistSavedRoutes() {
+    try {
+      localStorage.setItem(ROUTES_STORAGE_KEY,JSON.stringify(savedRoutes));
+    } catch (_) {}
+    renderQuickBar();
+  }
+
+  function shortPlaceName(label) {
+    const clean = String(label || '').trim();
+    if (!clean) return 'Unknown';
+    const firstPart = clean.split(',')[0].trim();
+    return firstPart.length > 22 ? firstPart.slice(0,21) + '…' : firstPart;
+  }
+
+  function makeRouteRecord(labelOverride) {
+    if (!pickupCoords || !dropoffCoords) return null;
+    const pLabel = $('pickup').value.trim();
+    const dLabel = $('dropoff').value.trim();
+    return {
+      id:`${pickupCoords.lat.toFixed(4)},${pickupCoords.lng.toFixed(4)}->${dropoffCoords.lat.toFixed(4)},${dropoffCoords.lng.toFixed(4)}`,
+      tag:labelOverride || `${shortPlaceName(pLabel)} → ${shortPlaceName(dLabel)}`,
+      pickupLabel:pLabel,
+      dropoffLabel:dLabel,
+      pickupCoords:{...pickupCoords},
+      dropoffCoords:{...dropoffCoords},
+      pickupCategories:pickupItem && Array.isArray(pickupItem.categories) ? pickupItem.categories : [],
+      dropoffCategories:dropoffItem && Array.isArray(dropoffItem.categories) ? dropoffItem.categories : []
+    };
+  }
+
+  function recordRecentRoute() {
+    const rec = makeRouteRecord();
+    if (!rec) return;
+    if (savedRoutes.pinned.some(r => r.id === rec.id)) return;
+    savedRoutes.recent = [
+      rec,
+      ...savedRoutes.recent.filter(r => r.id !== rec.id)
+    ].slice(0,MAX_RECENT_ROUTES);
+    persistSavedRoutes();
+  }
+
+  function pinCurrentRoute() {
+    const rec = makeRouteRecord();
+    if (!rec) return;
+    const existingIdx = savedRoutes.pinned.findIndex(r => r.id === rec.id);
+    if (existingIdx >= 0) {
+      savedRoutes.pinned.splice(existingIdx,1);
+      persistSavedRoutes();
+      updatePinButtonState();
+      setRouteStatus('Removed route from pinned shortcuts.');
+      return;
+    }
+    const customTag = prompt('Shortcut label for this route:',rec.tag);
+    if (customTag === null) return;
+    rec.tag = customTag.trim() || rec.tag;
+    savedRoutes.pinned = [rec,...savedRoutes.pinned].slice(0,MAX_PINNED_ROUTES);
+    savedRoutes.recent = savedRoutes.recent.filter(r => r.id !== rec.id);
+    persistSavedRoutes();
+    updatePinButtonState();
+    setRouteStatus(`Pinned "${rec.tag}" to quick bar.`);
+  }
+
+  function updatePinButtonState() {
+    const btn = $('pin-trip-btn');
+    if (!btn || !pickupCoords || !dropoffCoords) return;
+    const id = `${pickupCoords.lat.toFixed(4)},${pickupCoords.lng.toFixed(4)}->${dropoffCoords.lat.toFixed(4)},${dropoffCoords.lng.toFixed(4)}`;
+    const isPinned = savedRoutes.pinned.some(r => r.id === id);
+    btn.textContent = isPinned ? '★ Pinned' : '📌 Pin Route';
+  }
+
+  function applySavedRoute(rec) {
+    if (!rec || !rec.pickupCoords || !rec.dropoffCoords) return;
+    cancelGpsRequest();
+    invalidateRoute(true);
+    pickupCoords = {...rec.pickupCoords};
+    dropoffCoords = {...rec.dropoffCoords};
+    pickupItem = {address:{label:rec.pickupLabel},categories:rec.pickupCategories || []};
+    dropoffItem = {address:{label:rec.dropoffLabel},categories:rec.dropoffCategories || []};
+    $('pickup').value = rec.pickupLabel || '';
+    $('dropoff').value = rec.dropoffLabel || '';
+    $('pickup-suggestions').style.display = 'none';
+    $('dropoff-suggestions').style.display = 'none';
+    updateInputClearButton('pickup');
+    updateInputClearButton('dropoff');
+    updateMarker('pickup',pickupCoords);
+    updateMarker('dropoff',dropoffCoords);
+    clearError();
+    calculateRoute();
+  }
+
+  function renderQuickBar() {
+    const bar = $('quick-bar');
+    if (!bar) return;
+    bar.innerHTML = '';
+    const allChips = [
+      ...savedRoutes.pinned.map(r => ({...r,isPinned:true})),
+      ...savedRoutes.recent.map(r => ({...r,isPinned:false}))
+    ];
+    if (!allChips.length) {
+      bar.style.display = 'none';
+      return;
+    }
+    allChips.forEach(item => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = item.isPinned ? 'chip-btn' : 'chip-btn recent';
+      btn.textContent = `${item.isPinned ? '★' : '🕒'} ${item.tag}`;
+      btn.title = `${item.pickupLabel} → ${item.dropoffLabel}`;
+      btn.addEventListener('click',() => applySavedRoute(item));
+      bar.appendChild(btn);
+    });
+    bar.style.display = 'flex';
+  }
+
+  function readSettingsForm() {
+    const fields = {
+      ratePerKm:'setting-rate',
+      minimumFare:'setting-minimum',
+      urbanSurcharge:'setting-urban',
+      hillSurcharge:'setting-hill',
+      longHaulTriggerKm:'setting-longhaul-km',
+      longHaulPercent:'setting-longhaul-percent',
+      longHaulCap:'setting-longhaul-cap',
+      adminPercent:'setting-admin-percent',
+      adminFlatThreshold:'setting-admin-threshold',
+      adminMinimum:'setting-admin-min'
+    };
+    const next = {};
+    for (const [key,id] of Object.entries(fields)) {
+      const raw = $(id).value.trim();
+      if (raw === '') throw new Error(`Please complete the ${key} field.`);
+      const value = Number(raw);
+      if (!Number.isFinite(value) || value < 0) throw new Error(`Invalid non-negative value for ${key}.`);
+      next[key] = value;
+    }
+    if (next.longHaulPercent > 100 || next.adminPercent > 100) {
+      throw new Error('Percentage values cannot exceed 100%.');
+    }
+    next.tollQuoteMode = $('setting-toll-mode').value;
+    if (!['include','separate'].includes(next.tollQuoteMode)) {
+      throw new Error('Invalid toll inclusion mode.');
+    }
+    next.roundingUnit = Number($('setting-rounding').value);
+    if (![1,0.5,0.1,0.01].includes(next.roundingUnit)) {
+      throw new Error('Invalid rounding selection.');
+    }
+    return next;
+  }
+
+  function populateSettingsForm() {
+    $('setting-rate').value = settings.ratePerKm;
+    $('setting-minimum').value = settings.minimumFare;
+    $('setting-urban').value = settings.urbanSurcharge;
+    $('setting-hill').value = settings.hillSurcharge;
+    $('setting-longhaul-km').value = settings.longHaulTriggerKm;
+    $('setting-longhaul-percent').value = settings.longHaulPercent;
+    $('setting-longhaul-cap').value = settings.longHaulCap;
+    $('setting-admin-percent').value = settings.adminPercent;
+    $('setting-admin-threshold').value = settings.adminFlatThreshold;
+    $('setting-admin-min').value = settings.adminMinimum;
+    $('setting-toll-mode').value = settings.tollQuoteMode;
+    $('setting-rounding').value = String(settings.roundingUnit);
+  }
+
+  /* =========================================================
+     5. STATUS AND ERROR HANDLING
+     ========================================================= */
+  function showError(message, showRetry=false) {
+    $('error-msg').textContent = message;
+    $('error-msg').style.display = 'block';
+    $('loading-msg').style.display = 'none';
+    $('retry-route-btn').style.display = showRetry && pickupCoords && dropoffCoords ? 'inline-block' : 'none';
+  }
+
+  function clearError() {
+    $('error-msg').textContent = '';
+    $('error-msg').style.display = 'none';
+    $('retry-route-btn').style.display = 'none';
+  }
+
+  function setLoading(active) {
+    $('loading-msg').style.display = active ? 'block' : 'none';
+  }
+
+  function setRouteStatus(message) {
+    $('route-status').textContent = message || '';
+  }
+
+  function isApiKeyConfigured() {
+    return (
+      HERE_API_KEY &&
+      !HERE_API_KEY.includes('PASTE_') &&
+      HERE_API_KEY.length > 15
+    );
+  }
+
+  /* =========================================================
+     6. DISTANCE, ZONE & POLYLINE TOLL MATCHING ENGINE
+     ========================================================= */
+  function calculateHaversineDistance(lat1,lon1,lat2,lon2) {
+    const R = 6371;
+    const dLat = (lat2-lat1)*Math.PI/180;
+    const dLon = (lon2-lon1)*Math.PI/180;
+    const a =
+      Math.sin(dLat/2)**2 +
+      Math.cos(lat1*Math.PI/180) *
+      Math.cos(lat2*Math.PI/180) *
+      Math.sin(dLon/2)**2;
+    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  }
+
+  function getHighlandZone(pickup,dropoff) {
+    const points = [pickup,dropoff].filter(Boolean);
+    for (const point of points) {
+      for (const zone of HIGHLAND_ZONES) {
+        if (calculateHaversineDistance(point.lat,point.lng,zone.lat,zone.lng) <= zone.radiusKm) {
+          return zone;
+        }
       }
     }
     return null;
   }
 
-  function setStatus(msg, showRetry = false) {
-    dom.routeStatus.textContent = msg || '';
-    dom.retryRouteBtn.style.display = showRetry ? 'inline-block' : 'none';
-  }
-
-  function showError(msg) {
-    dom.errorMsg.textContent = msg;
-    dom.errorMsg.style.display = 'block';
-    dom.resultCard.style.display = 'none';
-  }
-
-  function clearError() {
-    dom.errorMsg.textContent = '';
-    dom.errorMsg.style.display = 'none';
-  }
-
-  function setLoading(flag) {
-    isRoutingInFlight = flag;
-    dom.loadingMsg.style.display = flag ? 'block' : 'none';
-    if (flag) {
-      clearError();
-      setStatus('Querying HERE routing engine…');
+  function getUrbanZone(pickup,dropoff) {
+    const points = [pickup,dropoff].filter(Boolean);
+    for (const point of points) {
+      for (const zone of URBAN_POI_ZONES) {
+        if (calculateHaversineDistance(point.lat,point.lng,zone.lat,zone.lng) <= zone.radiusKm) {
+          return zone;
+        }
+      }
     }
+    return null;
   }
 
-  function syncClearButtons() {
-    dom.clearPickupBtn.style.display = dom.pickupInput.value.trim() ? 'flex' : 'none';
-    dom.clearDropoffBtn.style.display = dom.dropoffInput.value.trim() ? 'flex' : 'none';
+  function isRelevantPoi(item) {
+    if (!item) return false;
+    const categories = Array.isArray(item.categories) ? item.categories : [];
+    const text = categories.map(c => `${c.name || ''} ${c.id || ''}`).join(' ').toLowerCase();
+    const label = ((item.address && item.address.label) || item.title || '').toLowerCase();
+    return /airport|shopping.?mall|shopping.?centre|shopping.?center|railway.?station|train.?station|bus.?station|convention.?centre|convention.?center|stadium|terminal|hospital|university/.test(`${text} ${label}`);
   }
 
-  /* =========================================================
-     5. TOLL EVALUATION ENGINE (CHRONOLOGICAL, MATRIX & BRIDGE)
-     ========================================================= */
-  function determinePenangBridgeDirection(routePoints, hitIndex) {
-    const prevPt = routePoints[Math.max(0, hitIndex - 6)];
-    const nextPt = routePoints[Math.min(routePoints.length - 1, hitIndex + 6)];
-    const distPrevToIsland = calculateHaversineDistance(
-      prevPt.lat, prevPt.lng, PENANG_ISLAND_CENTER.lat, PENANG_ISLAND_CENTER.lng
-    );
-    const distNextToIsland = calculateHaversineDistance(
-      nextPt.lat, nextPt.lng, PENANG_ISLAND_CENTER.lat, PENANG_ISLAND_CENTER.lng
-    );
-    if (Math.abs(distNextToIsland - distPrevToIsland) > 0.02) {
-      return distNextToIsland < distPrevToIsland ? 'MAINLAND_TO_ISLAND' : 'ISLAND_TO_MAINLAND';
-    }
-    // Fallback bearing check: Mainland (~100.38-100.44) -> Island (~100.28-100.34)
-    return nextPt.lng < prevPt.lng ? 'MAINLAND_TO_ISLAND' : 'ISLAND_TO_MAINLAND';
+  function getUrbanAssessment(pickup,dropoff,itemP,itemD) {
+    const zone = getUrbanZone(pickup,dropoff);
+    if (zone) return {applies:true,label:`Urban zone: ${zone.name}`};
+    if (isRelevantPoi(itemP) || isRelevantPoi(itemD)) return {applies:true,label:'Major transport / destination POI'};
+    return {applies:false,label:''};
   }
 
-  function resolveClosedPairFareCents(netId, entryHit, exitHit) {
-    const matrixKey = `${netId}|${entryHit.plaza.id}|${exitHit.plaza.id}`;
-    const exact = CLOSED_FARE_MAP.get(matrixKey);
-    if (exact !== undefined) {
-      return {
-        amountCents: exact,
-        note: `Closed matrix (${netId})`
-      };
-    }
-    const segKm = Math.max(1, Math.abs(exitHit.kmAtHit - entryHit.kmAtHit));
-    const rateSen = NETWORK_FALLBACK_SEN_PER_KM[netId] || 11.5;
-    return {
-      amountCents: Math.round(segKm * rateSen),
-      note: `Closed distance estimate (~${segKm.toFixed(1)} km)`
-    };
-  }
-
-  function evaluateRouteTolls(rawRoutePoints, avoidTollsSelected) {
-    const routePoints = densifyPolyline(rawRoutePoints, 0.25);
+  function evaluateRouteTolls(routePoints, avoidTollsSelected) {
     const rawHits = [];
     let cumulativeKm = 0;
 
@@ -1455,6 +1418,7 @@
       }
 
       for (const plaza of TOLL_PLAZAS) {
+        // Fast bounding-box pre-filter (~0.01 deg ≈ 1.11 km) before expensive trig math
         const degMargin = (plaza.radiusKm / 111) + 0.005;
         if (Math.abs(pt.lat - plaza.lat) > degMargin || Math.abs(pt.lng - plaza.lng) > degMargin) {
           continue;
@@ -1462,9 +1426,10 @@
 
         const dist = calculateHaversineDistance(pt.lat, pt.lng, plaza.lat, plaza.lng);
         if (dist <= plaza.radiusKm) {
-          const bridgeDir = plaza.type === 'BRIDGE'
-            ? determinePenangBridgeDirection(routePoints, i)
-            : 'MAINLAND_TO_ISLAND';
+          const prevPt = routePoints[Math.max(0, i - 5)];
+          const nextPt = routePoints[Math.min(routePoints.length - 1, i + 5)];
+          const dLng = nextPt.lng - prevPt.lng;
+          const bridgeDir = dLng < -0.0005 ? 'MAINLAND_TO_ISLAND' : 'ISLAND_TO_MAINLAND';
 
           const lastHit = rawHits[rawHits.length - 1];
           if (lastHit && lastHit.plaza.id === plaza.id) {
@@ -1475,7 +1440,7 @@
             }
           } else {
             const alreadyHitRecently = rawHits.some(
-              h => h.plaza.id === plaza.id && Math.abs(cumulativeKm - h.kmAtHit) < 4.5
+              h => h.plaza.id === plaza.id && Math.abs(cumulativeKm - h.kmAtHit) < 4.0
             );
             if (!alreadyHitRecently) {
               rawHits.push({ plaza, minDist: dist, kmAtHit: cumulativeKm, bridgeDir });
@@ -1485,12 +1450,9 @@
       }
     }
 
-    // Strictly sort hits chronologically from origin (0 km) to destination
-    rawHits.sort((a, b) => a.kmAtHit - b.kmAtHit);
-
     const events = [];
-    // Group closed-system hits by network so corridor entry -> final exit stays intact
-    const closedHitsByNet = new Map();
+    const openClosedSessions = new Map();
+    let seq = 1;
 
     for (const hit of rawHits) {
       const p = hit.plaza;
@@ -1498,7 +1460,7 @@
 
       if (p.type === 'TOLL_FREE') {
         events.push({
-          orderKm: hit.kmAtHit,
+          seq: seq++,
           systemType: 'TOLL_FREE',
           operatorId: p.op,
           operatorName: opInfo.short,
@@ -1513,10 +1475,36 @@
       if (avoidTollsSelected) continue;
 
       if (p.type === 'CLOSED' && p.net) {
-        if (!closedHitsByNet.has(p.net)) {
-          closedHitsByNet.set(p.net, []);
+        if (!openClosedSessions.has(p.net)) {
+          openClosedSessions.set(p.net, hit);
+        } else {
+          const entryHit = openClosedSessions.get(p.net);
+          openClosedSessions.delete(p.net);
+
+          if (entryHit.plaza.id === p.id) continue;
+
+          const matrixKey = `${p.net}|${entryHit.plaza.id}|${p.id}`;
+          let fareCents = CLOSED_FARE_MAP.get(matrixKey);
+          let lookupNote = `Closed matrix (${p.net})`;
+
+          if (fareCents === undefined) {
+            const segKm = Math.max(1, Math.abs(hit.kmAtHit - entryHit.kmAtHit));
+            const rateSen = NETWORK_FALLBACK_SEN_PER_KM[p.net] || 11.5;
+            fareCents = Math.round(segKm * rateSen);
+            lookupNote = `Closed distance estimate (~${segKm.toFixed(1)} km)`;
+          }
+
+          events.push({
+            seq: seq++,
+            systemType: 'CLOSED',
+            operatorId: p.op,
+            operatorName: opInfo.short,
+            routeCode: p.code,
+            title: `${entryHit.plaza.name} → ${p.name}`,
+            subtitle: `${opInfo.short} · ${lookupNote}`,
+            amountCents: fareCents
+          });
         }
-        closedHitsByNet.get(p.net).push(hit);
         continue;
       }
 
@@ -1524,7 +1512,7 @@
         const isTolledLeg = hit.bridgeDir === p.dir;
         const fareCents = isTolledLeg ? p.rateCents : 0;
         events.push({
-          orderKm: hit.kmAtHit,
+          seq: seq++,
           systemType: 'BRIDGE',
           operatorId: p.op,
           operatorName: opInfo.short,
@@ -1538,7 +1526,7 @@
 
       if (p.type === 'OPEN') {
         events.push({
-          orderKm: hit.kmAtHit,
+          seq: seq++,
           systemType: 'OPEN',
           operatorId: p.op,
           operatorName: opInfo.short,
@@ -1550,52 +1538,28 @@
       }
     }
 
-    // Resolve each closed-system corridor from first entry gantry to last exit gantry
-    for (const [netId, netHits] of closedHitsByNet.entries()) {
-      if (avoidTollsSelected || !netHits.length) continue;
-      const entryHit = netHits[0];
-      const opInfo = TOLL_OPERATORS[entryHit.plaza.op] || { name: entryHit.plaza.op, short: entryHit.plaza.op };
-
-      if (netHits.length >= 2) {
-        const exitHit = netHits[netHits.length - 1];
-        if (exitHit.plaza.id === entryHit.plaza.id) continue;
-        const resolved = resolveClosedPairFareCents(netId, entryHit, exitHit);
+    for (const [netId, entryHit] of openClosedSessions.entries()) {
+      if (avoidTollsSelected) break;
+      const p = entryHit.plaza;
+      const opInfo = TOLL_OPERATORS[p.op] || { name: p.op, short: p.op };
+      const distBefore = entryHit.kmAtHit;
+      const distAfter = Math.max(0, cumulativeKm - entryHit.kmAtHit);
+      const activeClosedKm = Math.max(distBefore, distAfter);
+      if (activeClosedKm >= 3.0) {
+        const rateSen = NETWORK_FALLBACK_SEN_PER_KM[netId] || 11.5;
+        const estCents = Math.round(activeClosedKm * rateSen);
         events.push({
-          orderKm: entryHit.kmAtHit,
+          seq: seq++,
           systemType: 'CLOSED',
-          operatorId: entryHit.plaza.op,
+          operatorId: p.op,
           operatorName: opInfo.short,
-          routeCode: entryHit.plaza.code,
-          title: `${entryHit.plaza.name} → ${exitHit.plaza.name}`,
-          subtitle: `${opInfo.short} · ${resolved.note}`,
-          amountCents: resolved.amountCents
+          routeCode: p.code,
+          title: `${p.name} (${distBefore > distAfter ? 'Exit' : 'Entry'} section)`,
+          subtitle: `${opInfo.short} · Partial closed corridor (~${activeClosedKm.toFixed(1)} km)`,
+          amountCents: estCents
         });
-      } else {
-        const distBefore = entryHit.kmAtHit;
-        const distAfter = Math.max(0, cumulativeKm - entryHit.kmAtHit);
-        const activeClosedKm = Math.max(distBefore, distAfter);
-        if (activeClosedKm >= 3.0) {
-          const rateSen = NETWORK_FALLBACK_SEN_PER_KM[netId] || 11.5;
-          const estCents = Math.round(activeClosedKm * rateSen);
-          events.push({
-            orderKm: entryHit.kmAtHit,
-            systemType: 'CLOSED',
-            operatorId: entryHit.plaza.op,
-            operatorName: opInfo.short,
-            routeCode: entryHit.plaza.code,
-            title: `${entryHit.plaza.name} (${distBefore > distAfter ? 'Exit' : 'Entry'} section)`,
-            subtitle: `${opInfo.short} · Partial closed corridor (~${activeClosedKm.toFixed(1)} km)`,
-            amountCents: estCents
-          });
-        }
       }
     }
-
-    // Sort all final toll events strictly in order of encounter from origin to destination
-    events.sort((a, b) => a.orderKm - b.orderKm);
-    events.forEach((ev, idx) => {
-      ev.seq = idx + 1;
-    });
 
     const operatorSubtotals = {};
     let totalTollCents = 0;
@@ -1612,1086 +1576,1108 @@
   }
 
   /* =========================================================
-     6. FARE CALCULATION ENGINE
+     7. MAP OBJECT MANAGEMENT
      ========================================================= */
-  function calculateFareBreakdown(distanceKm, durationMin, tollEval, pickupPt, dropoffPt) {
-    const distFare = distanceKm * settings.ratePerKm;
-
-    const pickupUrban = findZoneMatch(pickupPt, URBAN_POI_ZONES);
-    const dropoffUrban = findZoneMatch(dropoffPt, URBAN_POI_ZONES);
-    const urbanZone = pickupUrban || dropoffUrban;
-    const urbanSurcharge = urbanZone ? settings.urbanSurcharge : 0;
-
-    const pickupHill = findZoneMatch(pickupPt, HIGHLAND_ZONES);
-    const dropoffHill = findZoneMatch(dropoffPt, HIGHLAND_ZONES);
-    const hillZone = dropoffHill || pickupHill;
-    const hillSurcharge = hillZone ? settings.hillSurcharge : 0;
-
-    let longHaulIncentive = 0;
-    if (settings.longHaulTriggerKm > 0 && distanceKm >= settings.longHaulTriggerKm && settings.longHaulPercent > 0) {
-      const rawIncentive = distFare * (settings.longHaulPercent / 100);
-      longHaulIncentive = settings.longHaulCap > 0
-        ? Math.min(rawIncentive, settings.longHaulCap)
-        : rawIncentive;
-    }
-
-    const rawTransportFare = distFare + urbanSurcharge + hillSurcharge + longHaulIncentive;
-    const transportFare = Math.max(settings.minimumFare, rawTransportFare);
-    const tollTotal = (tollEval ? tollEval.totalTollCents : 0) / 100;
-
-    const exactGrandTotal = transportFare + tollTotal;
-
-    const roundedFareOnly = roundByUnit(transportFare, settings.roundingUnit);
-    const roundedGrandTotal = roundByUnit(exactGrandTotal, settings.roundingUnit);
-
-    const customerFareQuote = settings.tollQuoteMode === 'include'
-      ? roundByUnit(exactGrandTotal, settings.roundingUnit)
-      : roundedFareOnly;
-
-    const customerTotalWithTolls = roundByUnit(exactGrandTotal, settings.roundingUnit);
-    const roundingDiff = Number((customerTotalWithTolls - exactGrandTotal).toFixed(2));
-
-    let adminDeduction = 0;
-    if (settings.adminPercent > 0 || settings.adminMinimum > 0) {
-      if (transportFare < settings.adminFlatThreshold) {
-        adminDeduction = settings.adminMinimum;
-      } else {
-        adminDeduction = transportFare * (settings.adminPercent / 100);
-      }
-    }
-    adminDeduction = Math.round(adminDeduction * 100) / 100;
-
-    const driverFareNet = Math.max(0, Number((transportFare - adminDeduction).toFixed(2)));
-    const driverCollectionAfterCommission = Math.max(0, Number((customerTotalWithTolls - adminDeduction).toFixed(2)));
-
-    return {
-      distanceKm,
-      durationMin,
-      distFare,
-      urbanZone,
-      urbanSurcharge,
-      hillZone,
-      hillSurcharge,
-      longHaulIncentive,
-      transportFare,
-      tollTotal,
-      exactGrandTotal,
-      customerFareQuote,
-      customerTotalWithTolls,
-      roundingDiff,
-      adminDeduction,
-      driverFareNet,
-      driverCollectionAfterCommission,
-      tollEval
-    };
-  }
-
-  /* =========================================================
-     7. RENDERING: FARE CARD, TOLL RECEIPT & PINS/RECENT
-     ========================================================= */
-  function renderTollBreakdown(tollEval) {
-    const events = (tollEval && tollEval.events) || [];
-    const totalRM = formatRM(((tollEval && tollEval.totalTollCents) || 0) / 100);
-
-    dom.tollReceiptSummary.textContent = `🛣️ Toll Receipt Breakdown (${events.length} event${events.length === 1 ? '' : 's'} · ${totalRM})`;
-    dom.tollEventsContainer.innerHTML = '';
-
-    if (!events.length) {
-      dom.tollEventsContainer.innerHTML = '<div class="toll-event-item"><div class="toll-event-sub">No toll gantries detected along active route</div></div>';
-      dom.tollOperatorSubtotals.textContent = '';
-      return;
-    }
-
-    for (const ev of events) {
-      const badgeClass = ev.systemType === 'CLOSED' ? 'closed'
-        : ev.systemType === 'BRIDGE' ? 'bridge'
-        : ev.systemType === 'TOLL_FREE' ? 'free' : 'open';
-      const badgeLabel = ev.systemType === 'CLOSED' ? 'Closed Matrix'
-        : ev.systemType === 'BRIDGE' ? 'Bridge'
-        : ev.systemType === 'TOLL_FREE' ? 'Toll-Free' : 'Open';
-
-      const item = document.createElement('div');
-      item.className = 'toll-event-item';
-      item.innerHTML = `
-        <div class="toll-event-top">
-          <span><span class="toll-badge ${badgeClass}">${escapeHtml(badgeLabel)}</span>${escapeHtml(ev.title)}</span>
-          <span>${escapeHtml(formatRM(ev.amountCents / 100))}</span>
-        </div>
-        <div class="toll-event-sub">
-          <span>${escapeHtml(ev.subtitle)}</span>
-          <span>#${escapeHtml(ev.seq)}</span>
-        </div>
-      `;
-      dom.tollEventsContainer.appendChild(item);
-    }
-
-    const opEntries = Object.entries((tollEval && tollEval.operatorSubtotals) || {});
-    if (opEntries.length) {
-      dom.tollOperatorSubtotals.innerHTML = opEntries
-        .map(([opName, cents]) => `<div class="detail-row" style="margin-bottom:3px"><span>${escapeHtml(opName)}</span><span>${escapeHtml(formatRM(cents / 100))}</span></div>`)
-        .join('');
-    } else {
-      dom.tollOperatorSubtotals.textContent = '';
-    }
-  }
-
-  function renderQuote(quote, pickupLabel, dropoffLabel) {
-    lastQuote = {
-      ...quote,
-      pickupLabel,
-      dropoffLabel,
-      routeMode: currentRouteMode,
-      avoidTolls
-    };
-
-    const primaryDisplay = settings.tollQuoteMode === 'separate' && quote.tollTotal > 0
-      ? `${formatRM(roundByUnit(quote.transportFare, settings.roundingUnit))} + ${formatRM(quote.tollTotal)}`
-      : formatRM(quote.customerFareQuote);
-
-    dom.totalFare.textContent = primaryDisplay;
-    dom.fareDistance.textContent = `${quote.distanceKm.toFixed(1)} km`;
-    dom.fareDuration.textContent = formatDuration(quote.durationMin);
-
-    dom.calcDistanceFare.textContent = formatRM(quote.distFare);
-
-    if (quote.urbanSurcharge > 0) {
-      dom.urbanRow.style.display = 'flex';
-      dom.urbanLabel.textContent = `Urban / POI (${quote.urbanZone ? quote.urbanZone.name : 'Zone'})`;
-      dom.calcUrban.textContent = formatRM(quote.urbanSurcharge);
-    } else {
-      dom.urbanRow.style.display = 'none';
-    }
-
-    if (quote.hillSurcharge > 0) {
-      dom.hillRow.style.display = 'flex';
-      dom.hillLabel.textContent = `Highland (${quote.hillZone ? quote.hillZone.name : 'Highland'})`;
-      dom.calcHill.textContent = formatRM(quote.hillSurcharge);
-    } else {
-      dom.hillRow.style.display = 'none';
-    }
-
-    if (quote.longHaulIncentive > 0) {
-      dom.longHaulRow.style.display = 'flex';
-      dom.calcLongHaul.textContent = formatRM(quote.longHaulIncentive);
-    } else {
-      dom.longHaulRow.style.display = 'none';
-    }
-
-    dom.calcTransportFare.textContent = formatRM(quote.transportFare);
-    dom.calcTollTotal.textContent = formatRM(quote.tollTotal);
-    dom.calcGrand.textContent = formatRM(quote.exactGrandTotal);
-    dom.calcCustomerFareOnly.textContent = formatRM(roundByUnit(quote.transportFare, settings.roundingUnit));
-    dom.calcCustomerTotal.textContent = formatRM(quote.customerTotalWithTolls);
-
-    if (quote.adminDeduction > 0) {
-      dom.adminRow.style.display = 'flex';
-      dom.calcDeduction.textContent = `-${formatRM(quote.adminDeduction)}`;
-    } else {
-      dom.adminRow.style.display = 'none';
-    }
-
-    dom.driverFareNet.textContent = formatRM(quote.driverFareNet);
-    dom.driverNetFare.textContent = formatRM(quote.driverCollectionAfterCommission);
-
-    const adjText = quote.roundingDiff === 0
-      ? 'Rounding adjustment: RM 0.00.'
-      : `Rounding adjustment: ${quote.roundingDiff > 0 ? '+' : ''}${formatRM(quote.roundingDiff)}.`;
-
-    dom.farePolicyNote.textContent =
-      `Minimum transport fare: ${formatRM(settings.minimumFare)}. ` +
-      `Admin commission: ${settings.adminPercent}% of transport fare (tolls excluded from commission), or ${formatRM(settings.adminMinimum)} below ${formatRM(settings.adminFlatThreshold)}. ` +
-      adjText;
-
-    renderTollBreakdown(quote.tollEval);
-    updatePinButtonState();
-    dom.resultCard.style.display = 'block';
-  }
-
-  function routeSignature(a, b) {
-    if (!a || !b) return '';
-    return `${a.lat.toFixed(4)},${a.lng.toFixed(4)}->${b.lat.toFixed(4)},${b.lng.toFixed(4)}`;
-  }
-
-  function isCurrentRoutePinned() {
-    if (!pickupLocation || !dropoffLocation) return false;
-    const sig = routeSignature(pickupLocation, dropoffLocation);
-    return routeMemory.pinned.some(item => item.sig === sig);
-  }
-
-  function updatePinButtonState() {
-    if (!dom.pinTripBtn) return;
-    if (isCurrentRoutePinned()) {
-      dom.pinTripBtn.textContent = '📌 Pinned';
-    } else {
-      dom.pinTripBtn.textContent = '📌 Pin Route';
-    }
-  }
-
-  function recordRecentRoute(fromLoc, toLoc) {
-    if (!fromLoc || !toLoc) return;
-    const sig = routeSignature(fromLoc, toLoc);
-    const entry = {
-      sig,
-      from: { lat: fromLoc.lat, lng: fromLoc.lng, label: fromLoc.label },
-      to: { lat: toLoc.lat, lng: toLoc.lng, label: toLoc.label },
-      ts: Date.now()
-    };
-    routeMemory.recent = [
-      entry,
-      ...routeMemory.recent.filter(item => item.sig !== sig)
-    ].slice(0, MAX_RECENT_ROUTES);
-    saveRouteMemory();
-    renderQuickBar();
-  }
-
-  function togglePinCurrentRoute() {
-    if (!pickupLocation || !dropoffLocation) return;
-    const sig = routeSignature(pickupLocation, dropoffLocation);
-    const exists = routeMemory.pinned.some(item => item.sig === sig);
-    if (exists) {
-      routeMemory.pinned = routeMemory.pinned.filter(item => item.sig !== sig);
-    } else {
-      routeMemory.pinned = [
-        {
-          sig,
-          from: { lat: pickupLocation.lat, lng: pickupLocation.lng, label: pickupLocation.label },
-          to: { lat: dropoffLocation.lat, lng: dropoffLocation.lng, label: dropoffLocation.label }
-        },
-        ...routeMemory.pinned.filter(item => item.sig !== sig)
-      ].slice(0, MAX_PINNED_ROUTES);
-    }
-    saveRouteMemory();
-    updatePinButtonState();
-    renderQuickBar();
-  }
-
-  function shortPlaceName(label) {
-    if (!label) return 'Point';
-    return label.split(',')[0].trim().slice(0, 18);
-  }
-
-  function renderQuickBar() {
-    const items = [];
-    routeMemory.pinned.forEach(p => {
-      items.push({ kind: 'pinned', data: p });
-    });
-    routeMemory.recent.forEach(r => {
-      if (!routeMemory.pinned.some(p => p.sig === r.sig)) {
-        items.push({ kind: 'recent', data: r });
-      }
-    });
-
-    dom.quickBar.innerHTML = '';
-    if (!items.length) {
-      dom.quickBar.style.display = 'none';
-      return;
-    }
-
-    for (const item of items) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = `chip-btn ${item.kind === 'recent' ? 'recent' : ''}`;
-      const prefix = item.kind === 'pinned' ? '📌' : '🕒';
-      btn.textContent = `${prefix} ${shortPlaceName(item.data.from.label)} → ${shortPlaceName(item.data.to.label)}`;
-      btn.title = `${item.data.from.label} → ${item.data.to.label}`;
-      btn.addEventListener('click', () => {
-        userSelectedLocation = true;
-        stopLocationTracking(false);
-        pickupLocation = { ...item.data.from };
-        dropoffLocation = { ...item.data.to };
-        dom.pickupInput.value = pickupLocation.label;
-        dom.dropoffInput.value = dropoffLocation.label;
-        syncClearButtons();
-        updateMarker(true, pickupLocation.lat, pickupLocation.lng);
-        updateMarker(false, dropoffLocation.lat, dropoffLocation.lng);
-        calculateAndDisplayRoute();
-      });
-      dom.quickBar.appendChild(btn);
-    }
-    dom.quickBar.style.display = 'flex';
-  }
-
-  /* =========================================================
-     8. HERE MAP, AUTOCOMPLETE & ROUTING ENGINE
-     ========================================================= */
-  function createPinSvgIcon(fillHex, letter) {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40">
-      <path d="M16 1C8.3 1 2 7.3 2 15c0 10.5 14 24 14 24s14-13.5 14-24C30 7.3 23.7 1 16 1z" fill="${fillHex}" stroke="#ffffff" stroke-width="2.5"/>
-      <circle cx="16" cy="15" r="7" fill="#ffffff"/>
-      <text x="16" y="18.5" text-anchor="middle" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="${fillHex}">${letter}</text>
-    </svg>`;
-    return new H.map.Icon(svg);
-  }
-
-  function initMap() {
-    const defaultLat = 3.0738;
-    const defaultLng = 101.5183;
-
-    const platform = new H.service.Platform({
-      apikey: HERE_API_KEY
-    });
-
-    const defaultLayers = platform.createDefaultLayers();
-    map = new H.Map(
-      document.getElementById('map'),
-      defaultLayers.vector.normal.map,
-      {
-        center: { lat: defaultLat, lng: defaultLng },
-        zoom: 12,
-        pixelRatio: window.devicePixelRatio || 1
-      }
-    );
-
-    const behavior = new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
-    ui = H.ui.UI.createDefault(map, defaultLayers);
-
-    routeGroup = new H.map.Group();
-    map.addObject(routeGroup);
-
-    pickupMarkerIcon = createPinSvgIcon('#2e7d32', 'A');
-    dropoffMarkerIcon = createPinSvgIcon('#c62828', 'B');
-
-    searchService = platform.getSearchService();
-    routingService = platform.getRoutingService(null, 8);
-
-    map.addEventListener('tap', evt => {
-      if (evt.currentPointer && evt.currentPointer.type === 'tap') {
-        const coord = map.screenToGeo(evt.currentPointer.viewportX, evt.currentPointer.viewportY);
-        if (coord && Number.isFinite(coord.lat) && Number.isFinite(coord.lng)) {
-          reverseGeocodeAndSet(coord.lat, coord.lng, !pickupLocation);
-        }
-      }
-    });
-
-    window.addEventListener('resize', () => {
-      if (map) {
-        map.getViewPort().resize();
-      }
-    });
-  }
-
-  function updateMarker(isPickup, lat, lng) {
+  function clearRouteObjects() {
     if (!map) return;
-    const pos = { lat, lng };
-    if (isPickup) {
-      if (!pickupMarker) {
-        pickupMarker = new H.map.Marker(pos, { icon: pickupMarkerIcon });
-        map.addObject(pickupMarker);
-      } else {
-        pickupMarker.setGeometry(pos);
-      }
-    } else {
-      if (!dropoffMarker) {
-        dropoffMarker = new H.map.Marker(pos, { icon: dropoffMarkerIcon });
-        map.addObject(dropoffMarker);
-      } else {
-        dropoffMarker.setGeometry(pos);
-      }
-    }
+    routePolylines.forEach(line => {
+      try { map.removeObject(line); } catch (_) {}
+    });
+    routePolylines = [];
   }
 
-  function removeMarker(isPickup) {
+  function clearMarker(type) {
     if (!map) return;
-    if (isPickup && pickupMarker) {
+    if (type === 'pickup' && pickupMarker) {
       map.removeObject(pickupMarker);
       pickupMarker = null;
-    } else if (!isPickup && dropoffMarker) {
+    }
+    if (type === 'dropoff' && dropoffMarker) {
       map.removeObject(dropoffMarker);
       dropoffMarker = null;
     }
   }
 
-  function drawRoutesOnMap(routes, selectedIdx) {
-    if (!map || !routeGroup) return;
-    routeGroup.removeAll();
+  function updateMarker(type,coords) {
+    if (!map) return;
+    clearMarker(type);
+    const svg = type === 'pickup'
+      ? '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42"><path fill="#2e7d32" stroke="white" stroke-width="2" d="M16 1C7.7 1 1 7.7 1 16c0 11 15 25 15 25s15-14 15-25C31 7.7 24.3 1 16 1z"/><circle cx="16" cy="16" r="6" fill="white"/></svg>'
+      : '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42"><path fill="#c62828" stroke="white" stroke-width="2" d="M16 1C7.7 1 1 7.7 1 16c0 11 15 25 15 25s15-14 15-25C31 7.7 24.3 1 16 1z"/><circle cx="16" cy="16" r="6" fill="white"/></svg>';
+    const icon = new H.map.Icon('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg));
+    const marker = new H.map.Marker({lat:coords.lat,lng:coords.lng},{icon});
+    map.addObject(marker);
+    if (type === 'pickup') pickupMarker = marker;
+    else dropoffMarker = marker;
+  }
 
-    routes.forEach((r, idx) => {
-      if (!r.points || r.points.length < 2) return;
-      const lineString = new H.geo.LineString();
-      r.points.forEach(pt => lineString.pushPoint({ lat: pt.lat, lng: pt.lng }));
-
-      const isSelected = idx === selectedIdx;
-      const polyline = new H.map.Polyline(lineString, {
-        style: {
-          strokeColor: isSelected ? '#8e24aa' : '#9e9e9e',
-          lineWidth: isSelected ? 6 : 4,
-          lineDash: isSelected ? undefined : [6, 6]
-        },
-        zIndex: isSelected ? 10 : 5
-      });
-      routeGroup.addObject(polyline);
-    });
-
-    const active = routes[selectedIdx];
-    if (active && active.points && active.points.length >= 2) {
-      const ls = new H.geo.LineString();
-      active.points.forEach(pt => ls.pushPoint({ lat: pt.lat, lng: pt.lng }));
-      if (pickupLocation) ls.pushPoint({ lat: pickupLocation.lat, lng: pickupLocation.lng });
-      if (dropoffLocation) ls.pushPoint({ lat: dropoffLocation.lat, lng: dropoffLocation.lng });
-      const bounds = ls.getBoundingBox();
-      if (bounds) {
-        map.getViewModel().setLookAtData({ bounds }, true);
-      }
+  function invalidateRoute(clearResults=true) {
+    routeRequestId++;
+    if (routeDebounce) {
+      clearTimeout(routeDebounce);
+      routeDebounce = null;
+    }
+    setLoading(false);
+    if (clearResults) {
+      clearRouteObjects();
+      $('result-card').style.display = 'none';
+      latestCalculation = null;
+      setRouteStatus('');
     }
   }
 
-  function formatHereAddress(item) {
-    const title = item.title || (item.address && item.address.label) || 'Selected location';
-    const sub = (item.address && item.address.label && item.address.label !== title)
-      ? item.address.label
-      : (item.resultType || '');
-    const fullLabel = (item.address && item.address.label) || title;
-    return { title, sub, fullLabel };
+  function updateInputClearButton(type) {
+    const input = $(type);
+    const button = $(`clear-${type}`);
+    button.style.display = input.value.trim() ? 'block' : 'none';
   }
 
-  function showSuggestionMessage(boxEl, text) {
-    boxEl.innerHTML = `<div class="suggestion-empty">${escapeHtml(text)}</div>`;
-    boxEl.style.display = 'block';
+  function setGpsButtonIdle() {
+    gpsActive = false;
+    const button = $('current-loc-btn');
+    if (button) {
+      button.textContent = '🎯';
+      button.title = 'Use current location';
+    }
   }
 
-  function hideSuggestions(boxEl) {
-    boxEl.style.display = 'none';
-    boxEl.innerHTML = '';
+  function cancelGpsRequest(silent=true) {
+    gpsRequestId++;
+    setGpsButtonIdle();
+    if (!silent) {
+      setRouteStatus('GPS request cancelled.');
+    }
   }
 
-  function triggerAutocomplete(query, isPickup) {
-    const boxEl = isPickup ? dom.pickupSuggestions : dom.dropoffSuggestions;
-    const trimmed = query.trim();
-    if (trimmed.length < 2) {
-      hideSuggestions(boxEl);
+  /* =========================================================
+     8. LOCATION SELECTION
+     ========================================================= */
+  function formatPlaceLabel(item) {
+    if (!item) return '';
+    const title = (item.title || '').trim();
+    const addrLabel = (item.address && item.address.label || '').trim();
+    if (title && addrLabel && !addrLabel.toLowerCase().startsWith(title.toLowerCase())) {
+      return `${title}, ${addrLabel}`;
+    }
+    return addrLabel || title || 'Unnamed location';
+  }
+
+  function setSelectedLocation(type,item) {
+    const coords = item && item.position;
+    if (!coords || !Number.isFinite(coords.lat) || !Number.isFinite(coords.lng)) {
+      showError('The selected location has invalid coordinates.');
       return;
     }
-
-    const bias = pickupLocation || { lat: 3.0738, lng: 101.5183 };
-    searchService.autosuggest(
-      {
-        q: trimmed,
-        at: `${bias.lat},${bias.lng}`,
-        in: 'countryCode:MYS',
-        limit: 6
-      },
-      result => {
-        const items = (result && result.items || []).filter(
-          it => it.position && Number.isFinite(it.position.lat) && Number.isFinite(it.position.lng)
-        );
-        if (!items.length) {
-          showSuggestionMessage(boxEl, 'No matching locations in Malaysia');
-          return;
-        }
-        boxEl.innerHTML = '';
-        items.forEach(it => {
-          const info = formatHereAddress(it);
-          const row = document.createElement('div');
-          row.className = 'suggestion-item';
-          row.setAttribute('role', 'option');
-          row.tabIndex = 0;
-          row.innerHTML = `
-            <span class="suggestion-title">${escapeHtml(info.title)}</span>
-            ${info.sub ? `<span class="suggestion-sub">${escapeHtml(info.sub)}</span>` : ''}
-          `;
-          const pick = () => {
-            userSelectedLocation = true;
-            if (isPickup) {
-              stopLocationTracking(false);
-              pickupLocation = {
-                lat: it.position.lat,
-                lng: it.position.lng,
-                label: info.fullLabel
-              };
-              dom.pickupInput.value = info.fullLabel;
-              updateMarker(true, pickupLocation.lat, pickupLocation.lng);
-            } else {
-              dropoffLocation = {
-                lat: it.position.lat,
-                lng: it.position.lng,
-                label: info.fullLabel
-              };
-              dom.dropoffInput.value = info.fullLabel;
-              updateMarker(false, dropoffLocation.lat, dropoffLocation.lng);
-            }
-            syncClearButtons();
-            hideSuggestions(boxEl);
-            calculateAndDisplayRoute();
-          };
-          row.addEventListener('click', pick);
-          row.addEventListener('keydown', e => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              pick();
-            }
-          });
-          boxEl.appendChild(row);
-        });
-        boxEl.style.display = 'block';
-      },
-      () => {
-        showSuggestionMessage(boxEl, 'Unable to fetch suggestions right now');
-      }
-    );
+    if (type === 'pickup') cancelGpsRequest(true);
+    invalidateRoute(true);
+    const point = {lat:coords.lat,lng:coords.lng};
+    if (type === 'pickup') {
+      pickupCoords = point;
+      pickupItem = item;
+    } else {
+      dropoffCoords = point;
+      dropoffItem = item;
+    }
+    $(type).value = formatPlaceLabel(item);
+    $(`${type}-suggestions`).style.display = 'none';
+    $(`${type}-suggestions`).innerHTML = '';
+    updateInputClearButton(type);
+    updateMarker(type,point);
+    if (map && (!pickupCoords || !dropoffCoords)) {
+      map.setCenter(point);
+      map.setZoom(15);
+    }
+    clearError();
+    if (pickupCoords && dropoffCoords) {
+      calculateRoute();
+    }
   }
 
-  function geocodeTextIfNeeded(text, isPickup) {
-    return new Promise((resolve, reject) => {
-      const existing = isPickup ? pickupLocation : dropoffLocation;
-      if (existing && existing.label === text) {
-        resolve(existing);
-        return;
-      }
-      const bias = pickupLocation || dropoffLocation || { lat: 3.0738, lng: 101.5183 };
-      searchService.geocode(
-        {
-          q: text,
-          at: `${bias.lat},${bias.lng}`,
-          in: 'countryCode:MYS',
-          limit: 1
-        },
-        res => {
-          const item = res && res.items && res.items[0];
-          if (!item || !item.position) {
-            reject(new Error(`Location not found: "${text}"`));
-            return;
-          }
-          const loc = {
-            lat: item.position.lat,
-            lng: item.position.lng,
-            label: (item.address && item.address.label) || item.title || text
-          };
-          if (isPickup) {
-            pickupLocation = loc;
-            dom.pickupInput.value = loc.label;
-            updateMarker(true, loc.lat, loc.lng);
-          } else {
-            dropoffLocation = loc;
-            dom.dropoffInput.value = loc.label;
-            updateMarker(false, loc.lat, loc.lng);
-          }
-          syncClearButtons();
-          resolve(loc);
-        },
-        () => reject(new Error(`Failed to geocode "${text}"`))
-      );
-    });
+  function clearLocation(type) {
+    if (type === 'pickup') cancelGpsRequest(true);
+    invalidateRoute(true);
+    if (type === 'pickup') {
+      pickupCoords = null;
+      pickupItem = null;
+      $('pickup').value = '';
+    } else {
+      dropoffCoords = null;
+      dropoffItem = null;
+      $('dropoff').value = '';
+    }
+    updateInputClearButton(type);
+    clearMarker(type);
+    clearError();
   }
 
-  function reverseGeocodeAndSet(lat, lng, asPickup) {
-    userSelectedLocation = true;
-    const coordLabel = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    const applyLoc = label => {
-      const loc = { lat, lng, label };
-      if (asPickup) {
-        stopLocationTracking(false);
-        pickupLocation = loc;
-        dom.pickupInput.value = label;
-        updateMarker(true, lat, lng);
-      } else {
-        dropoffLocation = loc;
-        dom.dropoffInput.value = label;
-        updateMarker(false, lat, lng);
+  /* =========================================================
+     9. MALAYSIA AUTOCOMPLETE (WITH DISCOVER FALLBACK)
+     ========================================================= */
+  function getSearchCenter() {
+    if (pickupCoords && Number.isFinite(pickupCoords.lat) && Number.isFinite(pickupCoords.lng)) {
+      return `${pickupCoords.lat},${pickupCoords.lng}`;
+    }
+    if (map) {
+      const center = map.getCenter();
+      if (center && Number.isFinite(center.lat) && Number.isFinite(center.lng)) {
+        return `${center.lat},${center.lng}`;
       }
-      syncClearButtons();
-      calculateAndDisplayRoute();
+    }
+    return '3.1390,101.6869';
+  }
+
+  function renderSuggestionNotice(box, text) {
+    box.innerHTML = '';
+    const notice = document.createElement('div');
+    notice.className = 'suggestion-empty';
+    notice.textContent = text;
+    box.appendChild(notice);
+    box.style.display = 'block';
+  }
+
+  async function fetchHerePlaces(query, signal) {
+    const center = getSearchCenter();
+    const baseParams = {
+      q:query,
+      at:center,
+      in:'countryCode:MYS',
+      limit:'10',
+      lang:'en-US',
+      apiKey:HERE_API_KEY
     };
 
-    if (!searchService) {
-      applyLoc(coordLabel);
-      return;
-    }
-    searchService.reverseGeocode(
-      { at: `${lat},${lng}`, limit: 1 },
-      res => {
-        const item = res && res.items && res.items[0];
-        const label = (item && item.address && item.address.label) || (item && item.title) || coordLabel;
-        applyLoc(label);
-      },
-      () => applyLoc(coordLabel)
+    const autoRes = await fetch(
+      `https://autosuggest.search.hereapi.com/v1/autosuggest?${new URLSearchParams(baseParams)}`,
+      {signal}
     );
-  }
-
-  function extractHereSectionPoints(section) {
-    if (!section) return [];
-    if (section.polyline && typeof H.geo.LineString.fromFlexiblePolyline === 'function') {
-      const ls = H.geo.LineString.fromFlexiblePolyline(section.polyline);
-      const pts = [];
-      ls.eachLatLngAlt((lat, lng) => pts.push({ lat, lng }));
-      if (pts.length >= 2) return pts;
+    if (autoRes.status === 429) {
+      throw new Error('Location search rate limit reached. Wait a few seconds and retry.');
     }
-    const pts = [];
-    if (section.departure && section.departure.place && section.departure.place.location) {
-      pts.push({
-        lat: section.departure.place.location.lat,
-        lng: section.departure.place.location.lng
-      });
+    if (autoRes.status === 401 || autoRes.status === 403) {
+      throw new Error(`HERE API key rejected (HTTP ${autoRes.status}). Check key or referrer restrictions.`);
     }
-    if (section.arrival && section.arrival.place && section.arrival.place.location) {
-      pts.push({
-        lat: section.arrival.place.location.lat,
-        lng: section.arrival.place.location.lng
-      });
+    if (!autoRes.ok) {
+      throw new Error(`Location search failed (HTTP ${autoRes.status}).`);
     }
-    return pts;
-  }
-
-  function selectRouteAlternative(index) {
-    if (!availableRoutes.length) return;
-    activeRouteIndex = Math.max(0, Math.min(availableRoutes.length - 1, index));
-    renderAltRoutesBar();
-    const chosen = availableRoutes[activeRouteIndex];
-    drawRoutesOnMap(availableRoutes, activeRouteIndex);
-
-    const tollEval = evaluateRouteTolls(chosen.points, avoidTolls);
-    const quote = calculateFareBreakdown(
-      chosen.distanceKm,
-      chosen.durationMin,
-      tollEval,
-      pickupLocation,
-      dropoffLocation
+    const autoData = await autoRes.json();
+    let items = (autoData.items || []).filter(item =>
+      item.position &&
+      Number.isFinite(item.position.lat) &&
+      Number.isFinite(item.position.lng) &&
+      (!item.address || !item.address.countryCode || item.address.countryCode === 'MYS')
     );
-    renderQuote(quote, pickupLocation.label, dropoffLocation.label);
-    setStatus(`Route ${activeRouteIndex + 1} of ${availableRoutes.length} · ${chosen.distanceKm.toFixed(1)} km`, false);
-  }
 
-  function renderAltRoutesBar() {
-    dom.altRoutesBar.innerHTML = '';
-    if (availableRoutes.length <= 1) {
-      dom.altRoutesBar.style.display = 'none';
-      return;
+    // Fallback to /discover when /autosuggest returns only query-completion stubs without coordinates
+    if (!items.length) {
+      const discRes = await fetch(
+        `https://discover.search.hereapi.com/v1/discover?${new URLSearchParams(baseParams)}`,
+        {signal}
+      );
+      if (discRes.ok) {
+        const discData = await discRes.json();
+        items = (discData.items || []).filter(item =>
+          item.position &&
+          Number.isFinite(item.position.lat) &&
+          Number.isFinite(item.position.lng) &&
+          (!item.address || !item.address.countryCode || item.address.countryCode === 'MYS')
+        );
+      }
     }
-    availableRoutes.forEach((r, idx) => {
-      const pill = document.createElement('button');
-      pill.type = 'button';
-      pill.className = `alt-pill ${idx === activeRouteIndex ? 'active' : ''}`;
-      pill.textContent = `Route ${idx + 1}: ${r.distanceKm.toFixed(1)} km · ${formatDuration(r.durationMin)}`;
-      pill.addEventListener('click', () => selectRouteAlternative(idx));
-      dom.altRoutesBar.appendChild(pill);
-    });
-    dom.altRoutesBar.style.display = 'flex';
+    return items;
   }
 
-  async function calculateAndDisplayRoute() {
-    const rawPickup = dom.pickupInput.value.trim();
-    const rawDropoff = dom.dropoffInput.value.trim();
-    if (!rawPickup || !rawDropoff) return;
+  function setupAutocomplete(type) {
+    const input = $(type);
+    const box = $(`${type}-suggestions`);
+    const state = autocompleteState[type];
 
-    const reqId = ++activeRequestId;
-    setLoading(true);
-    dom.retryRouteBtn.style.display = 'none';
+    input.addEventListener('input',() => {
+      const query = input.value.trim();
+      updateInputClearButton(type);
+      if (type === 'pickup') {
+        cancelGpsRequest(true);
+        pickupCoords = null;
+        pickupItem = null;
+        clearMarker('pickup');
+      } else {
+        dropoffCoords = null;
+        dropoffItem = null;
+        clearMarker('dropoff');
+      }
+      invalidateRoute(true);
+      clearError();
 
-    try {
-      const [fromLoc, toLoc] = await Promise.all([
-        geocodeTextIfNeeded(rawPickup, true),
-        geocodeTextIfNeeded(rawDropoff, false)
-      ]);
-      if (reqId !== activeRequestId) return;
+      if (state.timer) {
+        clearTimeout(state.timer);
+        state.timer = null;
+      }
+      if (state.controller) {
+        state.controller.abort();
+        state.controller = null;
+      }
+      state.sequence++;
+      const sequence = state.sequence;
 
-      lastRouteRequest = { fromLoc, toLoc };
-
-      const routingParams = {
-        origin: `${fromLoc.lat},${fromLoc.lng}`,
-        destination: `${toLoc.lat},${toLoc.lng}`,
-        transportMode: 'car',
-        routingMode: currentRouteMode === 'shortest' ? 'short' : 'fast',
-        alternatives: 2,
-        return: 'summary,polyline'
-      };
-      if (avoidTolls) {
-        routingParams['avoid[features]'] = 'tollRoad';
+      if (!query) {
+        box.innerHTML = '';
+        box.style.display = 'none';
+        return;
       }
 
-      routingService.calculateRoute(
-        routingParams,
-        result => {
-          if (reqId !== activeRequestId) return;
-          setLoading(false);
+      if (query.length < 2) {
+        renderSuggestionNotice(box,'Type at least 2 characters to search Malaysia locations…');
+        return;
+      }
 
-          const routes = (result && result.routes) || [];
-          const parsedRoutes = [];
+      renderSuggestionNotice(box,'Searching Malaysia locations…');
 
-          for (const r of routes) {
-            const sections = r.sections || [];
-            let totalMeters = 0;
-            let totalSeconds = 0;
-            let combinedPts = [];
+      state.timer = setTimeout(async () => {
+        if (!isApiKeyConfigured()) {
+          box.style.display = 'none';
+          showError('Please configure your HERE API key in the script.');
+          return;
+        }
+        state.controller = new AbortController();
+        try {
+          const items = await fetchHerePlaces(query, state.controller.signal);
+          if (sequence !== state.sequence || input.value.trim() !== query) return;
 
-            for (const sec of sections) {
-              if (sec.summary) {
-                totalMeters += Number(sec.summary.length || 0);
-                totalSeconds += Number(sec.summary.duration || 0);
-              }
-              const secPts = extractHereSectionPoints(sec);
-              if (secPts.length) {
-                if (combinedPts.length && secPts.length) {
-                  const last = combinedPts[combinedPts.length - 1];
-                  const first = secPts[0];
-                  if (last.lat === first.lat && last.lng === first.lng) {
-                    secPts.shift();
-                  }
-                }
-                combinedPts = combinedPts.concat(secPts);
-              }
-            }
-
-            if (totalMeters > 0) {
-              parsedRoutes.push({
-                distanceKm: totalMeters / 1000,
-                durationMin: totalSeconds / 60,
-                points: combinedPts
-              });
-            }
-          }
-
-          if (!parsedRoutes.length) {
-            showError('No drivable route found between these two locations.');
-            setStatus('Route calculation failed', true);
+          box.innerHTML = '';
+          if (!items.length) {
+            renderSuggestionNotice(box,'No matching Malaysian locations found.');
             return;
           }
 
-          availableRoutes = parsedRoutes;
-          activeRouteIndex = 0;
-          recordRecentRoute(fromLoc, toLoc);
-          selectRouteAlternative(0);
-        },
-        err => {
-          if (reqId !== activeRequestId) return;
-          setLoading(false);
-          const detail = (err && err.message) ? ` (${err.message})` : '';
-          showError(`Could not calculate route${detail}. Check connection or try again.`);
-          setStatus('Routing request failed', true);
+          items.slice(0,8).forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'suggestion-item';
+            div.setAttribute('role','option');
+            div.tabIndex = 0;
+
+            const titleEl = document.createElement('div');
+            titleEl.className = 'suggestion-title';
+            titleEl.textContent = item.title || (item.address && item.address.label) || 'Unnamed location';
+            div.appendChild(titleEl);
+
+            if (item.address && item.address.label && item.address.label !== titleEl.textContent) {
+              const subEl = document.createElement('div');
+              subEl.className = 'suggestion-sub';
+              subEl.textContent = item.address.label;
+              div.appendChild(subEl);
+            }
+
+            // pointerdown fires before blur/document click on mobile & desktop
+            div.addEventListener('pointerdown',event => {
+              event.preventDefault();
+              setSelectedLocation(type,item);
+            });
+            div.addEventListener('keydown',event => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                setSelectedLocation(type,item);
+              }
+            });
+            box.appendChild(div);
+          });
+          box.style.display = 'block';
+        } catch(error) {
+          if (error.name !== 'AbortError' && sequence === state.sequence) {
+            box.style.display = 'none';
+            showError(error.message || 'Location search failed.');
+          }
+        } finally {
+          if (sequence === state.sequence) {
+            state.controller = null;
+          }
         }
-      );
-    } catch (e) {
-      if (reqId !== activeRequestId) return;
-      setLoading(false);
-      showError(e.message || 'Unable to locate pickup or drop-off address.');
-      setStatus('Address lookup failed', true);
-    }
+      },280);
+    });
+
+    $(`clear-${type}`).addEventListener('click',() => {
+      if (state.controller) {
+        state.controller.abort();
+        state.controller = null;
+      }
+      if (state.timer) {
+        clearTimeout(state.timer);
+        state.timer = null;
+      }
+      state.sequence++;
+      box.innerHTML = '';
+      box.style.display = 'none';
+      clearLocation(type);
+    });
+
+    input.addEventListener('keydown',event => {
+      if (event.key === 'Escape') {
+        box.style.display = 'none';
+        return;
+      }
+      if (event.key === 'ArrowDown') {
+        const first = box.querySelector('.suggestion-item');
+        if (first) {
+          event.preventDefault();
+          first.focus();
+        }
+        return;
+      }
+      if (event.key === 'Enter') {
+        const first = box.querySelector('.suggestion-item');
+        if (first) {
+          event.preventDefault();
+          first.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));
+        }
+      }
+    });
   }
 
   /* =========================================================
-     9. GEOLOCATION, SHARE ACTIONS & SETTINGS
+     10. NON-BLOCKING GPS & REVERSE GEOCODING
      ========================================================= */
-  function stopLocationTracking(clearInputIfAuto = false) {
-    if (watchId !== null && navigator.geolocation) {
-      navigator.geolocation.clearWatch(watchId);
-      watchId = null;
-    }
-    isTrackingLocation = false;
-    dom.currentLocBtn.style.color = '#757575';
-    dom.currentLocBtn.title = 'Use current location (click again to cancel)';
-    if (clearInputIfAuto && !userSelectedLocation) {
-      pickupLocation = null;
-      dom.pickupInput.value = '';
-      removeMarker(true);
-      syncClearButtons();
+  async function reverseGeocode(lat,lng) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+    try {
+      const params = new URLSearchParams({
+        at:`${lat},${lng}`,
+        lang:'en-US',
+        apiKey:HERE_API_KEY
+      });
+      const response = await fetch(
+        `https://revgeocode.search.hereapi.com/v1/revgeocode?${params}`,
+        {signal:controller.signal}
+      );
+      if (!response.ok) return null;
+      const data = await response.json();
+      const item = data.items && data.items[0] ? data.items[0] : null;
+      if (!item || !item.address || item.address.countryCode !== 'MYS') return null;
+      return item;
+    } finally {
+      clearTimeout(timer);
     }
   }
 
-  function startLocationTracking() {
+  function getPositionAsync(options) {
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, options);
+    });
+  }
+
+  async function requestCurrentLocation() {
     if (!navigator.geolocation) {
-      showError('Geolocation is not supported on this device.');
+      showError('Geolocation is not supported by this browser.');
       return;
     }
-    stopLocationTracking(false);
-    isTrackingLocation = true;
-    dom.currentLocBtn.style.color = '#8e24aa';
-    dom.currentLocBtn.title = 'Locating… click again to cancel';
-    setStatus('Acquiring GPS position…');
 
-    watchId = navigator.geolocation.watchPosition(
-      pos => {
-        const { latitude, longitude } = pos.coords;
-        reverseGeocodeAndSet(latitude, longitude, true);
-        if (watchId !== null) {
-          navigator.geolocation.clearWatch(watchId);
-          watchId = null;
-        }
-        isTrackingLocation = false;
-        dom.currentLocBtn.style.color = '#757575';
-      },
-      err => {
-        stopLocationTracking(false);
-        showError(`GPS error: ${err.message || 'Location permission denied'}`);
-        setStatus('GPS unavailable');
-      },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 15000 }
-    );
-  }
-
-  function buildCustomerQuoteText() {
-    if (!lastQuote) return '';
-    const q = lastQuote;
-    const tollText = q.tollTotal > 0 ? ` + ${formatRM(q.tollTotal)} tolls` : ' (no tolls)';
-    const totalLabel = settings.tollQuoteMode === 'include'
-      ? `${formatRM(q.customerTotalWithTolls)}${q.tollTotal > 0 ? ' incl. tolls' : ''}`
-      : `${formatRM(roundByUnit(q.transportFare, settings.roundingUnit))}${tollText}`;
-
-    const lines = [
-      `🚗 Trip Fare Quote (Rideshare MY)`,
-      `From: ${q.pickupLabel}`,
-      `To: ${q.dropoffLabel}`,
-      `Distance / Est. Time: ${q.distanceKm.toFixed(1)} km · ${formatDuration(q.durationMin)}`,
-      `Quoted Total: ${totalLabel}`
-    ];
-    if (q.tollEval && q.tollEval.events && q.tollEval.events.length) {
-      lines.push(`Tolls (${q.tollEval.events.length}): ${q.tollEval.events.map(e => `#${e.seq} ${e.title} (${formatRM(e.amountCents / 100)})`).join(', ')}`);
+    // Allow tapping the GPS button again to cancel a stalled lock
+    if (gpsActive) {
+      cancelGpsRequest(false);
+      return;
     }
-    return lines.join('\n');
-  }
 
-  function buildDriverLogText() {
-    if (!lastQuote) return '';
-    const q = lastQuote;
-    const lines = [
-      `📋 Rideshare MY Driver Log (v${APP_VERSION})`,
-      `Route: ${q.pickupLabel} → ${q.dropoffLabel}`,
-      `Mode: ${q.routeMode}${q.avoidTolls ? ' · Avoid Tolls' : ''}`,
-      `Distance: ${q.distanceKm.toFixed(1)} km | Duration: ${formatDuration(q.durationMin)}`,
-      `Transport Fare: ${formatRM(q.transportFare)} | Tolls: ${formatRM(q.tollTotal)}`,
-      `Customer Total: ${formatRM(q.customerTotalWithTolls)} | Admin Comm.: -${formatRM(q.adminDeduction)}`,
-      `Driver Collection: ${formatRM(q.driverCollectionAfterCommission)}`
-    ];
-    if (q.tollEval && q.tollEval.events && q.tollEval.events.length) {
-      q.tollEval.events.forEach(ev => {
-        lines.push(`  #${ev.seq} [${ev.systemType}] ${ev.title}: ${formatRM(ev.amountCents / 100)} (${ev.subtitle})`);
-      });
-    }
-    return lines.join('\n');
-  }
+    const requestId = ++gpsRequestId;
+    gpsActive = true;
+    const button = $('current-loc-btn');
+    button.textContent = '⏳';
+    button.title = 'Acquiring GPS — tap to cancel';
+    clearError();
+    setRouteStatus('Acquiring GPS position (tap ⏳ to cancel)…');
 
-  async function copyTextWithFeedback(text, btnEl, originalLabel) {
-    if (!text) return;
+    let position = null;
     try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(text);
-      } else {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
+      // Fast/high-accuracy attempt (7s)
+      position = await getPositionAsync({
+        enableHighAccuracy:true,
+        timeout:7000,
+        maximumAge:30000
+      });
+    } catch (firstErr) {
+      if (requestId !== gpsRequestId) return;
+      // If permission denied (code 1), fail immediately; otherwise try coarse/network fix
+      if (firstErr && firstErr.code === 1) {
+        setGpsButtonIdle();
+        showError('Location permission denied. Enable GPS/Location in browser settings.');
+        setRouteStatus('');
+        return;
       }
-      if (btnEl) {
-        btnEl.textContent = '✅ Copied!';
-        setTimeout(() => { btnEl.textContent = originalLabel; }, 1600);
+      setRouteStatus('Fine GPS slow — trying network/cell location…');
+      try {
+        position = await getPositionAsync({
+          enableHighAccuracy:false,
+          timeout:8000,
+          maximumAge:60000
+        });
+      } catch (secondErr) {
+        if (requestId !== gpsRequestId) return;
+        setGpsButtonIdle();
+        const messages = {
+          1:'Location permission denied. Please enable location services.',
+          2:'Current location is unavailable. Check device GPS toggle.',
+          3:'Location request timed out. Move near a window or type pickup manually.'
+        };
+        showError(messages[secondErr.code] || 'Unable to retrieve current location.');
+        setRouteStatus('');
+        return;
       }
-    } catch {
-      if (btnEl) {
-        btnEl.textContent = '⚠️ Copy failed';
-        setTimeout(() => { btnEl.textContent = originalLabel; }, 1600);
-      }
+    }
+
+    if (requestId !== gpsRequestId || !position) return;
+
+    // Immediately apply coordinates & unlock UI before reverse geocoding
+    const point = {lat:position.coords.latitude,lng:position.coords.longitude};
+    gpsAccuracy = position.coords.accuracy;
+    setGpsButtonIdle();
+    invalidateRoute(true);
+
+    pickupCoords = point;
+    pickupItem = null;
+    $('pickup').value = `GPS (${point.lat.toFixed(5)}, ${point.lng.toFixed(5)})`;
+    $('pickup-suggestions').style.display = 'none';
+    updateInputClearButton('pickup');
+    updateMarker('pickup',point);
+
+    if (map) {
+      map.setCenter(point);
+      map.setZoom(15);
+    }
+
+    const accuracyNote = Number.isFinite(gpsAccuracy) && gpsAccuracy > 100
+      ? ` (low accuracy ±${Math.round(gpsAccuracy)}m — verify pin)`
+      : (Number.isFinite(gpsAccuracy) ? ` · ±${Math.round(gpsAccuracy)}m` : '');
+    setRouteStatus(`GPS pickup set${accuracyNote}. Resolving address…`);
+
+    if (pickupCoords && dropoffCoords) {
+      calculateRoute();
+    }
+
+    // Non-blocking background reverse geocode
+    if (isApiKeyConfigured()) {
+      reverseGeocode(point.lat, point.lng)
+        .then(item => {
+          if (requestId !== gpsRequestId || !pickupCoords) return;
+          if (pickupCoords.lat !== point.lat || pickupCoords.lng !== point.lng) return;
+          if (item) {
+            pickupItem = item;
+            $('pickup').value = formatPlaceLabel(item);
+            updateInputClearButton('pickup');
+          }
+          if (!dropoffCoords) {
+            setRouteStatus(`GPS pickup ready${accuracyNote}.`);
+          }
+        })
+        .catch(() => {
+          if (requestId === gpsRequestId && !dropoffCoords) {
+            setRouteStatus(`GPS coordinates set${accuracyNote}.`);
+          }
+        });
     }
   }
 
-  function populateSettingsInputs() {
-    dom.settingRate.value = settings.ratePerKm;
-    dom.settingMinimum.value = settings.minimumFare;
-    dom.settingUrban.value = settings.urbanSurcharge;
-    dom.settingHill.value = settings.hillSurcharge;
-    dom.settingLongHaulKm.value = settings.longHaulTriggerKm;
-    dom.settingLongHaulPercent.value = settings.longHaulPercent;
-    dom.settingLongHaulCap.value = settings.longHaulCap;
-    dom.settingAdminPercent.value = settings.adminPercent;
-    dom.settingAdminThreshold.value = settings.adminFlatThreshold;
-    dom.settingAdminMin.value = settings.adminMinimum;
-    dom.settingTollMode.value = settings.tollQuoteMode;
-    dom.settingRounding.value = String(settings.roundingUnit);
+  /* =========================================================
+     11. ROUTING CONTROLS
+     ========================================================= */
+  function swapLocations() {
+    cancelGpsRequest(true);
+    invalidateRoute(true);
+    const pText = $('pickup').value;
+    const dText = $('dropoff').value;
+    $('pickup').value = dText;
+    $('dropoff').value = pText;
+    [pickupCoords,dropoffCoords] = [dropoffCoords,pickupCoords];
+    [pickupItem,dropoffItem] = [dropoffItem,pickupItem];
+    updateInputClearButton('pickup');
+    updateInputClearButton('dropoff');
+    clearMarker('pickup');
+    clearMarker('dropoff');
+    if (pickupCoords) updateMarker('pickup',pickupCoords);
+    if (dropoffCoords) updateMarker('dropoff',dropoffCoords);
+    if (pickupCoords && dropoffCoords) {
+      calculateRoute();
+    }
   }
 
-  function bindEvents() {
-    dom.pickupInput.addEventListener('input', () => {
-      userSelectedLocation = true;
-      pickupLocation = null;
-      syncClearButtons();
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => triggerAutocomplete(dom.pickupInput.value, true), 260);
-    });
+  function setRoutingMode(mode) {
+    if (!['fast','short','notoll'].includes(mode)) return;
+    if (activeRoutingMode === mode) return;
+    activeRoutingMode = mode;
+    $('btn-mode-fast').classList.toggle('active',mode === 'fast');
+    $('btn-mode-short').classList.toggle('active',mode === 'short');
+    $('btn-mode-notoll').classList.toggle('active',mode === 'notoll');
+    if (pickupCoords && dropoffCoords) {
+      calculateRoute();
+    }
+  }
 
-    dom.dropoffInput.addEventListener('input', () => {
-      userSelectedLocation = true;
-      dropoffLocation = null;
-      syncClearButtons();
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => triggerAutocomplete(dom.dropoffInput.value, false), 260);
-    });
+  /* =========================================================
+     12. ROUTE CALCULATION (HERE ROUTING API v8)
+     ========================================================= */
+  function calculateRoute() {
+    if (!pickupCoords || !dropoffCoords) return;
 
-    dom.pickupInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        hideSuggestions(dom.pickupSuggestions);
-        calculateAndDisplayRoute();
+    const directDistance = calculateHaversineDistance(
+      pickupCoords.lat,
+      pickupCoords.lng,
+      dropoffCoords.lat,
+      dropoffCoords.lng
+    );
+    if (directDistance < 0.02) {
+      showError('Pickup and drop-off are almost the same location.');
+      return;
+    }
+    if (!router) {
+      showError('HERE routing service is unavailable.');
+      return;
+    }
+    if (!isApiKeyConfigured()) {
+      showError('Configure your HERE API key before calculating routes.');
+      return;
+    }
+
+    const hadPreviousCard = $('result-card').style.display === 'block';
+    invalidateRoute(!hadPreviousCard);
+    const requestId = routeRequestId;
+    const origin = {...pickupCoords};
+    const destination = {...dropoffCoords};
+    const routingMode = activeRoutingMode;
+
+    setLoading(true);
+    clearError();
+    setRouteStatus('Requesting route & evaluating toll events…');
+
+    routeDebounce = setTimeout(() => {
+      if (requestId !== routeRequestId) return;
+      const params = {
+        routingMode: routingMode === 'short' ? 'short' : 'fast',
+        transportMode:'car',
+        origin:`${origin.lat},${origin.lng}`,
+        destination:`${destination.lat},${destination.lng}`,
+        departureTime:'any',
+        return:'polyline,summary,actions'
+      };
+      if (routingMode === 'notoll') {
+        params['avoid[features]'] = 'tollRoad';
       }
-    });
 
-    dom.dropoffInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        hideSuggestions(dom.dropoffSuggestions);
-        calculateAndDisplayRoute();
+      router.calculateRoute(
+        params,
+        result => {
+          if (requestId !== routeRequestId) return;
+          setLoading(false);
+          if (!result || !Array.isArray(result.routes) || !result.routes.length) {
+            showError('No route found for the selected locations.',true);
+            return;
+          }
+          try {
+            handleRouteResult(result.routes[0],result.routes.length,requestId);
+          } catch(error) {
+            console.error('Route processing error:',error);
+            showError('Route was returned, but its details could not be processed.',true);
+          }
+        },
+        error => {
+          if (requestId !== routeRequestId) return;
+          setLoading(false);
+          console.error('HERE routing error:',error);
+          const detail = (error && (error.message || error.title)) ? ` (${error.message || error.title})` : '';
+          showError(`Route calculation failed${detail}. Check connection and retry.`,true);
+        }
+      );
+    },180);
+  }
+
+  /* =========================================================
+     13. ROUTE RESULT PROCESSING & TOLL EXTRACTION
+     ========================================================= */
+  function handleRouteResult(route,routesReturnedCount,requestId) {
+    if (requestId !== routeRequestId) return;
+    const sections = Array.isArray(route.sections) ? route.sections : [];
+    if (!sections.length) {
+      throw new Error('Route contains no sections.');
+    }
+
+    let distanceMeters = 0;
+    let durationSeconds = 0;
+    const decodedPoints = [];
+
+    clearRouteObjects();
+    const group = new H.map.Group();
+
+    sections.forEach(section => {
+      distanceMeters += Number(section.summary && section.summary.length || 0);
+      durationSeconds += Number(section.summary && section.summary.duration || 0);
+
+      if (!section.polyline) return;
+      const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
+      const count = lineString.getPointCount();
+      for (let i = 0; i < count; i++) {
+        const pt = lineString.extractPoint(i);
+        decodedPoints.push({ lat: pt.lat, lng: pt.lng });
       }
-    });
-
-    dom.clearPickupBtn.addEventListener('click', () => {
-      stopLocationTracking(false);
-      userSelectedLocation = true;
-      pickupLocation = null;
-      dom.pickupInput.value = '';
-      removeMarker(true);
-      hideSuggestions(dom.pickupSuggestions);
-      syncClearButtons();
-      dom.resultCard.style.display = 'none';
-      setStatus('');
-    });
-
-    dom.clearDropoffBtn.addEventListener('click', () => {
-      dropoffLocation = null;
-      dom.dropoffInput.value = '';
-      removeMarker(false);
-      hideSuggestions(dom.dropoffSuggestions);
-      syncClearButtons();
-      dom.resultCard.style.display = 'none';
-      setStatus('');
-    });
-
-    dom.currentLocBtn.addEventListener('click', () => {
-      if (isTrackingLocation) {
-        stopLocationTracking(true);
-      } else {
-        startLocationTracking();
-      }
-    });
-
-    dom.swapBtn.addEventListener('click', () => {
-      const tmpLoc = pickupLocation;
-      pickupLocation = dropoffLocation;
-      dropoffLocation = tmpLoc;
-
-      const tmpVal = dom.pickupInput.value;
-      dom.pickupInput.value = dom.dropoffInput.value;
-      dom.dropoffInput.value = tmpVal;
-
-      if (pickupLocation) updateMarker(true, pickupLocation.lat, pickupLocation.lng);
-      else removeMarker(true);
-
-      if (dropoffLocation) updateMarker(false, dropoffLocation.lat, dropoffLocation.lng);
-      else removeMarker(false);
-
-      syncClearButtons();
-      if (dom.pickupInput.value.trim() && dom.dropoffInput.value.trim()) {
-        calculateAndDisplayRoute();
-      }
-    });
-
-    dom.btnFast.addEventListener('click', () => {
-      currentRouteMode = 'fastest';
-      dom.btnFast.classList.add('active');
-      dom.btnShort.classList.remove('active');
-      if (pickupLocation && dropoffLocation) calculateAndDisplayRoute();
-    });
-
-    dom.btnShort.addEventListener('click', () => {
-      currentRouteMode = 'shortest';
-      dom.btnShort.classList.add('active');
-      dom.btnFast.classList.remove('active');
-      if (pickupLocation && dropoffLocation) calculateAndDisplayRoute();
-    });
-
-    dom.btnNoToll.addEventListener('click', () => {
-      avoidTolls = !avoidTolls;
-      dom.btnNoToll.classList.toggle('active', avoidTolls);
-      if (pickupLocation && dropoffLocation) calculateAndDisplayRoute();
-    });
-
-    dom.retryRouteBtn.addEventListener('click', () => {
-      if (lastRouteRequest && lastRouteRequest.fromLoc && lastRouteRequest.toLoc) {
-        pickupLocation = lastRouteRequest.fromLoc;
-        dropoffLocation = lastRouteRequest.toLoc;
-        dom.pickupInput.value = pickupLocation.label;
-        dom.dropoffInput.value = dropoffLocation.label;
-      }
-      calculateAndDisplayRoute();
-    });
-
-    dom.pinTripBtn.addEventListener('click', togglePinCurrentRoute);
-
-    dom.copyCustomerBtn.addEventListener('click', () => {
-      copyTextWithFeedback(buildCustomerQuoteText(), dom.copyCustomerBtn, '💬 Copy Customer Quote');
-    });
-
-    dom.shareBtn.addEventListener('click', () => {
-      copyTextWithFeedback(buildDriverLogText(), dom.shareBtn, '📋 Copy Driver Log');
-    });
-
-    dom.whatsappCustomerBtn.addEventListener('click', () => {
-      const txt = buildCustomerQuoteText();
-      if (!txt) return;
-      const url = `https://wa.me/?text=${encodeURIComponent(txt)}`;
-      window.open(url, '_blank', 'noopener,noreferrer');
-    });
-
-    dom.saveSettingsBtn.addEventListener('click', () => {
-      saveSettings({
-        ratePerKm: nonNeg(dom.settingRate.value, DEFAULT_SETTINGS.ratePerKm),
-        minimumFare: nonNeg(dom.settingMinimum.value, DEFAULT_SETTINGS.minimumFare),
-        urbanSurcharge: nonNeg(dom.settingUrban.value, DEFAULT_SETTINGS.urbanSurcharge),
-        hillSurcharge: nonNeg(dom.settingHill.value, DEFAULT_SETTINGS.hillSurcharge),
-        longHaulTriggerKm: nonNeg(dom.settingLongHaulKm.value, DEFAULT_SETTINGS.longHaulTriggerKm),
-        longHaulPercent: clampPct(dom.settingLongHaulPercent.value, DEFAULT_SETTINGS.longHaulPercent),
-        longHaulCap: nonNeg(dom.settingLongHaulCap.value, DEFAULT_SETTINGS.longHaulCap),
-        adminPercent: clampPct(dom.settingAdminPercent.value, DEFAULT_SETTINGS.adminPercent),
-        adminFlatThreshold: nonNeg(dom.settingAdminThreshold.value, DEFAULT_SETTINGS.adminFlatThreshold),
-        adminMinimum: nonNeg(dom.settingAdminMin.value, DEFAULT_SETTINGS.adminMinimum),
-        tollQuoteMode: dom.settingTollMode.value === 'separate' ? 'separate' : 'include',
-        roundingUnit: Number(dom.settingRounding.value) || 1
+      const line = new H.map.Polyline(lineString,{
+        style:{strokeColor: activeRoutingMode === 'notoll' ? '#2e7d32' : '#8e24aa', lineWidth:5}
       });
-      populateSettingsInputs();
-      if (availableRoutes.length && pickupLocation && dropoffLocation) {
-        selectRouteAlternative(activeRouteIndex);
+      routePolylines.push(line);
+      group.addObject(line);
+    });
+
+    const distanceKm = distanceMeters / 1000;
+    const durationMins = durationSeconds / 60;
+    if (!(distanceKm > 0) || !Number.isFinite(durationMins) || durationMins < 0) {
+      throw new Error('Invalid route summary.');
+    }
+
+    if (routePolylines.length) {
+      map.addObjects(routePolylines);
+      const bounds = group.getBoundingBox();
+      if (bounds) {
+        map.getViewModel().setLookAtData({bounds,padding:30});
+      }
+    }
+
+    const tollResult = evaluateRouteTolls(decodedPoints, activeRoutingMode === 'notoll');
+
+    const calculation = processCalculations({
+      distance:distanceKm,
+      duration:durationMins,
+      sectionsCount:sections.length,
+      alternativesCount:Math.max(0,routesReturnedCount - 1),
+      tollResult
+    });
+
+    latestCalculation = calculation;
+    recordRecentRoute();
+    updatePinButtonState();
+
+    const modeLabel = activeRoutingMode === 'fast'
+      ? 'Fastest'
+      : (activeRoutingMode === 'short' ? 'Shortest' : 'Avoid Tolls');
+    const tollLabel = tollResult.totalTollCents > 0
+      ? `${moneyFromCents(tollResult.totalTollCents)} toll`
+      : 'Toll-free';
+    setRouteStatus(`Route calculated · ${modeLabel} · ${tollLabel}`);
+  }
+
+  /* =========================================================
+     14. FARE & TOLL CALCULATION ENGINE (INTEGER-CENT ARITHMETIC)
+     ========================================================= */
+  function renderTollReceiptUI(tollResult) {
+    const container = $('toll-events-container');
+    const summaryEl = $('toll-receipt-summary');
+    const opSummaryEl = $('toll-operator-subtotals');
+    container.innerHTML = '';
+    opSummaryEl.innerHTML = '';
+
+    const count = tollResult.events.length;
+    summaryEl.textContent = `🛣️ Toll Receipt Breakdown (${count} event${count === 1 ? '' : 's'} · ${moneyFromCents(tollResult.totalTollCents)})`;
+
+    if (!count) {
+      const empty = document.createElement('div');
+      empty.className = 'detail-note';
+      empty.textContent = 'No tolled plazas or bridges detected along this route (RM 0.00).';
+      container.appendChild(empty);
+      return;
+    }
+
+    tollResult.events.forEach(ev => {
+      const item = document.createElement('div');
+      item.className = 'toll-event-item';
+
+      const badgeClass = ev.systemType === 'CLOSED'
+        ? 'closed'
+        : (ev.systemType === 'BRIDGE' ? 'bridge' : (ev.systemType === 'TOLL_FREE' ? 'free' : 'open'));
+      const badgeText = ev.systemType === 'CLOSED'
+        ? 'CLOSED MATRIX'
+        : (ev.systemType === 'BRIDGE' ? 'BRIDGE' : (ev.systemType === 'TOLL_FREE' ? 'TOLL-FREE' : 'OPEN'));
+
+      item.innerHTML = `
+        <div class="toll-event-top">
+          <span><span class="toll-badge ${badgeClass}">${badgeText}</span>${ev.title}</span>
+          <span>${moneyFromCents(ev.amountCents)}</span>
+        </div>
+        <div class="toll-event-sub">
+          <span>${ev.subtitle}</span>
+          <span>#${ev.seq}</span>
+        </div>
+      `;
+      container.appendChild(item);
+    });
+
+    const opEntries = Object.entries(tollResult.operatorSubtotals);
+    if (opEntries.length) {
+      opSummaryEl.innerHTML = opEntries
+        .map(([opName, cents]) => `<div class="detail-row" style="margin-bottom:3px"><span>${opName}</span><span>${moneyFromCents(cents)}</span></div>`)
+        .join('');
+    }
+  }
+
+  function processCalculations(routeData) {
+    const distanceFareCents = toCents(routeData.distance * settings.ratePerKm);
+
+    const urban = getUrbanAssessment(pickupCoords,dropoffCoords,pickupItem,dropoffItem);
+    const urbanSurchargeCents = urban.applies ? toCents(settings.urbanSurcharge) : 0;
+
+    const highlandZone = getHighlandZone(pickupCoords,dropoffCoords);
+    const hillSurchargeCents = highlandZone ? toCents(settings.hillSurcharge) : 0;
+
+    const longHaulApplies = settings.longHaulTriggerKm > 0 && routeData.distance >= settings.longHaulTriggerKm;
+    const longHaulCapCents = toCents(settings.longHaulCap);
+    const longHaulIncentiveCents = longHaulApplies
+      ? Math.min(longHaulCapCents,Math.round(distanceFareCents * settings.longHaulPercent / 100))
+      : 0;
+
+    const transportSubtotalCents = distanceFareCents + urbanSurchargeCents + hillSurchargeCents + longHaulIncentiveCents;
+    const minimumFareCents = toCents(settings.minimumFare);
+    const transportFareCents = Math.max(minimumFareCents,transportSubtotalCents);
+
+    const tollCents = routeData.tollResult.totalTollCents;
+    const exactGrandTotalCents = transportFareCents + tollCents;
+
+    const customerFareOnlyCents = roundCentsToUnit(transportFareCents,settings.roundingUnit);
+    const customerTotalInclTollsCents = settings.tollQuoteMode === 'include'
+      ? roundCentsToUnit(exactGrandTotalCents,settings.roundingUnit)
+      : customerFareOnlyCents + tollCents;
+
+    const headlineDisplayCents = settings.tollQuoteMode === 'include'
+      ? customerTotalInclTollsCents
+      : customerFareOnlyCents;
+
+    const adminThresholdCents = toCents(settings.adminFlatThreshold);
+    const usesFlatCommission = transportFareCents < adminThresholdCents;
+
+    const proposedAdminCents = usesFlatCommission
+      ? toCents(settings.adminMinimum)
+      : Math.round(transportFareCents * settings.adminPercent / 100);
+    const adminDeductionCents = Math.min(transportFareCents,proposedAdminCents);
+
+    const driverFareEarningsCents = Math.max(0,transportFareCents - adminDeductionCents);
+    const driverAmountAfterDeductionCents = Math.max(0,customerTotalInclTollsCents - adminDeductionCents);
+    const roundingAdjustmentCents = customerTotalInclTollsCents - exactGrandTotalCents;
+
+    $('urban-surcharge-row').style.display = urbanSurchargeCents > 0 ? 'flex' : 'none';
+    $('urban-surcharge-label').textContent = urban.label ? `Urban / POI surcharge (${urban.label})` : 'Urban / POI surcharge';
+    $('hill-surcharge-row').style.display = hillSurchargeCents > 0 ? 'flex' : 'none';
+    $('hill-surcharge-label').textContent = highlandZone ? `Highland surcharge (${highlandZone.name})` : 'Highland surcharge';
+    $('long-haul-incentive-row').style.display = longHaulIncentiveCents > 0 ? 'flex' : 'none';
+    $('admin-deduction-row').style.display = adminDeductionCents > 0 ? 'flex' : 'none';
+
+    $('total-fare').textContent = settings.tollQuoteMode === 'include'
+      ? moneyFromCents(headlineDisplayCents)
+      : `${moneyFromCents(headlineDisplayCents)} + ${moneyFromCents(tollCents)} toll`;
+    $('fare-distance').textContent = `${routeData.distance.toFixed(1)} km`;
+    $('fare-duration').textContent = formatDuration(routeData.duration);
+    $('calc-distance-fare').textContent = moneyFromCents(distanceFareCents);
+    $('calc-urban-surcharge').textContent = moneyFromCents(urbanSurchargeCents);
+    $('calc-hill-surcharge').textContent = moneyFromCents(hillSurchargeCents);
+    $('calc-long-haul-incentive').textContent = moneyFromCents(longHaulIncentiveCents);
+    $('calc-transport-fare').textContent = moneyFromCents(transportFareCents);
+    $('calc-toll-total').textContent = moneyFromCents(tollCents);
+    $('calc-grand').textContent = moneyFromCents(exactGrandTotalCents);
+    $('calc-customer-fare-only').textContent = moneyFromCents(customerFareOnlyCents);
+    $('calc-customer-total').textContent = moneyFromCents(customerTotalInclTollsCents);
+    $('calc-deduction').textContent = `-${moneyFromCents(adminDeductionCents)}`;
+    $('driver-fare-net').textContent = moneyFromCents(driverFareEarningsCents);
+    $('driver-net-fare').textContent = moneyFromCents(driverAmountAfterDeductionCents);
+
+    renderTollReceiptUI(routeData.tollResult);
+
+    $('fare-policy-note').textContent =
+      `Minimum transport fare: ${money(settings.minimumFare)}. ` +
+      `Admin commission: ${settings.adminPercent}% of transport fare (tolls excluded from commission), ` +
+      `or ${money(settings.adminMinimum)} below ${money(settings.adminFlatThreshold)}. ` +
+      `Rounding adjustment: ${moneyFromCents(roundingAdjustmentCents)}.`;
+
+    $('result-card').style.display = 'block';
+
+    return {
+      version:APP_VERSION,
+      pickup:$('pickup').value.trim(),
+      dropoff:$('dropoff').value.trim(),
+      distance:routeData.distance,
+      duration:routeData.duration,
+      distanceFare:fromCents(distanceFareCents),
+      urbanSurcharge:fromCents(urbanSurchargeCents),
+      urbanLabel:urban.label,
+      hillSurcharge:fromCents(hillSurchargeCents),
+      highlandZone:highlandZone ? highlandZone.name : '',
+      longHaulIncentive:fromCents(longHaulIncentiveCents),
+      transportSubtotal:fromCents(transportSubtotalCents),
+      transportFare:fromCents(transportFareCents),
+      tollTotal:fromCents(tollCents),
+      tollEvents:routeData.tollResult.events.map(ev => ({
+        ...ev,
+        amount:fromCents(ev.amountCents)
+      })),
+      operatorSubtotals:Object.fromEntries(
+        Object.entries(routeData.tollResult.operatorSubtotals).map(([k,v]) => [k,fromCents(v)])
+      ),
+      exactTotal:fromCents(exactGrandTotalCents),
+      customerFareOnly:fromCents(customerFareOnlyCents),
+      customerTotal:fromCents(customerTotalInclTollsCents),
+      roundingAdjustment:fromCents(roundingAdjustmentCents),
+      adminDeduction:fromCents(adminDeductionCents),
+      adminPercent:settings.adminPercent,
+      adminFlatBelowThreshold:settings.adminMinimum,
+      adminFlatThreshold:settings.adminFlatThreshold,
+      usesFlatCommission,
+      driverFareEarnings:fromCents(driverFareEarningsCents),
+      driverAmountAfterDeduction:fromCents(driverAmountAfterDeductionCents),
+      routingMode:activeRoutingMode,
+      settingsSnapshot:{...settings},
+      calculatedAt:new Date().toISOString()
+    };
+  }
+
+  /* =========================================================
+     15. DURATION FORMATTING
+     ========================================================= */
+  function formatDuration(minutes) {
+    const totalMinutes = Math.max(0,Math.round(Number(minutes) || 0));
+    if (totalMinutes < 60) return `${totalMinutes} mins`;
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    return `${hours} hr ${mins} mins`;
+  }
+
+  /* =========================================================
+     16. CUSTOMER QUOTE & DRIVER RECEIPT GENERATION
+     ========================================================= */
+  function customerQuoteText(data) {
+    const tollSummary = data.tollTotal > 0
+      ? (data.settingsSnapshot.tollQuoteMode === 'include'
+          ? `Est. Tolls (Class 1): ${money(data.tollTotal)} (included)`
+          : `Est. Tolls (Class 1): +${money(data.tollTotal)} (actual toll pass-through)`)
+      : 'Tolls: RM 0.00 (Toll-free route)';
+
+    const totalLine = data.settingsSnapshot.tollQuoteMode === 'include'
+      ? `*Total Fare (incl. tolls): ${money(data.customerTotal)}*`
+      : `*Fare: ${money(data.customerFareOnly)}* + *Est. Tolls: ${money(data.tollTotal)}*`;
+
+    return [
+      '*TRIP FARE QUOTATION*',
+      `From: ${data.pickup}`,
+      `To: ${data.dropoff}`,
+      `Est. Distance: ${data.distance.toFixed(1)} km (~${formatDuration(data.duration)})`,
+      tollSummary,
+      totalLine,
+      '_Cashless (TnG eWallet / DuitNow QR) preferred._'
+    ].join('\n');
+  }
+
+  function receiptText(data) {
+    const modeLabel = data.routingMode === 'fast'
+      ? 'Fastest'
+      : (data.routingMode === 'short' ? 'Shortest' : 'Avoid Tolls');
+
+    const tollLines = data.tollEvents.length
+      ? data.tollEvents.map(ev => `  #${ev.seq} [${ev.systemType}] ${ev.title} (${ev.operatorName}): ${money(ev.amount)}`)
+      : ['  None (RM 0.00)'];
+
+    const opLines = Object.entries(data.operatorSubtotals).length
+      ? Object.entries(data.operatorSubtotals).map(([op, amt]) => `  - ${op}: ${money(amt)}`)
+      : [];
+
+    return [
+      `DRIVER FARE & TOLL LOG — RIDESHARE MY v${APP_VERSION}`,
+      '------------------------------------------------',
+      `From: ${data.pickup}`,
+      `To: ${data.dropoff}`,
+      `Distance: ${data.distance.toFixed(1)} km`,
+      `Estimated duration: ${formatDuration(data.duration)}`,
+      `Route mode: ${modeLabel}`,
+      '------------------------------------------------',
+      `Distance fare: ${money(data.distanceFare)}`,
+      `Urban / POI surcharge: ${money(data.urbanSurcharge)}`,
+      `Highland surcharge: ${money(data.hillSurcharge)}`,
+      `Highland zone: ${data.highlandZone || 'None'}`,
+      `Long-haul contribution: ${money(data.longHaulIncentive)}`,
+      `Minimum-adjusted transport fare: ${money(data.transportFare)}`,
+      '------------------------------------------------',
+      `TOLL EVENTS (CLASS 1): ${money(data.tollTotal)}`,
+      ...tollLines,
+      ...(opLines.length ? ['Operator Subtotals:', ...opLines] : []),
+      '------------------------------------------------',
+      `Exact calculated total (incl. tolls): ${money(data.exactTotal)}`,
+      `Quotation rounding adjustment: ${money(data.roundingAdjustment)}`,
+      `CUSTOMER FARE ONLY: ${money(data.customerFareOnly)}`,
+      `CUSTOMER TOTAL (INCL. TOLLS): ${money(data.customerTotal)}`,
+      '------------------------------------------------',
+      `Admin commission (on fare): -${money(data.adminDeduction)}`,
+      `Commission method: ${data.usesFlatCommission ? 'Flat commission' : 'Percentage commission'}`,
+      `Driver transport earnings: ${money(data.driverFareEarnings)}`,
+      `Driver collection after commission: ${money(data.driverAmountAfterDeduction)}`,
+      '------------------------------------------------',
+      `Generated by Rideshare MY v${APP_VERSION}`
+    ].join('\n');
+  }
+
+  /* =========================================================
+     17. CLIPBOARD & WHATSAPP DISPATCH
+     ========================================================= */
+  async function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return;
+      } catch(error) {
+        console.warn('Modern clipboard failed; trying fallback.',error);
+      }
+    }
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly','');
+    area.style.position = 'fixed';
+    area.style.left = '-9999px';
+    area.style.top = '0';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.focus();
+    area.select();
+    area.setSelectionRange(0,area.value.length);
+    let copied = false;
+    try {
+      copied = document.execCommand('copy');
+    } finally {
+      area.remove();
+    }
+    if (!copied) {
+      throw new Error('Clipboard access was blocked by the browser.');
+    }
+  }
+
+  async function copyFormatted(buttonId, formatter, successLabel) {
+    if (!latestCalculation) return;
+    const button = $(buttonId);
+    const original = button.textContent;
+    try {
+      await copyText(formatter(latestCalculation));
+      button.textContent = successLabel;
+      setTimeout(() => { button.textContent = original; },1800);
+    } catch(error) {
+      showError(`Unable to copy: ${error.message}`);
+    }
+  }
+
+  function sendCustomerWhatsApp() {
+    if (!latestCalculation) return;
+    const text = encodeURIComponent(customerQuoteText(latestCalculation));
+    window.open(`https://wa.me/?text=${text}`,'_blank','noopener');
+  }
+
+  /* =========================================================
+     18. MAP INITIALISATION
+     ========================================================= */
+  function initMap() {
+    try {
+      if (!window.H || !H.service || !H.Map) {
+        showError('HERE Maps scripts did not load. Check internet connection or content blockers.');
+        return false;
+      }
+      if (!isApiKeyConfigured()) {
+        setRouteStatus('Setup required: configure your HERE API key to enable map services.');
+      }
+      platform = new H.service.Platform({apikey:HERE_API_KEY});
+      const layers = platform.createDefaultLayers();
+      map = new H.Map(
+        $('map'),
+        layers.vector.normal.map,
+        {
+          zoom:11,
+          center:{lat:3.1390,lng:101.6869},
+          pixelRatio:window.devicePixelRatio || 1
+        }
+      );
+      window.addEventListener('resize',() => {
+        if (map) map.getViewPort().resize();
+      });
+      new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
+      ui = H.ui.UI.createDefault(map,layers);
+      router = platform.getRoutingService(null,8);
+      return true;
+    } catch(error) {
+      console.error('Map initialisation error:',error);
+      showError('Unable to initialise HERE Maps. Check API key, permissions and internet connection.');
+      return false;
+    }
+  }
+
+  /* =========================================================
+     19. EVENT BINDING
+     ========================================================= */
+  function bindEvents() {
+    setupAutocomplete('pickup');
+    setupAutocomplete('dropoff');
+    $('current-loc-btn').addEventListener('click',requestCurrentLocation);
+    $('swap-locations-btn').addEventListener('click',swapLocations);
+    $('btn-mode-fast').addEventListener('click',() => setRoutingMode('fast'));
+    $('btn-mode-short').addEventListener('click',() => setRoutingMode('short'));
+    $('btn-mode-notoll').addEventListener('click',() => setRoutingMode('notoll'));
+    $('retry-route-btn').addEventListener('click',calculateRoute);
+    $('pin-trip-btn').addEventListener('click',pinCurrentRoute);
+
+    $('copy-customer-btn').addEventListener('click',() =>
+      copyFormatted('copy-customer-btn',customerQuoteText,'✓ Quote Copied')
+    );
+    $('share-btn').addEventListener('click',() =>
+      copyFormatted('share-btn',receiptText,'✓ Log Copied')
+    );
+    $('whatsapp-customer-btn').addEventListener('click',sendCustomerWhatsApp);
+
+    $('save-settings-btn').addEventListener('click',() => {
+      try {
+        const next = readSettingsForm();
+        settings = sanitizeSettings(next);
+        if (!persistSettings()) return;
+        if (pickupCoords && dropoffCoords) calculateRoute();
+        setRouteStatus('Fare & toll settings saved successfully on this device.');
+        clearError();
+      } catch(error) {
+        showError(error.message);
       }
     });
 
-    dom.resetSettingsBtn.addEventListener('click', () => {
-      saveSettings({ ...DEFAULT_SETTINGS });
-      populateSettingsInputs();
-      if (availableRoutes.length && pickupLocation && dropoffLocation) {
-        selectRouteAlternative(activeRouteIndex);
-      }
+    $('reset-settings-btn').addEventListener('click',() => {
+      if (!confirm('Restore all default fare settings?')) return;
+      settings = {...DEFAULT_SETTINGS};
+      populateSettingsForm();
+      if (!persistSettings()) return;
+      if (pickupCoords && dropoffCoords) calculateRoute();
+      setRouteStatus('Default fare settings restored.');
+      clearError();
     });
 
-    dom.clearHistoryBtn.addEventListener('click', () => {
-      routeMemory = { pinned: [], recent: [] };
-      saveRouteMemory();
-      renderQuickBar();
+    $('clear-history-btn').addEventListener('click',() => {
+      if (!confirm('Clear all pinned and recent routes on this device?')) return;
+      savedRoutes = {pinned:[],recent:[]};
+      persistSavedRoutes();
       updatePinButtonState();
+      setRouteStatus('Saved routes cleared.');
     });
 
-    document.addEventListener('click', e => {
-      if (!dom.pickupInput.contains(e.target) && !dom.pickupSuggestions.contains(e.target)) {
-        hideSuggestions(dom.pickupSuggestions);
-      }
-      if (!dom.dropoffInput.contains(e.target) && !dom.dropoffSuggestions.contains(e.target)) {
-        hideSuggestions(dom.dropoffSuggestions);
-      }
+    document.addEventListener('pointerdown',event => {
+      ['pickup','dropoff'].forEach(type => {
+        const box = $(`${type}-suggestions`);
+        const input = $(type);
+        if (!box.contains(event.target) && !input.contains(event.target)) {
+          box.style.display = 'none';
+        }
+      });
     });
   }
 
   /* =========================================================
-     10. BOOTSTRAP
+     20. APPLICATION STARTUP
      ========================================================= */
-  function bootstrap() {
-    initMap();
-    populateSettingsInputs();
+  function boot() {
+    populateSettingsForm();
     renderQuickBar();
-    syncClearButtons();
     bindEvents();
+    initMap();
+    if (!isApiKeyConfigured()) {
+      setRouteStatus('Setup required: replace HERE_API_KEY with your valid key.');
+    }
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bootstrap);
-  } else {
-    bootstrap();
-  }
+  boot();
 })();
 </script>
 </body>
