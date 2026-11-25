@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<title>Rideshare MY Personal Edition v3.8.1</title>
+<title>Rideshare MY Personal Edition v3.7.0</title>
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 <style>
   :root {
@@ -597,7 +597,7 @@
   <main id="search-panel">
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.8.1</span>
+      <span class="version">PERSONAL EDITION v3.7.0</span>
     </div>
 
     <!-- QUICK PINS & RECENT ROUTES -->
@@ -810,7 +810,7 @@
   /* =========================================================
      1. CONFIGURATION & COMPREHENSIVE MALAYSIAN TOLL DIRECTORY
      ========================================================= */
-  const APP_VERSION = '3.8.1';
+  const APP_VERSION = '3.8.2';
   const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
   const DEFAULT_SETTINGS = Object.freeze({
@@ -2812,10 +2812,31 @@
             tariffVerified:false
           });
 
+          if (item.amountAnomaly) {
+            // The amount is inconsistent with the matched open-plaza reference.
+            // Keep the HERE amount in the route total, but withdraw the unsupported plaza attribution.
+            item.suggestedPlazaName = item.plazaName;
+            item.suggestedRegistryPlazaId = item.registryPlazaId || null;
+            item.plazaName = `Unallocated HERE toll event ${sIdx + 1}.${tIdx + 1}`;
+            item.operator = 'Unallocated HERE toll';
+            item.systemName = 'HERE route toll event';
+            item.registryMatched = false;
+            item.registryPlazaId = null;
+            item.registryOperatorId = null;
+            item.llmEntryId = null;
+            item.llmExitId = null;
+            item.registryLatitude = null;
+            item.registryLongitude = null;
+            item.verificationStatus = 'amount-mismatch-unallocated';
+            hasEstimatedTolls = true;
+          }
+
           if (item.unresolved) {
             unresolvedCount++;
             hasEstimatedTolls = true;
           } else {
+            // Count each distinct HERE fare ID once. Never discard a different fare ID
+            // merely because it appears to refer to the same plaza.
             totalCents += item.cents;
           }
           items.push(item);
@@ -2899,31 +2920,9 @@
       });
     }
 
-    // Reconcile repeated exact registry-plaza identities within one route.
-    // Keep anomalous duplicate observations visible for audit, but exclude them
-    // from the payable total when the same plaza also has a non-anomalous event.
-    const registryGroups = new Map();
-    items.forEach(item => {
-      if (!item.registryMatched || !item.registryPlazaId) return;
-      const group = registryGroups.get(item.registryPlazaId) || [];
-      group.push(item);
-      registryGroups.set(item.registryPlazaId, group);
-    });
-    let duplicatePlazaEvents = 0;
-    registryGroups.forEach(group => {
-      if (group.length < 2 || !group.some(x => x.amountAnomaly)) return;
-      const validCandidates = group.filter(x => !x.amountAnomaly && !x.unresolved);
-      if (!validCandidates.length) return;
-      group.forEach(item => {
-        if (!item.amountAnomaly || item.unresolved || item.duplicateExcluded) return;
-        item.duplicateExcluded = true;
-        item.excludedFromTotal = true;
-        item.verificationStatus = 'duplicate-anomaly';
-        duplicatePlazaEvents++;
-        totalCents -= Number(item.cents || 0);
-        hasEstimatedTolls = true;
-      });
-    });
+    // Duplicate suppression is based only on an identical HERE fare ID above.
+    // Distinct fare IDs are retained even if plaza names or registry matches coincide.
+    const duplicatePlazaEvents = 0;
 
     return {
       cents:Math.max(0,totalCents),
@@ -3155,7 +3154,7 @@
       const title = document.createElement('div');
       title.className = 'toll-breakdown-title';
       const titleText = document.createElement('span');
-      titleText.textContent = `HERE Toll Results · ${routeData.tollResult.registryMatchedCount || 0} plaza identity match(es) · ${routeData.tollResult.duplicatePlazaEvents || 0} duplicate anomaly event(s) excluded`;
+      titleText.textContent = `HERE Toll Results · ${routeData.tollResult.registryMatchedCount || 0} plaza identity match(es) · ${routeData.tollResult.items.filter(x => x.verificationStatus === 'amount-mismatch-unallocated').length} amount-mismatch event(s) unallocated`;
       title.appendChild(titleText);
       breakdownBox.appendChild(title);
 
@@ -3175,9 +3174,11 @@
         plazaLine.textContent = item.plazaName || 'Plaza Tol';
         const registryMeta = document.createElement('span');
         registryMeta.className = 'toll-registry-meta';
-        registryMeta.textContent = item.registryPlazaId
-          ? `${item.registryPlazaId} · ${item.llmEntryId || item.llmExitId ? `LLM ${item.llmEntryId || '—'} / ${item.llmExitId || '—'}` : 'LLM ID pending'}`
-          : 'No exact plaza registry match';
+        registryMeta.textContent = item.suggestedPlazaName
+          ? `Possible match only: ${item.suggestedPlazaName} · identity unconfirmed`
+          : (item.registryPlazaId
+            ? `${item.registryPlazaId} · ${item.llmEntryId || item.llmExitId ? `LLM ${item.llmEntryId || '—'} / ${item.llmExitId || '—'}` : 'LLM ID pending'}`
+            : 'No exact plaza registry match');
 
         left.append(opLine,plazaLine,registryMeta);
 
@@ -3189,12 +3190,11 @@
         amountSpan.textContent = item.unresolved ? 'Unverified' : moneyFromCents(item.cents);
 
         const badge = document.createElement('span');
-        if (item.duplicateExcluded) {
+        if (item.verificationStatus === 'amount-mismatch-unallocated') {
           badge.className = 'toll-badge unverified';
-          badge.textContent = 'Duplicate anomaly · excluded from total';
+          badge.textContent = 'Amount mismatch · retained, plaza unallocated';
           row.classList.add('fare-warning');
-          amountSpan.style.textDecoration = 'line-through';
-          amountSpan.title = 'Audit-only HERE observation; excluded because the same registered plaza has a non-anomalous event.';
+          amountSpan.title = 'Distinct HERE toll amount retained in the route total; plaza attribution withdrawn because the amount conflicts with the registry reference.';
         } else if (item.unresolved) {
           badge.className = 'toll-badge unverified';
           badge.textContent = 'Check';
