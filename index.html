@@ -861,7 +861,7 @@
 
   const TOLL_PLAZAS = [
     // --- PENANG BRIDGES, BORR (E17) & BKE (E15) ---
-    { id:'PLZ_E36_PERAI', code:'E36', name:'Penang Bridge (Perai)', op:'OP_PLUS', type:'BRIDGE', net:null, dir:'MAINLAND_TO_ISLAND', rateCents:700, lat:5.3792, lng:100.3863, radiusKm:0.50 },
+    { id:'PLZ_E36_PERAI', code:'E36', name:'Penang Bridge (Perai)', op:'OP_PLUS', type:'BRIDGE', net:null, dir:'MAINLAND_TO_ISLAND', rateCents:574, lat:5.3792, lng:100.3863, radiusKm:0.55 },
     { id:'PLZ_E28_BDR_CASSIA_BRG', code:'E28', name:'Penang 2nd Bridge (Bandar Cassia)', op:'OP_JKSB', type:'BRIDGE', net:null, dir:'MAINLAND_TO_ISLAND', rateCents:574, lat:5.2427, lng:100.4319, radiusKm:0.55 },
     { id:'PLZ_E17_PERAI', code:'E17', name:'BORR Perai', op:'OP_BORR', type:'OPEN', net:null, dir:'ANY', rateCents:150, lat:5.3887, lng:100.3849, radiusKm:0.35 },
     { id:'PLZ_E17_BAGAN_AJAM', code:'E17', name:'BORR Bagan Ajam', op:'OP_BORR', type:'OPEN', net:null, dir:'ANY', rateCents:150, lat:5.4379, lng:100.3821, radiusKm:0.35 },
@@ -1028,6 +1028,20 @@
 
   // Rectified Class 1 closed-system matrix pairs (in sen)
   const CLOSED_MATRIX_RAW = [
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_JLN_DUTA', 481],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_JLN_DUTA', 392],
+    ['NET_PLUS', 'PLZ_E1_SHAH_ALAM', 'PLZ_E1_JLN_DUTA', 435],
+    ['NET_PLUS', 'PLZ_E1_SUBANG', 'PLZ_E1_JLN_DUTA', 340],
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_JURU', 3715],
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_BDR_CASSIA', 3555],
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_SG_DUA', 3825],
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E1_IPOH_U', 2390],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_JURU', 3625],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_BDR_CASSIA', 3465],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_SG_DUA', 3735],
+    ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_JURU', 3550],
+    ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_BDR_CASSIA', 3390],
+    ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_SG_DUA', 3660],
     ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_RAWANG', 295],
     ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_TG_MALIM', 779],
     ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E1_TAPAH', 1591],
@@ -1117,395 +1131,281 @@
     return map;
   })();
 
-  const NETWORK_FALLBACK_SEN_PER_KM = {
+  const NETWORK_FALLBACK_SEN_PER_KM = Object.freeze({
     NET_PLUS: 11.4,
     NET_LPT1: 12.2,
     NET_LEKAS: 14.5
-  };
+  });
 
   /* =========================================================
-     3. INTEGER-CENT MONEY ENGINE & APPLICATION STATE
+     3. APPLICATION STATE & DOM REFERENCES
      ========================================================= */
-  const $ = id => document.getElementById(id);
-  const toCents = rm => Math.round((Number(rm || 0) + Number.EPSILON) * 100);
-  const fromCents = cents => Math.round(Number(cents || 0)) / 100;
-  const moneyFromCents = cents => `RM ${fromCents(cents).toFixed(2)}`;
-  const money = value => moneyFromCents(toCents(value));
-
-  function roundCentsToUnit(cents, unitRm) {
-    const unitCents = toCents(unitRm);
-    if (unitCents <= 1) return Math.round(cents);
-    return Math.round(cents / unitCents) * unitCents;
-  }
-
   let settings = loadSettings();
-  let savedRoutes = loadSavedRoutes();
-  let map = null;
-  let platform = null;
-  let router = null;
-  let ui = null;
+  let routeMemory = loadRouteMemory();
+  let map, routeGroup, ui;
+  let searchService;
+  let routingService;
+  let currentRouteMode = 'fastest';
+  let avoidTolls = false;
+  let activeRouteIndex = 0;
+  let availableRoutes = [];
+  let lastQuote = null;
+  let lastRouteRequest = null;
+  let isRoutingInFlight = false;
+  let debounceTimer;
+  let activeRequestId = 0;
 
-  let pickupCoords = null;
-  let dropoffCoords = null;
-  let pickupItem = null;
-  let dropoffItem = null;
-
+  let pickupLocation = null;
+  let dropoffLocation = null;
   let pickupMarker = null;
   let dropoffMarker = null;
-  let routePolylines = [];
+  let pickupMarkerIcon = null;
+  let dropoffMarkerIcon = null;
 
-  let activeRoutingMode = 'fast';
-  let availableRoutes = [];
-  let selectedRouteIndex = 0;
-  let routeRequestId = 0;
-  let routeDebounce = null;
-  let latestCalculation = null;
-  let gpsAccuracy = null;
-  let gpsRequestId = 0;
-  let gpsActive = false;
+  let watchId = null;
+  let isTrackingLocation = false;
+  let userSelectedLocation = false;
 
-  const autocompleteState = {
-    pickup:{controller:null,sequence:0,timer:null},
-    dropoff:{controller:null,sequence:0,timer:null}
+  const dom = {
+    pickupInput: document.getElementById('pickup'),
+    dropoffInput: document.getElementById('dropoff'),
+    clearPickupBtn: document.getElementById('clear-pickup'),
+    clearDropoffBtn: document.getElementById('clear-dropoff'),
+    pickupSuggestions: document.getElementById('pickup-suggestions'),
+    dropoffSuggestions: document.getElementById('dropoff-suggestions'),
+    currentLocBtn: document.getElementById('current-loc-btn'),
+    swapBtn: document.getElementById('swap-locations-btn'),
+    quickBar: document.getElementById('quick-bar'),
+    altRoutesBar: document.getElementById('alt-routes-bar'),
+    btnFast: document.getElementById('btn-mode-fast'),
+    btnShort: document.getElementById('btn-mode-short'),
+    btnNoToll: document.getElementById('btn-mode-notoll'),
+    loadingMsg: document.getElementById('loading-msg'),
+    errorMsg: document.getElementById('error-msg'),
+    routeStatus: document.getElementById('route-status'),
+    retryRouteBtn: document.getElementById('retry-route-btn'),
+    resultCard: document.getElementById('result-card'),
+    pinTripBtn: document.getElementById('pin-trip-btn'),
+    totalFare: document.getElementById('total-fare'),
+    fareDistance: document.getElementById('fare-distance'),
+    fareDuration: document.getElementById('fare-duration'),
+    calcDistanceFare: document.getElementById('calc-distance-fare'),
+    urbanRow: document.getElementById('urban-surcharge-row'),
+    urbanLabel: document.getElementById('urban-surcharge-label'),
+    calcUrban: document.getElementById('calc-urban-surcharge'),
+    hillRow: document.getElementById('hill-surcharge-row'),
+    hillLabel: document.getElementById('hill-surcharge-label'),
+    calcHill: document.getElementById('calc-hill-surcharge'),
+    longHaulRow: document.getElementById('long-haul-incentive-row'),
+    calcLongHaul: document.getElementById('calc-long-haul-incentive'),
+    calcTransportFare: document.getElementById('calc-transport-fare'),
+    calcTollTotal: document.getElementById('calc-toll-total'),
+    calcGrand: document.getElementById('calc-grand'),
+    calcCustomerFareOnly: document.getElementById('calc-customer-fare-only'),
+    calcCustomerTotal: document.getElementById('calc-customer-total'),
+    adminRow: document.getElementById('admin-deduction-row'),
+    calcDeduction: document.getElementById('calc-deduction'),
+    driverFareNet: document.getElementById('driver-fare-net'),
+    driverNetFare: document.getElementById('driver-net-fare'),
+    farePolicyNote: document.getElementById('fare-policy-note'),
+    tollReceiptSummary: document.getElementById('toll-receipt-summary'),
+    tollEventsContainer: document.getElementById('toll-events-container'),
+    tollOperatorSubtotals: document.getElementById('toll-operator-subtotals'),
+    copyCustomerBtn: document.getElementById('copy-customer-btn'),
+    shareBtn: document.getElementById('share-btn'),
+    whatsappCustomerBtn: document.getElementById('whatsapp-customer-btn'),
+    settingRate: document.getElementById('setting-rate'),
+    settingMinimum: document.getElementById('setting-minimum'),
+    settingUrban: document.getElementById('setting-urban'),
+    settingHill: document.getElementById('setting-hill'),
+    settingLongHaulKm: document.getElementById('setting-longhaul-km'),
+    settingLongHaulPercent: document.getElementById('setting-longhaul-percent'),
+    settingLongHaulCap: document.getElementById('setting-longhaul-cap'),
+    settingAdminPercent: document.getElementById('setting-admin-percent'),
+    settingAdminThreshold: document.getElementById('setting-admin-threshold'),
+    settingAdminMin: document.getElementById('setting-admin-min'),
+    settingTollMode: document.getElementById('setting-toll-mode'),
+    settingRounding: document.getElementById('setting-rounding'),
+    saveSettingsBtn: document.getElementById('save-settings-btn'),
+    resetSettingsBtn: document.getElementById('reset-settings-btn'),
+    clearHistoryBtn: document.getElementById('clear-history-btn')
   };
 
   /* =========================================================
-     4. SETTINGS & ROUTE HISTORY STORAGE
+     4. STORAGE, FORMATTING & GEOMETRY UTILITIES
      ========================================================= */
-  function sanitizeSettings(saved) {
-    const merged = {...DEFAULT_SETTINGS,...saved};
-    Object.keys(DEFAULT_SETTINGS).forEach(key => {
-      if (key === 'tollQuoteMode') return;
-      if (!Number.isFinite(Number(merged[key])) || Number(merged[key]) < 0) {
-        merged[key] = DEFAULT_SETTINGS[key];
-      } else {
-        merged[key] = Number(merged[key]);
-      }
-    });
-    if (merged.longHaulPercent > 100) merged.longHaulPercent = DEFAULT_SETTINGS.longHaulPercent;
-    if (merged.adminPercent > 100) merged.adminPercent = DEFAULT_SETTINGS.adminPercent;
-    if (!['include','separate'].includes(merged.tollQuoteMode)) merged.tollQuoteMode = DEFAULT_SETTINGS.tollQuoteMode;
-    if (![1,0.5,0.1,0.01].includes(merged.roundingUnit)) merged.roundingUnit = DEFAULT_SETTINGS.roundingUnit;
-    return merged;
-  }
-
   function loadSettings() {
     try {
       let raw = localStorage.getItem(SETTINGS_KEY);
       if (!raw) {
-        for (const legacyKey of LEGACY_SETTINGS_KEYS) {
-          raw = localStorage.getItem(legacyKey);
+        for (const key of LEGACY_SETTINGS_KEYS) {
+          raw = localStorage.getItem(key);
           if (raw) break;
         }
       }
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          return sanitizeSettings(parsed);
-        }
-      }
-    } catch (error) {
-      console.warn('Settings could not be loaded; defaults will be used:',error);
-    }
-    return {...DEFAULT_SETTINGS};
-  }
-
-  function persistSettings() {
-    try {
-      localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings));
-      return true;
-    } catch (error) {
-      showError('Unable to save settings. Browser storage may be unavailable.');
-      return false;
-    }
-  }
-
-  function loadSavedRoutes() {
-    try {
-      const raw = localStorage.getItem(ROUTES_STORAGE_KEY);
-      if (!raw) return {pinned:[],recent:[]};
+      if (!raw) return { ...DEFAULT_SETTINGS };
       const parsed = JSON.parse(raw);
       return {
-        pinned:Array.isArray(parsed.pinned) ? parsed.pinned.slice(0,MAX_PINNED_ROUTES) : [],
-        recent:Array.isArray(parsed.recent) ? parsed.recent.slice(0,MAX_RECENT_ROUTES) : []
+        ratePerKm: nonNeg(parsed.ratePerKm, DEFAULT_SETTINGS.ratePerKm),
+        minimumFare: nonNeg(parsed.minimumFare, DEFAULT_SETTINGS.minimumFare),
+        urbanSurcharge: nonNeg(parsed.urbanSurcharge, DEFAULT_SETTINGS.urbanSurcharge),
+        hillSurcharge: nonNeg(parsed.hillSurcharge, DEFAULT_SETTINGS.hillSurcharge),
+        longHaulTriggerKm: nonNeg(parsed.longHaulTriggerKm, DEFAULT_SETTINGS.longHaulTriggerKm),
+        longHaulPercent: clampPct(parsed.longHaulPercent, DEFAULT_SETTINGS.longHaulPercent),
+        longHaulCap: nonNeg(parsed.longHaulCap, DEFAULT_SETTINGS.longHaulCap),
+        adminPercent: clampPct(parsed.adminPercent, DEFAULT_SETTINGS.adminPercent),
+        adminFlatThreshold: nonNeg(parsed.adminFlatThreshold, DEFAULT_SETTINGS.adminFlatThreshold),
+        adminMinimum: nonNeg(parsed.adminMinimum, DEFAULT_SETTINGS.adminMinimum),
+        tollQuoteMode: parsed.tollQuoteMode === 'separate' ? 'separate' : 'include',
+        roundingUnit: [1, 0.5, 0.1, 0.01].includes(Number(parsed.roundingUnit))
+          ? Number(parsed.roundingUnit)
+          : DEFAULT_SETTINGS.roundingUnit
       };
-    } catch (_) {
-      return {pinned:[],recent:[]};
+    } catch {
+      return { ...DEFAULT_SETTINGS };
     }
   }
 
-  function persistSavedRoutes() {
+  function saveSettings(next) {
+    settings = { ...next };
     try {
-      localStorage.setItem(ROUTES_STORAGE_KEY,JSON.stringify(savedRoutes));
-    } catch (_) {}
-    renderQuickBar();
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    } catch {}
   }
 
-  function shortPlaceName(label) {
-    const clean = String(label || '').trim();
-    if (!clean) return 'Unknown';
-    const firstPart = clean.split(',')[0].trim();
-    return firstPart.length > 22 ? firstPart.slice(0,21) + '…' : firstPart;
-  }
-
-  function makeRouteRecord(labelOverride) {
-    if (!pickupCoords || !dropoffCoords) return null;
-    const pLabel = $('pickup').value.trim();
-    const dLabel = $('dropoff').value.trim();
-    return {
-      id:`${pickupCoords.lat.toFixed(4)},${pickupCoords.lng.toFixed(4)}->${dropoffCoords.lat.toFixed(4)},${dropoffCoords.lng.toFixed(4)}`,
-      tag:labelOverride || `${shortPlaceName(pLabel)} → ${shortPlaceName(dLabel)}`,
-      pickupLabel:pLabel,
-      dropoffLabel:dLabel,
-      pickupCoords:{...pickupCoords},
-      dropoffCoords:{...dropoffCoords},
-      pickupCategories:pickupItem && Array.isArray(pickupItem.categories) ? pickupItem.categories : [],
-      dropoffCategories:dropoffItem && Array.isArray(dropoffItem.categories) ? dropoffItem.categories : []
-    };
-  }
-
-  function recordRecentRoute() {
-    const rec = makeRouteRecord();
-    if (!rec) return;
-    if (savedRoutes.pinned.some(r => r.id === rec.id)) return;
-    savedRoutes.recent = [
-      rec,
-      ...savedRoutes.recent.filter(r => r.id !== rec.id)
-    ].slice(0,MAX_RECENT_ROUTES);
-    persistSavedRoutes();
-  }
-
-  function pinCurrentRoute() {
-    const rec = makeRouteRecord();
-    if (!rec) return;
-    const existingIdx = savedRoutes.pinned.findIndex(r => r.id === rec.id);
-    if (existingIdx >= 0) {
-      savedRoutes.pinned.splice(existingIdx,1);
-      persistSavedRoutes();
-      updatePinButtonState();
-      setRouteStatus('Removed route from pinned shortcuts.');
-      return;
+  function loadRouteMemory() {
+    try {
+      const raw = localStorage.getItem(ROUTES_STORAGE_KEY);
+      if (!raw) return { pinned: [], recent: [] };
+      const parsed = JSON.parse(raw);
+      return {
+        pinned: Array.isArray(parsed.pinned) ? parsed.pinned.slice(0, MAX_PINNED_ROUTES) : [],
+        recent: Array.isArray(parsed.recent) ? parsed.recent.slice(0, MAX_RECENT_ROUTES) : []
+      };
+    } catch {
+      return { pinned: [], recent: [] };
     }
-    const customTag = prompt('Shortcut label for this route:',rec.tag);
-    if (customTag === null) return;
-    rec.tag = customTag.trim() || rec.tag;
-    savedRoutes.pinned = [rec,...savedRoutes.pinned].slice(0,MAX_PINNED_ROUTES);
-    savedRoutes.recent = savedRoutes.recent.filter(r => r.id !== rec.id);
-    persistSavedRoutes();
-    updatePinButtonState();
-    setRouteStatus(`Pinned "${rec.tag}" to quick bar.`);
   }
 
-  function updatePinButtonState() {
-    const btn = $('pin-trip-btn');
-    if (!btn || !pickupCoords || !dropoffCoords) return;
-    const id = `${pickupCoords.lat.toFixed(4)},${pickupCoords.lng.toFixed(4)}->${dropoffCoords.lat.toFixed(4)},${dropoffCoords.lng.toFixed(4)}`;
-    const isPinned = savedRoutes.pinned.some(r => r.id === id);
-    btn.textContent = isPinned ? '★ Pinned' : '📌 Pin Route';
+  function saveRouteMemory() {
+    try {
+      localStorage.setItem(ROUTES_STORAGE_KEY, JSON.stringify(routeMemory));
+    } catch {}
   }
 
-  function applySavedRoute(rec) {
-    if (!rec || !rec.pickupCoords || !rec.dropoffCoords) return;
-    cancelGpsRequest();
-    invalidateRoute(true);
-    pickupCoords = {...rec.pickupCoords};
-    dropoffCoords = {...rec.dropoffCoords};
-    pickupItem = {address:{label:rec.pickupLabel},categories:rec.pickupCategories || []};
-    dropoffItem = {address:{label:rec.dropoffLabel},categories:rec.dropoffCategories || []};
-    $('pickup').value = rec.pickupLabel || '';
-    $('dropoff').value = rec.dropoffLabel || '';
-    $('pickup-suggestions').style.display = 'none';
-    $('dropoff-suggestions').style.display = 'none';
-    updateInputClearButton('pickup');
-    updateInputClearButton('dropoff');
-    updateMarker('pickup',pickupCoords);
-    updateMarker('dropoff',dropoffCoords);
-    clearError();
-    calculateRoute();
+  function nonNeg(v, fallback) {
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : fallback;
   }
 
-  function renderQuickBar() {
-    const bar = $('quick-bar');
-    if (!bar) return;
-    bar.innerHTML = '';
-    const allChips = [
-      ...savedRoutes.pinned.map(r => ({...r,isPinned:true})),
-      ...savedRoutes.recent.map(r => ({...r,isPinned:false}))
-    ];
-    if (!allChips.length) {
-      bar.style.display = 'none';
-      return;
-    }
-    allChips.forEach(item => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = item.isPinned ? 'chip-btn' : 'chip-btn recent';
-      btn.textContent = `${item.isPinned ? '★' : '🕒'} ${item.tag}`;
-      btn.title = `${item.pickupLabel} → ${item.dropoffLabel}`;
-      btn.addEventListener('click',() => applySavedRoute(item));
-      bar.appendChild(btn);
-    });
-    bar.style.display = 'flex';
+  function clampPct(v, fallback) {
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 && n <= 100 ? n : fallback;
   }
 
-  function readSettingsForm() {
-    const fields = {
-      ratePerKm:'setting-rate',
-      minimumFare:'setting-minimum',
-      urbanSurcharge:'setting-urban',
-      hillSurcharge:'setting-hill',
-      longHaulTriggerKm:'setting-longhaul-km',
-      longHaulPercent:'setting-longhaul-percent',
-      longHaulCap:'setting-longhaul-cap',
-      adminPercent:'setting-admin-percent',
-      adminFlatThreshold:'setting-admin-threshold',
-      adminMinimum:'setting-admin-min'
-    };
-    const next = {};
-    for (const [key,id] of Object.entries(fields)) {
-      const raw = $(id).value.trim();
-      if (raw === '') throw new Error(`Please complete the ${key} field.`);
-      const value = Number(raw);
-      if (!Number.isFinite(value) || value < 0) throw new Error(`Invalid non-negative value for ${key}.`);
-      next[key] = value;
-    }
-    if (next.longHaulPercent > 100 || next.adminPercent > 100) {
-      throw new Error('Percentage values cannot exceed 100%.');
-    }
-    next.tollQuoteMode = $('setting-toll-mode').value;
-    if (!['include','separate'].includes(next.tollQuoteMode)) {
-      throw new Error('Invalid toll inclusion mode.');
-    }
-    next.roundingUnit = Number($('setting-rounding').value);
-    if (![1,0.5,0.1,0.01].includes(next.roundingUnit)) {
-      throw new Error('Invalid rounding selection.');
-    }
-    return next;
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[ch]));
   }
 
-  function populateSettingsForm() {
-    $('setting-rate').value = settings.ratePerKm;
-    $('setting-minimum').value = settings.minimumFare;
-    $('setting-urban').value = settings.urbanSurcharge;
-    $('setting-hill').value = settings.hillSurcharge;
-    $('setting-longhaul-km').value = settings.longHaulTriggerKm;
-    $('setting-longhaul-percent').value = settings.longHaulPercent;
-    $('setting-longhaul-cap').value = settings.longHaulCap;
-    $('setting-admin-percent').value = settings.adminPercent;
-    $('setting-admin-threshold').value = settings.adminFlatThreshold;
-    $('setting-admin-min').value = settings.adminMinimum;
-    $('setting-toll-mode').value = settings.tollQuoteMode;
-    $('setting-rounding').value = String(settings.roundingUnit);
+  function formatRM(amount) {
+    return `RM ${(Number(amount) || 0).toFixed(2)}`;
   }
 
-  /* =========================================================
-     5. STATUS AND ERROR HANDLING
-     ========================================================= */
-  function showError(message, showRetry=false) {
-    $('error-msg').textContent = message;
-    $('error-msg').style.display = 'block';
-    $('loading-msg').style.display = 'none';
-    $('retry-route-btn').style.display = showRetry && pickupCoords && dropoffCoords ? 'inline-block' : 'none';
+  function roundByUnit(amount, unit) {
+    const u = Number(unit) || 0.01;
+    if (u <= 0.01) return Math.round(amount * 100) / 100;
+    return Math.round((Math.round(amount / u) * u) * 100) / 100;
   }
 
-  function clearError() {
-    $('error-msg').textContent = '';
-    $('error-msg').style.display = 'none';
-    $('retry-route-btn').style.display = 'none';
+  function formatDuration(minutes) {
+    const mins = Math.max(1, Math.round(minutes));
+    if (mins < 60) return `${mins} min${mins === 1 ? '' : 's'}`;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return m === 0 ? `${h} hr${h === 1 ? '' : 's'}` : `${h} hr ${m} min${m === 1 ? '' : 's'}`;
   }
 
-  function setLoading(active) {
-    $('loading-msg').style.display = active ? 'block' : 'none';
-  }
-
-  function setRouteStatus(message) {
-    $('route-status').textContent = message || '';
-  }
-
-  function isApiKeyConfigured() {
-    return (
-      HERE_API_KEY &&
-      !HERE_API_KEY.includes('PASTE_') &&
-      HERE_API_KEY.length > 15
-    );
-  }
-
-  /* =========================================================
-     6. DISTANCE, ZONE & POLYLINE TOLL MATCHING ENGINE
-     ========================================================= */
-  function calculateHaversineDistance(lat1,lon1,lat2,lon2) {
+  function calculateHaversineDistance(lat1, lng1, lat2, lng2) {
     const R = 6371;
-    const dLat = (lat2-lat1)*Math.PI/180;
-    const dLon = (lon2-lon1)*Math.PI/180;
-    const a =
-      Math.sin(dLat/2)**2 +
-      Math.cos(lat1*Math.PI/180) *
-      Math.cos(lat2*Math.PI/180) *
-      Math.sin(dLon/2)**2;
-    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+    const toRad = d => d * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  function densifyPolyline(points, maxStepKm = 0.25) {
+  function densifyPolyline(points, stepKm = 0.25) {
     if (!Array.isArray(points) || points.length < 2) return points || [];
-    const out = [points[0]];
+    const dense = [points[0]];
     for (let i = 1; i < points.length; i++) {
       const a = points[i - 1];
       const b = points[i];
       const segKm = calculateHaversineDistance(a.lat, a.lng, b.lat, b.lng);
-      if (segKm > maxStepKm) {
-        const steps = Math.ceil(segKm / maxStepKm);
+      if (segKm > stepKm) {
+        const steps = Math.ceil(segKm / stepKm);
         for (let s = 1; s < steps; s++) {
           const t = s / steps;
-          out.push({
+          dense.push({
             lat: a.lat + (b.lat - a.lat) * t,
             lng: a.lng + (b.lng - a.lng) * t
           });
         }
       }
-      out.push(b);
+      dense.push(b);
     }
-    return out;
+    return dense;
   }
 
-  function getHighlandZone(pickup,dropoff) {
-    const points = [pickup,dropoff].filter(Boolean);
-    for (const point of points) {
-      for (const zone of HIGHLAND_ZONES) {
-        if (calculateHaversineDistance(point.lat,point.lng,zone.lat,zone.lng) <= zone.radiusKm) {
-          return zone;
-        }
+  function findZoneMatch(point, zones) {
+    if (!point) return null;
+    for (const z of zones) {
+      if (calculateHaversineDistance(point.lat, point.lng, z.lat, z.lng) <= z.radiusKm) {
+        return z;
       }
     }
     return null;
   }
 
-  function getUrbanZone(pickup,dropoff) {
-    const points = [pickup,dropoff].filter(Boolean);
-    for (const point of points) {
-      for (const zone of URBAN_POI_ZONES) {
-        if (calculateHaversineDistance(point.lat,point.lng,zone.lat,zone.lng) <= zone.radiusKm) {
-          return zone;
-        }
-      }
+  function setStatus(msg, showRetry = false) {
+    dom.routeStatus.textContent = msg || '';
+    dom.retryRouteBtn.style.display = showRetry ? 'inline-block' : 'none';
+  }
+
+  function showError(msg) {
+    dom.errorMsg.textContent = msg;
+    dom.errorMsg.style.display = 'block';
+    dom.resultCard.style.display = 'none';
+  }
+
+  function clearError() {
+    dom.errorMsg.textContent = '';
+    dom.errorMsg.style.display = 'none';
+  }
+
+  function setLoading(flag) {
+    isRoutingInFlight = flag;
+    dom.loadingMsg.style.display = flag ? 'block' : 'none';
+    if (flag) {
+      clearError();
+      setStatus('Querying HERE routing engine…');
     }
-    return null;
   }
 
-  function isRelevantPoi(item) {
-    if (!item) return false;
-    const categories = Array.isArray(item.categories) ? item.categories : [];
-    const text = categories.map(c => `${c.name || ''} ${c.id || ''}`).join(' ').toLowerCase();
-    const label = ((item.address && item.address.label) || item.title || '').toLowerCase();
-    return /airport|shopping.?mall|shopping.?centre|shopping.?center|railway.?station|train.?station|bus.?station|convention.?centre|convention.?center|stadium|terminal|hospital|university/.test(`${text} ${label}`);
+  function syncClearButtons() {
+    dom.clearPickupBtn.style.display = dom.pickupInput.value.trim() ? 'flex' : 'none';
+    dom.clearDropoffBtn.style.display = dom.dropoffInput.value.trim() ? 'flex' : 'none';
   }
 
-  function getUrbanAssessment(pickup,dropoff,itemP,itemD) {
-    const zone = getUrbanZone(pickup,dropoff);
-    if (zone) return {applies:true,label:`Urban zone: ${zone.name}`};
-    if (isRelevantPoi(itemP) || isRelevantPoi(itemD)) return {applies:true,label:'Major transport / destination POI'};
-    return {applies:false,label:''};
-  }
-
+  /* =========================================================
+     5. TOLL EVALUATION ENGINE (CHRONOLOGICAL, MATRIX & BRIDGE)
+     ========================================================= */
   function determinePenangBridgeDirection(routePoints, hitIndex) {
     const prevPt = routePoints[Math.max(0, hitIndex - 6)];
     const nextPt = routePoints[Math.min(routePoints.length - 1, hitIndex + 6)];
@@ -1515,7 +1415,28 @@
     const distNextToIsland = calculateHaversineDistance(
       nextPt.lat, nextPt.lng, PENANG_ISLAND_CENTER.lat, PENANG_ISLAND_CENTER.lng
     );
-    return distNextToIsland < distPrevToIsland ? 'MAINLAND_TO_ISLAND' : 'ISLAND_TO_MAINLAND';
+    if (Math.abs(distNextToIsland - distPrevToIsland) > 0.02) {
+      return distNextToIsland < distPrevToIsland ? 'MAINLAND_TO_ISLAND' : 'ISLAND_TO_MAINLAND';
+    }
+    // Fallback bearing check: Mainland (~100.38-100.44) -> Island (~100.28-100.34)
+    return nextPt.lng < prevPt.lng ? 'MAINLAND_TO_ISLAND' : 'ISLAND_TO_MAINLAND';
+  }
+
+  function resolveClosedPairFareCents(netId, entryHit, exitHit) {
+    const matrixKey = `${netId}|${entryHit.plaza.id}|${exitHit.plaza.id}`;
+    const exact = CLOSED_FARE_MAP.get(matrixKey);
+    if (exact !== undefined) {
+      return {
+        amountCents: exact,
+        note: `Closed matrix (${netId})`
+      };
+    }
+    const segKm = Math.max(1, Math.abs(exitHit.kmAtHit - entryHit.kmAtHit));
+    const rateSen = NETWORK_FALLBACK_SEN_PER_KM[netId] || 11.5;
+    return {
+      amountCents: Math.round(segKm * rateSen),
+      note: `Closed distance estimate (~${segKm.toFixed(1)} km)`
+    };
   }
 
   function evaluateRouteTolls(rawRoutePoints, avoidTollsSelected) {
@@ -1563,9 +1484,12 @@
       }
     }
 
+    // Strictly sort hits chronologically from origin (0 km) to destination
+    rawHits.sort((a, b) => a.kmAtHit - b.kmAtHit);
+
     const events = [];
-    const openClosedSessions = new Map();
-    let seq = 1;
+    // Group closed-system hits by network so corridor entry -> final exit stays intact
+    const closedHitsByNet = new Map();
 
     for (const hit of rawHits) {
       const p = hit.plaza;
@@ -1573,7 +1497,7 @@
 
       if (p.type === 'TOLL_FREE') {
         events.push({
-          seq: seq++,
+          orderKm: hit.kmAtHit,
           systemType: 'TOLL_FREE',
           operatorId: p.op,
           operatorName: opInfo.short,
@@ -1588,36 +1512,10 @@
       if (avoidTollsSelected) continue;
 
       if (p.type === 'CLOSED' && p.net) {
-        if (!openClosedSessions.has(p.net)) {
-          openClosedSessions.set(p.net, hit);
-        } else {
-          const entryHit = openClosedSessions.get(p.net);
-          openClosedSessions.delete(p.net);
-
-          if (entryHit.plaza.id === p.id) continue;
-
-          const matrixKey = `${p.net}|${entryHit.plaza.id}|${p.id}`;
-          let fareCents = CLOSED_FARE_MAP.get(matrixKey);
-          let lookupNote = `Closed matrix (${p.net})`;
-
-          if (fareCents === undefined) {
-            const segKm = Math.max(1, Math.abs(hit.kmAtHit - entryHit.kmAtHit));
-            const rateSen = NETWORK_FALLBACK_SEN_PER_KM[p.net] || 11.5;
-            fareCents = Math.round(segKm * rateSen);
-            lookupNote = `Closed distance estimate (~${segKm.toFixed(1)} km)`;
-          }
-
-          events.push({
-            seq: seq++,
-            systemType: 'CLOSED',
-            operatorId: p.op,
-            operatorName: opInfo.short,
-            routeCode: p.code,
-            title: `${entryHit.plaza.name} → ${p.name}`,
-            subtitle: `${opInfo.short} · ${lookupNote}`,
-            amountCents: fareCents
-          });
+        if (!closedHitsByNet.has(p.net)) {
+          closedHitsByNet.set(p.net, []);
         }
+        closedHitsByNet.get(p.net).push(hit);
         continue;
       }
 
@@ -1625,7 +1523,7 @@
         const isTolledLeg = hit.bridgeDir === p.dir;
         const fareCents = isTolledLeg ? p.rateCents : 0;
         events.push({
-          seq: seq++,
+          orderKm: hit.kmAtHit,
           systemType: 'BRIDGE',
           operatorId: p.op,
           operatorName: opInfo.short,
@@ -1639,7 +1537,7 @@
 
       if (p.type === 'OPEN') {
         events.push({
-          seq: seq++,
+          orderKm: hit.kmAtHit,
           systemType: 'OPEN',
           operatorId: p.op,
           operatorName: opInfo.short,
@@ -1651,28 +1549,52 @@
       }
     }
 
-    for (const [netId, entryHit] of openClosedSessions.entries()) {
-      if (avoidTollsSelected) break;
-      const p = entryHit.plaza;
-      const opInfo = TOLL_OPERATORS[p.op] || { name: p.op, short: p.op };
-      const distBefore = entryHit.kmAtHit;
-      const distAfter = Math.max(0, cumulativeKm - entryHit.kmAtHit);
-      const activeClosedKm = Math.max(distBefore, distAfter);
-      if (activeClosedKm >= 3.0) {
-        const rateSen = NETWORK_FALLBACK_SEN_PER_KM[netId] || 11.5;
-        const estCents = Math.round(activeClosedKm * rateSen);
+    // Resolve each closed-system corridor from first entry gantry to last exit gantry
+    for (const [netId, netHits] of closedHitsByNet.entries()) {
+      if (avoidTollsSelected || !netHits.length) continue;
+      const entryHit = netHits[0];
+      const opInfo = TOLL_OPERATORS[entryHit.plaza.op] || { name: entryHit.plaza.op, short: entryHit.plaza.op };
+
+      if (netHits.length >= 2) {
+        const exitHit = netHits[netHits.length - 1];
+        if (exitHit.plaza.id === entryHit.plaza.id) continue;
+        const resolved = resolveClosedPairFareCents(netId, entryHit, exitHit);
         events.push({
-          seq: seq++,
+          orderKm: entryHit.kmAtHit,
           systemType: 'CLOSED',
-          operatorId: p.op,
+          operatorId: entryHit.plaza.op,
           operatorName: opInfo.short,
-          routeCode: p.code,
-          title: `${p.name} (${distBefore > distAfter ? 'Exit' : 'Entry'} section)`,
-          subtitle: `${opInfo.short} · Partial closed corridor (~${activeClosedKm.toFixed(1)} km)`,
-          amountCents: estCents
+          routeCode: entryHit.plaza.code,
+          title: `${entryHit.plaza.name} → ${exitHit.plaza.name}`,
+          subtitle: `${opInfo.short} · ${resolved.note}`,
+          amountCents: resolved.amountCents
         });
+      } else {
+        const distBefore = entryHit.kmAtHit;
+        const distAfter = Math.max(0, cumulativeKm - entryHit.kmAtHit);
+        const activeClosedKm = Math.max(distBefore, distAfter);
+        if (activeClosedKm >= 3.0) {
+          const rateSen = NETWORK_FALLBACK_SEN_PER_KM[netId] || 11.5;
+          const estCents = Math.round(activeClosedKm * rateSen);
+          events.push({
+            orderKm: entryHit.kmAtHit,
+            systemType: 'CLOSED',
+            operatorId: entryHit.plaza.op,
+            operatorName: opInfo.short,
+            routeCode: entryHit.plaza.code,
+            title: `${entryHit.plaza.name} (${distBefore > distAfter ? 'Exit' : 'Entry'} section)`,
+            subtitle: `${opInfo.short} · Partial closed corridor (~${activeClosedKm.toFixed(1)} km)`,
+            amountCents: estCents
+          });
+        }
       }
     }
+
+    // Sort all final toll events strictly in order of encounter from origin to destination
+    events.sort((a, b) => a.orderKm - b.orderKm);
+    events.forEach((ev, idx) => {
+      ev.seq = idx + 1;
+    });
 
     const operatorSubtotals = {};
     let totalTollCents = 0;
@@ -1689,1150 +1611,1086 @@
   }
 
   /* =========================================================
-     7. MAP OBJECT MANAGEMENT
+     6. FARE CALCULATION ENGINE
      ========================================================= */
-  function clearRouteObjects() {
-    if (!map) return;
-    routePolylines.forEach(line => {
-      try { map.removeObject(line); } catch (_) {}
-    });
-    routePolylines = [];
+  function calculateFareBreakdown(distanceKm, durationMin, tollEval, pickupPt, dropoffPt) {
+    const distFare = distanceKm * settings.ratePerKm;
+
+    const pickupUrban = findZoneMatch(pickupPt, URBAN_POI_ZONES);
+    const dropoffUrban = findZoneMatch(dropoffPt, URBAN_POI_ZONES);
+    const urbanZone = pickupUrban || dropoffUrban;
+    const urbanSurcharge = urbanZone ? settings.urbanSurcharge : 0;
+
+    const pickupHill = findZoneMatch(pickupPt, HIGHLAND_ZONES);
+    const dropoffHill = findZoneMatch(dropoffPt, HIGHLAND_ZONES);
+    const hillZone = dropoffHill || pickupHill;
+    const hillSurcharge = hillZone ? settings.hillSurcharge : 0;
+
+    let longHaulIncentive = 0;
+    if (settings.longHaulTriggerKm > 0 && distanceKm >= settings.longHaulTriggerKm && settings.longHaulPercent > 0) {
+      const rawIncentive = distFare * (settings.longHaulPercent / 100);
+      longHaulIncentive = settings.longHaulCap > 0
+        ? Math.min(rawIncentive, settings.longHaulCap)
+        : rawIncentive;
+    }
+
+    const rawTransportFare = distFare + urbanSurcharge + hillSurcharge + longHaulIncentive;
+    const transportFare = Math.max(settings.minimumFare, rawTransportFare);
+    const tollTotal = (tollEval ? tollEval.totalTollCents : 0) / 100;
+
+    const exactGrandTotal = transportFare + tollTotal;
+
+    const roundedFareOnly = roundByUnit(transportFare, settings.roundingUnit);
+    const roundedGrandTotal = roundByUnit(exactGrandTotal, settings.roundingUnit);
+
+    const customerFareQuote = settings.tollQuoteMode === 'include'
+      ? roundByUnit(exactGrandTotal, settings.roundingUnit)
+      : roundedFareOnly;
+
+    const customerTotalWithTolls = roundByUnit(exactGrandTotal, settings.roundingUnit);
+    const roundingDiff = Number((customerTotalWithTolls - exactGrandTotal).toFixed(2));
+
+    let adminDeduction = 0;
+    if (settings.adminPercent > 0 || settings.adminMinimum > 0) {
+      if (transportFare < settings.adminFlatThreshold) {
+        adminDeduction = settings.adminMinimum;
+      } else {
+        adminDeduction = transportFare * (settings.adminPercent / 100);
+      }
+    }
+    adminDeduction = Math.round(adminDeduction * 100) / 100;
+
+    const driverFareNet = Math.max(0, Number((transportFare - adminDeduction).toFixed(2)));
+    const driverCollectionAfterCommission = Math.max(0, Number((customerTotalWithTolls - adminDeduction).toFixed(2)));
+
+    return {
+      distanceKm,
+      durationMin,
+      distFare,
+      urbanZone,
+      urbanSurcharge,
+      hillZone,
+      hillSurcharge,
+      longHaulIncentive,
+      transportFare,
+      tollTotal,
+      exactGrandTotal,
+      customerFareQuote,
+      customerTotalWithTolls,
+      roundingDiff,
+      adminDeduction,
+      driverFareNet,
+      driverCollectionAfterCommission,
+      tollEval
+    };
   }
 
-  function clearMarker(type) {
+  /* =========================================================
+     7. RENDERING: FARE CARD, TOLL RECEIPT & PINS/RECENT
+     ========================================================= */
+  function renderTollBreakdown(tollEval) {
+    const events = (tollEval && tollEval.events) || [];
+    const totalRM = formatRM(((tollEval && tollEval.totalTollCents) || 0) / 100);
+
+    dom.tollReceiptSummary.textContent = `🛣️ Toll Receipt Breakdown (${events.length} event${events.length === 1 ? '' : 's'} · ${totalRM})`;
+    dom.tollEventsContainer.innerHTML = '';
+
+    if (!events.length) {
+      dom.tollEventsContainer.innerHTML = '<div class="toll-event-item"><div class="toll-event-sub">No toll gantries detected along active route</div></div>';
+      dom.tollOperatorSubtotals.textContent = '';
+      return;
+    }
+
+    for (const ev of events) {
+      const badgeClass = ev.systemType === 'CLOSED' ? 'closed'
+        : ev.systemType === 'BRIDGE' ? 'bridge'
+        : ev.systemType === 'TOLL_FREE' ? 'free' : 'open';
+      const badgeLabel = ev.systemType === 'CLOSED' ? 'Closed Matrix'
+        : ev.systemType === 'BRIDGE' ? 'Bridge'
+        : ev.systemType === 'TOLL_FREE' ? 'Toll-Free' : 'Open';
+
+      const item = document.createElement('div');
+      item.className = 'toll-event-item';
+      item.innerHTML = `
+        <div class="toll-event-top">
+          <span><span class="toll-badge ${badgeClass}">${escapeHtml(badgeLabel)}</span>${escapeHtml(ev.title)}</span>
+          <span>${escapeHtml(formatRM(ev.amountCents / 100))}</span>
+        </div>
+        <div class="toll-event-sub">
+          <span>${escapeHtml(ev.subtitle)}</span>
+          <span>#${escapeHtml(ev.seq)}</span>
+        </div>
+      `;
+      dom.tollEventsContainer.appendChild(item);
+    }
+
+    const opEntries = Object.entries((tollEval && tollEval.operatorSubtotals) || {});
+    if (opEntries.length) {
+      dom.tollOperatorSubtotals.innerHTML = opEntries
+        .map(([opName, cents]) => `<div class="detail-row" style="margin-bottom:3px"><span>${escapeHtml(opName)}</span><span>${escapeHtml(formatRM(cents / 100))}</span></div>`)
+        .join('');
+    } else {
+      dom.tollOperatorSubtotals.textContent = '';
+    }
+  }
+
+  function renderQuote(quote, pickupLabel, dropoffLabel) {
+    lastQuote = {
+      ...quote,
+      pickupLabel,
+      dropoffLabel,
+      routeMode: currentRouteMode,
+      avoidTolls
+    };
+
+    const primaryDisplay = settings.tollQuoteMode === 'separate' && quote.tollTotal > 0
+      ? `${formatRM(roundByUnit(quote.transportFare, settings.roundingUnit))} + ${formatRM(quote.tollTotal)}`
+      : formatRM(quote.customerFareQuote);
+
+    dom.totalFare.textContent = primaryDisplay;
+    dom.fareDistance.textContent = `${quote.distanceKm.toFixed(1)} km`;
+    dom.fareDuration.textContent = formatDuration(quote.durationMin);
+
+    dom.calcDistanceFare.textContent = formatRM(quote.distFare);
+
+    if (quote.urbanSurcharge > 0) {
+      dom.urbanRow.style.display = 'flex';
+      dom.urbanLabel.textContent = `Urban / POI (${quote.urbanZone ? quote.urbanZone.name : 'Zone'})`;
+      dom.calcUrban.textContent = formatRM(quote.urbanSurcharge);
+    } else {
+      dom.urbanRow.style.display = 'none';
+    }
+
+    if (quote.hillSurcharge > 0) {
+      dom.hillRow.style.display = 'flex';
+      dom.hillLabel.textContent = `Highland (${quote.hillZone ? quote.hillZone.name : 'Highland'})`;
+      dom.calcHill.textContent = formatRM(quote.hillSurcharge);
+    } else {
+      dom.hillRow.style.display = 'none';
+    }
+
+    if (quote.longHaulIncentive > 0) {
+      dom.longHaulRow.style.display = 'flex';
+      dom.calcLongHaul.textContent = formatRM(quote.longHaulIncentive);
+    } else {
+      dom.longHaulRow.style.display = 'none';
+    }
+
+    dom.calcTransportFare.textContent = formatRM(quote.transportFare);
+    dom.calcTollTotal.textContent = formatRM(quote.tollTotal);
+    dom.calcGrand.textContent = formatRM(quote.exactGrandTotal);
+    dom.calcCustomerFareOnly.textContent = formatRM(roundByUnit(quote.transportFare, settings.roundingUnit));
+    dom.calcCustomerTotal.textContent = formatRM(quote.customerTotalWithTolls);
+
+    if (quote.adminDeduction > 0) {
+      dom.adminRow.style.display = 'flex';
+      dom.calcDeduction.textContent = `-${formatRM(quote.adminDeduction)}`;
+    } else {
+      dom.adminRow.style.display = 'none';
+    }
+
+    dom.driverFareNet.textContent = formatRM(quote.driverFareNet);
+    dom.driverNetFare.textContent = formatRM(quote.driverCollectionAfterCommission);
+
+    const adjText = quote.roundingDiff === 0
+      ? 'Rounding adjustment: RM 0.00.'
+      : `Rounding adjustment: ${quote.roundingDiff > 0 ? '+' : ''}${formatRM(quote.roundingDiff)}.`;
+
+    dom.farePolicyNote.textContent =
+      `Minimum transport fare: ${formatRM(settings.minimumFare)}. ` +
+      `Admin commission: ${settings.adminPercent}% of transport fare (tolls excluded from commission), or ${formatRM(settings.adminMinimum)} below ${formatRM(settings.adminFlatThreshold)}. ` +
+      adjText;
+
+    renderTollBreakdown(quote.tollEval);
+    updatePinButtonState();
+    dom.resultCard.style.display = 'block';
+  }
+
+  function routeSignature(a, b) {
+    if (!a || !b) return '';
+    return `${a.lat.toFixed(4)},${a.lng.toFixed(4)}->${b.lat.toFixed(4)},${b.lng.toFixed(4)}`;
+  }
+
+  function isCurrentRoutePinned() {
+    if (!pickupLocation || !dropoffLocation) return false;
+    const sig = routeSignature(pickupLocation, dropoffLocation);
+    return routeMemory.pinned.some(item => item.sig === sig);
+  }
+
+  function updatePinButtonState() {
+    if (!dom.pinTripBtn) return;
+    if (isCurrentRoutePinned()) {
+      dom.pinTripBtn.textContent = '📌 Pinned';
+    } else {
+      dom.pinTripBtn.textContent = '📌 Pin Route';
+    }
+  }
+
+  function recordRecentRoute(fromLoc, toLoc) {
+    if (!fromLoc || !toLoc) return;
+    const sig = routeSignature(fromLoc, toLoc);
+    const entry = {
+      sig,
+      from: { lat: fromLoc.lat, lng: fromLoc.lng, label: fromLoc.label },
+      to: { lat: toLoc.lat, lng: toLoc.lng, label: toLoc.label },
+      ts: Date.now()
+    };
+    routeMemory.recent = [
+      entry,
+      ...routeMemory.recent.filter(item => item.sig !== sig)
+    ].slice(0, MAX_RECENT_ROUTES);
+    saveRouteMemory();
+    renderQuickBar();
+  }
+
+  function togglePinCurrentRoute() {
+    if (!pickupLocation || !dropoffLocation) return;
+    const sig = routeSignature(pickupLocation, dropoffLocation);
+    const exists = routeMemory.pinned.some(item => item.sig === sig);
+    if (exists) {
+      routeMemory.pinned = routeMemory.pinned.filter(item => item.sig !== sig);
+    } else {
+      routeMemory.pinned = [
+        {
+          sig,
+          from: { lat: pickupLocation.lat, lng: pickupLocation.lng, label: pickupLocation.label },
+          to: { lat: dropoffLocation.lat, lng: dropoffLocation.lng, label: dropoffLocation.label }
+        },
+        ...routeMemory.pinned.filter(item => item.sig !== sig)
+      ].slice(0, MAX_PINNED_ROUTES);
+    }
+    saveRouteMemory();
+    updatePinButtonState();
+    renderQuickBar();
+  }
+
+  function shortPlaceName(label) {
+    if (!label) return 'Point';
+    return label.split(',')[0].trim().slice(0, 18);
+  }
+
+  function renderQuickBar() {
+    const items = [];
+    routeMemory.pinned.forEach(p => {
+      items.push({ kind: 'pinned', data: p });
+    });
+    routeMemory.recent.forEach(r => {
+      if (!routeMemory.pinned.some(p => p.sig === r.sig)) {
+        items.push({ kind: 'recent', data: r });
+      }
+    });
+
+    dom.quickBar.innerHTML = '';
+    if (!items.length) {
+      dom.quickBar.style.display = 'none';
+      return;
+    }
+
+    for (const item of items) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `chip-btn ${item.kind === 'recent' ? 'recent' : ''}`;
+      const prefix = item.kind === 'pinned' ? '📌' : '🕒';
+      btn.textContent = `${prefix} ${shortPlaceName(item.data.from.label)} → ${shortPlaceName(item.data.to.label)}`;
+      btn.title = `${item.data.from.label} → ${item.data.to.label}`;
+      btn.addEventListener('click', () => {
+        userSelectedLocation = true;
+        stopLocationTracking(false);
+        pickupLocation = { ...item.data.from };
+        dropoffLocation = { ...item.data.to };
+        dom.pickupInput.value = pickupLocation.label;
+        dom.dropoffInput.value = dropoffLocation.label;
+        syncClearButtons();
+        updateMarker(true, pickupLocation.lat, pickupLocation.lng);
+        updateMarker(false, dropoffLocation.lat, dropoffLocation.lng);
+        calculateAndDisplayRoute();
+      });
+      dom.quickBar.appendChild(btn);
+    }
+    dom.quickBar.style.display = 'flex';
+  }
+
+  /* =========================================================
+     8. HERE MAP, AUTOCOMPLETE & ROUTING ENGINE
+     ========================================================= */
+  function createPinSvgIcon(fillHex, letter) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40">
+      <path d="M16 1C8.3 1 2 7.3 2 15c0 10.5 14 24 14 24s14-13.5 14-24C30 7.3 23.7 1 16 1z" fill="${fillHex}" stroke="#ffffff" stroke-width="2.5"/>
+      <circle cx="16" cy="15" r="7" fill="#ffffff"/>
+      <text x="16" y="18.5" text-anchor="middle" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="${fillHex}">${letter}</text>
+    </svg>`;
+    return new H.map.Icon(svg);
+  }
+
+  function initMap() {
+    const defaultLat = 3.0738;
+    const defaultLng = 101.5183;
+
+    const platform = new H.service.Platform({
+      apikey: HERE_API_KEY
+    });
+
+    const defaultLayers = platform.createDefaultLayers();
+    map = new H.Map(
+      document.getElementById('map'),
+      defaultLayers.vector.normal.map,
+      {
+        center: { lat: defaultLat, lng: defaultLng },
+        zoom: 12,
+        pixelRatio: window.devicePixelRatio || 1
+      }
+    );
+
+    const behavior = new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
+    ui = H.ui.UI.createDefault(map, defaultLayers);
+
+    routeGroup = new H.map.Group();
+    map.addObject(routeGroup);
+
+    pickupMarkerIcon = createPinSvgIcon('#2e7d32', 'A');
+    dropoffMarkerIcon = createPinSvgIcon('#c62828', 'B');
+
+    searchService = platform.getSearchService();
+    routingService = platform.getRoutingService(null, 8);
+
+    map.addEventListener('tap', evt => {
+      if (evt.currentPointer && evt.currentPointer.type === 'tap') {
+        const coord = map.screenToGeo(evt.currentPointer.viewportX, evt.currentPointer.viewportY);
+        if (coord && Number.isFinite(coord.lat) && Number.isFinite(coord.lng)) {
+          reverseGeocodeAndSet(coord.lat, coord.lng, !pickupLocation);
+        }
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      if (map) {
+        map.getViewPort().resize();
+      }
+    });
+  }
+
+  function updateMarker(isPickup, lat, lng) {
     if (!map) return;
-    if (type === 'pickup' && pickupMarker) {
+    const pos = { lat, lng };
+    if (isPickup) {
+      if (!pickupMarker) {
+        pickupMarker = new H.map.Marker(pos, { icon: pickupMarkerIcon });
+        map.addObject(pickupMarker);
+      } else {
+        pickupMarker.setGeometry(pos);
+      }
+    } else {
+      if (!dropoffMarker) {
+        dropoffMarker = new H.map.Marker(pos, { icon: dropoffMarkerIcon });
+        map.addObject(dropoffMarker);
+      } else {
+        dropoffMarker.setGeometry(pos);
+      }
+    }
+  }
+
+  function removeMarker(isPickup) {
+    if (!map) return;
+    if (isPickup && pickupMarker) {
       map.removeObject(pickupMarker);
       pickupMarker = null;
-    }
-    if (type === 'dropoff' && dropoffMarker) {
+    } else if (!isPickup && dropoffMarker) {
       map.removeObject(dropoffMarker);
       dropoffMarker = null;
     }
   }
 
-  function updateMarker(type,coords) {
-    if (!map) return;
-    clearMarker(type);
-    const svg = type === 'pickup'
-      ? '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42"><path fill="#2e7d32" stroke="white" stroke-width="2" d="M16 1C7.7 1 1 7.7 1 16c0 11 15 25 15 25s15-14 15-25C31 7.7 24.3 1 16 1z"/><circle cx="16" cy="16" r="6" fill="white"/></svg>'
-      : '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42"><path fill="#c62828" stroke="white" stroke-width="2" d="M16 1C7.7 1 1 7.7 1 16c0 11 15 25 15 25s15-14 15-25C31 7.7 24.3 1 16 1z"/><circle cx="16" cy="16" r="6" fill="white"/></svg>';
-    const icon = new H.map.Icon('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg));
-    const marker = new H.map.Marker({lat:coords.lat,lng:coords.lng},{icon});
-    map.addObject(marker);
-    if (type === 'pickup') pickupMarker = marker;
-    else dropoffMarker = marker;
-  }
+  function drawRoutesOnMap(routes, selectedIdx) {
+    if (!map || !routeGroup) return;
+    routeGroup.removeAll();
 
-  function invalidateRoute(clearResults=true) {
-    routeRequestId++;
-    if (routeDebounce) {
-      clearTimeout(routeDebounce);
-      routeDebounce = null;
-    }
-    setLoading(false);
-    if (clearResults) {
-      clearRouteObjects();
-      $('result-card').style.display = 'none';
-      $('alt-routes-bar').style.display = 'none';
-      $('alt-routes-bar').innerHTML = '';
-      availableRoutes = [];
-      selectedRouteIndex = 0;
-      latestCalculation = null;
-      setRouteStatus('');
-    }
-  }
+    routes.forEach((r, idx) => {
+      if (!r.points || r.points.length < 2) return;
+      const lineString = new H.geo.LineString();
+      r.points.forEach(pt => lineString.pushPoint({ lat: pt.lat, lng: pt.lng }));
 
-  function updateInputClearButton(type) {
-    const input = $(type);
-    const button = $(`clear-${type}`);
-    button.style.display = input.value.trim() ? 'block' : 'none';
-  }
+      const isSelected = idx === selectedIdx;
+      const polyline = new H.map.Polyline(lineString, {
+        style: {
+          strokeColor: isSelected ? '#8e24aa' : '#9e9e9e',
+          lineWidth: isSelected ? 6 : 4,
+          lineDash: isSelected ? undefined : [6, 6]
+        },
+        zIndex: isSelected ? 10 : 5
+      });
+      routeGroup.addObject(polyline);
+    });
 
-  function setGpsButtonIdle() {
-    gpsActive = false;
-    const button = $('current-loc-btn');
-    if (button) {
-      button.textContent = '🎯';
-      button.title = 'Use current location';
+    const active = routes[selectedIdx];
+    if (active && active.points && active.points.length >= 2) {
+      const ls = new H.geo.LineString();
+      active.points.forEach(pt => ls.pushPoint({ lat: pt.lat, lng: pt.lng }));
+      if (pickupLocation) ls.pushPoint({ lat: pickupLocation.lat, lng: pickupLocation.lng });
+      if (dropoffLocation) ls.pushPoint({ lat: dropoffLocation.lat, lng: dropoffLocation.lng });
+      const bounds = ls.getBoundingBox();
+      if (bounds) {
+        map.getViewModel().setLookAtData({ bounds }, true);
+      }
     }
   }
 
-  function cancelGpsRequest(silent=true) {
-    gpsRequestId++;
-    setGpsButtonIdle();
-    if (!silent) {
-      setRouteStatus('GPS request cancelled.');
-    }
+  function formatHereAddress(item) {
+    const title = item.title || (item.address && item.address.label) || 'Selected location';
+    const sub = (item.address && item.address.label && item.address.label !== title)
+      ? item.address.label
+      : (item.resultType || '');
+    const fullLabel = (item.address && item.address.label) || title;
+    return { title, sub, fullLabel };
   }
 
-  /* =========================================================
-     8. LOCATION SELECTION
-     ========================================================= */
-  function formatPlaceLabel(item) {
-    if (!item) return '';
-    const title = (item.title || '').trim();
-    const addrLabel = (item.address && item.address.label || '').trim();
-    if (title && addrLabel && !addrLabel.toLowerCase().startsWith(title.toLowerCase())) {
-      return `${title}, ${addrLabel}`;
-    }
-    return addrLabel || title || 'Unnamed location';
+  function showSuggestionMessage(boxEl, text) {
+    boxEl.innerHTML = `<div class="suggestion-empty">${escapeHtml(text)}</div>`;
+    boxEl.style.display = 'block';
   }
 
-  function setSelectedLocation(type,item) {
-    const coords = item && item.position;
-    if (!coords || !Number.isFinite(coords.lat) || !Number.isFinite(coords.lng)) {
-      showError('The selected location has invalid coordinates.');
+  function hideSuggestions(boxEl) {
+    boxEl.style.display = 'none';
+    boxEl.innerHTML = '';
+  }
+
+  function triggerAutocomplete(query, isPickup) {
+    const boxEl = isPickup ? dom.pickupSuggestions : dom.dropoffSuggestions;
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      hideSuggestions(boxEl);
       return;
     }
-    if (type === 'pickup') cancelGpsRequest(true);
-    invalidateRoute(true);
-    const point = {lat:coords.lat,lng:coords.lng};
-    if (type === 'pickup') {
-      pickupCoords = point;
-      pickupItem = item;
-    } else {
-      dropoffCoords = point;
-      dropoffItem = item;
-    }
-    $(type).value = formatPlaceLabel(item);
-    $(`${type}-suggestions`).style.display = 'none';
-    $(`${type}-suggestions`).innerHTML = '';
-    updateInputClearButton(type);
-    updateMarker(type,point);
-    if (map && (!pickupCoords || !dropoffCoords)) {
-      map.setCenter(point);
-      map.setZoom(15);
-    }
-    clearError();
-    if (pickupCoords && dropoffCoords) {
-      calculateRoute();
-    }
-  }
 
-  function clearLocation(type) {
-    if (type === 'pickup') cancelGpsRequest(true);
-    invalidateRoute(true);
-    if (type === 'pickup') {
-      pickupCoords = null;
-      pickupItem = null;
-      $('pickup').value = '';
-    } else {
-      dropoffCoords = null;
-      dropoffItem = null;
-      $('dropoff').value = '';
-    }
-    updateInputClearButton(type);
-    clearMarker(type);
-    clearError();
-  }
-
-  /* =========================================================
-     9. MALAYSIA AUTOCOMPLETE (WITH DISCOVER FALLBACK)
-     ========================================================= */
-  function getSearchCenter() {
-    if (pickupCoords && Number.isFinite(pickupCoords.lat) && Number.isFinite(pickupCoords.lng)) {
-      return `${pickupCoords.lat},${pickupCoords.lng}`;
-    }
-    if (map) {
-      const center = map.getCenter();
-      if (center && Number.isFinite(center.lat) && Number.isFinite(center.lng)) {
-        return `${center.lat},${center.lng}`;
-      }
-    }
-    return '3.1390,101.6869';
-  }
-
-  function renderSuggestionNotice(box, text) {
-    box.innerHTML = '';
-    const notice = document.createElement('div');
-    notice.className = 'suggestion-empty';
-    notice.textContent = text;
-    box.appendChild(notice);
-    box.style.display = 'block';
-  }
-
-  async function fetchHerePlaces(query, signal) {
-    const center = getSearchCenter();
-    const baseParams = {
-      q:query,
-      at:center,
-      in:'countryCode:MYS',
-      limit:'10',
-      lang:'en-US',
-      apiKey:HERE_API_KEY
-    };
-
-    const autoRes = await fetch(
-      `https://autosuggest.search.hereapi.com/v1/autosuggest?${new URLSearchParams(baseParams)}`,
-      {signal}
-    );
-    if (autoRes.status === 429) {
-      throw new Error('Location search rate limit reached. Wait a few seconds and retry.');
-    }
-    if (autoRes.status === 401 || autoRes.status === 403) {
-      throw new Error(`HERE API key rejected (HTTP ${autoRes.status}). Check key or referrer restrictions.`);
-    }
-    if (!autoRes.ok) {
-      throw new Error(`Location search failed (HTTP ${autoRes.status}).`);
-    }
-    const autoData = await autoRes.json();
-    let items = (autoData.items || []).filter(item =>
-      item.position &&
-      Number.isFinite(item.position.lat) &&
-      Number.isFinite(item.position.lng) &&
-      (!item.address || !item.address.countryCode || item.address.countryCode === 'MYS')
-    );
-
-    if (!items.length) {
-      const discRes = await fetch(
-        `https://discover.search.hereapi.com/v1/discover?${new URLSearchParams(baseParams)}`,
-        {signal}
-      );
-      if (discRes.ok) {
-        const discData = await discRes.json();
-        items = (discData.items || []).filter(item =>
-          item.position &&
-          Number.isFinite(item.position.lat) &&
-          Number.isFinite(item.position.lng) &&
-          (!item.address || !item.address.countryCode || item.address.countryCode === 'MYS')
+    const bias = pickupLocation || { lat: 3.0738, lng: 101.5183 };
+    searchService.autosuggest(
+      {
+        q: trimmed,
+        at: `${bias.lat},${bias.lng}`,
+        in: 'countryCode:MYS',
+        limit: 6
+      },
+      result => {
+        const items = (result && result.items || []).filter(
+          it => it.position && Number.isFinite(it.position.lat) && Number.isFinite(it.position.lng)
         );
-      }
-    }
-    return items;
-  }
-
-  function setupAutocomplete(type) {
-    const input = $(type);
-    const box = $(`${type}-suggestions`);
-    const state = autocompleteState[type];
-
-    input.addEventListener('input',() => {
-      const query = input.value.trim();
-      updateInputClearButton(type);
-      if (type === 'pickup') {
-        cancelGpsRequest(true);
-        pickupCoords = null;
-        pickupItem = null;
-        clearMarker('pickup');
-      } else {
-        dropoffCoords = null;
-        dropoffItem = null;
-        clearMarker('dropoff');
-      }
-      invalidateRoute(true);
-      clearError();
-
-      if (state.timer) {
-        clearTimeout(state.timer);
-        state.timer = null;
-      }
-      if (state.controller) {
-        state.controller.abort();
-        state.controller = null;
-      }
-      state.sequence++;
-      const sequence = state.sequence;
-
-      if (!query) {
-        box.innerHTML = '';
-        box.style.display = 'none';
-        return;
-      }
-
-      if (query.length < 2) {
-        renderSuggestionNotice(box,'Type at least 2 characters to search Malaysia locations…');
-        return;
-      }
-
-      renderSuggestionNotice(box,'Searching Malaysia locations…');
-
-      state.timer = setTimeout(async () => {
-        if (!isApiKeyConfigured()) {
-          box.style.display = 'none';
-          showError('Please configure your HERE API key in the script.');
+        if (!items.length) {
+          showSuggestionMessage(boxEl, 'No matching locations in Malaysia');
           return;
         }
-        state.controller = new AbortController();
-        try {
-          const items = await fetchHerePlaces(query, state.controller.signal);
-          if (sequence !== state.sequence || input.value.trim() !== query) return;
+        boxEl.innerHTML = '';
+        items.forEach(it => {
+          const info = formatHereAddress(it);
+          const row = document.createElement('div');
+          row.className = 'suggestion-item';
+          row.setAttribute('role', 'option');
+          row.tabIndex = 0;
+          row.innerHTML = `
+            <span class="suggestion-title">${escapeHtml(info.title)}</span>
+            ${info.sub ? `<span class="suggestion-sub">${escapeHtml(info.sub)}</span>` : ''}
+          `;
+          const pick = () => {
+            userSelectedLocation = true;
+            if (isPickup) {
+              stopLocationTracking(false);
+              pickupLocation = {
+                lat: it.position.lat,
+                lng: it.position.lng,
+                label: info.fullLabel
+              };
+              dom.pickupInput.value = info.fullLabel;
+              updateMarker(true, pickupLocation.lat, pickupLocation.lng);
+            } else {
+              dropoffLocation = {
+                lat: it.position.lat,
+                lng: it.position.lng,
+                label: info.fullLabel
+              };
+              dom.dropoffInput.value = info.fullLabel;
+              updateMarker(false, dropoffLocation.lat, dropoffLocation.lng);
+            }
+            syncClearButtons();
+            hideSuggestions(boxEl);
+            calculateAndDisplayRoute();
+          };
+          row.addEventListener('click', pick);
+          row.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              pick();
+            }
+          });
+          boxEl.appendChild(row);
+        });
+        boxEl.style.display = 'block';
+      },
+      () => {
+        showSuggestionMessage(boxEl, 'Unable to fetch suggestions right now');
+      }
+    );
+  }
 
-          box.innerHTML = '';
-          if (!items.length) {
-            renderSuggestionNotice(box,'No matching Malaysian locations found.');
+  function geocodeTextIfNeeded(text, isPickup) {
+    return new Promise((resolve, reject) => {
+      const existing = isPickup ? pickupLocation : dropoffLocation;
+      if (existing && existing.label === text) {
+        resolve(existing);
+        return;
+      }
+      const bias = pickupLocation || dropoffLocation || { lat: 3.0738, lng: 101.5183 };
+      searchService.geocode(
+        {
+          q: text,
+          at: `${bias.lat},${bias.lng}`,
+          in: 'countryCode:MYS',
+          limit: 1
+        },
+        res => {
+          const item = res && res.items && res.items[0];
+          if (!item || !item.position) {
+            reject(new Error(`Location not found: "${text}"`));
             return;
           }
+          const loc = {
+            lat: item.position.lat,
+            lng: item.position.lng,
+            label: (item.address && item.address.label) || item.title || text
+          };
+          if (isPickup) {
+            pickupLocation = loc;
+            dom.pickupInput.value = loc.label;
+            updateMarker(true, loc.lat, loc.lng);
+          } else {
+            dropoffLocation = loc;
+            dom.dropoffInput.value = loc.label;
+            updateMarker(false, loc.lat, loc.lng);
+          }
+          syncClearButtons();
+          resolve(loc);
+        },
+        () => reject(new Error(`Failed to geocode "${text}"`))
+      );
+    });
+  }
 
-          items.slice(0,8).forEach(item => {
-            const div = document.createElement('div');
-            div.className = 'suggestion-item';
-            div.setAttribute('role','option');
-            div.tabIndex = 0;
+  function reverseGeocodeAndSet(lat, lng, asPickup) {
+    userSelectedLocation = true;
+    const coordLabel = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    const applyLoc = label => {
+      const loc = { lat, lng, label };
+      if (asPickup) {
+        stopLocationTracking(false);
+        pickupLocation = loc;
+        dom.pickupInput.value = label;
+        updateMarker(true, lat, lng);
+      } else {
+        dropoffLocation = loc;
+        dom.dropoffInput.value = label;
+        updateMarker(false, lat, lng);
+      }
+      syncClearButtons();
+      calculateAndDisplayRoute();
+    };
 
-            const titleEl = document.createElement('div');
-            titleEl.className = 'suggestion-title';
-            titleEl.textContent = item.title || (item.address && item.address.label) || 'Unnamed location';
-            div.appendChild(titleEl);
+    if (!searchService) {
+      applyLoc(coordLabel);
+      return;
+    }
+    searchService.reverseGeocode(
+      { at: `${lat},${lng}`, limit: 1 },
+      res => {
+        const item = res && res.items && res.items[0];
+        const label = (item && item.address && item.address.label) || (item && item.title) || coordLabel;
+        applyLoc(label);
+      },
+      () => applyLoc(coordLabel)
+    );
+  }
 
-            if (item.address && item.address.label && item.address.label !== titleEl.textContent) {
-              const subEl = document.createElement('div');
-              subEl.className = 'suggestion-sub';
-              subEl.textContent = item.address.label;
-              div.appendChild(subEl);
+  function extractHereSectionPoints(section) {
+    if (!section) return [];
+    if (section.polyline && typeof H.geo.LineString.fromFlexiblePolyline === 'function') {
+      const ls = H.geo.LineString.fromFlexiblePolyline(section.polyline);
+      const pts = [];
+      ls.eachLatLngAlt((lat, lng) => pts.push({ lat, lng }));
+      if (pts.length >= 2) return pts;
+    }
+    const pts = [];
+    if (section.departure && section.departure.place && section.departure.place.location) {
+      pts.push({
+        lat: section.departure.place.location.lat,
+        lng: section.departure.place.location.lng
+      });
+    }
+    if (section.arrival && section.arrival.place && section.arrival.place.location) {
+      pts.push({
+        lat: section.arrival.place.location.lat,
+        lng: section.arrival.place.location.lng
+      });
+    }
+    return pts;
+  }
+
+  function selectRouteAlternative(index) {
+    if (!availableRoutes.length) return;
+    activeRouteIndex = Math.max(0, Math.min(availableRoutes.length - 1, index));
+    renderAltRoutesBar();
+    const chosen = availableRoutes[activeRouteIndex];
+    drawRoutesOnMap(availableRoutes, activeRouteIndex);
+
+    const tollEval = evaluateRouteTolls(chosen.points, avoidTolls);
+    const quote = calculateFareBreakdown(
+      chosen.distanceKm,
+      chosen.durationMin,
+      tollEval,
+      pickupLocation,
+      dropoffLocation
+    );
+    renderQuote(quote, pickupLocation.label, dropoffLocation.label);
+    setStatus(`Route ${activeRouteIndex + 1} of ${availableRoutes.length} · ${chosen.distanceKm.toFixed(1)} km`, false);
+  }
+
+  function renderAltRoutesBar() {
+    dom.altRoutesBar.innerHTML = '';
+    if (availableRoutes.length <= 1) {
+      dom.altRoutesBar.style.display = 'none';
+      return;
+    }
+    availableRoutes.forEach((r, idx) => {
+      const pill = document.createElement('button');
+      pill.type = 'button';
+      pill.className = `alt-pill ${idx === activeRouteIndex ? 'active' : ''}`;
+      pill.textContent = `Route ${idx + 1}: ${r.distanceKm.toFixed(1)} km · ${formatDuration(r.durationMin)}`;
+      pill.addEventListener('click', () => selectRouteAlternative(idx));
+      dom.altRoutesBar.appendChild(pill);
+    });
+    dom.altRoutesBar.style.display = 'flex';
+  }
+
+  async function calculateAndDisplayRoute() {
+    const rawPickup = dom.pickupInput.value.trim();
+    const rawDropoff = dom.dropoffInput.value.trim();
+    if (!rawPickup || !rawDropoff) return;
+
+    const reqId = ++activeRequestId;
+    setLoading(true);
+    dom.retryRouteBtn.style.display = 'none';
+
+    try {
+      const [fromLoc, toLoc] = await Promise.all([
+        geocodeTextIfNeeded(rawPickup, true),
+        geocodeTextIfNeeded(rawDropoff, false)
+      ]);
+      if (reqId !== activeRequestId) return;
+
+      lastRouteRequest = { fromLoc, toLoc };
+
+      const routingParams = {
+        origin: `${fromLoc.lat},${fromLoc.lng}`,
+        destination: `${toLoc.lat},${toLoc.lng}`,
+        transportMode: 'car',
+        routingMode: currentRouteMode === 'shortest' ? 'short' : 'fast',
+        alternatives: 2,
+        return: 'summary,polyline'
+      };
+      if (avoidTolls) {
+        routingParams['avoid[features]'] = 'tollRoad';
+      }
+
+      routingService.calculateRoute(
+        routingParams,
+        result => {
+          if (reqId !== activeRequestId) return;
+          setLoading(false);
+
+          const routes = (result && result.routes) || [];
+          const parsedRoutes = [];
+
+          for (const r of routes) {
+            const sections = r.sections || [];
+            let totalMeters = 0;
+            let totalSeconds = 0;
+            let combinedPts = [];
+
+            for (const sec of sections) {
+              if (sec.summary) {
+                totalMeters += Number(sec.summary.length || 0);
+                totalSeconds += Number(sec.summary.duration || 0);
+              }
+              const secPts = extractHereSectionPoints(sec);
+              if (secPts.length) {
+                if (combinedPts.length && secPts.length) {
+                  const last = combinedPts[combinedPts.length - 1];
+                  const first = secPts[0];
+                  if (last.lat === first.lat && last.lng === first.lng) {
+                    secPts.shift();
+                  }
+                }
+                combinedPts = combinedPts.concat(secPts);
+              }
             }
 
-            div.addEventListener('pointerdown',event => {
-              event.preventDefault();
-              setSelectedLocation(type,item);
-            });
-            div.addEventListener('keydown',event => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                setSelectedLocation(type,item);
-              }
-            });
-            box.appendChild(div);
-          });
-          box.style.display = 'block';
-        } catch(error) {
-          if (error.name !== 'AbortError' && sequence === state.sequence) {
-            box.style.display = 'none';
-            showError(error.message || 'Location search failed.');
+            if (totalMeters > 0) {
+              parsedRoutes.push({
+                distanceKm: totalMeters / 1000,
+                durationMin: totalSeconds / 60,
+                points: combinedPts
+              });
+            }
           }
-        } finally {
-          if (sequence === state.sequence) {
-            state.controller = null;
-          }
-        }
-      },280);
-    });
 
-    $(`clear-${type}`).addEventListener('click',() => {
-      if (state.controller) {
-        state.controller.abort();
-        state.controller = null;
-      }
-      if (state.timer) {
-        clearTimeout(state.timer);
-        state.timer = null;
-      }
-      state.sequence++;
-      box.innerHTML = '';
-      box.style.display = 'none';
-      clearLocation(type);
-    });
-
-    input.addEventListener('keydown',event => {
-      if (event.key === 'Escape') {
-        box.style.display = 'none';
-        return;
-      }
-      if (event.key === 'ArrowDown') {
-        const first = box.querySelector('.suggestion-item');
-        if (first) {
-          event.preventDefault();
-          first.focus();
-        }
-        return;
-      }
-      if (event.key === 'Enter') {
-        const first = box.querySelector('.suggestion-item');
-        if (first) {
-          event.preventDefault();
-          first.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));
-        }
-      }
-    });
-  }
-
-  /* =========================================================
-     10. NON-BLOCKING GPS & REVERSE GEOCODING
-     ========================================================= */
-  async function reverseGeocode(lat,lng) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 6000);
-    try {
-      const params = new URLSearchParams({
-        at:`${lat},${lng}`,
-        lang:'en-US',
-        apiKey:HERE_API_KEY
-      });
-      const response = await fetch(
-        `https://revgeocode.search.hereapi.com/v1/revgeocode?${params}`,
-        {signal:controller.signal}
-      );
-      if (!response.ok) return null;
-      const data = await response.json();
-      const item = data.items && data.items[0] ? data.items[0] : null;
-      if (!item || !item.address || item.address.countryCode !== 'MYS') return null;
-      return item;
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
-  function getPositionAsync(options) {
-    return new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(resolve, reject, options);
-    });
-  }
-
-  async function requestCurrentLocation() {
-    if (!navigator.geolocation) {
-      showError('Geolocation is not supported by this browser.');
-      return;
-    }
-
-    if (gpsActive) {
-      cancelGpsRequest(false);
-      return;
-    }
-
-    const requestId = ++gpsRequestId;
-    gpsActive = true;
-    const button = $('current-loc-btn');
-    button.textContent = '⏳';
-    button.title = 'Acquiring GPS — tap to cancel';
-    clearError();
-    setRouteStatus('Acquiring GPS position (tap ⏳ to cancel)…');
-
-    let position = null;
-    try {
-      position = await getPositionAsync({
-        enableHighAccuracy:true,
-        timeout:7000,
-        maximumAge:30000
-      });
-    } catch (firstErr) {
-      if (requestId !== gpsRequestId) return;
-      if (firstErr && firstErr.code === 1) {
-        setGpsButtonIdle();
-        showError('Location permission denied. Enable GPS/Location in browser settings.');
-        setRouteStatus('');
-        return;
-      }
-      setRouteStatus('Fine GPS slow — trying network/cell location…');
-      try {
-        position = await getPositionAsync({
-          enableHighAccuracy:false,
-          timeout:8000,
-          maximumAge:60000
-        });
-      } catch (secondErr) {
-        if (requestId !== gpsRequestId) return;
-        setGpsButtonIdle();
-        const messages = {
-          1:'Location permission denied. Please enable location services.',
-          2:'Current location is unavailable. Check device GPS toggle.',
-          3:'Location request timed out. Move near a window or type pickup manually.'
-        };
-        showError(messages[secondErr.code] || 'Unable to retrieve current location.');
-        setRouteStatus('');
-        return;
-      }
-    }
-
-    if (requestId !== gpsRequestId || !position) return;
-
-    const point = {lat:position.coords.latitude,lng:position.coords.longitude};
-    gpsAccuracy = position.coords.accuracy;
-    setGpsButtonIdle();
-    invalidateRoute(true);
-
-    pickupCoords = point;
-    pickupItem = null;
-    $('pickup').value = `GPS (${point.lat.toFixed(5)}, ${point.lng.toFixed(5)})`;
-    $('pickup-suggestions').style.display = 'none';
-    updateInputClearButton('pickup');
-    updateMarker('pickup',point);
-
-    if (map) {
-      map.setCenter(point);
-      map.setZoom(15);
-    }
-
-    const accuracyNote = Number.isFinite(gpsAccuracy) && gpsAccuracy > 100
-      ? ` (low accuracy ±${Math.round(gpsAccuracy)}m — verify pin)`
-      : (Number.isFinite(gpsAccuracy) ? ` · ±${Math.round(gpsAccuracy)}m` : '');
-    setRouteStatus(`GPS pickup set${accuracyNote}. Resolving address…`);
-
-    if (pickupCoords && dropoffCoords) {
-      calculateRoute();
-    }
-
-    if (isApiKeyConfigured()) {
-      reverseGeocode(point.lat, point.lng)
-        .then(item => {
-          if (requestId !== gpsRequestId || !pickupCoords) return;
-          if (pickupCoords.lat !== point.lat || pickupCoords.lng !== point.lng) return;
-          if (item) {
-            pickupItem = item;
-            $('pickup').value = formatPlaceLabel(item);
-            updateInputClearButton('pickup');
-          }
-          if (!dropoffCoords) {
-            setRouteStatus(`GPS pickup ready${accuracyNote}.`);
-          }
-        })
-        .catch(() => {
-          if (requestId === gpsRequestId && !dropoffCoords) {
-            setRouteStatus(`GPS coordinates set${accuracyNote}.`);
-          }
-        });
-    }
-  }
-
-  /* =========================================================
-     11. ROUTING CONTROLS
-     ========================================================= */
-  function swapLocations() {
-    cancelGpsRequest(true);
-    invalidateRoute(true);
-    const pText = $('pickup').value;
-    const dText = $('dropoff').value;
-    $('pickup').value = dText;
-    $('dropoff').value = pText;
-    [pickupCoords,dropoffCoords] = [dropoffCoords,pickupCoords];
-    [pickupItem,dropoffItem] = [dropoffItem,pickupItem];
-    updateInputClearButton('pickup');
-    updateInputClearButton('dropoff');
-    clearMarker('pickup');
-    clearMarker('dropoff');
-    if (pickupCoords) updateMarker('pickup',pickupCoords);
-    if (dropoffCoords) updateMarker('dropoff',dropoffCoords);
-    if (pickupCoords && dropoffCoords) {
-      calculateRoute();
-    }
-  }
-
-  function setRoutingMode(mode) {
-    if (!['fast','short','notoll'].includes(mode)) return;
-    if (activeRoutingMode === mode) return;
-    activeRoutingMode = mode;
-    $('btn-mode-fast').classList.toggle('active',mode === 'fast');
-    $('btn-mode-short').classList.toggle('active',mode === 'short');
-    $('btn-mode-notoll').classList.toggle('active',mode === 'notoll');
-    if (pickupCoords && dropoffCoords) {
-      calculateRoute();
-    }
-  }
-
-  /* =========================================================
-     12. ROUTE CALCULATION (HERE ROUTING API v8 + ALTERNATIVES)
-     ========================================================= */
-  function calculateRoute() {
-    if (!pickupCoords || !dropoffCoords) return;
-
-    const directDistance = calculateHaversineDistance(
-      pickupCoords.lat,
-      pickupCoords.lng,
-      dropoffCoords.lat,
-      dropoffCoords.lng
-    );
-    if (directDistance < 0.02) {
-      showError('Pickup and drop-off are almost the same location.');
-      return;
-    }
-    if (!router) {
-      showError('HERE routing service is unavailable.');
-      return;
-    }
-    if (!isApiKeyConfigured()) {
-      showError('Configure your HERE API key before calculating routes.');
-      return;
-    }
-
-    const hadPreviousCard = $('result-card').style.display === 'block';
-    invalidateRoute(!hadPreviousCard);
-    const requestId = routeRequestId;
-    const origin = {...pickupCoords};
-    const destination = {...dropoffCoords};
-    const routingMode = activeRoutingMode;
-
-    setLoading(true);
-    clearError();
-    setRouteStatus('Requesting routes & evaluating toll events…');
-
-    routeDebounce = setTimeout(() => {
-      if (requestId !== routeRequestId) return;
-      const params = {
-        routingMode: routingMode === 'short' ? 'short' : 'fast',
-        transportMode:'car',
-        origin:`${origin.lat},${origin.lng}`,
-        destination:`${destination.lat},${destination.lng}`,
-        alternatives:2,
-        departureTime:'any',
-        return:'polyline,summary,actions'
-      };
-      if (routingMode === 'notoll') {
-        params['avoid[features]'] = 'tollRoad';
-      }
-
-      router.calculateRoute(
-        params,
-        result => {
-          if (requestId !== routeRequestId) return;
-          setLoading(false);
-          if (!result || !Array.isArray(result.routes) || !result.routes.length) {
-            showError('No route found for the selected locations.',true);
+          if (!parsedRoutes.length) {
+            showError('No drivable route found between these two locations.');
+            setStatus('Route calculation failed', true);
             return;
           }
-          try {
-            availableRoutes = result.routes.map((rt, idx) =>
-              analyzeSingleRoute(rt, idx, routingMode === 'notoll')
-            );
-            selectedRouteIndex = 0;
-            renderAlternativeRoutesBar();
-            applyAnalyzedRoute(0, requestId);
-          } catch(error) {
-            console.error('Route processing error:',error);
-            showError('Route was returned, but its details could not be processed.',true);
-          }
+
+          availableRoutes = parsedRoutes;
+          activeRouteIndex = 0;
+          recordRecentRoute(fromLoc, toLoc);
+          selectRouteAlternative(0);
         },
-        error => {
-          if (requestId !== routeRequestId) return;
+        err => {
+          if (reqId !== activeRequestId) return;
           setLoading(false);
-          console.error('HERE routing error:',error);
-          const detail = (error && (error.message || error.title)) ? ` (${error.message || error.title})` : '';
-          showError(`Route calculation failed${detail}. Check connection and retry.`,true);
+          const detail = (err && err.message) ? ` (${err.message})` : '';
+          showError(`Could not calculate route${detail}. Check connection or try again.`);
+          setStatus('Routing request failed', true);
         }
       );
-    },180);
+    } catch (e) {
+      if (reqId !== activeRequestId) return;
+      setLoading(false);
+      showError(e.message || 'Unable to locate pickup or drop-off address.');
+      setStatus('Address lookup failed', true);
+    }
   }
 
   /* =========================================================
-     13. ROUTE ANALYSIS & ALTERNATIVE SWITCHING
+     9. GEOLOCATION, SHARE ACTIONS & SETTINGS
      ========================================================= */
-  function analyzeSingleRoute(route, idx, avoidTollsSelected) {
-    const sections = Array.isArray(route.sections) ? route.sections : [];
-    if (!sections.length) throw new Error('Route contains no sections.');
-
-    let distanceMeters = 0;
-    let durationSeconds = 0;
-    const decodedPoints = [];
-    const lineStrings = [];
-
-    sections.forEach(section => {
-      distanceMeters += Number(section.summary && section.summary.length || 0);
-      durationSeconds += Number(section.summary && section.summary.duration || 0);
-      if (!section.polyline) return;
-      const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
-      lineStrings.push(lineString);
-      const count = lineString.getPointCount();
-      for (let i = 0; i < count; i++) {
-        const pt = lineString.extractPoint(i);
-        decodedPoints.push({ lat: pt.lat, lng: pt.lng });
-      }
-    });
-
-    const distanceKm = distanceMeters / 1000;
-    const durationMins = durationSeconds / 60;
-    if (!(distanceKm > 0) || !Number.isFinite(durationMins) || durationMins < 0) {
-      throw new Error('Invalid route summary.');
+  function stopLocationTracking(clearInputIfAuto = false) {
+    if (watchId !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
     }
-
-    const tollResult = evaluateRouteTolls(decodedPoints, avoidTollsSelected);
-    const viaHint = tollResult.events.length
-      ? tollResult.events.map(e => e.routeCode).filter((v, i, a) => a.indexOf(v) === i).join(' · ')
-      : 'Toll-free';
-
-    return {
-      idx,
-      distanceKm,
-      durationMins,
-      lineStrings,
-      tollResult,
-      viaHint
-    };
+    isTrackingLocation = false;
+    dom.currentLocBtn.style.color = '#757575';
+    dom.currentLocBtn.title = 'Use current location (click again to cancel)';
+    if (clearInputIfAuto && !userSelectedLocation) {
+      pickupLocation = null;
+      dom.pickupInput.value = '';
+      removeMarker(true);
+      syncClearButtons();
+    }
   }
 
-  function renderAlternativeRoutesBar() {
-    const bar = $('alt-routes-bar');
-    bar.innerHTML = '';
-    if (availableRoutes.length <= 1) {
-      bar.style.display = 'none';
+  function startLocationTracking() {
+    if (!navigator.geolocation) {
+      showError('Geolocation is not supported on this device.');
       return;
     }
-    availableRoutes.forEach((item, idx) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = idx === selectedRouteIndex ? 'alt-pill active' : 'alt-pill';
-      const tag = idx === 0 ? 'Primary' : `Alt ${idx}`;
-      btn.textContent = `${tag} (${item.viaHint}) · ${item.distanceKm.toFixed(1)} km · ${moneyFromCents(item.tollResult.totalTollCents)} toll`;
-      btn.addEventListener('click', () => {
-        selectedRouteIndex = idx;
-        renderAlternativeRoutesBar();
-        applyAnalyzedRoute(idx, routeRequestId);
+    stopLocationTracking(false);
+    isTrackingLocation = true;
+    dom.currentLocBtn.style.color = '#8e24aa';
+    dom.currentLocBtn.title = 'Locating… click again to cancel';
+    setStatus('Acquiring GPS position…');
+
+    watchId = navigator.geolocation.watchPosition(
+      pos => {
+        const { latitude, longitude } = pos.coords;
+        reverseGeocodeAndSet(latitude, longitude, true);
+        if (watchId !== null) {
+          navigator.geolocation.clearWatch(watchId);
+          watchId = null;
+        }
+        isTrackingLocation = false;
+        dom.currentLocBtn.style.color = '#757575';
+      },
+      err => {
+        stopLocationTracking(false);
+        showError(`GPS error: ${err.message || 'Location permission denied'}`);
+        setStatus('GPS unavailable');
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 15000 }
+    );
+  }
+
+  function buildCustomerQuoteText() {
+    if (!lastQuote) return '';
+    const q = lastQuote;
+    const tollText = q.tollTotal > 0 ? ` + ${formatRM(q.tollTotal)} tolls` : ' (no tolls)';
+    const totalLabel = settings.tollQuoteMode === 'include'
+      ? `${formatRM(q.customerTotalWithTolls)}${q.tollTotal > 0 ? ' incl. tolls' : ''}`
+      : `${formatRM(roundByUnit(q.transportFare, settings.roundingUnit))}${tollText}`;
+
+    const lines = [
+      `🚗 Trip Fare Quote (Rideshare MY)`,
+      `From: ${q.pickupLabel}`,
+      `To: ${q.dropoffLabel}`,
+      `Distance / Est. Time: ${q.distanceKm.toFixed(1)} km · ${formatDuration(q.durationMin)}`,
+      `Quoted Total: ${totalLabel}`
+    ];
+    if (q.tollEval && q.tollEval.events && q.tollEval.events.length) {
+      lines.push(`Tolls (${q.tollEval.events.length}): ${q.tollEval.events.map(e => `#${e.seq} ${e.title} (${formatRM(e.amountCents / 100)})`).join(', ')}`);
+    }
+    return lines.join('\n');
+  }
+
+  function buildDriverLogText() {
+    if (!lastQuote) return '';
+    const q = lastQuote;
+    const lines = [
+      `📋 Rideshare MY Driver Log (v${APP_VERSION})`,
+      `Route: ${q.pickupLabel} → ${q.dropoffLabel}`,
+      `Mode: ${q.routeMode}${q.avoidTolls ? ' · Avoid Tolls' : ''}`,
+      `Distance: ${q.distanceKm.toFixed(1)} km | Duration: ${formatDuration(q.durationMin)}`,
+      `Transport Fare: ${formatRM(q.transportFare)} | Tolls: ${formatRM(q.tollTotal)}`,
+      `Customer Total: ${formatRM(q.customerTotalWithTolls)} | Admin Comm.: -${formatRM(q.adminDeduction)}`,
+      `Driver Collection: ${formatRM(q.driverCollectionAfterCommission)}`
+    ];
+    if (q.tollEval && q.tollEval.events && q.tollEval.events.length) {
+      q.tollEval.events.forEach(ev => {
+        lines.push(`  #${ev.seq} [${ev.systemType}] ${ev.title}: ${formatRM(ev.amountCents / 100)} (${ev.subtitle})`);
       });
-      bar.appendChild(btn);
-    });
-    bar.style.display = 'flex';
-  }
-
-  function applyAnalyzedRoute(idx, requestId) {
-    if (requestId !== routeRequestId) return;
-    const analyzed = availableRoutes[idx];
-    if (!analyzed) return;
-
-    clearRouteObjects();
-    const group = new H.map.Group();
-    analyzed.lineStrings.forEach(ls => {
-      const line = new H.map.Polyline(ls,{
-        style:{strokeColor: activeRoutingMode === 'notoll' ? '#2e7d32' : '#8e24aa', lineWidth:5}
-      });
-      routePolylines.push(line);
-      group.addObject(line);
-    });
-
-    if (routePolylines.length) {
-      map.addObjects(routePolylines);
-      const bounds = group.getBoundingBox();
-      if (bounds) {
-        map.getViewModel().setLookAtData({bounds,padding:30});
-      }
     }
-
-    const calculation = processCalculations({
-      distance:analyzed.distanceKm,
-      duration:analyzed.durationMins,
-      tollResult:analyzed.tollResult
-    });
-
-    latestCalculation = calculation;
-    recordRecentRoute();
-    updatePinButtonState();
-
-    const modeLabel = activeRoutingMode === 'fast'
-      ? 'Fastest'
-      : (activeRoutingMode === 'short' ? 'Shortest' : 'Avoid Tolls');
-    const tollLabel = analyzed.tollResult.totalTollCents > 0
-      ? `${moneyFromCents(analyzed.tollResult.totalTollCents)} toll`
-      : 'Toll-free';
-    setRouteStatus(`Route ${idx + 1}/${availableRoutes.length} · ${modeLabel} · ${tollLabel}`);
+    return lines.join('\n');
   }
 
-  /* =========================================================
-     14. FARE & TOLL CALCULATION ENGINE (INTEGER-CENT ARITHMETIC)
-     ========================================================= */
-  function renderTollReceiptUI(tollResult) {
-    const container = $('toll-events-container');
-    const summaryEl = $('toll-receipt-summary');
-    const opSummaryEl = $('toll-operator-subtotals');
-    container.innerHTML = '';
-    opSummaryEl.innerHTML = '';
-
-    const count = tollResult.events.length;
-    summaryEl.textContent = `🛣️ Toll Receipt Breakdown (${count} event${count === 1 ? '' : 's'} · ${moneyFromCents(tollResult.totalTollCents)})`;
-
-    if (!count) {
-      const empty = document.createElement('div');
-      empty.className = 'detail-note';
-      empty.textContent = 'No tolled plazas or bridges detected along this route (RM 0.00).';
-      container.appendChild(empty);
-      return;
-    }
-
-    tollResult.events.forEach(ev => {
-      const item = document.createElement('div');
-      item.className = 'toll-event-item';
-
-      const badgeClass = ev.systemType === 'CLOSED'
-        ? 'closed'
-        : (ev.systemType === 'BRIDGE' ? 'bridge' : (ev.systemType === 'TOLL_FREE' ? 'free' : 'open'));
-      const badgeText = ev.systemType === 'CLOSED'
-        ? 'CLOSED MATRIX'
-        : (ev.systemType === 'BRIDGE' ? 'BRIDGE' : (ev.systemType === 'TOLL_FREE' ? 'TOLL-FREE' : 'OPEN'));
-
-      item.innerHTML = `
-        <div class="toll-event-top">
-          <span><span class="toll-badge ${badgeClass}">${badgeText}</span>${ev.title}</span>
-          <span>${moneyFromCents(ev.amountCents)}</span>
-        </div>
-        <div class="toll-event-sub">
-          <span>${ev.subtitle}</span>
-          <span>#${ev.seq}</span>
-        </div>
-      `;
-      container.appendChild(item);
-    });
-
-    const opEntries = Object.entries(tollResult.operatorSubtotals);
-    if (opEntries.length) {
-      opSummaryEl.innerHTML = opEntries
-        .map(([opName, cents]) => `<div class="detail-row" style="margin-bottom:3px"><span>${opName}</span><span>${moneyFromCents(cents)}</span></div>`)
-        .join('');
-    }
-  }
-
-  function processCalculations(routeData) {
-    const distanceFareCents = toCents(routeData.distance * settings.ratePerKm);
-
-    const urban = getUrbanAssessment(pickupCoords,dropoffCoords,pickupItem,dropoffItem);
-    const urbanSurchargeCents = urban.applies ? toCents(settings.urbanSurcharge) : 0;
-
-    const highlandZone = getHighlandZone(pickupCoords,dropoffCoords);
-    const hillSurchargeCents = highlandZone ? toCents(settings.hillSurcharge) : 0;
-
-    const longHaulApplies = settings.longHaulTriggerKm > 0 && routeData.distance >= settings.longHaulTriggerKm;
-    const longHaulCapCents = toCents(settings.longHaulCap);
-    const longHaulIncentiveCents = longHaulApplies
-      ? Math.min(longHaulCapCents,Math.round(distanceFareCents * settings.longHaulPercent / 100))
-      : 0;
-
-    const transportSubtotalCents = distanceFareCents + urbanSurchargeCents + hillSurchargeCents + longHaulIncentiveCents;
-    const minimumFareCents = toCents(settings.minimumFare);
-    const transportFareCents = Math.max(minimumFareCents,transportSubtotalCents);
-
-    const tollCents = routeData.tollResult.totalTollCents;
-    const exactGrandTotalCents = transportFareCents + tollCents;
-
-    const customerFareOnlyCents = roundCentsToUnit(transportFareCents,settings.roundingUnit);
-    const customerTotalInclTollsCents = settings.tollQuoteMode === 'include'
-      ? roundCentsToUnit(exactGrandTotalCents,settings.roundingUnit)
-      : customerFareOnlyCents + tollCents;
-
-    const headlineDisplayCents = settings.tollQuoteMode === 'include'
-      ? customerTotalInclTollsCents
-      : customerFareOnlyCents;
-
-    const adminThresholdCents = toCents(settings.adminFlatThreshold);
-    const usesFlatCommission = transportFareCents < adminThresholdCents;
-
-    const proposedAdminCents = usesFlatCommission
-      ? toCents(settings.adminMinimum)
-      : Math.round(transportFareCents * settings.adminPercent / 100);
-    const adminDeductionCents = Math.min(transportFareCents,proposedAdminCents);
-
-    const driverFareEarningsCents = Math.max(0,transportFareCents - adminDeductionCents);
-    const driverAmountAfterDeductionCents = Math.max(0,customerTotalInclTollsCents - adminDeductionCents);
-    const roundingAdjustmentCents = customerTotalInclTollsCents - exactGrandTotalCents;
-
-    $('urban-surcharge-row').style.display = urbanSurchargeCents > 0 ? 'flex' : 'none';
-    $('urban-surcharge-label').textContent = urban.label ? `Urban / POI surcharge (${urban.label})` : 'Urban / POI surcharge';
-    $('hill-surcharge-row').style.display = hillSurchargeCents > 0 ? 'flex' : 'none';
-    $('hill-surcharge-label').textContent = highlandZone ? `Highland surcharge (${highlandZone.name})` : 'Highland surcharge';
-    $('long-haul-incentive-row').style.display = longHaulIncentiveCents > 0 ? 'flex' : 'none';
-    $('admin-deduction-row').style.display = adminDeductionCents > 0 ? 'flex' : 'none';
-
-    $('total-fare').textContent = settings.tollQuoteMode === 'include'
-      ? moneyFromCents(headlineDisplayCents)
-      : `${moneyFromCents(headlineDisplayCents)} + ${moneyFromCents(tollCents)} toll`;
-    $('fare-distance').textContent = `${routeData.distance.toFixed(1)} km`;
-    $('fare-duration').textContent = formatDuration(routeData.duration);
-    $('calc-distance-fare').textContent = moneyFromCents(distanceFareCents);
-    $('calc-urban-surcharge').textContent = moneyFromCents(urbanSurchargeCents);
-    $('calc-hill-surcharge').textContent = moneyFromCents(hillSurchargeCents);
-    $('calc-long-haul-incentive').textContent = moneyFromCents(longHaulIncentiveCents);
-    $('calc-transport-fare').textContent = moneyFromCents(transportFareCents);
-    $('calc-toll-total').textContent = moneyFromCents(tollCents);
-    $('calc-grand').textContent = moneyFromCents(exactGrandTotalCents);
-    $('calc-customer-fare-only').textContent = moneyFromCents(customerFareOnlyCents);
-    $('calc-customer-total').textContent = moneyFromCents(customerTotalInclTollsCents);
-    $('calc-deduction').textContent = `-${moneyFromCents(adminDeductionCents)}`;
-    $('driver-fare-net').textContent = moneyFromCents(driverFareEarningsCents);
-    $('driver-net-fare').textContent = moneyFromCents(driverAmountAfterDeductionCents);
-
-    renderTollReceiptUI(routeData.tollResult);
-
-    $('fare-policy-note').textContent =
-      `Minimum transport fare: ${money(settings.minimumFare)}. ` +
-      `Admin commission: ${settings.adminPercent}% of transport fare (tolls excluded from commission), ` +
-      `or ${money(settings.adminMinimum)} below ${money(settings.adminFlatThreshold)}. ` +
-      `Rounding adjustment: ${moneyFromCents(roundingAdjustmentCents)}.`;
-
-    $('result-card').style.display = 'block';
-
-    return {
-      version:APP_VERSION,
-      pickup:$('pickup').value.trim(),
-      dropoff:$('dropoff').value.trim(),
-      distance:routeData.distance,
-      duration:routeData.duration,
-      distanceFare:fromCents(distanceFareCents),
-      urbanSurcharge:fromCents(urbanSurchargeCents),
-      urbanLabel:urban.label,
-      hillSurcharge:fromCents(hillSurchargeCents),
-      highlandZone:highlandZone ? highlandZone.name : '',
-      longHaulIncentive:fromCents(longHaulIncentiveCents),
-      transportSubtotal:fromCents(transportSubtotalCents),
-      transportFare:fromCents(transportFareCents),
-      tollTotal:fromCents(tollCents),
-      tollEvents:routeData.tollResult.events.map(ev => ({
-        ...ev,
-        amount:fromCents(ev.amountCents)
-      })),
-      operatorSubtotals:Object.fromEntries(
-        Object.entries(routeData.tollResult.operatorSubtotals).map(([k,v]) => [k,fromCents(v)])
-      ),
-      exactTotal:fromCents(exactGrandTotalCents),
-      customerFareOnly:fromCents(customerFareOnlyCents),
-      customerTotal:fromCents(customerTotalInclTollsCents),
-      roundingAdjustment:fromCents(roundingAdjustmentCents),
-      adminDeduction:fromCents(adminDeductionCents),
-      adminPercent:settings.adminPercent,
-      adminFlatBelowThreshold:settings.adminMinimum,
-      adminFlatThreshold:settings.adminFlatThreshold,
-      usesFlatCommission,
-      driverFareEarnings:fromCents(driverFareEarningsCents),
-      driverAmountAfterDeduction:fromCents(driverAmountAfterDeductionCents),
-      routingMode:activeRoutingMode,
-      settingsSnapshot:{...settings},
-      calculatedAt:new Date().toISOString()
-    };
-  }
-
-  /* =========================================================
-     15. DURATION FORMATTING
-     ========================================================= */
-  function formatDuration(minutes) {
-    const totalMinutes = Math.max(0,Math.round(Number(minutes) || 0));
-    if (totalMinutes < 60) return `${totalMinutes} mins`;
-    const hours = Math.floor(totalMinutes / 60);
-    const mins = totalMinutes % 60;
-    return `${hours} hr ${mins} mins`;
-  }
-
-  /* =========================================================
-     16. CUSTOMER QUOTE & DRIVER RECEIPT GENERATION
-     ========================================================= */
-  function customerQuoteText(data) {
-    const tollSummary = data.tollTotal > 0
-      ? (data.settingsSnapshot.tollQuoteMode === 'include'
-          ? `Est. Tolls (Class 1): ${money(data.tollTotal)} (included)`
-          : `Est. Tolls (Class 1): +${money(data.tollTotal)} (actual toll pass-through)`)
-      : 'Tolls: RM 0.00 (Toll-free route)';
-
-    const totalLine = data.settingsSnapshot.tollQuoteMode === 'include'
-      ? `*Total Fare (incl. tolls): ${money(data.customerTotal)}*`
-      : `*Fare: ${money(data.customerFareOnly)}* + *Est. Tolls: ${money(data.tollTotal)}*`;
-
-    return [
-      '*TRIP FARE QUOTATION*',
-      `From: ${data.pickup}`,
-      `To: ${data.dropoff}`,
-      `Est. Distance: ${data.distance.toFixed(1)} km (~${formatDuration(data.duration)})`,
-      tollSummary,
-      totalLine,
-      '_Cashless (TnG eWallet / DuitNow QR) preferred._'
-    ].join('\n');
-  }
-
-  function receiptText(data) {
-    const modeLabel = data.routingMode === 'fast'
-      ? 'Fastest'
-      : (data.routingMode === 'short' ? 'Shortest' : 'Avoid Tolls');
-
-    const tollLines = data.tollEvents.length
-      ? data.tollEvents.map(ev => `  #${ev.seq} [${ev.systemType}] ${ev.title} (${ev.operatorName}): ${money(ev.amount)}`)
-      : ['  None (RM 0.00)'];
-
-    const opLines = Object.entries(data.operatorSubtotals).length
-      ? Object.entries(data.operatorSubtotals).map(([op, amt]) => `  - ${op}: ${money(amt)}`)
-      : [];
-
-    return [
-      `DRIVER FARE & TOLL LOG — RIDESHARE MY v${APP_VERSION}`,
-      '------------------------------------------------',
-      `From: ${data.pickup}`,
-      `To: ${data.dropoff}`,
-      `Distance: ${data.distance.toFixed(1)} km`,
-      `Estimated duration: ${formatDuration(data.duration)}`,
-      `Route mode: ${modeLabel}`,
-      '------------------------------------------------',
-      `Distance fare: ${money(data.distanceFare)}`,
-      `Urban / POI surcharge: ${money(data.urbanSurcharge)}`,
-      `Highland surcharge: ${money(data.hillSurcharge)}`,
-      `Highland zone: ${data.highlandZone || 'None'}`,
-      `Long-haul contribution: ${money(data.longHaulIncentive)}`,
-      `Minimum-adjusted transport fare: ${money(data.transportFare)}`,
-      '------------------------------------------------',
-      `TOLL EVENTS (CLASS 1): ${money(data.tollTotal)}`,
-      ...tollLines,
-      ...(opLines.length ? ['Operator Subtotals:', ...opLines] : []),
-      '------------------------------------------------',
-      `Exact calculated total (incl. tolls): ${money(data.exactTotal)}`,
-      `Quotation rounding adjustment: ${money(data.roundingAdjustment)}`,
-      `CUSTOMER FARE ONLY: ${money(data.customerFareOnly)}`,
-      `CUSTOMER TOTAL (INCL. TOLLS): ${money(data.customerTotal)}`,
-      '------------------------------------------------',
-      `Admin commission (on fare): -${money(data.adminDeduction)}`,
-      `Commission method: ${data.usesFlatCommission ? 'Flat commission' : 'Percentage commission'}`,
-      `Driver transport earnings: ${money(data.driverFareEarnings)}`,
-      `Driver collection after commission: ${money(data.driverAmountAfterDeduction)}`,
-      '------------------------------------------------',
-      `Generated by Rideshare MY v${APP_VERSION}`
-    ].join('\n');
-  }
-
-  /* =========================================================
-     17. CLIPBOARD & WHATSAPP DISPATCH
-     ========================================================= */
-  async function copyText(text) {
-    if (navigator.clipboard && window.isSecureContext) {
-      try {
+  async function copyTextWithFeedback(text, btnEl, originalLabel) {
+    if (!text) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(text);
-        return;
-      } catch(error) {
-        console.warn('Modern clipboard failed; trying fallback.',error);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      if (btnEl) {
+        btnEl.textContent = '✅ Copied!';
+        setTimeout(() => { btnEl.textContent = originalLabel; }, 1600);
+      }
+    } catch {
+      if (btnEl) {
+        btnEl.textContent = '⚠️ Copy failed';
+        setTimeout(() => { btnEl.textContent = originalLabel; }, 1600);
       }
     }
-    const area = document.createElement('textarea');
-    area.value = text;
-    area.setAttribute('readonly','');
-    area.style.position = 'fixed';
-    area.style.left = '-9999px';
-    area.style.top = '0';
-    area.style.opacity = '0';
-    document.body.appendChild(area);
-    area.focus();
-    area.select();
-    area.setSelectionRange(0,area.value.length);
-    let copied = false;
-    try {
-      copied = document.execCommand('copy');
-    } finally {
-      area.remove();
-    }
-    if (!copied) {
-      throw new Error('Clipboard access was blocked by the browser.');
-    }
   }
 
-  async function copyFormatted(buttonId, formatter, successLabel) {
-    if (!latestCalculation) return;
-    const button = $(buttonId);
-    const original = button.textContent;
-    try {
-      await copyText(formatter(latestCalculation));
-      button.textContent = successLabel;
-      setTimeout(() => { button.textContent = original; },1800);
-    } catch(error) {
-      showError(`Unable to copy: ${error.message}`);
-    }
+  function populateSettingsInputs() {
+    dom.settingRate.value = settings.ratePerKm;
+    dom.settingMinimum.value = settings.minimumFare;
+    dom.settingUrban.value = settings.urbanSurcharge;
+    dom.settingHill.value = settings.hillSurcharge;
+    dom.settingLongHaulKm.value = settings.longHaulTriggerKm;
+    dom.settingLongHaulPercent.value = settings.longHaulPercent;
+    dom.settingLongHaulCap.value = settings.longHaulCap;
+    dom.settingAdminPercent.value = settings.adminPercent;
+    dom.settingAdminThreshold.value = settings.adminFlatThreshold;
+    dom.settingAdminMin.value = settings.adminMinimum;
+    dom.settingTollMode.value = settings.tollQuoteMode;
+    dom.settingRounding.value = String(settings.roundingUnit);
   }
 
-  function sendCustomerWhatsApp() {
-    if (!latestCalculation) return;
-    const text = encodeURIComponent(customerQuoteText(latestCalculation));
-    window.open(`https://wa.me/?text=${text}`,'_blank','noopener');
-  }
-
-  /* =========================================================
-     18. MAP INITIALISATION
-     ========================================================= */
-  function initMap() {
-    try {
-      if (!window.H || !H.service || !H.Map) {
-        showError('HERE Maps scripts did not load. Check internet connection or content blockers.');
-        return false;
-      }
-      if (!isApiKeyConfigured()) {
-        setRouteStatus('Setup required: configure your HERE API key to enable map services.');
-      }
-      platform = new H.service.Platform({apikey:HERE_API_KEY});
-      const layers = platform.createDefaultLayers();
-      map = new H.Map(
-        $('map'),
-        layers.vector.normal.map,
-        {
-          zoom:11,
-          center:{lat:3.1390,lng:101.6869},
-          pixelRatio:window.devicePixelRatio || 1
-        }
-      );
-      window.addEventListener('resize',() => {
-        if (map) map.getViewPort().resize();
-      });
-      new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
-      ui = H.ui.UI.createDefault(map,layers);
-      router = platform.getRoutingService(null,8);
-      return true;
-    } catch(error) {
-      console.error('Map initialisation error:',error);
-      showError('Unable to initialise HERE Maps. Check API key, permissions and internet connection.');
-      return false;
-    }
-  }
-
-  /* =========================================================
-     19. EVENT BINDING
-     ========================================================= */
   function bindEvents() {
-    setupAutocomplete('pickup');
-    setupAutocomplete('dropoff');
-    $('current-loc-btn').addEventListener('click',requestCurrentLocation);
-    $('swap-locations-btn').addEventListener('click',swapLocations);
-    $('btn-mode-fast').addEventListener('click',() => setRoutingMode('fast'));
-    $('btn-mode-short').addEventListener('click',() => setRoutingMode('short'));
-    $('btn-mode-notoll').addEventListener('click',() => setRoutingMode('notoll'));
-    $('retry-route-btn').addEventListener('click',calculateRoute);
-    $('pin-trip-btn').addEventListener('click',pinCurrentRoute);
+    dom.pickupInput.addEventListener('input', () => {
+      userSelectedLocation = true;
+      pickupLocation = null;
+      syncClearButtons();
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => triggerAutocomplete(dom.pickupInput.value, true), 260);
+    });
 
-    $('copy-customer-btn').addEventListener('click',() =>
-      copyFormatted('copy-customer-btn',customerQuoteText,'✓ Quote Copied')
-    );
-    $('share-btn').addEventListener('click',() =>
-      copyFormatted('share-btn',receiptText,'✓ Log Copied')
-    );
-    $('whatsapp-customer-btn').addEventListener('click',sendCustomerWhatsApp);
+    dom.dropoffInput.addEventListener('input', () => {
+      userSelectedLocation = true;
+      dropoffLocation = null;
+      syncClearButtons();
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => triggerAutocomplete(dom.dropoffInput.value, false), 260);
+    });
 
-    $('save-settings-btn').addEventListener('click',() => {
-      try {
-        const next = readSettingsForm();
-        settings = sanitizeSettings(next);
-        if (!persistSettings()) return;
-        if (pickupCoords && dropoffCoords) calculateRoute();
-        setRouteStatus('Fare & toll settings saved successfully on this device.');
-        clearError();
-      } catch(error) {
-        showError(error.message);
+    dom.pickupInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        hideSuggestions(dom.pickupSuggestions);
+        calculateAndDisplayRoute();
       }
     });
 
-    $('reset-settings-btn').addEventListener('click',() => {
-      if (!confirm('Restore all default fare settings?')) return;
-      settings = {...DEFAULT_SETTINGS};
-      populateSettingsForm();
-      if (!persistSettings()) return;
-      if (pickupCoords && dropoffCoords) calculateRoute();
-      setRouteStatus('Default fare settings restored.');
-      clearError();
+    dom.dropoffInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        hideSuggestions(dom.dropoffSuggestions);
+        calculateAndDisplayRoute();
+      }
     });
 
-    $('clear-history-btn').addEventListener('click',() => {
-      if (!confirm('Clear all pinned and recent routes on this device?')) return;
-      savedRoutes = {pinned:[],recent:[]};
-      persistSavedRoutes();
-      updatePinButtonState();
-      setRouteStatus('Saved routes cleared.');
+    dom.clearPickupBtn.addEventListener('click', () => {
+      stopLocationTracking(false);
+      userSelectedLocation = true;
+      pickupLocation = null;
+      dom.pickupInput.value = '';
+      removeMarker(true);
+      hideSuggestions(dom.pickupSuggestions);
+      syncClearButtons();
+      dom.resultCard.style.display = 'none';
+      setStatus('');
     });
 
-    document.addEventListener('pointerdown',event => {
-      ['pickup','dropoff'].forEach(type => {
-        const box = $(`${type}-suggestions`);
-        const input = $(type);
-        if (!box.contains(event.target) && !input.contains(event.target)) {
-          box.style.display = 'none';
-        }
+    dom.clearDropoffBtn.addEventListener('click', () => {
+      dropoffLocation = null;
+      dom.dropoffInput.value = '';
+      removeMarker(false);
+      hideSuggestions(dom.dropoffSuggestions);
+      syncClearButtons();
+      dom.resultCard.style.display = 'none';
+      setStatus('');
+    });
+
+    dom.currentLocBtn.addEventListener('click', () => {
+      if (isTrackingLocation) {
+        stopLocationTracking(true);
+      } else {
+        startLocationTracking();
+      }
+    });
+
+    dom.swapBtn.addEventListener('click', () => {
+      const tmpLoc = pickupLocation;
+      pickupLocation = dropoffLocation;
+      dropoffLocation = tmpLoc;
+
+      const tmpVal = dom.pickupInput.value;
+      dom.pickupInput.value = dom.dropoffInput.value;
+      dom.dropoffInput.value = tmpVal;
+
+      if (pickupLocation) updateMarker(true, pickupLocation.lat, pickupLocation.lng);
+      else removeMarker(true);
+
+      if (dropoffLocation) updateMarker(false, dropoffLocation.lat, dropoffLocation.lng);
+      else removeMarker(false);
+
+      syncClearButtons();
+      if (dom.pickupInput.value.trim() && dom.dropoffInput.value.trim()) {
+        calculateAndDisplayRoute();
+      }
+    });
+
+    dom.btnFast.addEventListener('click', () => {
+      currentRouteMode = 'fastest';
+      dom.btnFast.classList.add('active');
+      dom.btnShort.classList.remove('active');
+      if (pickupLocation && dropoffLocation) calculateAndDisplayRoute();
+    });
+
+    dom.btnShort.addEventListener('click', () => {
+      currentRouteMode = 'shortest';
+      dom.btnShort.classList.add('active');
+      dom.btnFast.classList.remove('active');
+      if (pickupLocation && dropoffLocation) calculateAndDisplayRoute();
+    });
+
+    dom.btnNoToll.addEventListener('click', () => {
+      avoidTolls = !avoidTolls;
+      dom.btnNoToll.classList.toggle('active', avoidTolls);
+      if (pickupLocation && dropoffLocation) calculateAndDisplayRoute();
+    });
+
+    dom.retryRouteBtn.addEventListener('click', () => {
+      if (lastRouteRequest && lastRouteRequest.fromLoc && lastRouteRequest.toLoc) {
+        pickupLocation = lastRouteRequest.fromLoc;
+        dropoffLocation = lastRouteRequest.toLoc;
+        dom.pickupInput.value = pickupLocation.label;
+        dom.dropoffInput.value = dropoffLocation.label;
+      }
+      calculateAndDisplayRoute();
+    });
+
+    dom.pinTripBtn.addEventListener('click', togglePinCurrentRoute);
+
+    dom.copyCustomerBtn.addEventListener('click', () => {
+      copyTextWithFeedback(buildCustomerQuoteText(), dom.copyCustomerBtn, '💬 Copy Customer Quote');
+    });
+
+    dom.shareBtn.addEventListener('click', () => {
+      copyTextWithFeedback(buildDriverLogText(), dom.shareBtn, '📋 Copy Driver Log');
+    });
+
+    dom.whatsappCustomerBtn.addEventListener('click', () => {
+      const txt = buildCustomerQuoteText();
+      if (!txt) return;
+      const url = `https://wa.me/?text=${encodeURIComponent(txt)}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    });
+
+    dom.saveSettingsBtn.addEventListener('click', () => {
+      saveSettings({
+        ratePerKm: nonNeg(dom.settingRate.value, DEFAULT_SETTINGS.ratePerKm),
+        minimumFare: nonNeg(dom.settingMinimum.value, DEFAULT_SETTINGS.minimumFare),
+        urbanSurcharge: nonNeg(dom.settingUrban.value, DEFAULT_SETTINGS.urbanSurcharge),
+        hillSurcharge: nonNeg(dom.settingHill.value, DEFAULT_SETTINGS.hillSurcharge),
+        longHaulTriggerKm: nonNeg(dom.settingLongHaulKm.value, DEFAULT_SETTINGS.longHaulTriggerKm),
+        longHaulPercent: clampPct(dom.settingLongHaulPercent.value, DEFAULT_SETTINGS.longHaulPercent),
+        longHaulCap: nonNeg(dom.settingLongHaulCap.value, DEFAULT_SETTINGS.longHaulCap),
+        adminPercent: clampPct(dom.settingAdminPercent.value, DEFAULT_SETTINGS.adminPercent),
+        adminFlatThreshold: nonNeg(dom.settingAdminThreshold.value, DEFAULT_SETTINGS.adminFlatThreshold),
+        adminMinimum: nonNeg(dom.settingAdminMin.value, DEFAULT_SETTINGS.adminMinimum),
+        tollQuoteMode: dom.settingTollMode.value === 'separate' ? 'separate' : 'include',
+        roundingUnit: Number(dom.settingRounding.value) || 1
       });
+      populateSettingsInputs();
+      if (availableRoutes.length && pickupLocation && dropoffLocation) {
+        selectRouteAlternative(activeRouteIndex);
+      }
+    });
+
+    dom.resetSettingsBtn.addEventListener('click', () => {
+      saveSettings({ ...DEFAULT_SETTINGS });
+      populateSettingsInputs();
+      if (availableRoutes.length && pickupLocation && dropoffLocation) {
+        selectRouteAlternative(activeRouteIndex);
+      }
+    });
+
+    dom.clearHistoryBtn.addEventListener('click', () => {
+      routeMemory = { pinned: [], recent: [] };
+      saveRouteMemory();
+      renderQuickBar();
+      updatePinButtonState();
+    });
+
+    document.addEventListener('click', e => {
+      if (!dom.pickupInput.contains(e.target) && !dom.pickupSuggestions.contains(e.target)) {
+        hideSuggestions(dom.pickupSuggestions);
+      }
+      if (!dom.dropoffInput.contains(e.target) && !dom.dropoffSuggestions.contains(e.target)) {
+        hideSuggestions(dom.dropoffSuggestions);
+      }
     });
   }
 
   /* =========================================================
-     20. APPLICATION STARTUP
+     10. BOOTSTRAP
      ========================================================= */
-  function boot() {
-    populateSettingsForm();
-    renderQuickBar();
-    bindEvents();
+  function bootstrap() {
     initMap();
-    if (!isApiKeyConfigured()) {
-      setRouteStatus('Setup required: replace HERE_API_KEY with your valid key.');
-    }
+    populateSettingsInputs();
+    renderQuickBar();
+    syncClearButtons();
+    bindEvents();
   }
 
-  boot();
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootstrap);
+  } else {
+    bootstrap();
+  }
 })();
 </script>
 </body>
