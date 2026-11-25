@@ -5,611 +5,760 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare estimator">
-<meta name="robots" content="noindex,nofollow">
-<title>Fare Estimator v4.0.0</title>
+<title>Rideshare MY - Personal Edition v2.5</title>
+
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
+
 <style>
-  :root {
-    --primary:#8e24aa;
-    --primary-light:#b388ff;
-    --bg-dark:#1c1c1e;
-    --border:#e0e0e0;
-    --text:#212529;
-    --muted:#aeaeb2;
-    --green:#25D366;
-    --danger:#c62828;
-    --warning:#f57c00;
-  }
-  * {box-sizing:border-box}
-  body {
-    margin:0;
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-    background:#f8f9fa;
-    color:var(--text);
-    height:100vh;
-    height:100dvh;
-    overflow:hidden;
-  }
-  button,input,select {font:inherit}
-  button {touch-action:manipulation}
-  #container {
-    display:flex;
-    flex-direction:column;
-    height:100%;
-    position:relative;
-  }
+:root {
+  --primary:#8e24aa;
+  --primary-light:#b388ff;
+  --bg-dark:#1c1c1e;
+  --border:#e0e0e0;
+  --text:#212529;
+  --muted:#aeaeb2;
+  --green:#25D366;
+  --danger:#c62828;
+  --warning:#f57c00;
+}
+
+* {box-sizing:border-box}
+
+body {
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:#f8f9fa;
+  color:var(--text);
+  height:100vh;
+  height:100dvh;
+  overflow:hidden;
+}
+
+button,input,select {font:inherit}
+
+button {touch-action:manipulation}
+
+#container {
+  display:flex;
+  flex-direction:column;
+  height:100%;
+  position:relative;
+}
+
+#map {
+  height:24vh;
+  min-height:150px;
+  width:100%;
+  z-index:1;
+  background:#e9e9e9;
+}
+
+#search-panel {
+  flex:1;
+  min-height:0;
+  background:#fff;
+  padding:12px 16px;
+  box-shadow:0 -4px 20px #00000014;
+  z-index:10;
+  border-radius:16px 16px 0 0;
+  display:flex;
+  flex-direction:column;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+}
+
+.header-row {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+
+.header-row h2 {
+  margin:0 0 8px;
+  font-size:18px;
+  font-weight:750;
+}
+
+.version {
+  font-size:10px;
+  color:#777;
+  margin-bottom:8px;
+}
+
+.routing-wrapper {
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+  position:relative;
+  margin-bottom:6px;
+}
+
+.input-container {
+  position:relative;
+  display:flex;
+  align-items:center;
+}
+
+.location-input {
+  width:100%;
+  padding:10px 76px 10px 12px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  font-size:14px;
+  background:#f9f9f9;
+  min-width:0;
+}
+
+.location-input:focus,
+.setting-input:focus {
+  outline:none;
+  border-color:var(--primary);
+  background:#fff;
+  box-shadow:0 0 0 2px #8e24aa1a;
+}
+
+.action-group {
+  position:absolute;
+  right:7px;
+  display:flex;
+  align-items:center;
+  gap:3px;
+  z-index:5;
+}
+
+.icon-btn {
+  border:0;
+  background:none;
+  color:#757575;
+  font-size:17px;
+  cursor:pointer;
+  padding:4px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.icon-btn:disabled {opacity:.5}
+
+.icon-btn:hover {
+  background:#f0f0f0;
+  color:var(--primary);
+}
+
+.clear-btn {
+  display:none;
+  font-size:19px;
+  color:#999;
+}
+
+.swap-divider {
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  margin:-4px 0;
+  z-index:6;
+}
+
+.swap-btn {
+  background:white;
+  border:1px solid var(--border);
+  color:var(--primary);
+  width:27px;
+  height:27px;
+  border-radius:50%;
+  cursor:pointer;
+  box-shadow:0 2px 6px #00000020;
+  font-size:14px;
+}
+
+.suggestions {
+  position:absolute;
+  top:100%;
+  left:0;
+  right:0;
+  background:white;
+  border:1px solid var(--border);
+  border-radius:8px;
+  max-height:190px;
+  overflow-y:auto;
+  z-index:1000;
+  box-shadow:0 6px 16px #0000001a;
+  display:none;
+}
+
+.suggestion-item {
+  padding:9px 12px;
+  cursor:pointer;
+  font-size:13px;
+  line-height:1.4;
+  border-bottom:1px solid #f5f5f5;
+}
+
+.suggestion-item:hover,
+.suggestion-item:focus {
+  background:#f5f5f5;
+}
+
+.suggestion-empty {
+  padding:10px;
+  font-size:12px;
+  color:#777;
+}
+
+.route-controls {
+  display:flex;
+  flex-direction:column;
+  gap:7px;
+  margin:3px 0 8px;
+}
+
+.route-mode-container {
+  display:flex;
+  gap:6px;
+}
+
+.mode-btn,.toggle-btn {
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:#fff;
+  color:#555;
+  font-size:11px;
+  font-weight:650;
+  cursor:pointer;
+  padding:8px 5px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+}
+
+.mode-btn {flex:1}
+
+.mode-btn.active {
+  background:#f3e5f5;
+  border-color:var(--primary);
+  color:var(--primary);
+}
+
+.toggle-btn {font-size:12px}
+
+.toggle-btn.active {
+  background:#fff3e0;
+  border-color:#f57c00;
+  color:#e65100;
+}
+
+.toll-adjust {
+  display:grid;
+  grid-template-columns:1fr 112px;
+  gap:8px;
+  align-items:center;
+  font-size:12px;
+  color:#555;
+}
+
+.toll-adjust input {
+  width:100%;
+  padding:7px 8px;
+  border:1px solid var(--border);
+  border-radius:7px;
+  font-size:13px;
+}
+
+.status-line {
+  font-size:11px;
+  color:#777;
+  min-height:14px;
+  margin:1px 0 4px;
+  line-height:1.4;
+}
+
+#loading-msg {
+  display:none;
+  color:var(--primary);
+  font-size:12px;
+  font-weight:600;
+  padding:5px 0;
+}
+
+#error-msg {
+  display:none;
+  color:var(--danger);
+  font-size:13px;
+  margin:4px 0;
+  font-weight:550;
+  line-height:1.4;
+}
+
+#result-card {
+  background:var(--bg-dark);
+  color:#fff;
+  padding:12px 14px;
+  border-radius:12px;
+  margin-top:3px;
+  display:none;
+  box-shadow:0 4px 14px #00000026;
+}
+
+.fare-header-row {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:2px;
+}
+
+.fare-header {
+  font-size:27px;
+  font-weight:800;
+  color:var(--primary-light);
+}
+
+.fare-meta {
+  font-size:12px;
+  color:#e5e5ea;
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+  font-weight:500;
+  margin-bottom:8px;
+}
+
+.fare-status {
+  font-size:10px;
+  color:#c5cae9;
+  margin-bottom:6px;
+  line-height:1.5;
+}
+
+.fare-warning {
+  color:#ffcc80;
+}
+
+details {
+  border-top:1px dashed #3a3a3c;
+  padding-top:8px;
+  margin-top:7px;
+}
+
+summary {
+  font-size:12px;
+  font-weight:650;
+  color:var(--primary-light);
+  cursor:pointer;
+  outline:none;
+  user-select:none;
+  margin-bottom:7px;
+}
+
+.detail-row {
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  font-size:12px;
+  color:var(--muted);
+  margin-bottom:6px;
+}
+
+.detail-row span:last-child {
+  text-align:right;
+  white-space:nowrap;
+}
+
+.detail-row.total-bold {
+  color:#fff;
+  font-weight:700;
+  border-top:1px solid #3a3a3c;
+  padding-top:7px;
+  font-size:13px;
+}
+
+.detail-row.driver-net-highlight {
+  color:#a5d6a7;
+  font-weight:750;
+  border-top:1px solid #ffffff1a;
+  padding-top:7px;
+  margin-bottom:9px;
+  font-size:13px;
+}
+
+.detail-note {
+  font-size:10px;
+  color:#aeb0b5;
+  line-height:1.5;
+  margin:4px 0 7px;
+}
+
+.share-btn {
+  width:100%;
+  background:var(--green);
+  color:#fff;
+  border:0;
+  padding:11px;
+  border-radius:8px;
+  font-size:13px;
+  font-weight:750;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  margin-top:9px;
+}
+
+.secondary-btn {
+  width:100%;
+  background:#424242;
+  color:#fff;
+  border:0;
+  padding:9px;
+  border-radius:8px;
+  font-size:12px;
+  font-weight:650;
+  cursor:pointer;
+  margin-top:6px;
+}
+
+.settings-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin:8px 0;
+}
+
+.setting-field {
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  font-size:11px;
+  color:#555;
+}
+
+.setting-input {
+  width:100%;
+  padding:8px;
+  border:1px solid var(--border);
+  border-radius:7px;
+  font-size:13px;
+  background:#fafafa;
+}
+
+.settings-actions {
+  display:flex;
+  gap:7px;
+  flex-wrap:wrap;
+}
+
+.settings-actions button,
+.history-actions button {
+  border:1px solid var(--border);
+  background:#fff;
+  border-radius:7px;
+  padding:7px 9px;
+  font-size:11px;
+  cursor:pointer;
+}
+
+#history-list {
+  font-size:11px;
+  color:#555;
+  line-height:1.5;
+  max-height:180px;
+  overflow:auto;
+}
+
+.history-item {
+  border-bottom:1px solid #eee;
+  padding:7px 0;
+}
+
+.history-item strong {color:#222}
+
+.history-actions {
+  display:flex;
+  gap:7px;
+  margin-top:8px;
+  flex-wrap:wrap;
+}
+
+.small-muted {
+  font-size:10px;
+  color:#888;
+  line-height:1.5;
+}
+
+@media(min-width:768px) {
+  #container {flex-direction:row-reverse}
   #map {
-    height:23vh;
-    min-height:145px;
-    width:100%;
-    z-index:1;
-    background:#e9e9e9;
+    height:100%;
+    min-height:0;
+    flex:1;
   }
   #search-panel {
-    flex:1;
-    min-height:0;
-    background:#fff;
-    padding:12px 16px;
-    box-shadow:0 -4px 20px #00000014;
-    z-index:10;
-    border-radius:16px 16px 0 0;
-    display:flex;
-    flex-direction:column;
-    overflow-y:auto;
-    overscroll-behavior:contain;
+    width:400px;
+    max-width:42vw;
+    height:100%;
+    border-radius:0;
+    box-shadow:-4px 0 20px #0000000d;
   }
-  .header-row {
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:8px;
-  }
-  .header-row h2 {
-    margin:0 0 8px;
-    font-size:18px;
-    font-weight:750;
-  }
-  .version {
-    font-size:10px;
-    color:#777;
-    margin-bottom:8px;
-  }
-  .routing-wrapper {
-    display:flex;
-    flex-direction:column;
-    gap:5px;
-    position:relative;
-    margin-bottom:6px;
-  }
-  .input-container {
-    position:relative;
-    display:flex;
-    align-items:center;
-  }
-  .location-input {
-    width:100%;
-    padding:10px 76px 10px 12px;
-    border:1px solid var(--border);
-    border-radius:8px;
-    font-size:14px;
-    background:#f9f9f9;
-    min-width:0;
-  }
-  .location-input:focus,
-  .setting-input:focus {
-    outline:none;
-    border-color:var(--primary);
-    background:#fff;
-    box-shadow:0 0 0 2px #8e24aa1a;
-  }
-  .action-group {
-    position:absolute;
-    right:7px;
-    display:flex;
-    align-items:center;
-    gap:3px;
-    z-index:5;
-  }
-  .icon-btn {
-    border:0;
-    background:none;
-    color:#757575;
-    font-size:17px;
-    cursor:pointer;
-    padding:4px;
-    border-radius:50%;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-  }
-  .icon-btn:disabled {opacity:.5}
-  .icon-btn:hover {
-    background:#f0f0f0;
-    color:var(--primary);
-  }
-  .clear-btn {
-    display:none;
-    font-size:19px;
-    color:#999;
-  }
-  .swap-divider {
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    margin:-4px 0;
-    z-index:6;
-  }
-  .swap-btn {
-    background:white;
-    border:1px solid var(--border);
-    color:var(--primary);
-    width:27px;
-    height:27px;
-    border-radius:50%;
-    cursor:pointer;
-    box-shadow:0 2px 6px #00000020;
-    font-size:14px;
-  }
-  .suggestions {
-    position:absolute;
-    top:100%;
-    left:0;
-    right:0;
-    background:white;
-    border:1px solid var(--border);
-    border-radius:8px;
-    max-height:190px;
-    overflow-y:auto;
-    z-index:1000;
-    box-shadow:0 6px 16px #0000001a;
-    display:none;
-  }
-  .suggestion-item {
-    padding:9px 12px;
-    cursor:pointer;
-    font-size:13px;
-    line-height:1.4;
-    border-bottom:1px solid #f5f5f5;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    gap:8px;
-  }
-  .suggestion-item:hover,
-  .suggestion-item:focus {
-    background:#f5f5f5;
-  }
-  .suggestion-empty {
-    padding:10px;
-    font-size:12px;
-    color:#777;
-  }
-  .quick-bar {
-    display:flex;
-    gap:6px;
-    overflow-x:auto;
-    padding:2px 0 6px;
-    scrollbar-width:none;
-  }
-  .quick-bar::-webkit-scrollbar {display:none}
-  .chip-btn {
-    border:1px solid var(--border);
-    background:#f5f3f7;
-    color:#4a148c;
-    border-radius:16px;
-    padding:5px 10px;
-    font-size:11px;
-    font-weight:600;
-    white-space:nowrap;
-    cursor:pointer;
-    display:inline-flex;
-    align-items:center;
-    gap:4px;
-  }
-  .chip-btn:hover {background:#ede7f6}
-  .chip-btn.recent {background:#f1f3f5;color:#495057}
-  .route-controls {
-    display:flex;
-    flex-direction:row;
-    align-items:stretch;
-    gap:6px;
-    margin:4px 0 8px;
-  }
-  .mode-btn {
-    flex:1;
-    min-width:0;
-    border:1px solid var(--border);
-    border-radius:8px;
-    background:#fff;
-    color:#555;
-    font-size:11px;
-    font-weight:650;
-    cursor:pointer;
-    padding:8px 4px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    gap:3px;
-    white-space:nowrap;
-  }
-  .mode-btn.active {
-    background:#f3e5f5;
-    border-color:var(--primary);
-    color:var(--primary);
-  }
-  .status-line {
-    font-size:11px;
-    color:#777;
-    min-height:14px;
-    margin:1px 0 4px;
-    line-height:1.4;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:8px;
-  }
-  .retry-link {
-    border:1px solid var(--primary);
-    background:#f3e5f5;
-    color:var(--primary);
-    border-radius:6px;
-    padding:2px 8px;
-    font-size:11px;
-    font-weight:650;
-    cursor:pointer;
-    white-space:nowrap;
-  }
-  #loading-msg {
-    display:none;
-    color:var(--primary);
-    font-size:12px;
-    font-weight:600;
-    padding:5px 0;
-  }
-  #error-msg {
-    display:none;
-    color:var(--danger);
-    font-size:13px;
-    margin:4px 0;
-    font-weight:550;
-    line-height:1.4;
-  }
-  #result-card {
-    background:var(--bg-dark);
-    color:#fff;
-    padding:12px 14px;
-    border-radius:12px;
-    margin-top:3px;
-    display:none;
-    box-shadow:0 4px 14px #00000026;
-  }
-  .fare-header-row {
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:2px;
-  }
-  .fare-header {
-    font-size:27px;
-    font-weight:800;
-    color:var(--primary-light);
-  }
-  .pin-trip-btn {
-    border:1px solid #3a3a3c;
-    background:#2c2c2e;
-    color:#e5e5ea;
-    border-radius:8px;
-    padding:5px 9px;
-    font-size:11px;
-    font-weight:600;
-    cursor:pointer;
-  }
-  .pin-trip-btn:hover {background:#3a3a3c}
-  .fare-meta {
-    font-size:12px;
-    color:#e5e5ea;
-    display:flex;
-    justify-content:space-between;
-    gap:8px;
-    font-weight:500;
-    margin-bottom:8px;
-  }
-  details {
-    border-top:1px dashed #3a3a3c;
-    padding-top:8px;
-    margin-top:7px;
-  }
-  #search-panel > details {
-    border-top:1px solid var(--border);
-    padding-top:9px;
-    margin-top:8px;
-  }
-  summary {
-    font-size:12px;
-    font-weight:650;
-    color:var(--primary-light);
-    cursor:pointer;
-    outline:none;
-    user-select:none;
-    margin-bottom:7px;
-  }
-  #search-panel > details > summary {
-    color:var(--primary);
-  }
-  .detail-row {
-    display:flex;
-    justify-content:space-between;
-    gap:10px;
-    font-size:12px;
-    color:var(--muted);
-    margin-bottom:6px;
-  }
-  .detail-row span:last-child {
-    text-align:right;
-    white-space:nowrap;
-  }
-  .detail-row.total-bold {
-    color:#fff;
-    font-weight:700;
-    border-top:1px solid #3a3a3c;
-    padding-top:7px;
-    font-size:13px;
-  }
-  .detail-row.driver-net-highlight {
-    color:#a5d6a7;
-    font-weight:750;
-    border-top:1px solid #ffffff1a;
-    padding-top:7px;
-    margin-bottom:9px;
-    font-size:13px;
-  }
-  .detail-note {
-    font-size:10px;
-    color:#aeb0b5;
-    line-height:1.5;
-    margin:4px 0 7px;
-  }
-  .confidence-line {
-    font-size:10px;
-    color:#aeb0b5;
-    margin:0 0 8px;
-    font-style:italic;
-  }
-  .share-actions {
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:8px;
-    margin-top:9px;
-  }
-  .share-btn {
-    width:100%;
-    background:var(--green);
-    color:#fff;
-    border:0;
-    padding:10px 8px;
-    border-radius:8px;
-    font-size:12px;
-    font-weight:750;
-    cursor:pointer;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    gap:5px;
-  }
-  .share-btn.secondary {
-    background:#3a3a3c;
-    color:#fff;
-  }
-  .share-btn.whatsapp-full {
-    grid-column:1 / -1;
-    background:#128c7e;
-  }
-  .settings-grid {
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:8px;
-    margin:8px 0;
-  }
-  .setting-field {
-    display:flex;
-    flex-direction:column;
-    gap:4px;
-    font-size:11px;
-    color:#555;
-  }
-  .setting-input {
-    width:100%;
-    padding:8px;
-    border:1px solid var(--border);
-    border-radius:7px;
-    font-size:13px;
-    background:#fafafa;
-  }
-  .settings-actions {
-    display:flex;
-    gap:7px;
-    flex-wrap:wrap;
-  }
-  .settings-actions button {
-    border:1px solid var(--border);
-    background:#fff;
-    border-radius:7px;
-    padding:7px 9px;
-    font-size:11px;
-    cursor:pointer;
-  }
-  .small-muted {
-    font-size:10px;
-    color:#888;
-    line-height:1.5;
-  }
-  @media(min-width:768px) {
-    #container {flex-direction:row-reverse}
-    #map {
-      height:100%;
-      min-height:0;
-      flex:1;
-    }
-    #search-panel {
-      width:430px;
-      max-width:45vw;
-      height:100%;
-      border-radius:0;
-      box-shadow:-4px 0 20px #0000000d;
-    }
-  }
-  @media(max-width:360px) {
-    #search-panel {padding:10px}
-    .settings-grid {gap:6px}
-    .fare-header {font-size:24px}
-    .mode-btn {font-size:10px;padding:7px 3px}
-    .share-actions {grid-template-columns:1fr}
-  }
+}
+
+@media(max-width:360px) {
+  #search-panel {padding:10px}
+  .settings-grid {gap:6px}
+  .fare-header {font-size:24px}
+}
 </style>
+
 <script src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
 <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
 <script src="https://js.api.here.com/v3/3.1/mapsjs-ui.js"></script>
 <script src="https://js.api.here.com/v3/3.1/mapsjs-mapevents.js"></script>
 </head>
+
 <body>
-<noscript><p style="padding:20px;font-family:sans-serif">This estimator requires JavaScript.</p></noscript>
 <div id="container">
+
   <div id="map" aria-label="Route map"></div>
+
   <main id="search-panel">
+
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v4.0.0</span>
+      <span class="version">PERSONAL EDITION v2.5</span>
     </div>
 
-    <div id="quick-bar" class="quick-bar" style="display:none" aria-label="Saved and recent routes"></div>
+    <!-- LOCATION INPUTS -->
 
     <div class="routing-wrapper">
+
       <div class="input-container">
-        <input class="location-input" type="text" id="pickup" placeholder="Enter Pickup Location..." autocomplete="off" enterkeyhint="search" aria-label="Pickup location">
+        <input class="location-input" type="text" id="pickup"
+          placeholder="Enter Pickup Location..."
+          autocomplete="off" enterkeyhint="search"
+          aria-label="Pickup location">
+
         <div class="action-group">
-          <button class="icon-btn" id="current-loc-btn" title="Use current location" aria-label="Use current location">🎯</button>
-          <button class="icon-btn clear-btn" id="clear-pickup" title="Clear pickup" aria-label="Clear pickup">&times;</button>
+          <button class="icon-btn" id="current-loc-btn"
+            title="Use current location"
+            aria-label="Use current location">🎯</button>
+
+          <button class="icon-btn clear-btn" id="clear-pickup"
+            title="Clear pickup" aria-label="Clear pickup">&times;</button>
         </div>
-        <div id="pickup-suggestions" class="suggestions" role="listbox"></div>
+
+        <div id="pickup-suggestions" class="suggestions"
+          role="listbox"></div>
       </div>
 
       <div class="swap-divider">
-        <button class="swap-btn" id="swap-locations-btn" title="Swap locations" aria-label="Swap locations">⇅</button>
+        <button class="swap-btn" id="swap-locations-btn"
+          title="Swap locations" aria-label="Swap locations">⇅</button>
       </div>
 
       <div class="input-container">
-        <input class="location-input" type="text" id="dropoff" placeholder="Enter Drop-off Location..." autocomplete="off" enterkeyhint="search" aria-label="Drop-off location">
+        <input class="location-input" type="text" id="dropoff"
+          placeholder="Enter Drop-off Location..."
+          autocomplete="off" enterkeyhint="search"
+          aria-label="Drop-off location">
+
         <div class="action-group">
-          <button class="icon-btn clear-btn" id="clear-dropoff" title="Clear drop-off" aria-label="Clear drop-off">&times;</button>
+          <button class="icon-btn clear-btn" id="clear-dropoff"
+            title="Clear drop-off" aria-label="Clear drop-off">&times;</button>
         </div>
-        <div id="dropoff-suggestions" class="suggestions" role="listbox"></div>
+
+        <div id="dropoff-suggestions" class="suggestions"
+          role="listbox"></div>
       </div>
+
     </div>
+
+    <!-- ROUTING CONTROLS -->
 
     <div class="route-controls">
-      <button class="mode-btn active" id="btn-mode-fast" type="button" aria-pressed="true">
-        ⚡ Fastest
+
+      <div class="route-mode-container">
+        <button class="mode-btn active" id="btn-mode-fast" type="button">
+          ⚡ Fastest Route
+        </button>
+
+        <button class="mode-btn" id="btn-mode-short" type="button">
+          📏 Shortest Route
+        </button>
+      </div>
+
+      <button class="toggle-btn" id="btn-avoid-tolls" type="button">
+        🛑 Avoid Tolls: OFF
       </button>
-      <button class="mode-btn" id="btn-mode-short" type="button" aria-pressed="false">
-        📏 Shortest
-      </button>
+
+      <label class="toll-adjust">
+        <span>Manual toll override (RM, optional)</span>
+        <input id="manual-toll" type="number"
+          min="0" step="0.10" inputmode="decimal"
+          placeholder="Use HERE estimate">
+      </label>
+
+      <div class="small-muted">
+        Leave blank to use HERE toll data. Enter RM0.00 to explicitly
+        override tolls as zero. Unverified toll data must be checked manually.
+      </div>
+
     </div>
 
-    <div id="loading-msg">Calculating route…</div>
+    <div id="loading-msg">Calculating route and fare…</div>
     <div id="error-msg" role="alert"></div>
-    <div class="status-line" aria-live="polite">
-      <span id="route-status"></span>
-      <button id="retry-route-btn" class="retry-link" type="button" style="display:none">↻ Retry</button>
-    </div>
+    <div id="route-status" class="status-line" aria-live="polite"></div>
+
+    <!-- FARE RESULT -->
 
     <section id="result-card">
+
       <div class="fare-header-row">
         <div id="total-fare" class="fare-header">RM --</div>
-        <button class="pin-trip-btn" id="pin-trip-btn" type="button" title="Pin this route for quick reuse">📌 Pin Route</button>
       </div>
+
       <div class="fare-meta">
         <span id="fare-distance">0 km</span>
         <span id="fare-duration">0 mins</span>
       </div>
-      <p class="confidence-line" id="estimate-confidence"></p>
+
+      <div id="fare-status" class="fare-status"></div>
 
       <details open>
         <summary>Detailed Fare Calculation</summary>
+
         <div class="detail-row">
           <span>Distance fare</span>
           <span id="calc-distance-fare">RM 0.00</span>
         </div>
+
         <div class="detail-row" id="urban-surcharge-row" style="display:none">
           <span id="urban-surcharge-label">Urban / POI surcharge</span>
           <span id="calc-urban-surcharge">RM 0.00</span>
         </div>
+
+        <div class="detail-row" id="toll-fare-row">
+          <span>Toll charges</span>
+          <span id="calc-toll-fare">RM 0.00</span>
+        </div>
+
         <div class="detail-row" id="hill-surcharge-row" style="display:none">
           <span id="hill-surcharge-label">Highland surcharge</span>
           <span id="calc-hill-surcharge">RM 0.00</span>
         </div>
+
         <div class="detail-row" id="long-haul-incentive-row" style="display:none">
           <span>Long-haul / return contribution</span>
           <span id="calc-long-haul-incentive">RM 0.00</span>
         </div>
+
         <div class="detail-row total-bold">
           <span>Exact calculated total</span>
           <span id="calc-grand" style="color:var(--primary-light)">RM 0.00</span>
         </div>
+
         <div class="detail-row">
           <span>Rounded customer quotation</span>
           <span id="calc-customer-total">RM 0.00</span>
         </div>
+
+        <div class="detail-row" id="admin-deduction-row">
+          <span>Admin commission (excluding tolls)</span>
+          <span id="calc-deduction">RM 0.00</span>
+        </div>
+
+        <div class="detail-row">
+          <span>Driver fare earnings (excluding tolls)</span>
+          <span id="driver-fare-net">RM 0.00</span>
+        </div>
+
         <div class="detail-row driver-net-highlight">
-          <span>Driver collection</span>
+          <span>Driver collection after commission (incl. tolls)</span>
           <span id="driver-net-fare">RM 0.00</span>
         </div>
-        <p class="detail-note" id="fare-policy-note"></p>
+
+        <p class="detail-note" id="fare-policy-note">
+          Minimum fare applies to transport charges before tolls.
+          Admin commission is 15% of transport fare excluding tolls,
+          or RM1.50 when the pre-minimum transport subtotal is below RM8.
+          Tolls are pass-through reimbursement, not driver profit.
+          Vehicle operating costs are not deducted.
+        </p>
+
       </details>
 
-      <div class="share-actions">
-        <button class="share-btn" id="copy-customer-btn" type="button">
-          💬 Copy Customer Quote
-        </button>
-        <button class="share-btn secondary" id="share-btn" type="button">
-          📋 Copy Driver Log
-        </button>
-        <button class="share-btn whatsapp-full" id="whatsapp-customer-btn" type="button">
-          📲 Send Quote via WhatsApp
-        </button>
-      </div>
+      <button class="share-btn" id="share-btn" type="button">
+        📋 Copy Itemised Receipt
+      </button>
+
+      <button class="secondary-btn" id="save-trip-btn" type="button">
+        Save to Trip History
+      </button>
+
     </section>
+
+    <!-- SETTINGS -->
 
     <details id="settings-panel">
       <summary>⚙️ Fare Settings</summary>
+
       <div class="settings-grid">
+
         <label class="setting-field">
           Distance rate (RM/km)
-          <input class="setting-input" id="setting-rate" type="number" min="0" step="0.01">
+          <input class="setting-input" id="setting-rate"
+            type="number" min="0" step="0.01">
         </label>
+
         <label class="setting-field">
           Minimum fare (RM)
-          <input class="setting-input" id="setting-minimum" type="number" min="0" step="0.50">
+          <input class="setting-input" id="setting-minimum"
+            type="number" min="0" step="0.50">
         </label>
+
         <label class="setting-field">
           Urban / POI surcharge (RM)
-          <input class="setting-input" id="setting-urban" type="number" min="0" step="0.50">
+          <input class="setting-input" id="setting-urban"
+            type="number" min="0" step="0.50">
         </label>
+
         <label class="setting-field">
           Highland surcharge (RM)
-          <input class="setting-input" id="setting-hill" type="number" min="0" step="0.50">
+          <input class="setting-input" id="setting-hill"
+            type="number" min="0" step="0.50">
         </label>
+
         <label class="setting-field">
           Long-haul trigger (km)
-          <input class="setting-input" id="setting-longhaul-km" type="number" min="0" step="1">
+          <input class="setting-input" id="setting-longhaul-km"
+            type="number" min="0" step="1">
         </label>
+
         <label class="setting-field">
           Return contribution (%)
-          <input class="setting-input" id="setting-longhaul-percent" type="number" min="0" max="100" step="1">
+          <input class="setting-input" id="setting-longhaul-percent"
+            type="number" min="0" max="100" step="1">
         </label>
+
         <label class="setting-field">
           Return contribution cap (RM)
-          <input class="setting-input" id="setting-longhaul-cap" type="number" min="0" step="1">
+          <input class="setting-input" id="setting-longhaul-cap"
+            type="number" min="0" step="1">
         </label>
+
+        <label class="setting-field">
+          Admin commission (%)
+          <input class="setting-input" id="setting-admin-percent"
+            type="number" min="0" max="100" step="0.5">
+        </label>
+
+        <label class="setting-field">
+          Flat commission below RM8 (RM)
+          <input class="setting-input" id="setting-admin-min"
+            type="number" min="0" step="0.10">
+        </label>
+
         <label class="setting-field">
           Fare rounding
           <select class="setting-input" id="setting-rounding">
@@ -619,1218 +768,2399 @@
             <option value="0.01">Exact sen</option>
           </select>
         </label>
+
       </div>
+
       <div class="settings-actions">
         <button id="save-settings-btn" type="button">Save settings</button>
         <button id="reset-settings-btn" type="button">Restore defaults</button>
-        <button id="clear-history-btn" type="button">Clear saved routes</button>
       </div>
+
       <p class="small-muted">
-        Settings and saved routes are stored locally on this device only.
+        Settings are stored on this device only.
+        Commission is calculated on transport fare excluding tolls.
+        The flat commission applies below the RM8 pre-minimum threshold.
       </p>
     </details>
 
+    <!-- HISTORY -->
+
+    <details id="history-panel">
+      <summary>🧾 Recent Trip History</summary>
+
+      <div id="history-list">No saved trips yet.</div>
+
+      <div class="history-actions">
+        <button id="export-history-btn" type="button">Export history (CSV)</button>
+        <button id="clear-history-btn" type="button">Clear history</button>
+      </div>
+    </details>
+
     <p class="small-muted">
-      Estimates are indicative and exclude tolls, parking, and waiting charges. Distances use HERE routing; if routing is unavailable a straight-line fallback is shown and flagged.
+      Estimates are indicative. Confirm toll amounts and final fare before
+      accepting a trip. HERE Maps, location search and routing require
+      internet access. Browser storage is local to this device.
     </p>
+
   </main>
 </div>
 
 <script>
 (() => {
-  'use strict';
+'use strict';
 
-  /* =========================================================
-     1. CONFIGURATION
-     ========================================================= */
-  const APP_VERSION = '4.0.0';
-  const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
+/* =========================================================
+   1. CONFIGURATION
+========================================================= */
 
-  const SETTINGS_KEY = 'ridesafe.settings.v4';
-  const ROUTES_STORAGE_KEY = 'ridesafe.routes.v4';
-  const LEGACY_SETTINGS_KEYS = ['ridesafe.settings.v3','fareEstimatorSettings'];
-  const LEGACY_ROUTES_STORAGE_KEYS = ['ridesafe.routes.v3','fareEstimatorRoutes'];
+const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
-  const DEFAULT_SETTINGS = Object.freeze({
-    ratePerKm:1.45,
-    minimumFare:8.00,
-    urbanSurcharge:3.00,
-    hillSurcharge:25.00,
-    longHaulTriggerKm:100,
-    longHaulPercent:20,
-    longHaulCap:100,
-    roundingUnit:1
-  });
-  const MAX_PINNED_ROUTES = 6;
-  const MAX_RECENT_ROUTES = 5;
+const DEFAULT_SETTINGS = Object.freeze({
+  ratePerKm:1.45,
+  minimumFare:8.00,
+  urbanSurcharge:3.00,
+  hillSurcharge:25.00,
+  longHaulTriggerKm:100,
+  longHaulPercent:20,
+  longHaulCap:100,
+  adminPercent:15,
+  adminMinimum:1.50,
+  roundingUnit:1
+});
 
-  const HIGHLAND_ZONES = [
-    {lat:3.4241,lng:101.7933,radiusKm:8.5,name:'Genting Highlands & Gohtong'},
-    {lat:4.4715,lng:101.3787,radiusKm:22,name:'Cameron Highlands'},
-    {lat:3.7155,lng:101.7432,radiusKm:6,name:"Fraser's Hill"},
-    {lat:3.3533,lng:101.8385,radiusKm:7.5,name:'Bukit Tinggi & Colmar Tropicale'}
+const ADMIN_FLAT_THRESHOLD = 8;
+
+const SETTINGS_KEY = 'rideshareMY.personal.v2.5.settings';
+const LEGACY_SETTINGS_KEYS = [
+  'rideshareMY.personal.v2.4.settings',
+  'rideshareMY.personal.v2.3.settings',
+  'rideshareMY.personal.v2.2.settings',
+  'rideshareMY.personal.v2.1.settings',
+  'rideshareMY.personal.v2.settings'
+];
+
+const HISTORY_KEY = 'rideshareMY.personal.v2.5.history';
+const LEGACY_HISTORY_KEYS = [
+  'rideshareMY.personal.v2.4.history',
+  'rideshareMY.personal.v2.3.history',
+  'rideshareMY.personal.v2.2.history',
+  'rideshareMY.personal.v2.history'
+];
+
+const MAX_HISTORY = 100;
+
+const HIGHLAND_ZONES = [
+  {
+    lat:3.4241,lng:101.7933,
+    radiusKm:10,
+    name:'Genting Highlands & Gohtong'
+  },
+  {
+    lat:4.4715,lng:101.3787,
+    radiusKm:22,
+    name:'Cameron Highlands'
+  },
+  {
+    lat:3.7155,lng:101.7432,
+    radiusKm:6,
+    name:"Fraser's Hill"
+  },
+  {
+    lat:3.3533,lng:101.8385,
+    radiusKm:8,
+    name:'Bukit Tinggi & Colmar Tropicale'
+  }
+];
+
+const URBAN_POI_ZONES = [
+  {
+    lat:3.1579,lng:101.7116,
+    radiusKm:5,
+    name:'KL City Centre & Golden Triangle'
+  },
+  {
+    lat:2.7456,lng:101.7072,
+    radiusKm:8,
+    name:'KLIA / KLIA2 Airport Zone'
+  },
+  {
+    lat:3.1340,lng:101.6861,
+    radiusKm:3,
+    name:'KL Sentral & Brickfields'
+  },
+  {
+    lat:3.1191,lng:101.6741,
+    radiusKm:3,
+    name:'Mid Valley & Bangsar South'
+  },
+  {
+    lat:3.1580,lng:101.6145,
+    radiusKm:3,
+    name:'1 Utama & Mutiara Damansara'
+  },
+  {
+    lat:3.0732,lng:101.6070,
+    radiusKm:3,
+    name:'Sunway Pyramid & Subang Jaya'
+  },
+  {
+    lat:3.0449,lng:101.6212,
+    radiusKm:3,
+    name:'Puchong IOI Zone'
+  },
+  {
+    lat:3.0707,lng:101.5204,
+    radiusKm:4,
+    name:'Shah Alam City Centre'
+  },
+  {
+    lat:3.0442,lng:101.4456,
+    radiusKm:4,
+    name:'Klang City Centre'
+  }
+];
+
+/* =========================================================
+   2. APPLICATION STATE
+========================================================= */
+
+const $ = id => document.getElementById(id);
+
+const money = value =>
+  `RM ${Number(value || 0).toFixed(2)}`;
+
+const roundMoney = value =>
+  Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+
+let settings = loadSettings();
+let history = loadHistory();
+
+let map = null;
+let platform = null;
+let router = null;
+let ui = null;
+
+let pickupCoords = null;
+let dropoffCoords = null;
+
+let pickupItem = null;
+let dropoffItem = null;
+
+let pickupMarker = null;
+let dropoffMarker = null;
+
+let routePolylines = [];
+
+let activeRoutingMode = 'fast';
+let avoidTolls = false;
+
+let routeRequestId = 0;
+let routeDebounce = null;
+
+let latestCalculation = null;
+let gpsAccuracy = null;
+
+let autocompleteState = {
+  pickup:{
+    controller:null,
+    sequence:0,
+    timer:null
+  },
+  dropoff:{
+    controller:null,
+    sequence:0,
+    timer:null
+  }
+};
+
+/* =========================================================
+   3. STORAGE AND SETTINGS VALIDATION
+========================================================= */
+
+function isValidSettingObject(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+
+  const numericKeys = [
+    'ratePerKm',
+    'minimumFare',
+    'urbanSurcharge',
+    'hillSurcharge',
+    'longHaulTriggerKm',
+    'longHaulPercent',
+    'longHaulCap',
+    'adminPercent',
+    'adminMinimum'
   ];
 
-  const URBAN_POI_ZONES = [
-    {lat:3.1579,lng:101.7116,radiusKm:5,name:'KL City Centre & Golden Triangle'},
-    {lat:2.7456,lng:101.7072,radiusKm:8,name:'KLIA / KLIA2 Airport Zone'},
-    {lat:3.1340,lng:101.6861,radiusKm:3,name:'KL Sentral & Brickfields'},
-    {lat:3.1191,lng:101.6741,radiusKm:3,name:'Mid Valley & Bangsar South'},
-    {lat:3.1580,lng:101.6145,radiusKm:3,name:'1 Utama & Mutiara Damansara'},
-    {lat:3.0732,lng:101.6070,radiusKm:3,name:'Sunway Pyramid & Subang Jaya'},
-    {lat:3.0449,lng:101.6212,radiusKm:3,name:'Puchong IOI Zone'},
-    {lat:3.0707,lng:101.5204,radiusKm:4,name:'Shah Alam City Centre'},
-    {lat:3.0442,lng:101.4456,radiusKm:4,name:'Klang City Centre'}
-  ];
-
-  /* =========================================================
-     2. MONEY ENGINE & APP STATE
-     ========================================================= */
-  const $ = id => document.getElementById(id);
-  const toCents = rm => Math.round((Number(rm || 0) + Number.EPSILON) * 100);
-  const fromCents = cents => Math.round(Number(cents || 0)) / 100;
-  const moneyFromCents = cents => `RM ${fromCents(cents).toFixed(2)}`;
-  const money = value => moneyFromCents(toCents(value));
-
-  function roundCentsToUnit(cents, unitRm) {
-    const unitCents = toCents(unitRm);
-    if (unitCents <= 1) return Math.round(cents);
-    return Math.round(cents / unitCents) * unitCents;
-  }
-
-  let settings = null;
-  let savedRoutes = null;
-  let map = null;
-  let platform = null;
-  let router = null;
-
-  let pickupCoords = null;
-  let dropoffCoords = null;
-  let pickupItem = null;
-  let dropoffItem = null;
-
-  let pickupMarker = null;
-  let dropoffMarker = null;
-  let routePolylines = [];
-
-  let activeRoutingMode = 'fast';
-  let routeRequestId = 0;
-  let routeDebounce = null;
-  let latestCalculation = null;
-  let gpsRequestId = 0;
-
-  const autocompleteState = {
-    pickup:{controller:null,sequence:0,timer:null},
-    dropoff:{controller:null,sequence:0,timer:null}
-  };
-
-  /* =========================================================
-     3. SETTINGS & ROUTE HISTORY STORAGE
-     ========================================================= */
-  function sanitizeSettings(saved) {
-    const merged = {...DEFAULT_SETTINGS,...(saved || {})};
-    Object.keys(DEFAULT_SETTINGS).forEach(key => {
-      if (!Number.isFinite(Number(merged[key])) || Number(merged[key]) < 0) {
-        merged[key] = DEFAULT_SETTINGS[key];
-      } else {
-        merged[key] = Number(merged[key]);
-      }
-    });
-    if (merged.longHaulPercent > 100) merged.longHaulPercent = DEFAULT_SETTINGS.longHaulPercent;
-    if (![1,0.5,0.1,0.01].includes(merged.roundingUnit)) merged.roundingUnit = DEFAULT_SETTINGS.roundingUnit;
-    return merged;
-  }
-
-  function loadSettings() {
-    try {
-      let raw = localStorage.getItem(SETTINGS_KEY);
-      if (!raw) {
-        for (const legacyKey of LEGACY_SETTINGS_KEYS) {
-          raw = localStorage.getItem(legacyKey);
-          if (raw) break;
-        }
-      }
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          return sanitizeSettings(parsed);
-        }
-      }
-    } catch (error) {
-      console.warn('Settings could not be loaded; defaults will be used:',error);
-    }
-    return {...DEFAULT_SETTINGS};
-  }
-
-  function persistSettings() {
-    try {
-      localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings));
-      return true;
-    } catch (_) {
-      showError('Unable to save settings. Browser storage may be unavailable.');
+  for (const key of numericKeys) {
+    if (
+      !Number.isFinite(Number(value[key])) ||
+      Number(value[key]) < 0
+    ) {
       return false;
     }
   }
 
-  function loadSavedRoutes() {
-    try {
-      let raw = localStorage.getItem(ROUTES_STORAGE_KEY);
-      if (!raw) {
-        for (const legacyKey of LEGACY_ROUTES_STORAGE_KEYS) {
-          raw = localStorage.getItem(legacyKey);
-          if (raw) break;
+  if (
+    Number(value.longHaulPercent) > 100 ||
+    Number(value.adminPercent) > 100
+  ) {
+    return false;
+  }
+
+  return [1,0.5,0.1,0.01].includes(
+    Number(value.roundingUnit)
+  );
+}
+
+function sanitizeSettings(saved) {
+  const merged = {
+    ...DEFAULT_SETTINGS,
+    ...saved
+  };
+
+  const numericKeys = Object.keys(DEFAULT_SETTINGS);
+
+  numericKeys.forEach(key => {
+    if (
+      !Number.isFinite(Number(merged[key])) ||
+      Number(merged[key]) < 0
+    ) {
+      merged[key] = DEFAULT_SETTINGS[key];
+    } else {
+      merged[key] = Number(merged[key]);
+    }
+  });
+
+  if (merged.longHaulPercent > 100) {
+    merged.longHaulPercent = DEFAULT_SETTINGS.longHaulPercent;
+  }
+
+  if (merged.adminPercent > 100) {
+    merged.adminPercent = DEFAULT_SETTINGS.adminPercent;
+  }
+
+  if (![1,0.5,0.1,0.01].includes(merged.roundingUnit)) {
+    merged.roundingUnit = DEFAULT_SETTINGS.roundingUnit;
+  }
+
+  return merged;
+}
+
+function loadSettings() {
+  try {
+    let raw = localStorage.getItem(SETTINGS_KEY);
+
+    if (raw) {
+      const parsed = JSON.parse(raw);
+
+      if (isValidSettingObject(parsed)) {
+        return sanitizeSettings(parsed);
+      }
+
+      console.warn('Invalid saved settings. Restoring defaults.');
+      return {...DEFAULT_SETTINGS};
+    }
+
+    for (const key of LEGACY_SETTINGS_KEYS) {
+      raw = localStorage.getItem(key);
+
+      if (raw) {
+        const parsed = JSON.parse(raw);
+
+        if (parsed && typeof parsed === 'object') {
+          const migrated = {
+            ...DEFAULT_SETTINGS,
+            ...parsed,
+            adminPercent:15,
+            adminMinimum:1.50
+          };
+
+          return sanitizeSettings(migrated);
         }
       }
-      if (!raw) return {pinned:[],recent:[]};
-      const parsed = JSON.parse(raw);
-      return {
-        pinned:Array.isArray(parsed.pinned) ? parsed.pinned.slice(0,MAX_PINNED_ROUTES) : [],
-        recent:Array.isArray(parsed.recent) ? parsed.recent.slice(0,MAX_RECENT_ROUTES) : []
-      };
-    } catch (_) {
-      return {pinned:[],recent:[]};
+    }
+  } catch (error) {
+    console.warn('Settings could not be loaded:',error);
+  }
+
+  return {...DEFAULT_SETTINGS};
+}
+
+function loadHistory() {
+  try {
+    let raw = localStorage.getItem(HISTORY_KEY);
+
+    if (!raw) {
+      for (const key of LEGACY_HISTORY_KEYS) {
+        raw = localStorage.getItem(key);
+        if (raw) break;
+      }
+    }
+
+    const data = JSON.parse(raw || '[]');
+
+    if (!Array.isArray(data)) return [];
+
+    return data
+      .filter(item =>
+        item &&
+        typeof item === 'object' &&
+        Number.isFinite(Number(item.customerTotal))
+      )
+      .slice(0,MAX_HISTORY);
+
+  } catch (error) {
+    console.warn('History could not be loaded:',error);
+    return [];
+  }
+}
+
+function persistSettings() {
+  try {
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify(settings)
+    );
+    return true;
+  } catch (error) {
+    showError('Unable to save settings. Browser storage may be unavailable.');
+    return false;
+  }
+}
+
+function persistHistory() {
+  try {
+    localStorage.setItem(
+      HISTORY_KEY,
+      JSON.stringify(history)
+    );
+    return true;
+  } catch (error) {
+    showError('Unable to save trip history. Device storage may be full.');
+    return false;
+  }
+}
+
+function readSettingsForm() {
+  const fields = {
+    ratePerKm:'setting-rate',
+    minimumFare:'setting-minimum',
+    urbanSurcharge:'setting-urban',
+    hillSurcharge:'setting-hill',
+    longHaulTriggerKm:'setting-longhaul-km',
+    longHaulPercent:'setting-longhaul-percent',
+    longHaulCap:'setting-longhaul-cap',
+    adminPercent:'setting-admin-percent',
+    adminMinimum:'setting-admin-min'
+  };
+
+  const next = {};
+
+  for (const [key,id] of Object.entries(fields)) {
+    const raw = $(id).value.trim();
+
+    if (raw === '') {
+      throw new Error(`Please complete the ${key} field.`);
+    }
+
+    const value = Number(raw);
+
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error(`Invalid non-negative value for ${key}.`);
+    }
+
+    next[key] = value;
+  }
+
+  if (
+    next.longHaulPercent > 100 ||
+    next.adminPercent > 100
+  ) {
+    throw new Error('Percentage values cannot exceed 100%.');
+  }
+
+  next.roundingUnit = Number($('setting-rounding').value);
+
+  if (![1,0.5,0.1,0.01].includes(next.roundingUnit)) {
+    throw new Error('Invalid rounding selection.');
+  }
+
+  return next;
+}
+
+function populateSettingsForm() {
+  $('setting-rate').value = settings.ratePerKm;
+  $('setting-minimum').value = settings.minimumFare;
+  $('setting-urban').value = settings.urbanSurcharge;
+  $('setting-hill').value = settings.hillSurcharge;
+
+  $('setting-longhaul-km').value = settings.longHaulTriggerKm;
+  $('setting-longhaul-percent').value = settings.longHaulPercent;
+  $('setting-longhaul-cap').value = settings.longHaulCap;
+
+  $('setting-admin-percent').value = settings.adminPercent;
+  $('setting-admin-min').value = settings.adminMinimum;
+
+  $('setting-rounding').value = String(settings.roundingUnit);
+}
+
+/* =========================================================
+   4. STATUS AND ERROR HANDLING
+========================================================= */
+
+function showError(message) {
+  $('error-msg').textContent = message;
+  $('error-msg').style.display = 'block';
+  $('loading-msg').style.display = 'none';
+}
+
+function clearError() {
+  $('error-msg').textContent = '';
+  $('error-msg').style.display = 'none';
+}
+
+function setLoading(active) {
+  $('loading-msg').style.display = active ? 'block' : 'none';
+}
+
+function setRouteStatus(message) {
+  $('route-status').textContent = message || '';
+}
+
+function isApiKeyConfigured() {
+  return (
+    HERE_API_KEY &&
+    !HERE_API_KEY.includes('PASTE_') &&
+    HERE_API_KEY.length > 15
+  );
+}
+
+/* =========================================================
+   5. DISTANCE AND ZONE DETECTION
+========================================================= */
+
+function calculateHaversineDistance(lat1,lon1,lat2,lon2) {
+  const R = 6371;
+
+  const dLat = (lat2-lat1)*Math.PI/180;
+  const dLon = (lon2-lon1)*Math.PI/180;
+
+  const a =
+    Math.sin(dLat/2)**2 +
+    Math.cos(lat1*Math.PI/180) *
+    Math.cos(lat2*Math.PI/180) *
+    Math.sin(dLon/2)**2;
+
+  return R*2*Math.atan2(
+    Math.sqrt(a),
+    Math.sqrt(1-a)
+  );
+}
+
+function getHighlandZone(pickup,dropoff) {
+  const points = [pickup,dropoff].filter(Boolean);
+
+  for (const point of points) {
+    for (const zone of HIGHLAND_ZONES) {
+      const distance = calculateHaversineDistance(
+        point.lat,
+        point.lng,
+        zone.lat,
+        zone.lng
+      );
+
+      if (distance <= zone.radiusKm) {
+        return zone;
+      }
     }
   }
 
-  function persistSavedRoutes() {
-    try {
-      localStorage.setItem(ROUTES_STORAGE_KEY,JSON.stringify(savedRoutes));
-    } catch (_) {}
-    renderQuickBar();
+  return null;
+}
+
+function getUrbanZone(pickup,dropoff) {
+  const points = [pickup,dropoff].filter(Boolean);
+
+  for (const point of points) {
+    for (const zone of URBAN_POI_ZONES) {
+      const distance = calculateHaversineDistance(
+        point.lat,
+        point.lng,
+        zone.lat,
+        zone.lng
+      );
+
+      if (distance <= zone.radiusKm) {
+        return zone;
+      }
+    }
   }
 
-  function shortPlaceName(label) {
-    const clean = String(label || '').trim();
-    if (!clean) return 'Unknown';
-    const firstPart = clean.split(',')[0].trim();
-    return firstPart.length > 22 ? firstPart.slice(0,21) + '…' : firstPart;
-  }
+  return null;
+}
 
-  function makeRouteRecord(labelOverride) {
-    if (!pickupCoords || !dropoffCoords) return null;
-    const pLabel = $('pickup').value.trim();
-    const dLabel = $('dropoff').value.trim();
+function isRelevantPoi(item) {
+  if (!item) return false;
+
+  const categories = Array.isArray(item.categories)
+    ? item.categories
+    : [];
+
+  const text = categories
+    .map(category =>
+      `${category.name || ''} ${category.id || ''}`
+    )
+    .join(' ')
+    .toLowerCase();
+
+  return /airport|shopping.?mall|shopping.?centre|shopping.?center|railway.?station|train.?station|bus.?station|convention.?centre|convention.?center|stadium|terminal/.test(text);
+}
+
+function getUrbanAssessment(pickup,dropoff,itemP,itemD) {
+  const zone = getUrbanZone(pickup,dropoff);
+
+  if (zone) {
     return {
-      id:`${pickupCoords.lat.toFixed(4)},${pickupCoords.lng.toFixed(4)}->${dropoffCoords.lat.toFixed(4)},${dropoffCoords.lng.toFixed(4)}`,
-      tag:labelOverride || `${shortPlaceName(pLabel)} → ${shortPlaceName(dLabel)}`,
-      pickupLabel:pLabel,
-      dropoffLabel:dLabel,
-      pickupCoords:{...pickupCoords},
-      dropoffCoords:{...dropoffCoords},
-      pickupCategories:pickupItem && Array.isArray(pickupItem.categories) ? pickupItem.categories : [],
-      dropoffCategories:dropoffItem && Array.isArray(dropoffItem.categories) ? dropoffItem.categories : []
+      applies:true,
+      label:`Urban zone: ${zone.name}`
     };
   }
 
-  function recordRecentRoute() {
-    const rec = makeRouteRecord();
-    if (!rec) return;
-    if (savedRoutes.pinned.some(r => r.id === rec.id)) return;
-    savedRoutes.recent = [
-      rec,
-      ...savedRoutes.recent.filter(r => r.id !== rec.id)
-    ].slice(0,MAX_RECENT_ROUTES);
-    persistSavedRoutes();
+  if (isRelevantPoi(itemP) || isRelevantPoi(itemD)) {
+    return {
+      applies:true,
+      label:'Major transport / destination POI'
+    };
   }
 
-  function pinCurrentRoute() {
-    const rec = makeRouteRecord();
-    if (!rec) return;
-    const existingIdx = savedRoutes.pinned.findIndex(r => r.id === rec.id);
-    if (existingIdx >= 0) {
-      savedRoutes.pinned.splice(existingIdx,1);
-      persistSavedRoutes();
-      updatePinButtonState();
-      setRouteStatus('Removed route from pinned shortcuts.');
-      return;
-    }
-    let customTag = null;
-    try { customTag = prompt('Shortcut label for this route:',rec.tag); }
-    catch (_) { customTag = rec.tag; }
-    if (customTag === null) return;
-    rec.tag = String(customTag).trim() || rec.tag;
-    savedRoutes.pinned = [rec,...savedRoutes.pinned].slice(0,MAX_PINNED_ROUTES);
-    savedRoutes.recent = savedRoutes.recent.filter(r => r.id !== rec.id);
-    persistSavedRoutes();
-    updatePinButtonState();
-    setRouteStatus(`Pinned "${rec.tag}" to quick bar.`);
+  return {
+    applies:false,
+    label:''
+  };
+}
+
+/* =========================================================
+   6. MAP OBJECT MANAGEMENT
+========================================================= */
+
+function clearRouteObjects() {
+  if (!map) return;
+
+  routePolylines.forEach(line => {
+    try {
+      map.removeObject(line);
+    } catch (_) {}
+  });
+
+  routePolylines = [];
+}
+
+function clearMarker(type) {
+  if (!map) return;
+
+  if (type === 'pickup' && pickupMarker) {
+    map.removeObject(pickupMarker);
+    pickupMarker = null;
   }
 
-  function updatePinButtonState() {
-    const btn = $('pin-trip-btn');
-    if (!btn || !pickupCoords || !dropoffCoords) return;
-    const id = `${pickupCoords.lat.toFixed(4)},${pickupCoords.lng.toFixed(4)}->${dropoffCoords.lat.toFixed(4)},${dropoffCoords.lng.toFixed(4)}`;
-    const isPinned = savedRoutes.pinned.some(r => r.id === id);
-    btn.textContent = isPinned ? '★ Pinned' : '📌 Pin Route';
+  if (type === 'dropoff' && dropoffMarker) {
+    map.removeObject(dropoffMarker);
+    dropoffMarker = null;
+  }
+}
+
+function updateMarker(type,coords) {
+  if (!map) return;
+
+  clearMarker(type);
+
+  const svg = type === 'pickup'
+    ? '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42"><path fill="#2e7d32" stroke="white" stroke-width="2" d="M16 1C7.7 1 1 7.7 1 16c0 11 15 25 15 25s15-14 15-25C31 7.7 24.3 1 16 1z"/><circle cx="16" cy="16" r="6" fill="white"/></svg>'
+    : '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42"><path fill="#c62828" stroke="white" stroke-width="2" d="M16 1C7.7 1 1 7.7 1 16c0 11 15 25 15 25s15-14 15-25C31 7.7 24.3 1 16 1z"/><circle cx="16" cy="16" r="6" fill="white"/></svg>';
+
+  const icon = new H.map.Icon(
+    'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
+  );
+
+  const marker = new H.map.Marker(
+    {lat:coords.lat,lng:coords.lng},
+    {icon}
+  );
+
+  map.addObject(marker);
+
+  if (type === 'pickup') {
+    pickupMarker = marker;
+  } else {
+    dropoffMarker = marker;
+  }
+}
+
+function invalidateRoute(clearResults=true) {
+  routeRequestId++;
+
+  if (routeDebounce) {
+    clearTimeout(routeDebounce);
+    routeDebounce = null;
   }
 
-  function applySavedRoute(rec) {
-    if (!rec || !rec.pickupCoords || !rec.dropoffCoords) return;
-    cancelGpsRequest();
-    invalidateRoute(true);
-    pickupCoords = {...rec.pickupCoords};
-    dropoffCoords = {...rec.dropoffCoords};
-    pickupItem = {address:{label:rec.pickupLabel},categories:rec.pickupCategories || []};
-    dropoffItem = {address:{label:rec.dropoffLabel},categories:rec.dropoffCategories || []};
-    $('pickup').value = rec.pickupLabel || '';
-    $('dropoff').value = rec.dropoffLabel || '';
-    $('pickup-suggestions').style.display = 'none';
-    $('dropoff-suggestions').style.display = 'none';
-    updateInputClearButton('pickup');
-    updateInputClearButton('dropoff');
-    updateMarker('pickup',pickupCoords);
-    updateMarker('dropoff',dropoffCoords);
-    clearError();
+  setLoading(false);
+
+  if (clearResults) {
+    clearRouteObjects();
+
+    $('result-card').style.display = 'none';
+
+    latestCalculation = null;
+
+    setRouteStatus('');
+  }
+}
+
+function updateInputClearButton(type) {
+  const input = $(type);
+  const button = $(`clear-${type}`);
+
+  button.style.display =
+    input.value.trim() ? 'block' : 'none';
+}
+
+/* =========================================================
+   7. LOCATION SELECTION
+========================================================= */
+
+function setSelectedLocation(type,item) {
+  const coords = item && item.position;
+
+  if (
+    !coords ||
+    !Number.isFinite(coords.lat) ||
+    !Number.isFinite(coords.lng)
+  ) {
+    showError('The selected location has invalid coordinates.');
+    return;
+  }
+
+  invalidateRoute(true);
+
+  const point = {
+    lat:coords.lat,
+    lng:coords.lng
+  };
+
+  if (type === 'pickup') {
+    pickupCoords = point;
+    pickupItem = item;
+  } else {
+    dropoffCoords = point;
+    dropoffItem = item;
+  }
+
+  $(type).value =
+    (item.address && item.address.label) ||
+    item.title ||
+    '';
+
+  $(`${type}-suggestions`).style.display = 'none';
+  $(`${type}-suggestions`).innerHTML = '';
+
+  updateInputClearButton(type);
+  updateMarker(type,point);
+
+  clearError();
+
+  if (pickupCoords && dropoffCoords) {
     calculateRoute();
   }
+}
 
-  function renderQuickBar() {
-    const bar = $('quick-bar');
-    if (!bar) return;
-    bar.innerHTML = '';
-    const allChips = [
-      ...savedRoutes.pinned.map(r => ({...r,isPinned:true})),
-      ...savedRoutes.recent.map(r => ({...r,isPinned:false}))
-    ];
-    if (!allChips.length) {
-      bar.style.display = 'none';
-      return;
-    }
-    allChips.forEach(item => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = item.isPinned ? 'chip-btn' : 'chip-btn recent';
-      btn.textContent = `${item.isPinned ? '★' : '🕒'} ${item.tag}`;
-      btn.title = `${item.pickupLabel} → ${item.dropoffLabel}`;
-      btn.addEventListener('click',() => applySavedRoute(item));
-      bar.appendChild(btn);
-    });
-    bar.style.display = 'flex';
+function clearLocation(type) {
+  invalidateRoute(true);
+
+  if (type === 'pickup') {
+    pickupCoords = null;
+    pickupItem = null;
+    $('pickup').value = '';
+  } else {
+    dropoffCoords = null;
+    dropoffItem = null;
+    $('dropoff').value = '';
   }
 
-  function readSettingsForm() {
-    const fields = {
-      ratePerKm:'setting-rate',
-      minimumFare:'setting-minimum',
-      urbanSurcharge:'setting-urban',
-      hillSurcharge:'setting-hill',
-      longHaulTriggerKm:'setting-longhaul-km',
-      longHaulPercent:'setting-longhaul-percent',
-      longHaulCap:'setting-longhaul-cap'
-    };
-    const next = {};
-    for (const [key,id] of Object.entries(fields)) {
-      const raw = $(id).value.trim();
-      if (raw === '') throw new Error(`Please complete the ${key} field.`);
-      const value = Number(raw);
-      if (!Number.isFinite(value) || value < 0) throw new Error(`Invalid non-negative value for ${key}.`);
-      next[key] = value;
-    }
-    if (next.longHaulPercent > 100) {
-      throw new Error('Return contribution percentage cannot exceed 100%.');
-    }
-    next.roundingUnit = Number($('setting-rounding').value);
-    if (![1,0.5,0.1,0.01].includes(next.roundingUnit)) {
-      throw new Error('Invalid rounding selection.');
-    }
-    return next;
-  }
+  updateInputClearButton(type);
+  clearMarker(type);
+  clearError();
+}
 
-  function populateSettingsForm() {
-    $('setting-rate').value = settings.ratePerKm;
-    $('setting-minimum').value = settings.minimumFare;
-    $('setting-urban').value = settings.urbanSurcharge;
-    $('setting-hill').value = settings.hillSurcharge;
-    $('setting-longhaul-km').value = settings.longHaulTriggerKm;
-    $('setting-longhaul-percent').value = settings.longHaulPercent;
-    $('setting-longhaul-cap').value = settings.longHaulCap;
-    $('setting-rounding').value = String(settings.roundingUnit);
-  }
+/* =========================================================
+   8. MALAYSIA AUTOCOMPLETE
+========================================================= */
 
-  /* =========================================================
-     4. STATUS AND ERROR HANDLING
-     ========================================================= */
-  let lastStatus = '';
-  function showError(message, showRetry=false) {
-    $('error-msg').textContent = message;
-    $('error-msg').style.display = 'block';
-    $('loading-msg').style.display = 'none';
-    $('retry-route-btn').style.display = showRetry && pickupCoords && dropoffCoords ? 'inline-block' : 'none';
-  }
-  function clearError() {
-    $('error-msg').textContent = '';
-    $('error-msg').style.display = 'none';
-    $('retry-route-btn').style.display = 'none';
-  }
-  function setLoading(active) {
-    $('loading-msg').style.display = active ? 'block' : 'none';
-  }
-  function setRouteStatus(message) {
-    const next = message || '';
-    if (next === lastStatus) return;
-    lastStatus = next;
-    $('route-status').textContent = next;
-  }
-  function isApiKeyConfigured() {
-    return HERE_API_KEY && !HERE_API_KEY.includes('PASTE_') && HERE_API_KEY.length > 15;
-  }
+function getSearchCenter() {
+  if (map) {
+    const center = map.getCenter();
 
-  /* =========================================================
-     5. DISTANCE AND ZONE DETECTION
-     ========================================================= */
-  function calculateHaversineDistance(lat1,lon1,lat2,lon2) {
-    const R = 6371;
-    const dLat = (lat2-lat1)*Math.PI/180;
-    const dLon = (lon2-lon1)*Math.PI/180;
-    const a =
-      Math.sin(dLat/2)**2 +
-      Math.cos(lat1*Math.PI/180) *
-      Math.cos(lat2*Math.PI/180) *
-      Math.sin(dLon/2)**2;
-    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-  }
-
-  function getHighlandZone(pickup,dropoff) {
-    const points = [pickup,dropoff].filter(Boolean);
-    for (const point of points) {
-      for (const zone of HIGHLAND_ZONES) {
-        if (calculateHaversineDistance(point.lat,point.lng,zone.lat,zone.lng) <= zone.radiusKm) {
-          return zone;
-        }
-      }
-    }
-    return null;
-  }
-
-  function getUrbanZone(pickup,dropoff) {
-    const points = [pickup,dropoff].filter(Boolean);
-    for (const point of points) {
-      for (const zone of URBAN_POI_ZONES) {
-        if (calculateHaversineDistance(point.lat,point.lng,zone.lat,zone.lng) <= zone.radiusKm) {
-          return zone;
-        }
-      }
-    }
-    return null;
-  }
-
-  function isRelevantPoi(item) {
-    if (!item) return false;
-    const categories = Array.isArray(item.categories) ? item.categories : [];
-    const text = categories.map(c => `${c.name || ''} ${c.id || ''}`).join(' ').toLowerCase();
-    const label = ((item.address && item.address.label) || item.title || '').toLowerCase();
-    return /airport|shopping.?mall|shopping.?centre|shopping.?center|railway.?station|train.?station|bus.?station|convention.?centre|convention.?center|stadium|terminal|hospital|university/.test(`${text} ${label}`);
-  }
-
-  function getUrbanAssessment(pickup,dropoff,itemP,itemD) {
-    const zone = getUrbanZone(pickup,dropoff);
-    if (zone) return {applies:true,label:`Urban zone: ${zone.name}`};
-    if (isRelevantPoi(itemP) || isRelevantPoi(itemD)) return {applies:true,label:'Major transport / destination POI'};
-    return {applies:false,label:''};
-  }
-
-  /* =========================================================
-     6. MAP OBJECT MANAGEMENT
-     ========================================================= */
-  function clearRouteObjects() {
-    if (!map) return;
-    routePolylines.forEach(line => {
-      try { map.removeObject(line); } catch (_) {}
-    });
-    routePolylines = [];
-  }
-
-  function clearMarker(type) {
-    if (!map) return;
-    if (type === 'pickup' && pickupMarker) {
-      map.removeObject(pickupMarker);
-      pickupMarker = null;
-    }
-    if (type === 'dropoff' && dropoffMarker) {
-      map.removeObject(dropoffMarker);
-      dropoffMarker = null;
+    if (
+      center &&
+      Number.isFinite(center.lat) &&
+      Number.isFinite(center.lng)
+    ) {
+      return `${center.lat},${center.lng}`;
     }
   }
 
-  function updateMarker(type,coords) {
-    if (!map) return;
-    clearMarker(type);
-    const svg = type === 'pickup'
-      ? '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42"><path fill="#2e7d32" stroke="white" stroke-width="2" d="M16 1C7.7 1 1 7.7 1 16c0 11 15 25 15 25s15-14 15-25C31 7.7 24.3 1 16 1z"/><circle cx="16" cy="16" r="6" fill="white"/></svg>'
-      : '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42"><path fill="#c62828" stroke="white" stroke-width="2" d="M16 1C7.7 1 1 7.7 1 16c0 11 15 25 15 25s15-14 15-25C31 7.7 24.3 1 16 1z"/><circle cx="16" cy="16" r="6" fill="white"/></svg>';
-    const icon = new H.map.Icon('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg));
-    const marker = new H.map.Marker({lat:coords.lat,lng:coords.lng},{icon});
-    map.addObject(marker);
-    if (type === 'pickup') pickupMarker = marker;
-    else dropoffMarker = marker;
-  }
+  return '3.1390,101.6869';
+}
 
-  function invalidateRoute(clearResults=true) {
-    routeRequestId++;
-    if (routeDebounce) {
-      clearTimeout(routeDebounce);
-      routeDebounce = null;
-    }
-    setLoading(false);
-    if (clearResults) {
-      clearRouteObjects();
-      const card = $('result-card');
-      if (card) card.style.display = 'none';
-      latestCalculation = null;
-      setRouteStatus('');
-    }
-  }
+function setupAutocomplete(type) {
+  const input = $(type);
+  const box = $(`${type}-suggestions`);
+  const state = autocompleteState[type];
 
-  function updateInputClearButton(type) {
-    const input = $(type);
-    const button = $(`clear-${type}`);
-    if (!input || !button) return;
-    button.style.display = input.value.trim() ? 'block' : 'none';
-  }
+  input.addEventListener('input',() => {
+    const query = input.value.trim();
 
-  function cancelGpsRequest() {
-    gpsRequestId++;
-    const button = $('current-loc-btn');
-    if (button) {
-      button.textContent = '🎯';
-      button.disabled = false;
-    }
-  }
-
-  /* =========================================================
-     7. LOCATION SELECTION
-     ========================================================= */
-  function setSelectedLocation(type,item) {
-    const coords = item && item.position;
-    if (!coords || !Number.isFinite(coords.lat) || !Number.isFinite(coords.lng)) {
-      showError('The selected location has invalid coordinates.');
-      return;
-    }
-    if (type === 'pickup') cancelGpsRequest();
-    invalidateRoute(true);
-    const point = {lat:coords.lat,lng:coords.lng};
-    if (type === 'pickup') {
-      pickupCoords = point;
-      pickupItem = item;
-    } else {
-      dropoffCoords = point;
-      dropoffItem = item;
-    }
-    $(type).value = (item.address && item.address.label) || item.title || '';
-    const box = $(`${type}-suggestions`);
-    box.style.display = 'none';
-    box.innerHTML = '';
     updateInputClearButton(type);
-    updateMarker(type,point);
-    clearError();
-    if (pickupCoords && dropoffCoords) {
-      calculateRoute();
-    }
-  }
 
-  function clearLocation(type) {
-    if (type === 'pickup') cancelGpsRequest();
-    invalidateRoute(true);
     if (type === 'pickup') {
       pickupCoords = null;
       pickupItem = null;
-      $('pickup').value = '';
+      clearMarker('pickup');
     } else {
       dropoffCoords = null;
       dropoffItem = null;
-      $('dropoff').value = '';
+      clearMarker('dropoff');
     }
-    updateInputClearButton(type);
-    clearMarker(type);
+
+    invalidateRoute(true);
     clearError();
-  }
 
-  /* =========================================================
-     8. MALAYSIA AUTOCOMPLETE
-     ========================================================= */
-  function getSearchCenter() {
-    if (map) {
-      const center = map.getCenter();
-      if (center && Number.isFinite(center.lat) && Number.isFinite(center.lng)) {
-        return `${center.lat},${center.lng}`;
-      }
-    }
-    return '3.1390,101.6869';
-  }
-
-  function closeSuggestions(type) {
-    const state = autocompleteState[type];
-    if (state.controller) {
-      state.controller.abort();
-      state.controller = null;
-    }
     if (state.timer) {
       clearTimeout(state.timer);
       state.timer = null;
     }
-    state.sequence++;
-    const box = $(`${type}-suggestions`);
-    if (box) {
-      box.innerHTML = '';
-      box.style.display = 'none';
+
+    if (state.controller) {
+      state.controller.abort();
+      state.controller = null;
     }
-  }
 
-  function setupAutocomplete(type) {
-    const input = $(type);
-    const box = $(`${type}-suggestions`);
-    const state = autocompleteState[type];
+    state.sequence++;
 
-    input.addEventListener('input',() => {
-      const query = input.value.trim();
-      updateInputClearButton(type);
-      if (type === 'pickup') {
-        cancelGpsRequest();
-        pickupCoords = null;
-        pickupItem = null;
-        clearMarker('pickup');
-      } else {
-        dropoffCoords = null;
-        dropoffItem = null;
-        clearMarker('dropoff');
+    const sequence = state.sequence;
+
+    box.innerHTML = '';
+    box.style.display = 'none';
+
+    if (query.length < 3) return;
+
+    state.timer = setTimeout(async () => {
+      if (!isApiKeyConfigured()) {
+        showError('Please configure your HERE API key in the script.');
+        return;
       }
-      invalidateRoute(true);
-      clearError();
 
-      if (state.timer) {
-        clearTimeout(state.timer);
-        state.timer = null;
-      }
-      if (state.controller) {
-        state.controller.abort();
-        state.controller = null;
-      }
-      state.sequence++;
-      const sequence = state.sequence;
-      box.innerHTML = '';
-      box.style.display = 'none';
+      state.controller = new AbortController();
 
-      if (query.length < 3) return;
+      const params = new URLSearchParams({
+        q:query,
+        at:getSearchCenter(),
+        in:'countryCode:MYS',
+        limit:'10',
+        lang:'en-US',
+        apiKey:HERE_API_KEY
+      });
 
-      state.timer = setTimeout(async () => {
-        if (!isApiKeyConfigured()) {
-          showError('Please configure your HERE API key in the script.');
+      try {
+        const response = await fetch(
+          `https://autosuggest.search.hereapi.com/v1/autosuggest?${params}`,
+          {signal:state.controller.signal}
+        );
+
+        if (response.status === 429) {
+          throw new Error('Location search limit reached. Please wait and try again.');
+        }
+
+        if (!response.ok) {
+          throw new Error(`Location search failed (HTTP ${response.status}).`);
+        }
+
+        const data = await response.json();
+
+        if (
+          sequence !== state.sequence ||
+          input.value.trim() !== query
+        ) {
           return;
         }
-        state.controller = new AbortController();
-        const params = new URLSearchParams({
-          q:query,
-          at:getSearchCenter(),
-          in:'countryCode:MYS',
-          limit:'10',
-          lang:'en-US',
-          apiKey:HERE_API_KEY
-        });
-        try {
-          const response = await fetch(
-            `https://autosuggest.search.hereapi.com/v1/autosuggest?${params}`,
-            {signal:state.controller.signal}
-          );
-          if (response.status === 429) {
-            throw new Error('Location search limit reached. Please wait a moment and try again.');
-          }
-          if (!response.ok) {
-            throw new Error(`Location search failed (HTTP ${response.status}).`);
-          }
-          const data = await response.json();
-          if (sequence !== state.sequence || input.value.trim() !== query) return;
 
-          const items = (data.items || []).filter(item =>
-            item.position &&
-            Number.isFinite(item.position.lat) &&
-            Number.isFinite(item.position.lng) &&
-            (!item.address || !item.address.countryCode || item.address.countryCode === 'MYS')
-          );
+        const items = (data.items || []).filter(item =>
+          item.position &&
+          Number.isFinite(item.position.lat) &&
+          Number.isFinite(item.position.lng) &&
+          (
+            !item.address ||
+            !item.address.countryCode ||
+            item.address.countryCode === 'MYS'
+          )
+        );
 
-          if (!items.length) {
-            const empty = document.createElement('div');
-            empty.className = 'suggestion-empty';
-            empty.textContent = 'No matching Malaysian locations found.';
-            box.appendChild(empty);
-            box.style.display = 'block';
-            return;
-          }
-
-          items.slice(0,8).forEach(item => {
-            const div = document.createElement('div');
-            div.className = 'suggestion-item';
-            div.textContent = (item.address && item.address.label) || item.title || 'Unnamed location';
-            div.setAttribute('role','option');
-            div.tabIndex = 0;
-            div.addEventListener('click',() => setSelectedLocation(type,item));
-            div.addEventListener('keydown',event => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                setSelectedLocation(type,item);
-              }
-            });
-            box.appendChild(div);
-          });
+        if (!items.length) {
+          const empty = document.createElement('div');
+          empty.className = 'suggestion-empty';
+          empty.textContent = 'No matching Malaysian locations found.';
+          box.appendChild(empty);
           box.style.display = 'block';
-        } catch(error) {
-          if (error.name !== 'AbortError' && sequence === state.sequence) {
-            showError(error.message || 'Location search failed.');
-          }
-        } finally {
-          if (sequence === state.sequence) {
-            state.controller = null;
-          }
+          return;
         }
-      },320);
-    });
 
-    $(`clear-${type}`).addEventListener('click',() => {
-      closeSuggestions(type);
-      clearLocation(type);
-    });
+        items.slice(0,8).forEach(item => {
+          const div = document.createElement('div');
 
-    input.addEventListener('keydown',event => {
-      if (event.key === 'Escape') {
-        box.style.display = 'none';
-        return;
+          div.className = 'suggestion-item';
+          div.textContent =
+            (item.address && item.address.label) ||
+            item.title ||
+            'Unnamed location';
+
+          div.setAttribute('role','option');
+          div.tabIndex = 0;
+
+          div.addEventListener('click',() => {
+            setSelectedLocation(type,item);
+          });
+
+          div.addEventListener('keydown',event => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              setSelectedLocation(type,item);
+            }
+          });
+
+          box.appendChild(div);
+        });
+
+        box.style.display = 'block';
+
+      } catch(error) {
+        if (
+          error.name !== 'AbortError' &&
+          sequence === state.sequence
+        ) {
+          showError(error.message || 'Location search failed.');
+        }
+      } finally {
+        if (sequence === state.sequence) {
+          state.controller = null;
+        }
       }
-      if (event.key === 'ArrowDown') {
-        const first = box.querySelector('.suggestion-item');
-        if (first) {
-          event.preventDefault();
-          first.focus();
-        }
-        return;
-      }
-      if (event.key === 'Enter') {
-        const first = box.querySelector('.suggestion-item');
-        if (first) {
-          event.preventDefault();
-          first.click();
-        }
-      }
-    });
 
-    input.addEventListener('blur',() => {
-      // Delay so click on suggestion fires before hide
-      setTimeout(() => {
-        if (!box.contains(document.activeElement)) {
-          box.style.display = 'none';
-        }
-      },150);
-    });
-  }
+    },320);
+  });
 
-  /* =========================================================
-     9. GPS AND REVERSE GEOCODING
-     ========================================================= */
-  async function reverseGeocode(lat,lng) {
-    const params = new URLSearchParams({
-      at:`${lat},${lng}`,
-      lang:'en-US',
-      apiKey:HERE_API_KEY
-    });
-    const response = await fetch(`https://revgeocode.search.hereapi.com/v1/revgeocode?${params}`);
-    if (!response.ok) {
-      throw new Error(`Reverse geocoding failed (HTTP ${response.status}).`);
+  $(`clear-${type}`).addEventListener('click',() => {
+    if (state.controller) {
+      state.controller.abort();
+      state.controller = null;
     }
-    const data = await response.json();
-    const item = data.items && data.items[0] ? data.items[0] : null;
-    if (!item || !item.address || item.address.countryCode !== 'MYS') return null;
-    return item;
-  }
 
-  function requestCurrentLocation() {
-    if (!navigator.geolocation) {
-      showError('Geolocation is not supported by this browser.');
+    if (state.timer) {
+      clearTimeout(state.timer);
+      state.timer = null;
+    }
+
+    state.sequence++;
+
+    box.innerHTML = '';
+    box.style.display = 'none';
+
+    clearLocation(type);
+  });
+
+  input.addEventListener('keydown',event => {
+    if (event.key === 'Escape') {
+      box.style.display = 'none';
       return;
     }
-    const requestId = ++gpsRequestId;
-    const button = $('current-loc-btn');
-    button.textContent = '⏳';
-    button.disabled = true;
-    clearError();
-    setRouteStatus('Acquiring high-accuracy GPS position...');
 
-    navigator.geolocation.getCurrentPosition(
-      async position => {
-        if (requestId !== gpsRequestId) return;
-        const point = {lat:position.coords.latitude,lng:position.coords.longitude};
-        const accuracy = position.coords.accuracy;
-        let item = null;
-        if (isApiKeyConfigured()) {
-          try {
-            item = await reverseGeocode(point.lat,point.lng);
-          } catch(error) {
-            console.warn('Reverse geocoding unavailable:',error);
-          }
+    if (event.key === 'ArrowDown') {
+      const first = box.querySelector('.suggestion-item');
+
+      if (first) {
+        event.preventDefault();
+        first.focus();
+      }
+
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      const first = box.querySelector('.suggestion-item');
+
+      if (first) {
+        event.preventDefault();
+        first.click();
+      }
+    }
+  });
+}
+
+/* =========================================================
+   9. GPS AND REVERSE GEOCODING
+========================================================= */
+
+async function reverseGeocode(lat,lng) {
+  const params = new URLSearchParams({
+    at:`${lat},${lng}`,
+    lang:'en-US',
+    apiKey:HERE_API_KEY
+  });
+
+  const response = await fetch(
+    `https://revgeocode.search.hereapi.com/v1/revgeocode?${params}`
+  );
+
+  if (!response.ok) {
+    throw new Error(`Reverse geocoding failed (HTTP ${response.status}).`);
+  }
+
+  const data = await response.json();
+
+  return data.items && data.items[0]
+    ? data.items[0]
+    : null;
+}
+
+function requestCurrentLocation() {
+  if (!navigator.geolocation) {
+    showError('Geolocation is not supported by this browser.');
+    return;
+  }
+
+  const button = $('current-loc-btn');
+
+  button.textContent = '⏳';
+  button.disabled = true;
+
+  clearError();
+  setRouteStatus('Acquiring high-accuracy GPS position...');
+
+  navigator.geolocation.getCurrentPosition(
+    async position => {
+      const point = {
+        lat:position.coords.latitude,
+        lng:position.coords.longitude
+      };
+
+      gpsAccuracy = position.coords.accuracy;
+
+      let item = null;
+
+      if (isApiKeyConfigured()) {
+        try {
+          item = await reverseGeocode(point.lat,point.lng);
+        } catch(error) {
+          console.warn('Reverse geocoding unavailable:',error);
         }
-        if (requestId !== gpsRequestId) return;
-        invalidateRoute(true);
-        pickupCoords = point;
-        pickupItem = item;
-        $('pickup').value = item && item.address
+      }
+
+      invalidateRoute(true);
+
+      pickupCoords = point;
+      pickupItem = item;
+
+      $('pickup').value =
+        item && item.address
           ? item.address.label
           : `Current Location (${point.lat.toFixed(5)}, ${point.lng.toFixed(5)})`;
-        updateInputClearButton('pickup');
-        updateMarker('pickup',point);
-        if (map) {
-          map.setCenter(point);
-          map.setZoom(15);
-        }
-        const accMsg = Number.isFinite(accuracy)
-          ? (accuracy > 100
-              ? ` (low accuracy ±${Math.round(accuracy)}m — verify pin)`
-              : ` · GPS ±${Math.round(accuracy)}m`)
-          : '';
-        setRouteStatus(`GPS pickup set${accMsg}.`);
-        if (pickupCoords && dropoffCoords) {
-          calculateRoute();
-        }
-        if (requestId === gpsRequestId) {
-          button.textContent = '🎯';
-          button.disabled = false;
-        }
-      },
-      error => {
-        if (requestId !== gpsRequestId) return;
-        button.textContent = '🎯';
-        button.disabled = false;
-        const messages = {
-          1:'Location permission was denied. Please enable location services.',
-          2:'Current location is unavailable.',
-          3:'Location request timed out. Try moving near a window or check device GPS.'
-        };
-        showError(messages[error.code] || 'Unable to retrieve current location.');
-        setRouteStatus('');
-      },
-      {enableHighAccuracy:true,timeout:12000,maximumAge:30000}
-    );
+
+      updateInputClearButton('pickup');
+      updateMarker('pickup',point);
+
+      if (map) {
+        map.setCenter(point);
+        map.setZoom(15);
+      }
+
+      const accuracyText = Number.isFinite(gpsAccuracy)
+        ? ` · GPS accuracy ±${Math.round(gpsAccuracy)}m`
+        : '';
+
+      setRouteStatus(`GPS pickup set${accuracyText}.`);
+
+      if (pickupCoords && dropoffCoords) {
+        calculateRoute();
+      }
+
+      button.textContent = '🎯';
+      button.disabled = false;
+    },
+
+    error => {
+      button.textContent = '🎯';
+      button.disabled = false;
+
+      const messages = {
+        1:'Location permission was denied. Please enable location services.',
+        2:'Current location is unavailable.',
+        3:'Location request timed out. Try moving near a window or check device GPS.'
+      };
+
+      showError(
+        messages[error.code] ||
+        'Unable to retrieve current location.'
+      );
+      setRouteStatus('');
+    },
+
+    {
+      enableHighAccuracy:true,
+      timeout:12000,
+      maximumAge:30000
+    }
+  );
+}
+
+/* =========================================================
+   10. ROUTING CONTROLS
+========================================================= */
+
+function swapLocations() {
+  invalidateRoute(true);
+
+  const pText = $('pickup').value;
+  const dText = $('dropoff').value;
+
+  $('pickup').value = dText;
+  $('dropoff').value = pText;
+
+  [pickupCoords,dropoffCoords] =
+    [dropoffCoords,pickupCoords];
+
+  [pickupItem,dropoffItem] =
+    [dropoffItem,pickupItem];
+
+  updateInputClearButton('pickup');
+  updateInputClearButton('dropoff');
+
+  clearMarker('pickup');
+  clearMarker('dropoff');
+
+  if (pickupCoords) {
+    updateMarker('pickup',pickupCoords);
   }
 
-  /* =========================================================
-     10. ROUTING CONTROLS
-     ========================================================= */
-  function swapLocations() {
-    cancelGpsRequest();
-    invalidateRoute(true);
-    const pText = $('pickup').value;
-    const dText = $('dropoff').value;
-    $('pickup').value = dText;
-    $('dropoff').value = pText;
-    [pickupCoords,dropoffCoords] = [dropoffCoords,pickupCoords];
-    [pickupItem,dropoffItem] = [dropoffItem,pickupItem];
-    updateInputClearButton('pickup');
-    updateInputClearButton('dropoff');
-    clearMarker('pickup');
-    clearMarker('dropoff');
-    if (pickupCoords) updateMarker('pickup',pickupCoords);
-    if (dropoffCoords) updateMarker('dropoff',dropoffCoords);
-    if (pickupCoords && dropoffCoords) {
-      calculateRoute();
-    }
+  if (dropoffCoords) {
+    updateMarker('dropoff',dropoffCoords);
   }
 
-  function setRoutingMode(mode) {
-    if (!['fast','short'].includes(mode)) return;
-    if (activeRoutingMode === mode) return;
-    activeRoutingMode = mode;
-    $('btn-mode-fast').classList.toggle('active',mode === 'fast');
-    $('btn-mode-short').classList.toggle('active',mode === 'short');
-    $('btn-mode-fast').setAttribute('aria-pressed',String(mode === 'fast'));
-    $('btn-mode-short').setAttribute('aria-pressed',String(mode === 'short'));
-    if (pickupCoords && dropoffCoords) {
-      calculateRoute();
-    }
+  if (pickupCoords && dropoffCoords) {
+    calculateRoute();
+  }
+}
+
+function setRoutingMode(mode) {
+  if (!['fast','short'].includes(mode)) return;
+
+  if (activeRoutingMode === mode) return;
+
+  activeRoutingMode = mode;
+
+  $('btn-mode-fast').classList.toggle(
+    'active',mode === 'fast'
+  );
+
+  $('btn-mode-short').classList.toggle(
+    'active',mode === 'short'
+  );
+
+  if (pickupCoords && dropoffCoords) {
+    calculateRoute();
+  }
+}
+
+function toggleAvoidTolls() {
+  avoidTolls = !avoidTolls;
+
+  $('btn-avoid-tolls').classList.toggle(
+    'active',avoidTolls
+  );
+
+  $('btn-avoid-tolls').textContent =
+    `🛑 Avoid Tolls: ${avoidTolls ? 'ON' : 'OFF'}`;
+
+  if (pickupCoords && dropoffCoords) {
+    calculateRoute();
+  }
+}
+
+/* =========================================================
+   11. CLASS 1 MALAYSIA TOLL RESOLVER (DEDUPLICATED & SANITY CHECKED)
+========================================================= */
+
+function readTollAmount(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+
+  const price = entry.price || entry;
+  const value = Number(price.value);
+
+  if (!Number.isFinite(value) || value < 0) return null;
+
+  const currency = String(
+    price.currency || entry.currency || 'MYR'
+  ).toUpperCase();
+
+  if (currency !== 'MYR') {
+    return { valid: false, unsupportedCurrency: true };
   }
 
-  /* =========================================================
-     11. FARE CALCULATION
-     ========================================================= */
-  function buildFareBreakdown(distanceKm, durationMin, pickup, dropoff, itemP, itemD) {
-    const distanceCents = toCents(distanceKm * settings.ratePerKm);
+  return { valid: true, amount: roundMoney(value) };
+}
 
-    const urban = getUrbanAssessment(pickup, dropoff, itemP, itemD);
-    const urbanCents = urban.applies ? toCents(settings.urbanSurcharge) : 0;
+function isExcludedVehicleFare(fare) {
+  const descriptor = [
+    fare.name,
+    fare.category,
+    fare.vehicleType,
+    fare.description,
+    ...(Array.isArray(fare.paymentMethods) ? fare.paymentMethods : [])
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
 
-    const hillZone = getHighlandZone(pickup, dropoff);
-    const hillCents = hillZone ? toCents(settings.hillSurcharge) : 0;
+  return /\b(taxi|bus|lorry|truck|trailer|heavy|commercial|motorcycle|class\s*[02345])\b/.test(
+    descriptor
+  );
+}
 
-    let longHaulCents = 0;
-    let longHaulPercentApplied = 0;
-    if (distanceKm > settings.longHaulTriggerKm) {
-      longHaulPercentApplied = settings.longHaulPercent;
-      const raw = Math.round(distanceCents * (settings.longHaulPercent / 100));
-      const capCents = toCents(settings.longHaulCap);
-      longHaulCents = Math.min(raw, capCents);
+function isExplicitClass1Fare(fare) {
+  const descriptor = [
+    fare.name,
+    fare.category,
+    fare.vehicleType,
+    fare.description
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  return /\b(class\s*1|car|passenger|private|auto|2\s*axles?\s*3\s*or\s*4)\b/.test(
+    descriptor
+  );
+}
+
+function resolvePlazaFares(fares) {
+  const validFares = [];
+  let unsupportedCurrency = false;
+
+  fares.forEach(fare => {
+    const parsed = readTollAmount(fare);
+    if (!parsed) return;
+    if (parsed.unsupportedCurrency) {
+      unsupportedCurrency = true;
+      return;
     }
-
-    let subtotalCents = distanceCents + urbanCents + hillCents + longHaulCents;
-    const minCents = toCents(settings.minimumFare);
-    if (subtotalCents < minCents) {
-      subtotalCents = minCents;
+    if (parsed.valid) {
+      validFares.push({ raw: fare, amount: parsed.amount });
     }
+  });
 
-    const customerCents = roundCentsToUnit(subtotalCents, settings.roundingUnit);
+  if (!validFares.length) {
+    return { resolved: false, unsupportedCurrency };
+  }
 
+  const explicitClass1 = validFares.filter(f => isExplicitClass1Fare(f.raw));
+  const candidatePool = explicitClass1.length
+    ? explicitClass1
+    : validFares.filter(f => !isExcludedVehicleFare(f.raw));
+
+  const uniqueAmounts = new Set(
+    candidatePool.map(f => f.amount.toFixed(2))
+  );
+
+  if (uniqueAmounts.size === 1) {
     return {
-      distanceKm,
-      durationMin,
-      distanceCents,
-      urbanCents,
-      urbanLabel: urban.label,
-      hillCents,
-      hillLabel: hillZone ? `Highland zone: ${hillZone.name}` : '',
-      longHaulCents,
-      longHaulPercentApplied,
-      subtotalCents,
-      customerCents,
-      driverNetCents: customerCents
+      resolved: true,
+      amount: Number([...uniqueAmounts][0]),
+      unsupportedCurrency
     };
   }
 
-  function renderResults(calc, routeSummary) {
-    latestCalculation = calc;
+  return { resolved: false, unsupportedCurrency };
+}
 
-    $('total-fare').textContent = moneyFromCents(calc.customerCents);
-    $('fare-distance').textContent = `${calc.distanceKm.toFixed(1)} km`;
-    $('fare-duration').textContent = `${Math.round(calc.durationMin)} mins`;
+function extractTolls(sections) {
+  let total = 0;
+  let recordsDetected = false;
+  let validAmounts = 0;
+  let unresolvedRecords = 0;
+  let unsupportedCurrency = false;
 
-    const confidence = $('estimate-confidence');
-    if (routeSummary && routeSummary.source === 'routed') {
-      confidence.textContent = 'Confidence: high — routed distance from HERE.';
-    } else {
-      confidence.textContent = 'Confidence: low — routing unavailable, using straight-line distance × 1.25.';
+  const seenPlazas = new Set();
+  const breakdown = [];
+
+  // Check if itemised toll records exist across sections
+  let hasItemisedTolls = false;
+  sections.forEach(section => {
+    if (Array.isArray(section.tolls) && section.tolls.length > 0) {
+      hasItemisedTolls = true;
     }
+  });
 
-    $('calc-distance-fare').textContent = moneyFromCents(calc.distanceCents);
+  sections.forEach((section, sectionIndex) => {
+    const tolls = Array.isArray(section.tolls) ? section.tolls : [];
+    const costs =
+      section.summary && Array.isArray(section.summary.tollCosts)
+        ? section.summary.tollCosts
+        : [];
 
-    const urbanRow = $('urban-surcharge-row');
-    if (calc.urbanCents > 0) {
-      urbanRow.style.display = 'flex';
-      $('urban-surcharge-label').textContent = calc.urbanLabel || 'Urban / POI surcharge';
-      $('calc-urban-surcharge').textContent = moneyFromCents(calc.urbanCents);
-    } else {
-      urbanRow.style.display = 'none';
-    }
+    if (tolls.length) {
+      recordsDetected = true;
 
-    const hillRow = $('hill-surcharge-row');
-    if (calc.hillCents > 0) {
-      hillRow.style.display = 'flex';
-      $('hill-surcharge-label').textContent = calc.hillLabel || 'Highland surcharge';
-      $('calc-hill-surcharge').textContent = moneyFromCents(calc.hillCents);
-    } else {
-      hillRow.style.display = 'none';
-    }
+      tolls.forEach((toll, tollIndex) => {
+        const plazaName =
+          toll.name ||
+          (toll.tollSystem && toll.tollSystem.name) ||
+          `Toll Plaza ${tollIndex + 1}`;
 
-    const lhRow = $('long-haul-incentive-row');
-    if (calc.longHaulCents > 0) {
-      lhRow.style.display = 'flex';
-      $('calc-long-haul-incentive').textContent = moneyFromCents(calc.longHaulCents);
-    } else {
-      lhRow.style.display = 'none';
-    }
+        const identity = String(
+          toll.id || toll.tollId || `${sectionIndex}:${plazaName}:${tollIndex}`
+        );
 
-    $('calc-grand').textContent = moneyFromCents(calc.subtotalCents);
-    $('calc-customer-total').textContent = moneyFromCents(calc.customerCents);
-    $('driver-net-fare').textContent = moneyFromCents(calc.driverNetCents);
+        if (seenPlazas.has(identity)) return;
+        seenPlazas.add(identity);
 
-    const parts = [];
-    parts.push(`Rate RM${settings.ratePerKm.toFixed(2)}/km`);
-    if (settings.minimumFare > 0) parts.push(`Min RM${settings.minimumFare.toFixed(2)}`);
-    if (calc.longHaulPercentApplied > 0) {
-      parts.push(`${calc.longHaulPercentApplied}% return contribution above ${settings.longHaulTriggerKm}km (cap RM${settings.longHaulCap.toFixed(2)})`);
-    }
-    parts.push(`rounded to nearest RM${settings.roundingUnit}`);
-    $('fare-policy-note').textContent = `Policy: ${parts.join(' · ')}. Tolls, parking, and waiting charges are not included.`;
+        const fares = Array.isArray(toll.fares) ? toll.fares : [];
+        if (!fares.length) return;
 
-    $('result-card').style.display = 'block';
-    updatePinButtonState();
-  }
+        const resolution = resolvePlazaFares(fares);
+        if (resolution.unsupportedCurrency) unsupportedCurrency = true;
 
-  /* =========================================================
-     12. ROUTE CALCULATION (HERE ROUTING API v8)
-     ========================================================= */
-  function calculateRoute() {
-    if (!pickupCoords || !dropoffCoords) return;
-
-    const directDistance = calculateHaversineDistance(
-      pickupCoords.lat,
-      pickupCoords.lng,
-      dropoffCoords.lat,
-      dropoffCoords.lng
-    );
-    if (directDistance < 0.02) {
-      showError('Pickup and drop-off are almost the same location.');
-      return;
-    }
-    if (!router) {
-      showError('HERE routing service is unavailable.');
-      return;
-    }
-    if (!isApiKeyConfigured()) {
-      showError('Configure your HERE API key before calculating routes.');
-      return;
-    }
-
-    const hadPreviousCard = $('result-card').style.display === 'block';
-    invalidateRoute(!hadPreviousCard);
-    const requestId = routeRequestId;
-    const origin = {...pickupCoords};
-    const destination = {...dropoffCoords};
-    const routingMode = activeRoutingMode;
-
-    setLoading(true);
-    clearError();
-    setRouteStatus('Calculating route…');
-
-    routeDebounce = setTimeout(() => {
-      if (requestId !== routeRequestId) return;
-      const params = {
-        routingMode,
-        transportMode:'car',
-        origin:`${origin.lat},${origin.lng}`,
-        destination:`${destination.lat},${destination.lng}`,
-        departureTime:'any',
-        return:'polyline,summary'
-      };
-
-      router.calculateRoute(
-        params,
-        result => {
-          if (requestId !== routeRequestId) return;
-          routeDebounce = null;
-          setLoading(false);
-
-          const routes = result && result.routes;
-          if (!Array.isArray(routes) || !routes.length) {
-            showError('No route found between these locations.', true);
-            setRouteStatus('');
-            return;
-          }
-          const route = routes[0];
-          const summary = route.summary || {};
-          const distanceKm = (Number(summary.length) || 0) / 1000;
-          const durationMin = (Number(summary.travelTime) || 0) / 60;
-
-          if (!distanceKm) {
-            showError('Route returned with zero distance.', true);
-            setRouteStatus('');
-            return;
-          }
-
-          clearRouteObjects();
-          try {
-            if (route.sections) {
-              route.sections.forEach(section => {
-                if (section.polyline) {
-                  const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
-                  const line = new H.map.Polyline(lineString, {
-                    style:{strokeColor:'#8e24aa',lineWidth:5,lineCap:'round',lineJoin:'round'}
-                  });
-                  map.addObject(line);
-                  routePolylines.push(line);
-                }
-              });
-            }
-            if (map && routePolylines.length) {
-              map.getViewModel().setLookAtData({bounds:routePolylines[0].getBoundingBox()});
-            }
-          } catch (e) {
-            console.warn('Could not draw route:',e);
-          }
-
-          const calc = buildFareBreakdown(
-            distanceKm, durationMin,
-            pickupCoords, dropoffCoords,
-            pickupItem, dropoffItem
-          );
-          renderResults(calc, {source:'routed'});
-          setRouteStatus(`Routed: ${distanceKm.toFixed(1)} km · ${Math.round(durationMin)} min`);
-          recordRecentRoute();
-        },
-        error => {
-          if (requestId !== routeRequestId) return;
-          routeDebounce = null;
-          setLoading(false);
-          console.error('Routing error:',error);
-          const msg = (error && error.message) ? error.message : 'Routing service failed.';
-          showError(msg, true);
-          setRouteStatus('');
+        if (resolution.resolved) {
+          total += resolution.amount;
+          validAmounts++;
+          breakdown.push(`${plazaName}: ${money(resolution.amount)}`);
+        } else {
+          unresolvedRecords++;
+          breakdown.push(`${plazaName}: Unverified`);
         }
+      });
+      return;
+    }
+
+    // Only fallback to summary toll costs if itemised tolls are entirely absent,
+    // preventing double-counting glitches on complex multi-section routes.
+    if (!hasItemisedTolls && costs.length) {
+      recordsDetected = true;
+
+      costs.forEach((cost, costIndex) => {
+        const identity = String(
+          cost.id || cost.tollId || `${sectionIndex}:summary:${costIndex}`
+        );
+
+        if (seenPlazas.has(identity)) return;
+        seenPlazas.add(identity);
+
+        const result = readTollAmount(cost);
+        if (!result) {
+          unresolvedRecords++;
+          return;
+        }
+
+        if (result.unsupportedCurrency) {
+          unsupportedCurrency = true;
+          unresolvedRecords++;
+          return;
+        }
+
+        if (result.valid) {
+          total += result.amount;
+          validAmounts++;
+          breakdown.push(`Highway Segment: ${money(result.amount)}`);
+        }
+      });
+    }
+  });
+
+  total = roundMoney(total);
+
+  const available =
+    recordsDetected &&
+    validAmounts > 0 &&
+    unresolvedRecords === 0 &&
+    !unsupportedCurrency;
+
+  return {
+    amount: total,
+    available,
+    recordsDetected,
+    validAmounts,
+    unresolvedRecords,
+    unsupportedCurrency,
+    breakdown
+  };
+}
+
+/* =========================================================
+   12. ROUTE CALCULATION
+========================================================= */
+
+function calculateRoute() {
+  if (!pickupCoords || !dropoffCoords) return;
+
+  const directDistance = calculateHaversineDistance(
+    pickupCoords.lat,
+    pickupCoords.lng,
+    dropoffCoords.lat,
+    dropoffCoords.lng
+  );
+
+  if (directDistance < 0.02) {
+    showError('Pickup and drop-off are almost the same location.');
+    return;
+  }
+
+  if (!router) {
+    showError('HERE routing service is unavailable.');
+    return;
+  }
+
+  if (!isApiKeyConfigured()) {
+    showError('Configure your new HERE API key before calculating routes.');
+    return;
+  }
+
+  const manualValue = $('manual-toll').value.trim();
+
+  if (manualValue !== '') {
+    const parsed = Number(manualValue);
+
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      showError('Manual toll override must be RM0 or more.');
+      return;
+    }
+  }
+
+  invalidateRoute(true);
+
+  const requestId = routeRequestId;
+
+  const origin = {...pickupCoords};
+  const destination = {...dropoffCoords};
+
+  const routingMode = activeRoutingMode;
+  const avoidTollSnapshot = avoidTolls;
+
+  setLoading(true);
+  clearError();
+  setRouteStatus('Requesting route from HERE…');
+
+  routeDebounce = setTimeout(() => {
+    if (requestId !== routeRequestId) return;
+
+    const params = {
+      routingMode,
+      transportMode:'car',
+      origin:`${origin.lat},${origin.lng}`,
+      destination:`${destination.lat},${destination.lng}`,
+      departureTime:'any',
+      currency:'MYR',
+      return:'polyline,summary,tolls'
+    };
+
+    if (avoidTollSnapshot) {
+      params['avoid[features]'] = 'tollRoad';
+    }
+
+    router.calculateRoute(
+      params,
+
+      result => {
+        if (requestId !== routeRequestId) return;
+
+        setLoading(false);
+
+        if (
+          !result ||
+          !Array.isArray(result.routes) ||
+          !result.routes.length
+        ) {
+          showError('No route found for the selected locations.');
+          return;
+        }
+
+        try {
+          handleRouteResult(result.routes[0],requestId);
+        } catch(error) {
+          console.error('Route processing error:',error);
+          showError('Route was returned, but its details could not be processed.');
+        }
+      },
+
+      error => {
+        if (requestId !== routeRequestId) return;
+
+        setLoading(false);
+
+        console.error('HERE routing error:',error);
+
+        showError(
+          'Route calculation failed. Check internet access, API permissions and routing settings.'
+        );
+      }
+    );
+
+  },180);
+}
+
+/* =========================================================
+   13. ROUTE RESULT PROCESSING
+========================================================= */
+
+function handleRouteResult(route,requestId) {
+  if (requestId !== routeRequestId) return;
+
+  const sections = Array.isArray(route.sections)
+    ? route.sections
+    : [];
+
+  if (!sections.length) {
+    throw new Error('Route contains no sections.');
+  }
+
+  let distanceMeters = 0;
+  let durationSeconds = 0;
+
+  sections.forEach(section => {
+    distanceMeters += Number(
+      section.summary &&
+      section.summary.length || 0
+    );
+
+    durationSeconds += Number(
+      section.summary &&
+      section.summary.duration || 0
+    );
+  });
+
+  const distanceKm = distanceMeters / 1000;
+  const durationMins = durationSeconds / 60;
+
+  if (
+    !(distanceKm > 0) ||
+    !Number.isFinite(durationMins) ||
+    durationMins < 0
+  ) {
+    throw new Error('Invalid route summary.');
+  }
+
+  const tollInfo = extractTolls(sections);
+
+  const manualValue = $('manual-toll').value.trim();
+
+  let tollFee = tollInfo.amount;
+  let tollSource = tollInfo.available
+    ? 'HERE Class 1 MYR estimate'
+    : 'HERE toll data unverified';
+
+  let tollVerified = tollInfo.available;
+  let manualOverride = false;
+
+  if (manualValue !== '') {
+    tollFee = roundMoney(Number(manualValue));
+    tollSource = 'Manual override';
+    tollVerified = true;
+    manualOverride = true;
+  }
+
+  clearRouteObjects();
+
+  const group = new H.map.Group();
+
+  sections.forEach(section => {
+    if (!section.polyline) return;
+
+    const lineString =
+      H.geo.LineString.fromFlexiblePolyline(section.polyline);
+
+    const line = new H.map.Polyline(
+      lineString,
+      {
+        style:{
+          strokeColor:'#8e24aa',
+          lineWidth:5
+        }
+      }
+    );
+
+    routePolylines.push(line);
+    group.addObject(line);
+  });
+
+  if (routePolylines.length) {
+    map.addObjects(routePolylines);
+
+    const bounds = group.getBoundingBox();
+
+    if (bounds) {
+      map.getViewModel().setLookAtData({
+        bounds,
+        padding:30
+      });
+    }
+  }
+
+  const calculation = processCalculations({
+    distance:distanceKm,
+    duration:durationMins,
+    tollFee,
+    tollSource,
+    tollAvailable:tollInfo.available,
+    tollVerified,
+    tollRecordsDetected:tollInfo.recordsDetected,
+    tollUnresolvedRecords:tollInfo.unresolvedRecords,
+    tollUnsupportedCurrency:tollInfo.unsupportedCurrency,
+    tollBreakdown:tollInfo.breakdown,
+    manualOverride,
+    sectionsCount:sections.length,
+    avoidTollsRequested:avoidTolls
+  });
+
+  latestCalculation = calculation;
+
+  const statusParts = [
+    `Route calculated · ${sections.length} section(s)`,
+    activeRoutingMode === 'fast' ? 'Fastest' : 'Shortest'
+  ];
+
+  if (tollInfo.breakdown && tollInfo.breakdown.length) {
+    statusParts.push(`Plazas: ${tollInfo.breakdown.join(' | ')}`);
+  }
+
+  setRouteStatus(statusParts.join(' · '));
+}
+
+/* =========================================================
+   14. FARE CALCULATION ENGINE
+========================================================= */
+
+function roundToUnit(value,unit) {
+  if (!(unit > 0)) {
+    return roundMoney(value);
+  }
+
+  return roundMoney(
+    Math.round((value + Number.EPSILON) / unit) * unit
+  );
+}
+
+function processCalculations(routeData) {
+
+  const distanceFare = roundMoney(
+    routeData.distance * settings.ratePerKm
+  );
+
+  const urban = getUrbanAssessment(
+    pickupCoords,
+    dropoffCoords,
+    pickupItem,
+    dropoffItem
+  );
+
+  const urbanSurcharge = urban.applies
+    ? roundMoney(settings.urbanSurcharge)
+    : 0;
+
+  const highlandZone = getHighlandZone(
+    pickupCoords,
+    dropoffCoords
+  );
+
+  const hillApplies = Boolean(highlandZone);
+
+  const hillSurcharge = hillApplies
+    ? roundMoney(settings.hillSurcharge)
+    : 0;
+
+  const longHaulApplies =
+    settings.longHaulTriggerKm > 0 &&
+    routeData.distance >= settings.longHaulTriggerKm;
+
+  const longHaulIncentive = longHaulApplies
+    ? roundMoney(
+        Math.min(
+          settings.longHaulCap,
+          distanceFare * settings.longHaulPercent / 100
+        )
+      )
+    : 0;
+
+  const transportSubtotal = roundMoney(
+    distanceFare +
+    urbanSurcharge +
+    hillSurcharge +
+    longHaulIncentive
+  );
+
+  const transportFare = roundMoney(
+    Math.max(
+      settings.minimumFare,
+      transportSubtotal
+    )
+  );
+
+  const exactTotal = roundMoney(
+    transportFare + routeData.tollFee
+  );
+
+  const customerTotal = roundMoney(
+    roundToUnit(
+      exactTotal,
+      settings.roundingUnit
+    )
+  );
+
+  const usesFlatCommission =
+    transportSubtotal < ADMIN_FLAT_THRESHOLD;
+
+  const adminDeduction = usesFlatCommission
+    ? roundMoney(settings.adminMinimum)
+    : roundMoney(
+        transportFare * settings.adminPercent / 100
       );
-    }, 250);
+
+  const driverFareEarnings = roundMoney(
+    Math.max(0,transportFare-adminDeduction)
+  );
+
+  const driverAmountAfterDeduction = roundMoney(
+    Math.max(0,customerTotal-adminDeduction)
+  );
+
+  const roundingAdjustment = roundMoney(
+    customerTotal-exactTotal
+  );
+
+  $('urban-surcharge-row').style.display =
+    urbanSurcharge > 0 ? 'flex' : 'none';
+
+  $('urban-surcharge-label').textContent =
+    urban.label
+      ? `Urban / POI surcharge (${urban.label})`
+      : 'Urban / POI surcharge';
+
+  $('hill-surcharge-row').style.display =
+    hillSurcharge > 0 ? 'flex' : 'none';
+
+  $('hill-surcharge-label').textContent =
+    highlandZone
+      ? `Highland surcharge (${highlandZone.name})`
+      : 'Highland surcharge';
+
+  $('long-haul-incentive-row').style.display =
+    longHaulIncentive > 0 ? 'flex' : 'none';
+
+  $('admin-deduction-row').style.display =
+    adminDeduction > 0 ? 'flex' : 'none';
+
+  $('total-fare').textContent = money(customerTotal);
+
+  $('fare-distance').textContent =
+    `${routeData.distance.toFixed(1)} km`;
+
+  $('fare-duration').textContent =
+    formatDuration(routeData.duration);
+
+  $('calc-distance-fare').textContent =
+    money(distanceFare);
+
+  $('calc-urban-surcharge').textContent =
+    money(urbanSurcharge);
+
+  $('calc-toll-fare').textContent =
+    money(routeData.tollFee);
+
+  $('calc-hill-surcharge').textContent =
+    money(hillSurcharge);
+
+  $('calc-long-haul-incentive').textContent =
+    money(longHaulIncentive);
+
+  $('calc-grand').textContent =
+    money(exactTotal);
+
+  $('calc-customer-total').textContent =
+    money(customerTotal);
+
+  $('calc-deduction').textContent =
+    `-${money(adminDeduction)}`;
+
+  $('driver-fare-net').textContent =
+    money(driverFareEarnings);
+
+  $('driver-net-fare').textContent =
+    money(driverAmountAfterDeduction);
+
+  const warnings = [];
+
+  if (!routeData.tollVerified) {
+    warnings.push('Toll amount not independently verified — check manually');
   }
 
-  /* =========================================================
-     13. SHARE / COPY ACTIONS
-     ========================================================= */
-  function buildQuoteText() {
-    if (!latestCalculation) return '';
-    const c = latestCalculation;
-    const p = $('pickup').value.trim();
-    const d = $('dropoff').value.trim();
-    const lines = [
-      `🚗 Fare Estimate`,
-      `From: ${p}`,
-      `To: ${d}`,
-      `Distance: ${c.distanceKm.toFixed(1)} km`,
-      `Duration: ~${Math.round(c.durationMin)} min`,
-      ``,
-      `💰 Total: ${moneyFromCents(c.customerCents)}`,
-      ``,
-      `(Excludes tolls, parking, waiting charges.)`
-    ];
-    return lines.join('\n');
+  if (routeData.tollUnsupportedCurrency) {
+    warnings.push('Non-MYR toll prices were ignored');
   }
 
-  function buildDriverLogText() {
-    if (!latestCalculation) return '';
-    const c = latestCalculation;
-    const p = $('pickup').value.trim();
-    const d = $('dropoff').value.trim();
-    const lines = [
-      `DRIVER LOG — ${new Date().toLocaleString()}`,
-      `From: ${p}`,
-      `To: ${d}`,
-      `Distance: ${c.distanceKm.toFixed(1)} km`,
-      `Duration: ${Math.round(c.durationMin)} min`,
-      `Distance fare: ${moneyFromCents(c.distanceCents)}`,
-      c.urbanCents > 0 ? `Urban surcharge: ${moneyFromCents(c.urbanCents)}` : null,
-      c.hillCents > 0 ? `Highland surcharge: ${moneyFromCents(c.hillCents)}` : null,
-      c.longHaulCents > 0 ? `Long-haul: ${moneyFromCents(c.longHaulCents)}` : null,
-      `Subtotal: ${moneyFromCents(c.subtotalCents)}`,
-      `Customer total: ${moneyFromCents(c.customerCents)}`,
-      `Driver collection: ${moneyFromCents(c.driverNetCents)}`,
-      `(Excludes tolls, parking, waiting charges.)`
-    ].filter(Boolean);
-    return lines.join('\n');
+  if (
+    routeData.avoidTollsRequested &&
+    routeData.tollFee > 0
+  ) {
+    warnings.push('Returned route still contains toll charges');
   }
 
-  async function copyText(text) {
+  if (
+    routeData.avoidTollsRequested &&
+    routeData.tollFee === 0 &&
+    !routeData.tollVerified
+  ) {
+    warnings.push('Zero tolls not confirmed');
+  }
+
+  if (routeData.tollUnresolvedRecords > 0) {
+    warnings.push(
+      `${routeData.tollUnresolvedRecords} toll record(s) unresolved`
+    );
+  }
+
+  const status = [
+    `Tolls: ${routeData.tollSource}`,
+    `Highland: ${hillApplies ? 'applied' : 'not applied'}`
+  ];
+
+  if (warnings.length) {
+    status.push(...warnings);
+    $('fare-status').classList.add('fare-warning');
+  } else {
+    $('fare-status').classList.remove('fare-warning');
+  }
+
+  $('fare-status').textContent = status.join(' · ');
+
+  $('fare-policy-note').textContent =
+    `Minimum transport fare: ${money(settings.minimumFare)}. ` +
+    `Admin commission: ${settings.adminPercent}% of transport fare, ` +
+    `or ${money(settings.adminMinimum)} when the pre-minimum subtotal ` +
+    `is below RM${ADMIN_FLAT_THRESHOLD.toFixed(2)}. ` +
+    `Tolls are pass-through reimbursement, not driver profit. ` +
+    `Vehicle fuel, maintenance, depreciation and other operating costs ` +
+    `are not deducted. ` +
+    `Quotation rounding adjustment: ${money(roundingAdjustment)}.`;
+
+  $('result-card').style.display = 'block';
+
+  return {
+    version:'2.5',
+
+    pickup:$('pickup').value.trim(),
+    dropoff:$('dropoff').value.trim(),
+
+    distance:routeData.distance,
+    duration:routeData.duration,
+
+    distanceFare,
+    urbanSurcharge,
+    urbanLabel:urban.label,
+
+    tollFee:routeData.tollFee,
+    tollSource:routeData.tollSource,
+    tollAvailable:routeData.tollAvailable,
+    tollVerified:routeData.tollVerified,
+    tollRecordsDetected:routeData.tollRecordsDetected,
+    tollUnresolvedRecords:routeData.tollUnresolvedRecords,
+    tollUnsupportedCurrency:routeData.tollUnsupportedCurrency,
+    tollBreakdown:routeData.tollBreakdown || [],
+    manualOverride:routeData.manualOverride,
+
+    hillSurcharge,
+    highlandZone:highlandZone ? highlandZone.name : '',
+
+    longHaulIncentive,
+
+    transportSubtotal,
+    transportFare,
+
+    exactTotal,
+    customerTotal,
+    roundingAdjustment,
+
+    adminDeduction,
+    adminPercent:settings.adminPercent,
+    adminFlatBelowThreshold:settings.adminMinimum,
+    adminFlatThreshold:ADMIN_FLAT_THRESHOLD,
+    usesFlatCommission,
+
+    driverFareEarnings,
+    driverAmountAfterDeduction,
+
+    routingMode:activeRoutingMode,
+    avoidTolls:avoidTolls,
+
+    settingsSnapshot:{...settings},
+
+    calculatedAt:new Date().toISOString()
+  };
+}
+
+/* =========================================================
+   15. DURATION FORMATTING
+========================================================= */
+
+function formatDuration(minutes) {
+  if (minutes < 60) {
+    return `${Math.round(minutes)} mins`;
+  }
+
+  const hours = Math.floor(minutes/60);
+  const mins = Math.round(minutes%60);
+
+  if (mins === 60) {
+    return `${hours+1} hr 0 mins`;
+  }
+
+  return `${hours} hr ${mins} mins`;
+}
+
+/* =========================================================
+   16. RECEIPT GENERATION
+========================================================= */
+
+function receiptText(data) {
+  const plazaLines = data.tollBreakdown && data.tollBreakdown.length
+    ? data.tollBreakdown.map(p => `  - ${p}`).join('\n')
+    : '  - None / Unitemised';
+
+  return [
+    'TRIP FARE ESTIMATE — RIDESHARE MY PERSONAL EDITION v2.5',
+    '------------------------------------------------',
+    `From: ${data.pickup}`,
+    `To: ${data.dropoff}`,
+    `Distance: ${data.distance.toFixed(1)} km`,
+    `Estimated duration: ${formatDuration(data.duration)}`,
+    `Route: ${data.routingMode === 'fast' ? 'Fastest' : 'Shortest'}`,
+    `Avoid tolls requested: ${data.avoidTolls ? 'Yes' : 'No'}`,
+    '------------------------------------------------',
+    `Distance fare: ${money(data.distanceFare)}`,
+    `Urban / POI surcharge: ${money(data.urbanSurcharge)}`,
+    `Highland surcharge: ${money(data.hillSurcharge)}`,
+    `Highland zone: ${data.highlandZone || 'None'}`,
+    `Long-haul contribution: ${money(data.longHaulIncentive)}`,
+    `Transport subtotal: ${money(data.transportSubtotal)}`,
+    `Minimum-adjusted transport fare: ${money(data.transportFare)}`,
+    `Toll charges: ${money(data.tollFee)}`,
+    `Toll source: ${data.tollSource}`,
+    `Toll verified: ${data.tollVerified ? 'Yes' : 'No'}`,
+    `Manual toll override: ${data.manualOverride ? 'Yes' : 'No'}`,
+    'Detected Toll Plazas / Segments:',
+    plazaLines,
+    '------------------------------------------------',
+    `Exact calculated total: ${money(data.exactTotal)}`,
+    `Quotation rounding adjustment: ${money(data.roundingAdjustment)}`,
+    `CUSTOMER QUOTATION: ${money(data.customerTotal)}`,
+    '------------------------------------------------',
+    `Admin commission: -${money(data.adminDeduction)}`,
+    `Commission method: ${data.usesFlatCommission ? 'Flat commission' : 'Percentage commission'}`,
+    `Driver transport earnings: ${money(data.driverFareEarnings)}`,
+    `Driver collection after commission (incl. tolls): ${money(data.driverAmountAfterDeduction)}`,
+    '------------------------------------------------',
+    'Tolls are reimbursement, not driver profit.',
+    'Driver earnings exclude fuel, maintenance, depreciation and other operating costs.',
+    'Estimate only. Verify tolls and final fare before travel.',
+    'Generated by Rideshare MY Personal Edition v2.5'
+  ].join('\n');
+}
+
+/* =========================================================
+   17. CLIPBOARD
+========================================================= */
+
+async function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
     try {
       await navigator.clipboard.writeText(text);
-      return true;
-    } catch (_) {
-      try {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        const ok = document.execCommand('copy');
-        document.body.removeChild(ta);
-        return ok;
-      } catch (_) {
-        return false;
+      return;
+    } catch(error) {
+      console.warn('Modern clipboard failed; trying fallback.',error);
+    }
+  }
+
+  const area = document.createElement('textarea');
+
+  area.value = text;
+  area.setAttribute('readonly','');
+
+  area.style.position = 'fixed';
+  area.style.left = '-9999px';
+  area.style.top = '0';
+  area.style.opacity = '0';
+
+  document.body.appendChild(area);
+
+  area.focus();
+  area.select();
+  area.setSelectionRange(0,area.value.length);
+
+  let copied = false;
+
+  try {
+    copied = document.execCommand('copy');
+  } finally {
+    area.remove();
+  }
+
+  if (!copied) {
+    throw new Error('Clipboard access was blocked by the browser.');
+  }
+}
+
+async function copyReceipt() {
+  if (!latestCalculation) return;
+
+  const button = $('share-btn');
+  const original = button.textContent;
+
+  try {
+    await copyText(receiptText(latestCalculation));
+
+    button.textContent = '✓ Receipt copied';
+
+    setTimeout(() => {
+      button.textContent = original;
+    },1800);
+
+  } catch(error) {
+    showError(`Unable to copy receipt: ${error.message}`);
+  }
+}
+
+/* =========================================================
+   18. TRIP HISTORY
+========================================================= */
+
+function saveCurrentTrip() {
+  if (!latestCalculation) return;
+
+  const record = {
+    ...latestCalculation,
+
+    id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+
+    savedAt:new Date().toISOString()
+  };
+
+  history.unshift(record);
+  history = history.slice(0,MAX_HISTORY);
+
+  if (!persistHistory()) return;
+
+  renderHistory();
+
+  const button = $('save-trip-btn');
+  const original = button.textContent;
+
+  button.disabled = true;
+  button.textContent = '✓ Saved to history';
+
+  setTimeout(() => {
+    button.textContent = original;
+    button.disabled = false;
+  },1600);
+}
+
+function renderHistory() {
+  const list = $('history-list');
+
+  if (!history.length) {
+    list.textContent = 'No saved trips yet.';
+    return;
+  }
+
+  list.innerHTML = '';
+
+  history.slice(0,20).forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'history-item';
+
+    const date = new Date(
+      item.savedAt || item.calculatedAt || item.date
+    );
+
+    const heading = document.createElement('strong');
+
+    heading.textContent =
+      `${money(item.customerTotal)} · ${Number(item.distance).toFixed(1)} km`;
+
+    const detail = document.createElement('div');
+
+    detail.textContent =
+      `${item.pickup || 'Unknown pickup'} → ${item.dropoff || 'Unknown destination'}`;
+
+    const stamp = document.createElement('div');
+    stamp.className = 'small-muted';
+
+    stamp.textContent =
+      Number.isNaN(date.getTime())
+        ? ''
+        : date.toLocaleString();
+
+    const toll = document.createElement('div');
+    toll.className = 'small-muted';
+
+    toll.textContent =
+      `Tolls: ${money(item.tollFee)} · ` +
+      `${item.tollVerified ? 'Class 1 verified' : 'Unverified'}`;
+
+    row.append(
+      heading,
+      detail,
+      stamp,
+      toll
+    );
+
+    list.appendChild(row);
+  });
+}
+
+/* =========================================================
+   19. CSV EXPORT — FORMULA INJECTION PROTECTION
+========================================================= */
+
+function safeCsvValue(value) {
+  let text = String(value ?? '');
+
+  if (/^[\s\u0000-\u001f]*[=+\-@]/.test(text)) {
+    text = "'" + text;
+  }
+
+  return `"${text.replace(/"/g,'""')}"`;
+}
+
+function exportHistoryCsv() {
+  if (!history.length) {
+    showError('There are no saved trips to export.');
+    return;
+  }
+
+  const columns = [
+    'version',
+    'id',
+    'savedAt',
+    'calculatedAt',
+    'pickup',
+    'dropoff',
+    'distance',
+    'duration',
+    'distanceFare',
+    'urbanSurcharge',
+    'urbanLabel',
+    'tollFee',
+    'tollSource',
+    'tollVerified',
+    'tollUnresolvedRecords',
+    'tollBreakdown',
+    'manualOverride',
+    'hillSurcharge',
+    'highlandZone',
+    'longHaulIncentive',
+    'transportSubtotal',
+    'transportFare',
+    'exactTotal',
+    'roundingAdjustment',
+    'customerTotal',
+    'adminDeduction',
+    'usesFlatCommission',
+    'driverFareEarnings',
+    'driverAmountAfterDeduction',
+    'routingMode',
+    'avoidTolls',
+    'settingsSnapshot'
+  ];
+
+  const csv = [
+    columns.join(','),
+
+    ...history.map(item =>
+      columns.map(key => {
+        let value = item[key];
+
+        if (
+          value !== null &&
+          typeof value === 'object'
+        ) {
+          value = JSON.stringify(value);
+        }
+
+        return safeCsvValue(value);
+      }).join(',')
+    )
+
+  ].join('\r\n');
+
+  const blob = new Blob(
+    ['\uFEFF',csv],
+    {type:'text/csv;charset=utf-8;'}
+  );
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+
+  a.href = url;
+  a.download = 'rideshare-my-trip-history-v2.5.csv';
+
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  },1000);
+}
+
+function clearTripHistory() {
+  if (!history.length) return;
+
+  if (
+    confirm('Delete all saved trip history from this device?')
+  ) {
+    history = [];
+
+    if (persistHistory()) {
+      renderHistory();
+      setRouteStatus('Trip history cleared.');
+    }
+  }
+}
+
+/* =========================================================
+   20. MAP INITIALISATION
+========================================================= */
+
+function initMap() {
+  try {
+    if (!window.H || !H.service || !H.Map) {
+      showError(
+        'HERE Maps scripts did not load. Check internet connection or content blockers.'
+      );
+      return false;
+    }
+
+    if (!isApiKeyConfigured()) {
+      setRouteStatus(
+        'Setup required: configure your HERE API key to enable map services.'
+      );
+    }
+
+    platform = new H.service.Platform({
+      apikey:HERE_API_KEY
+    });
+
+    const layers = platform.createDefaultLayers();
+
+    map = new H.Map(
+      $('map'),
+      layers.vector.normal.map,
+      {
+        zoom:11,
+        center:{
+          lat:3.1390,
+          lng:101.6869
+        },
+        pixelRatio:window.devicePixelRatio || 1
+      }
+    );
+
+    window.addEventListener('resize',() => {
+      if (map) {
+        map.getViewPort().resize();
+      }
+    });
+
+    new H.mapevents.Behavior(
+      new H.mapevents.MapEvents(map)
+    );
+
+    ui = H.ui.UI.createDefault(map,layers);
+
+    router = platform.getRoutingService(null,8);
+
+    return true;
+
+  } catch(error) {
+    console.error('Map initialisation error:',error);
+
+    showError(
+      'Unable to initialise HERE Maps. Check API key, permissions and internet connection.'
+    );
+
+    return false;
+  }
+}
+
+/* =========================================================
+   21. EVENT BINDING
+========================================================= */
+
+function bindEvents() {
+
+  setupAutocomplete('pickup');
+  setupAutocomplete('dropoff');
+
+  $('current-loc-btn').addEventListener(
+    'click',
+    requestCurrentLocation
+  );
+
+  $('swap-locations-btn').addEventListener(
+    'click',
+    swapLocations
+  );
+
+  $('btn-mode-fast').addEventListener(
+    'click',
+    () => setRoutingMode('fast')
+  );
+
+  $('btn-mode-short').addEventListener(
+    'click',
+    () => setRoutingMode('short')
+  );
+
+  $('btn-avoid-tolls').addEventListener(
+    'click',
+    toggleAvoidTolls
+  );
+
+  $('manual-toll').addEventListener(
+    'change',
+    () => {
+      if (pickupCoords && dropoffCoords) {
+        calculateRoute();
       }
     }
-  }
+  );
 
-  async function handleCopyCustomer() {
-    if (!latestCalculation) return;
-    const ok = await copyText(buildQuoteText());
-    setRouteStatus(ok ? 'Customer quote copied.' : 'Copy failed.');
-  }
+  $('share-btn').addEventListener(
+    'click',
+    copyReceipt
+  );
 
-  async function handleCopyDriver() {
-    if (!latestCalculation) return;
-    const ok = await copyText(buildDriverLogText());
-    setRouteStatus(ok ? 'Driver log copied.' : 'Copy failed.');
-  }
+  $('save-trip-btn').addEventListener(
+    'click',
+    saveCurrentTrip
+  );
 
-  function handleWhatsApp() {
-    if (!latestCalculation) return;
-    const text = encodeURIComponent(buildQuoteText());
-    window.open(`https://wa.me/?text=${text}`,'_blank');
-  }
-
-  /* =========================================================
-     14. INITIALISATION
-     ========================================================= */
-  function initHERE() {
-    if (!isApiKeyConfigured()) {
-      showError('HERE API key is not configured.');
-      return false;
-    }
-    try {
-      platform = new H.service.Platform({apikey:HERE_API_KEY});
-      const layers = platform.createDefaultLayers();
-      map = new H.Map(
-        $('map'),
-        layers.vector.normal.map,
-        {zoom:7,center:{lat:3.1390,lng:101.6869},pixelRatio:window.devicePixelRatio || 1}
-      );
-      new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
-      H.ui.UI.createDefault(map,layers);
-      router = platform.getRoutingService(null,8);
-      window.addEventListener('resize',() => map && map.getViewport().resize());
-      return true;
-    } catch (error) {
-      console.error('Map init failed:',error);
-      showError('Map failed to initialise. Check network and API key.');
-      return false;
-    }
-  }
-
-  function attachUIHandlers() {
-    $('current-loc-btn').addEventListener('click',requestCurrentLocation);
-    $('swap-locations-btn').addEventListener('click',swapLocations);
-    $('btn-mode-fast').addEventListener('click',() => setRoutingMode('fast'));
-    $('btn-mode-short').addEventListener('click',() => setRoutingMode('short'));
-    $('retry-route-btn').addEventListener('click',() => {
-      if (pickupCoords && dropoffCoords) calculateRoute();
-    });
-    $('pin-trip-btn').addEventListener('click',pinCurrentRoute);
-    $('copy-customer-btn').addEventListener('click',handleCopyCustomer);
-    $('share-btn').addEventListener('click',handleCopyDriver);
-    $('whatsapp-customer-btn').addEventListener('click',handleWhatsApp);
-
-    $('save-settings-btn').addEventListener('click',() => {
+  $('save-settings-btn').addEventListener(
+    'click',
+    () => {
       try {
         const next = readSettingsForm();
+
         settings = sanitizeSettings(next);
-        if (persistSettings()) {
-          setRouteStatus('Settings saved.');
-          if (pickupCoords && dropoffCoords) calculateRoute();
+
+        if (!persistSettings()) return;
+
+        if (pickupCoords && dropoffCoords) {
+          calculateRoute();
         }
-      } catch (error) {
+
+        setRouteStatus(
+          'Fare settings saved successfully on this device.'
+        );
+
+        clearError();
+
+      } catch(error) {
         showError(error.message);
       }
-    });
-    $('reset-settings-btn').addEventListener('click',() => {
+    }
+  );
+
+  $('reset-settings-btn').addEventListener(
+    'click',
+    () => {
+      if (
+        !confirm('Restore all default fare settings?')
+      ) {
+        return;
+      }
+
       settings = {...DEFAULT_SETTINGS};
-      persistSettings();
+
       populateSettingsForm();
-      setRouteStatus('Defaults restored.');
-      if (pickupCoords && dropoffCoords) calculateRoute();
+
+      if (!persistSettings()) return;
+
+      if (pickupCoords && dropoffCoords) {
+        calculateRoute();
+      }
+
+      setRouteStatus('Default fare settings restored.');
+      clearError();
+    }
+  );
+
+  $('export-history-btn').addEventListener(
+    'click',
+    exportHistoryCsv
+  );
+
+  $('clear-history-btn').addEventListener(
+    'click',
+    clearTripHistory
+  );
+
+  document.addEventListener('click',event => {
+    ['pickup','dropoff'].forEach(type => {
+      const box = $(`${type}-suggestions`);
+      const input = $(type);
+
+      if (
+        !box.contains(event.target) &&
+        !input.contains(event.target)
+      ) {
+        box.style.display = 'none';
+      }
     });
-    $('clear-history-btn').addEventListener('click',() => {
-      savedRoutes = {pinned:[],recent:[]};
-      persistSavedRoutes();
-      setRouteStatus('Saved routes cleared.');
-    });
+  });
+}
 
-    setupAutocomplete('pickup');
-    setupAutocomplete('dropoff');
-  }
+/* =========================================================
+   22. APPLICATION STARTUP
+========================================================= */
 
-  function init() {
-    settings = loadSettings();
-    savedRoutes = loadSavedRoutes();
-    populateSettingsForm();
-    renderQuickBar();
-    attachUIHandlers();
-    initHERE();
-  }
+function boot() {
+  populateSettingsForm();
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded',init,{once:true});
-  } else {
-    init();
+  renderHistory();
+
+  bindEvents();
+
+  initMap();
+
+  if (!isApiKeyConfigured()) {
+    setRouteStatus(
+      'Setup required: replace HERE_API_KEY with your valid key.'
+    );
   }
+}
+
+boot();
+
 })();
 </script>
+
 </body>
 </html>
