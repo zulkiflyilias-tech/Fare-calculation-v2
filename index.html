@@ -660,7 +660,7 @@
 
       <div id="toll-breakdown-box" class="toll-breakdown-box" style="display:none">
         <div id="toll-warning-banner" class="estimated-warning-banner" style="display:none">
-          ⚠️ Some toll entries are unverified or corridor-estimated. Confirm before travel.
+          ⚠️ Some toll amounts are HERE route estimates, not verified official plaza tariffs. Confirm before travel.
         </div>
       </div>
 
@@ -798,7 +798,7 @@
     </details>
 
     <p class="small-muted">
-      Estimates are indicative. HERE MYR route tolls are preserved. Registry plaza aliases are partial; missing LLM IDs, coordinates and official tariffs are explicitly marked pending verification.
+      Estimates are indicative. HERE route tolls are shown separately from official tariffs. Plaza identity matches do not verify the amount. Unallocated route estimates are never assigned to invented plaza names.
     </p>
   </main>
 </div>
@@ -810,7 +810,7 @@
   /* =========================================================
      1. CONFIGURATION & COMPREHENSIVE MALAYSIAN TOLL DIRECTORY
      ========================================================= */
-  const APP_VERSION = '3.7.0';
+  const APP_VERSION = '3.8.0';
   const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
   const DEFAULT_SETTINGS = Object.freeze({
@@ -1625,11 +1625,11 @@
   }
 
   const TOLL_MASTER_REGISTRY = Object.freeze({
-    schemaVersion:'1.0.0',
+    schemaVersion:'1.1.0',
     country:'MY',
     currency:'MYR',
     vehicleClass:{id:1,label:'Class 1',description:'Private passenger cars; 2 axles, 3 or 4 wheels'},
-    generatedAt:'2026-11-25',
+    generatedAt:new Date().toISOString().slice(0,10),
     dataPolicy:{
       llmIds:'Only populated when confirmed from an authoritative LLM source; null means not yet verified.',
       coordinates:'Only populated when independently sourced; null means not yet verified.',
@@ -1794,7 +1794,7 @@
     const payload = {
       ...TOLL_MASTER_REGISTRY,
       exportedAt:new Date().toISOString(),
-      exportNotes:'This is the app-integrated seed registry. Null LLM IDs, coordinates, tariff models and source fields are intentionally not fabricated. HERE route MYR amounts remain authoritative for route estimates until official Class 1 tariffs are validated.'
+      exportNotes:'Seed registry only. Internal IDs are not LLM IDs. Null LLM IDs, coordinates, tariff models and sources are not fabricated. HERE toll amounts are route estimates and are never labelled as official tariff verification. Route summary costs remain unallocated; no synthetic plaza charges are added.'
     };
     const blob = new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'});
     const url = URL.createObjectURL(blob);
@@ -2536,35 +2536,52 @@
   function verifyAndStandardizeTollItem(rawItem) {
     const cleanedPlaza = cleanTollLabel(rawItem && rawItem.plazaName);
     const cleanedSystem = cleanTollLabel(rawItem && rawItem.systemName);
-    const searchBlob = `${cleanedPlaza} ${cleanedSystem} ${rawItem && rawItem.operator ? rawItem.operator : ''}`.toLowerCase();
+    const plazaText = ` ${cleanedPlaza.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()} `;
+    const systemText = `${cleanedSystem} ${rawItem && rawItem.operator ? rawItem.operator : ''}`.toLowerCase();
 
-    // 1. Check against the official plaza namelist & Class 1 tariff registry
-    let bestMatch = null;
-    let bestScore = 0;
-
+    // A plaza can only be matched from its own HERE collection-location label.
+    // Highway/operator context may disambiguate, but can never create a plaza match.
+    const candidates = [];
     for (const entry of MALAYSIA_TOLL_PLAZA_REGISTRY) {
-      const aliasHit = entry.aliases.some(alias => searchBlob.includes(alias));
-      if (!aliasHit) continue;
-
-      const contextHits = entry.contextKeywords.filter(ctx => searchBlob.includes(ctx)).length;
-      const score = 10 + contextHits * 5;
-      if (score > bestScore) {
-        bestScore = score;
-        bestMatch = entry;
-      }
+      const alias = (entry.aliases || [])
+        .slice()
+        .sort((a,b) => b.length - a.length)
+        .find(value => {
+          const token = ` ${String(value).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()} `;
+          return token.length > 2 && plazaText.includes(token);
+        });
+      if (!alias) continue;
+      const requiredContext = (entry.contextKeywords || []);
+      const contextHits = requiredContext.filter(ctx => systemText.includes(String(ctx).toLowerCase())).length;
+      candidates.push({entry,aliasLength:alias.length,contextHits});
     }
+    candidates.sort((a,b) => b.aliasLength - a.aliasLength || b.contextHits - a.contextHits);
+
+    const top = candidates[0] || null;
+    const tied = top && candidates.filter(x =>
+      x.aliasLength === top.aliasLength && x.contextHits === top.contextHits
+    );
+    const bestMatch = top && tied.length === 1 ? top.entry : null;
 
     if (bestMatch) {
-      const registryRecord = TOLL_MASTER_REGISTRY.plazas.find(p => p.officialPlazaName === bestMatch.officialName && p.operatorName === bestMatch.operator) || null;
-      // Never replace a HERE route fare with a flat per-plaza reference value.
-      // Closed systems need an entry × exit matrix; open-system tariff evidence
-      // must be explicit and current before it can become the payable amount.
+      const registryRecord = TOLL_MASTER_REGISTRY.plazas.find(p =>
+        p.officialPlazaName === bestMatch.officialName && p.operatorName === bestMatch.operator
+      ) || null;
+      const referenceCents = registryRecord && Number.isFinite(registryRecord.class1RateReferenceRM)
+        ? toCents(registryRecord.class1RateReferenceRM) : null;
+      const amountCents = rawItem.cents !== null && rawItem.cents !== undefined ? Number(rawItem.cents) : null;
+      // Large divergence from a known open-plaza reference is a reconciliation alert,
+      // not permission to overwrite HERE's route total with the reference tariff.
+      const amountAnomaly = referenceCents !== null && referenceCents > 0 &&
+        amountCents !== null && amountCents > referenceCents * 3;
       return {
         ...rawItem,
         operator:bestMatch.operator,
         systemName:bestMatch.highway,
         plazaName:bestMatch.officialName,
         registryMatched:Boolean(registryRecord),
+        amountAnomaly,
+        registryReferenceCents:referenceCents,
         registryPlazaId:registryRecord ? registryRecord.plazaId : null,
         registryOperatorId:registryRecord ? registryRecord.operatorId : null,
         llmEntryId:registryRecord ? registryRecord.llmEntryId : null,
@@ -2573,34 +2590,32 @@
         registryLongitude:registryRecord ? registryRecord.longitude : null,
         registryRateReferenceRM:registryRecord ? registryRecord.class1RateReferenceRM : null,
         registryRateStatus:registryRecord ? registryRecord.rateStatus : 'not-listed',
-        // Preserve HERE's MYR amount; a registry reference is not an active tariff.
+        // A name match validates identity only. HERE's amount is not an official tariff verification.
         cents:rawItem.cents,
         amount:rawItem.cents !== null && rawItem.cents !== undefined ? fromCents(rawItem.cents) : null,
         unresolved:rawItem.cents === null || rawItem.cents === undefined,
-        verificationStatus:rawItem.verificationStatus || (rawItem.cents !== null && rawItem.cents !== undefined ? 'here-myr' : 'unverified')
+        verificationStatus:rawItem.unresolved ? 'unverified' : 'here-route'
       };
     }
 
-    // 2. Fallback: Match concessionaire from 19-operator directory & normalize to "Plaza Tol <Name>"
-    const opEntry = matchMalaysiaOperatorEntry(searchBlob);
-    const operator = opEntry ? opEntry.operator : (rawItem.operator || 'LLM Concessionaire');
-    const shortOp = opEntry ? opEntry.shortName : '';
-
-    let formattedPlaza = cleanedPlaza || cleanedSystem || 'Toll Plaza';
-    if (formattedPlaza && !/^plaza\s+tol/i.test(formattedPlaza) && !/^toll\s+section/i.test(formattedPlaza) && !/^toll\s+summary/i.test(formattedPlaza)) {
+    const opEntry = matchMalaysiaOperatorEntry(`${cleanedPlaza} ${cleanedSystem}`);
+    const operator = opEntry ? opEntry.operator : (rawItem.operator || 'Unidentified concessionaire');
+    let formattedPlaza = cleanedPlaza || cleanedSystem || 'Unidentified toll charge';
+    if (formattedPlaza && !/^plaza\s+tol/i.test(formattedPlaza) &&
+        !/^toll\s+(section|summary|route)/i.test(formattedPlaza)) {
       formattedPlaza = `Plaza Tol ${formattedPlaza}`;
     }
-    if (shortOp && !formattedPlaza.toLowerCase().includes(shortOp.toLowerCase())) {
-      formattedPlaza = `${formattedPlaza} (${shortOp})`;
-    }
-
-    const isVerified = !rawItem.unresolved && Number.isFinite(rawItem.cents) && rawItem.cents >= 0;
-
     return {
       ...rawItem,
       operator,
       plazaName:formattedPlaza,
-      verificationStatus:rawItem.verificationStatus || (isVerified ? 'verified' : 'unverified')
+      registryMatched:false,
+      registryPlazaId:null,
+      registryOperatorId:opEntry ? `MY-OP-${registrySlug(opEntry.shortName)}` : null,
+      llmEntryId:null,
+      llmExitId:null,
+      unresolved:rawItem.cents === null || rawItem.cents === undefined,
+      verificationStatus:rawItem.unresolved ? 'unverified' : (rawItem.verificationStatus || 'here-route')
     };
   }
 
@@ -2758,217 +2773,142 @@
 
   function evaluateRouteTolls(route) {
     const sections = Array.isArray(route && route.sections) ? route.sections : [];
-    const rawItems = [];
+    const items = [];
     const seenFareIds = new Set();
     let itemisedSections = 0;
     let summarySections = 0;
+    let unresolvedCount = 0;
     let hasEstimatedTolls = false;
+    let totalCents = 0;
 
     sections.forEach((section,sIdx) => {
       const tolls = Array.isArray(section.tolls) ? section.tolls : [];
-      const secCosts = section.summary && Array.isArray(section.summary.tollCosts)
-        ? section.summary.tollCosts
-        : [];
+      const sectionCosts = section.summary && Array.isArray(section.summary.tollCosts)
+        ? section.summary.tollCosts : [];
+
       if (tolls.length) {
         itemisedSections++;
         tolls.forEach((toll,tIdx) => {
           const systemName = getTollSystemLabel(section,toll);
           const locationName = getTollLocationName(toll);
-          const plazaName = locationName || systemName || `Toll Plaza ${sIdx + 1}.${tIdx + 1}`;
+          const plazaName = locationName || '';
           const picked = extractMyrFare(toll);
-          if (!picked) {
-            rawItems.push(verifyAndStandardizeTollItem({
-              plazaName,
-              systemName,
-              operator:matchMalaysiaOperator(`${plazaName} ${systemName}`),
-              cents:null,
-              amount:null,
-              unresolved:true,
-              verificationStatus:'unverified'
-            }));
+          const fareId = picked && picked.fareId ? picked.fareId : '';
+
+          if (fareId && seenFareIds.has(fareId)) return;
+          if (fareId) seenFareIds.add(fareId);
+
+          const item = verifyAndStandardizeTollItem({
+            plazaName:plazaName || `Unidentified HERE toll event ${sIdx + 1}.${tIdx + 1}`,
+            systemName,
+            operator:'',
+            cents:picked ? picked.cents : null,
+            amount:picked ? fromCents(picked.cents) : null,
+            unresolved:!picked,
+            verificationStatus:picked ? 'here-route' : 'unverified',
+            source:'HERE section.tolls',
+            sourceFareId:fareId || null,
+            eventIndex:`${sIdx + 1}.${tIdx + 1}`,
+            tariffVerified:false
+          });
+
+          if (item.unresolved) {
+            unresolvedCount++;
+            hasEstimatedTolls = true;
+          } else {
+            totalCents += item.cents;
+          }
+          items.push(item);
+        });
+        // Itemised toll events take precedence over the same section's summary.
+        return;
+      }
+
+      if (sectionCosts.length) {
+        summarySections++;
+        hasEstimatedTolls = true;
+        sectionCosts.forEach((cost,cIdx) => {
+          const price = [cost && cost.convertedPrice,cost && cost.price,cost].find(p =>
+            p && typeof p === 'object' &&
+            Number.isFinite(Number(p.value)) && Number(p.value) >= 0 &&
+            String(p.currency || (cost && cost.currency) || '').toUpperCase() === 'MYR'
+          );
+          const fareId = cost && cost.id ? String(cost.id) : '';
+          if (fareId && seenFareIds.has(fareId)) return;
+          if (fareId) seenFareIds.add(fareId);
+
+          if (!price) {
+            unresolvedCount++;
+            items.push({
+              plazaName:`Unallocated section toll estimate ${sIdx + 1}.${cIdx + 1}`,
+              systemName:'HERE route section summary',
+              operator:'Unallocated route toll',
+              cents:null, amount:null, unresolved:true,
+              verificationStatus:'unverified', source:'HERE section.summary.tollCosts',
+              tariffVerified:false
+            });
             return;
           }
-          if (picked.fareId && seenFareIds.has(picked.fareId)) return;
-          if (picked.fareId) seenFareIds.add(picked.fareId);
-          rawItems.push(verifyAndStandardizeTollItem({
-            plazaName,
-            systemName,
-            operator:matchMalaysiaOperator(`${plazaName} ${systemName}`),
-            cents:picked.cents,
-            amount:fromCents(picked.cents),
-            unresolved:false,
-            verificationStatus:'verified'
-          }));
+          const cents = toCents(Number(price.value));
+          totalCents += cents;
+          items.push({
+            plazaName:`Unallocated section toll estimate ${sIdx + 1}.${cIdx + 1}`,
+            systemName:'HERE route section summary',
+            operator:'Unallocated route toll',
+            cents, amount:fromCents(cents), unresolved:false,
+            verificationStatus:'corridor', source:'HERE section.summary.tollCosts',
+            tariffVerified:false
+          });
         });
-        return;
-      }
-      if (secCosts.length) {
-        summarySections++;
-        extractTollCostsArray(secCosts,`Toll Section ${sIdx + 1}`,rawItems,seenFareIds);
       }
     });
 
-    if (itemisedSections === 0 && summarySections === 0 && route && route.summary && Array.isArray(route.summary.tollCosts) && route.summary.tollCosts.length) {
-      extractTollCostsArray(route.summary.tollCosts,'Toll Summary',rawItems,seenFareIds);
-    }
-
-    const corridors = analyzeRoutePolylineCorridors(route);
-
-    // WCE (E32) Missing Tariff Compensation (Selangor Sec 6 & Perak Sec 8)
-    if (!avoidTolls) {
-      if (corridors.wceSelangorBbrAssamJawa) {
-        const hasWceSel = rawItems.some(it =>
-          !it.unresolved &&
-          /assam jawa|bukit raja utara|kapar/i.test(`${it.plazaName || ''} ${it.systemName || ''}`) &&
-          it.cents >= 350
+    // Route-level summary is only a fallback when HERE provides no section-level toll data.
+    if (itemisedSections === 0 && summarySections === 0 &&
+        route && route.summary && Array.isArray(route.summary.tollCosts) &&
+        route.summary.tollCosts.length) {
+      hasEstimatedTolls = true;
+      route.summary.tollCosts.forEach((cost,idx) => {
+        const price = [cost && cost.convertedPrice,cost && cost.price,cost].find(p =>
+          p && typeof p === 'object' &&
+          Number.isFinite(Number(p.value)) && Number(p.value) >= 0 &&
+          String(p.currency || (cost && cost.currency) || '').toUpperCase() === 'MYR'
         );
-        if (!hasWceSel) {
-          const cSel = toCents(WCE_SELANGOR_BBR_ASSAM_JAWA_RATE);
-          hasEstimatedTolls = true;
-          rawItems.unshift({
-            plazaName:'Plaza Tol Bandar Bukit Raja Utara – Assam Jawa (WCE Sec 6)',
-            systemName:'West Coast Expressway — WCE (E32)',
-            operator:'West Coast Expressway Sdn Bhd (WCE)',
-            cents:cSel,
-            amount:fromCents(cSel),
-            unresolved:false,
-            verificationStatus:'corridor'
+        if (!price) {
+          unresolvedCount++;
+          items.push({
+            plazaName:`Unallocated route toll estimate ${idx + 1}`,
+            systemName:'HERE route summary',
+            operator:'Unallocated route toll',
+            cents:null, amount:null, unresolved:true,
+            verificationStatus:'unverified', source:'HERE route.summary.tollCosts',
+            tariffVerified:false
           });
+          return;
         }
-      }
-
-      if (corridors.wcePerakHutanMelintangTelukIntan) {
-        const hasWcePrk8 = rawItems.some(it =>
-          !it.unresolved &&
-          /hutan melintang|teluk intan/i.test(`${it.plazaName || ''} ${it.systemName || ''}`) &&
-          it.cents >= 250
-        );
-        if (!hasWcePrk8) {
-          const cPrk = toCents(WCE_PERAK_HUTAN_MELINTANG_TELUK_INTAN_RATE);
-          hasEstimatedTolls = true;
-          rawItems.push({
-            plazaName:'Plaza Tol Hutan Melintang – Teluk Intan (WCE Sec 8)',
-            systemName:'West Coast Expressway — WCE (E32)',
-            operator:'West Coast Expressway Sdn Bhd (WCE)',
-            cents:cPrk,
-            amount:fromCents(cPrk),
-            unresolved:false,
-            verificationStatus:'corridor'
-          });
-        }
-      }
-    }
-
-    // Genting Highlands Road Charge (RM 5.00 Class 1 entry charge)
-    const highlandZone = getHighlandZone(pickupCoords,dropoffCoords);
-    const inGentingZone = Boolean(highlandZone && highlandZone.isGenting);
-    const routeMentionsGenting = rawItems.some(item =>
-      /genting|gohtong|sempah/i.test(`${item.plazaName || ''} ${item.systemName || ''}`)
-    );
-    if (inGentingZone || routeMentionsGenting) {
-      const hasGentingItem = rawItems.some(item =>
-        !item.unresolved &&
-        /genting|gohtong|sempah/i.test(`${item.plazaName || ''} ${item.systemName || ''} ${item.operator || ''}`)
-      );
-      if (!hasGentingItem) {
-        const gentingCents = toCents(GENTING_ROAD_CHARGE);
-        hasEstimatedTolls = true;
-        rawItems.push({
-          plazaName:GENTING_ROAD_CHARGE_NAME,
-          systemName:'Jalan Genting Highlands',
-          operator:'Lingkaran Cekap Sdn Bhd (Genting Malaysia)',
-          cents:gentingCents,
-          amount:fromCents(gentingCents),
-          unresolved:false,
-          verificationStatus:'corridor'
+        const cents = toCents(Number(price.value));
+        totalCents += cents;
+        items.push({
+          plazaName:`Unallocated route toll estimate ${idx + 1}`,
+          systemName:'HERE route summary',
+          operator:'Unallocated route toll',
+          cents, amount:fromCents(cents), unresolved:false,
+          verificationStatus:'corridor', source:'HERE route.summary.tollCosts',
+          tariffVerified:false
         });
-      }
+      });
     }
-
-    // Penang 1st & 2nd Bridge Toll Fix (Direction-Aware + Verified RM 5.74)
-    const pickupIsland = isOnPenangIsland(pickupCoords);
-    const dropoffIsland = isOnPenangIsland(dropoffCoords);
-    const bridgeRegex = /penang.*bridge|jambatan.*(pulau pinang|kedua|sultan abdul halim)|jksb|perai|prai|bandar cassia|jk2pp/i;
-
-    if (pickupIsland && !dropoffIsland) {
-      // Island -> Mainland is RM 0.00 on both Penang bridges
-      for (let i = rawItems.length - 1; i >= 0; i--) {
-        const it = rawItems[i];
-        if (!it.unresolved && bridgeRegex.test(`${it.plazaName || ''} ${it.systemName || ''} ${it.operator || ''}`) && it.cents >= 500) {
-          rawItems.splice(i,1);
-        }
-      }
-    } else if (!pickupIsland && dropoffIsland) {
-      // Mainland -> Penang Island (RM 5.74 Class 1 on both 1st & 2nd Bridge)
-      const hasBridgeItem = rawItems.some(item =>
-        !item.unresolved &&
-        item.cents >= 500 &&
-        bridgeRegex.test(`${item.plazaName || ''} ${item.systemName || ''} ${item.operator || ''}`)
-      );
-      if (!hasBridgeItem) {
-        if (corridors.penangBridge === 'second') {
-          const c2 = toCents(PENANG_2ND_BRIDGE_RATE);
-          hasEstimatedTolls = true;
-          rawItems.push({
-            plazaName:'Plaza Tol Bandar Cassia / JK2PP (Jambatan Kedua)',
-            systemName:'Sultan Abdul Halim Mu\'adzam Shah Bridge (E28)',
-            operator:'Jambatan Kedua Sdn Bhd (JKSB)',
-            cents:c2,
-            amount:fromCents(c2),
-            unresolved:false,
-            verificationStatus:'corridor'
-          });
-        } else if (corridors.penangBridge === 'first' || !avoidTolls) {
-          const c1 = toCents(PENANG_1ST_BRIDGE_RATE);
-          hasEstimatedTolls = true;
-          rawItems.push({
-            plazaName:'Plaza Tol Jambatan Pulau Pinang (Perai)',
-            systemName:'Penang Bridge (E36)',
-            operator:'PLUS Malaysia Berhad',
-            cents:c1,
-            amount:fromCents(c1),
-            unresolved:false,
-            verificationStatus:'corridor'
-          });
-        }
-      }
-    }
-
-    // AGGREGATION STEP: Group by Operator + Official Plaza Name
-    const aggregatedMap = new Map();
-    let totalTollCents = 0;
-    let unresolvedCount = 0;
-
-    rawItems.forEach(item => {
-      if (item.unresolved) {
-        unresolvedCount++;
-        const key = `UNRESOLVED|${item.operator}|${item.plazaName}`;
-        if (!aggregatedMap.has(key)) {
-          aggregatedMap.set(key,{...item,isUnresolvedGroup:true});
-        }
-        return;
-      }
-
-      const key = `${item.operator || 'Unknown'}|${item.plazaName || 'Unknown'}`;
-      if (aggregatedMap.has(key)) {
-        const existing = aggregatedMap.get(key);
-        existing.cents += item.cents;
-        existing.amount = fromCents(existing.cents);
-      } else {
-        aggregatedMap.set(key,{...item});
-      }
-
-      totalTollCents += item.cents;
-    });
-
-    const finalItems = Array.from(aggregatedMap.values());
 
     return {
-      cents:totalTollCents,
-      amount:fromCents(totalTollCents),
-      items:finalItems,
+      cents:totalCents,
+      amount:fromCents(totalCents),
+      items,
       unresolvedCount,
-      hasEstimatedTolls
+      hasEstimatedTolls:hasEstimatedTolls || items.some(x => x.verificationStatus === 'corridor'),
+      itemisedSections,
+      summarySections,
+      tariffVerifiedCount:0,
+      registryMatchedCount:items.filter(x => x.registryMatched).length
     };
   }
 
@@ -3188,7 +3128,7 @@
       const title = document.createElement('div');
       title.className = 'toll-breakdown-title';
       const titleText = document.createElement('span');
-      titleText.textContent = `HERE Toll Results · ${routeData.tollResult.items.filter(x => x.registryMatched).length} registry match(es)`;
+      titleText.textContent = `HERE Toll Results · ${routeData.tollResult.registryMatchedCount || 0} plaza identity match(es)`;
       title.appendChild(titleText);
       breakdownBox.appendChild(title);
 
@@ -3228,13 +3168,17 @@
           row.classList.add('fare-warning');
         } else if (item.verificationStatus === 'corridor') {
           badge.className = 'toll-badge corridor';
-          badge.textContent = 'Corridor estimate';
+          badge.textContent = 'Unallocated route estimate';
+        } else if (item.amountAnomaly) {
+          badge.className = 'toll-badge unverified';
+          badge.textContent = 'Amount mismatch · investigate';
+          row.classList.add('fare-warning');
         } else if (item.registryMatched) {
           badge.className = 'toll-badge registry';
-          badge.textContent = 'HERE MYR · Registry matched';
+          badge.textContent = 'Plaza matched · HERE fare';
         } else {
           badge.className = 'toll-badge verified';
-          badge.textContent = 'HERE MYR';
+          badge.textContent = 'HERE route fare';
         }
 
         right.append(amountSpan,badge);
@@ -3242,7 +3186,7 @@
         breakdownBox.appendChild(row);
       });
 
-      if (routeData.tollResult.hasEstimatedTolls || routeData.tollResult.unresolvedCount > 0) {
+      if (routeData.tollResult.hasEstimatedTolls || routeData.tollResult.unresolvedCount > 0 || routeData.tollResult.items.some(x => x.amountAnomaly)) {
         warningBanner.style.display = 'flex';
       } else {
         warningBanner.style.display = 'none';
@@ -3328,7 +3272,7 @@
   function receiptText(data) {
     const tollLines = Array.isArray(data.tollItems) && data.tollItems.length
       ? data.tollItems.map(t => {
-          const tag = t.unresolved ? '[UNVERIFIED]' : (t.verificationStatus === 'corridor' ? '[CORRIDOR]' : '[VERIFIED]');
+          const tag = t.unresolved ? '[UNVERIFIED]' : (t.amountAnomaly ? '[AMOUNT MISMATCH — INVESTIGATE]' : (t.verificationStatus === 'corridor' ? '[ROUTE ESTIMATE]' : '[HERE ROUTE FARE — TARIFF NOT VERIFIED]'));
           return ` - ${formatTollDisplayName(t)} ${tag}: ${t.unresolved ? 'Confirm manually' : money(t.amount)}`;
         }).join('\n')
       : ' - No toll records returned; verify before travel';
@@ -3351,7 +3295,7 @@
       `Transport subtotal: ${money(data.transportSubtotal)}`,
       `Minimum-adjusted transport fare: ${money(data.transportFare)}`,
       `Toll charges: ${money(data.tollFee)}`,
-      'Operator-Verified Toll Plazas:',
+      'HERE Toll Events / Route Estimates (not official tariff verification):',
       tollLines,
       '------------------------------------------------',
       `Exact calculated total: ${money(data.exactTotal)}`,
