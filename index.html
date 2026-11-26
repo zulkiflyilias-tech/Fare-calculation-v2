@@ -5,10 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare and toll estimator">
-<title>Rideshare MY Personal Edition v3.9 Offline</title>
-<meta name="application-name" content="Rideshare MY Offline Fare & Toll Estimator">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
+<title>Rideshare MY Personal Edition v3.8.6</title>
+<link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 <style>
   :root {
     --primary:#8e24aa;
@@ -40,12 +38,12 @@
     position:relative;
   }
   #map {
-    height:23vh; min-height:145px; width:100%; z-index:1;
-    background:#eef1f4; position:relative; overflow:hidden;
-    border-bottom:1px solid #d8dde3;
+    height:23vh;
+    min-height:145px;
+    width:100%;
+    z-index:1;
+    background:#e9e9e9;
   }
-  #offline-route-svg {width:100%;height:100%;display:block}
-  .map-caption {position:absolute;left:9px;bottom:7px;padding:4px 7px;border-radius:5px;background:#ffffffdf;color:#58616b;font-size:10px;pointer-events:none}
   #search-panel {
     flex:1;
     min-height:0;
@@ -226,7 +224,13 @@
   }
   .chip-btn:hover {background:#ede7f6}
   .chip-btn.recent {background:#f1f3f5;color:#495057}
-  .route-controls {display:grid;grid-template-columns:1fr 1fr;align-items:stretch;gap:6px;margin:4px 0 8px;}
+  .route-controls {
+    display:flex;
+    flex-direction:row;
+    align-items:stretch;
+    gap:6px;
+    margin:4px 0 8px;
+  }
   .mode-btn {
     flex:1;
     min-width:0;
@@ -242,7 +246,9 @@
     align-items:center;
     justify-content:center;
     gap:3px;
-    white-space:nowrap;
+    white-space:normal;
+    line-height:1.25;
+    min-height:38px;
   }
   .mode-btn.active {
     background:#f3e5f5;
@@ -523,21 +529,18 @@
     .share-actions {grid-template-columns:1fr}
   }
 </style>
+<script src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
+<script src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
+<script src="https://js.api.here.com/v3/3.1/mapsjs-ui.js"></script>
+<script src="https://js.api.here.com/v3/3.1/mapsjs-mapevents.js"></script>
 </head>
 <body>
 <div id="container">
-  <div id="map" aria-label="Offline route preview">
-    <svg id="offline-route-svg" viewBox="0 0 800 420" role="img" aria-label="Route preview">
-      <rect width="800" height="420" fill="#eef1f4"/>
-      <text x="400" y="190" text-anchor="middle" fill="#6c757d" font-size="22">Offline route preview</text>
-      <text x="400" y="222" text-anchor="middle" fill="#8a929a" font-size="14">Select pickup and destination to calculate</text>
-    </svg>
-    <div class="map-caption">Route preview · Not a navigation map</div>
-  </div>
+  <div id="map" aria-label="Route overview map"></div>
   <main id="search-panel">
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.9 OFFLINE</span>
+      <span class="version">PERSONAL EDITION v3.8.6</span>
     </div>
 
     <!-- QUICK PINS & RECENT ROUTES -->
@@ -569,13 +572,15 @@
 
     <!-- ROUTING CONTROLS -->
     <div class="route-controls">
-      <button class="mode-btn active" id="btn-mode-fast" type="button">⚡ Normal · Toll Allowed</button>
-      <button class="mode-btn" id="btn-mode-short" type="button">📏 Shortest · Toll Allowed</button>
-      <button class="mode-btn" id="btn-mode-fast-notoll" type="button">🚫 Normal · No Toll</button>
-      <button class="mode-btn" id="btn-mode-short-notoll" type="button">📐 Shortest · No Toll</button>
-    </div>
-    <div class="small-muted" style="margin:-2px 0 7px">
-      Offline routing · No turn-by-turn navigation · ETA is a road-profile estimate, not live traffic
+      <button class="mode-btn active" id="btn-mode-fast" type="button">
+        🚗 Normal route (tolls)
+      </button>
+      <button class="mode-btn" id="btn-mode-short" type="button">
+        📏 Shortest (tolls)
+      </button>
+      <button class="mode-btn" id="btn-mode-notoll" type="button">
+        🚫 Shortest (no tolls)
+      </button>
     </div>
 
     <div id="loading-msg">Calculating route…</div>
@@ -593,11 +598,11 @@
       </div>
       <div class="fare-meta">
         <span id="fare-distance">0 km</span>
-        <span id="fare-duration">0 mins</span>
+        <span>ETA: <span id="fare-duration">0 mins</span></span>
       </div>
 
       <details open>
-        <summary>Detailed Fare Calculation</summary>
+        <summary>Trip, Fare &amp; Toll Summary</summary>
         <div class="detail-row">
           <span>Distance fare</span>
           <span id="calc-distance-fare">RM 0.00</span>
@@ -741,7 +746,7 @@
     </details>
 
     <p class="small-muted">
-      Offline route calculation uses locally installed road data. Toll estimates use the bundled Class 1 plaza registry and tariff matrices; unmatched closed-system pairs are labelled as estimates and should be verified.
+      Estimates are indicative. Toll calculations use Class 1 operator matrices and open/bridge tariffs across Peninsular Malaysia, Sabah &amp; Sarawak. Cross-check complex multi-highway trips with TollGuru.
     </p>
   </main>
 </div>
@@ -753,10 +758,8 @@
   /* =========================================================
      1. CONFIGURATION & ZONES
      ========================================================= */
-  const APP_VERSION = '3.9.0-OFFLINE';
-  // Local-only services; no cloud APIs or external CDN dependencies.
-  const OFFLINE_ROUTER_URL = 'http://127.0.0.1:8002/route';
-  const OFFLINE_GEOCODER_URL = 'http://127.0.0.1:8088';
+  const APP_VERSION = '3.8.6';
+  const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
   const DEFAULT_SETTINGS = Object.freeze({
     ratePerKm:1.45,
@@ -773,15 +776,16 @@
     roundingUnit:1
   });
 
-  const SETTINGS_KEY = 'rideshareMY.personal.v3.9.offline.settings';
+  const SETTINGS_KEY = 'rideshareMY.personal.v3.8.6.settings';
   const LEGACY_SETTINGS_KEYS = [
+    'rideshareMY.personal.v3.8.5.settings',
     'rideshareMY.personal.v3.8.settings',
     'rideshareMY.personal.v3.6.settings',
     'rideshareMY.personal.v3.5.settings',
     'rideshareMY.personal.v3.1.settings',
     'rideshareMY.personal.v3.0.settings'
   ];
-  const ROUTES_STORAGE_KEY = 'rideshareMY.personal.v3.9.offline.routes';
+  const ROUTES_STORAGE_KEY = 'rideshareMY.personal.v3.8.routes';
   const MAX_PINNED_ROUTES = 6;
   const MAX_RECENT_ROUTES = 5;
 
@@ -1589,25 +1593,12 @@
     $('route-status').textContent = message || '';
   }
 
-  function isApiKeyConfigured() { return true; }
-
-  function coordinateItem(query) {
-    if (!/^\s*-?\d{1,2}(?:\.\d+)?\s*[, ]\s*-?\d{1,3}(?:\.\d+)?\s*$/.test(query || '')) return null;
-    const parts=query.trim().split(/[ ,]+/).map(Number);
-    if (parts.length!==2 || !Number.isFinite(parts[0]) || !Number.isFinite(parts[1]) ||
-        Math.abs(parts[0])>90 || Math.abs(parts[1])>180) return null;
-    return {title:`Coordinates ${parts[0].toFixed(5)}, ${parts[1].toFixed(5)}`,
-      address:{label:`${parts[0].toFixed(5)}, ${parts[1].toFixed(5)}`},
-      position:{lat:parts[0],lng:parts[1]},categories:[]};
-  }
-
-  function normalizeGeocoderItem(item) {
-    const lat=Number(item.lat ?? (item.position && item.position.lat));
-    const lng=Number(item.lon ?? item.lng ?? (item.position && item.position.lng));
-    const label=item.display_name || (item.address && item.address.label) || item.name || item.title || '';
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    return {title:item.name || item.title || label.split(',')[0] || 'Location',
-      address:{label},position:{lat,lng},categories:[]};
+  function isApiKeyConfigured() {
+    return (
+      HERE_API_KEY &&
+      !HERE_API_KEY.includes('PASTE_') &&
+      HERE_API_KEY.length > 15
+    );
   }
 
   /* =========================================================
@@ -1731,8 +1722,8 @@
     return bestPlaza;
   }
 
-  function evaluateRouteTolls(rawRoutePoints, avoidTollsSelected) {
-    const routePoints = densifyRoutePoints(rawRoutePoints, 0.10);
+  function evaluateRouteTolls(rawRoutePoints) {
+    const routePoints = densifyRoutePoints(rawRoutePoints, 0.30);
     const cumDistances = [0];
     for (let i = 1; i < routePoints.length; i++) {
       cumDistances.push(
@@ -1863,8 +1854,6 @@
           continue;
         }
 
-        if (avoidTollsSelected) continue;
-
         if (p.type === 'BRIDGE') {
           const bridgeDir = determineBridgeDirection(routePoints, cumDistances, hit.kmAtHit);
           const isTolledLeg = bridgeDir === p.dir;
@@ -1898,7 +1887,6 @@
       }
 
       // CLOSED_CLUSTER: order by corridor index when available so entry->exit pair matches official direction
-      if (avoidTollsSelected) continue;
       const cluster = item.hits;
       const netId = item.netId;
 
@@ -1963,48 +1951,54 @@
       totalTollCents += ev.amountCents;
     }
 
+    const estimatedEvents = events.filter(ev =>
+      /\bEst\.|estimated|fallback/i.test(ev.subtitle || '')
+    ).length;
+    const unresolvedEvents = events.filter(ev => ev.unresolved).length;
+
     return {
       events,
       operatorSubtotals,
-      totalTollCents
+      totalTollCents,
+      estimatedEvents,
+      unresolvedEvents
     };
   }
 
   /* =========================================================
-     7. OFFLINE ROUTE PREVIEW (NO ONLINE MAP SDK / TILE REQUESTS)
+     7. MAP OBJECT MANAGEMENT
      ========================================================= */
-  let previewPickup=null, previewDropoff=null, previewRoutePoints=[];
-  function clearRouteObjects(){previewRoutePoints=[];renderOfflineMap();}
-  function clearMarker(type){
-    if(type==='pickup') previewPickup=null; else previewDropoff=null;
-    renderOfflineMap();
+  function clearRouteObjects() {
+    if (!map) return;
+    routePolylines.forEach(line => {
+      try { map.removeObject(line); } catch (_) {}
+    });
+    routePolylines = [];
   }
-  function updateMarker(type,coords){
-    if(type==='pickup') previewPickup=coords?{...coords}:null;
-    else previewDropoff=coords?{...coords}:null;
-    renderOfflineMap();
-  }
-  function renderOfflineMap(routePoints){
-    const svg=$('offline-route-svg'); if(!svg)return;
-    if(Array.isArray(routePoints)) previewRoutePoints=routePoints;
-    const pts=[...previewRoutePoints,...(previewPickup?[previewPickup]:[]),...(previewDropoff?[previewDropoff]:[])];
-    if(!pts.length){
-      svg.innerHTML='<rect width="800" height="420" fill="#eef1f4"/><text x="400" y="190" text-anchor="middle" fill="#6c757d" font-size="22">Offline route preview</text><text x="400" y="222" text-anchor="middle" fill="#8a929a" font-size="14">Select pickup and destination to calculate</text>';
-      return;
+
+  function clearMarker(type) {
+    if (!map) return;
+    if (type === 'pickup' && pickupMarker) {
+      map.removeObject(pickupMarker);
+      pickupMarker = null;
     }
-    const minLat=Math.min(...pts.map(p=>p.lat)),maxLat=Math.max(...pts.map(p=>p.lat));
-    const minLng=Math.min(...pts.map(p=>p.lng)),maxLng=Math.max(...pts.map(p=>p.lng));
-    const latSpan=Math.max(.002,maxLat-minLat),lngSpan=Math.max(.002,maxLng-minLng);
-    const scale=Math.min(710/lngSpan,330/latSpan),cx=(minLng+maxLng)/2,cy=(minLat+maxLat)/2;
-    const project=p=>({x:400+(p.lng-cx)*scale,y:210-(p.lat-cy)*scale});
-    const route=previewRoutePoints.map(project);
-    const path=route.length>1?route.map((p,i)=>`${i?'L':'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '):'';
-    const marker=(p,color,label)=>{
-      if(!p)return '';
-      const q=project(p);
-      return `<circle cx="${q.x}" cy="${q.y}" r="11" fill="${color}" stroke="#fff" stroke-width="4"/><text x="${q.x+15}" y="${q.y-12}" fill="#263238" font-size="15" font-weight="700">${label}</text>`;
-    };
-    svg.innerHTML=`<rect width="800" height="420" fill="#eef1f4"/><path d="M0 80H800 M0 160H800 M0 240H800 M0 320H800 M160 0V420 M320 0V420 M480 0V420 M640 0V420" stroke="#e0e5e9" stroke-width="1" fill="none"/>${path?`<path d="${path}" fill="none" stroke="#8e24aa" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>`:''}${marker(previewPickup,'#2e7d32','P')}${marker(previewDropoff,'#c62828','D')}`;
+    if (type === 'dropoff' && dropoffMarker) {
+      map.removeObject(dropoffMarker);
+      dropoffMarker = null;
+    }
+  }
+
+  function updateMarker(type,coords) {
+    if (!map) return;
+    clearMarker(type);
+    const svg = type === 'pickup'
+      ? '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42"><path fill="#2e7d32" stroke="white" stroke-width="2" d="M16 1C7.7 1 1 7.7 1 16c0 11 15 25 15 25s15-14 15-25C31 7.7 24.3 1 16 1z"/><circle cx="16" cy="16" r="6" fill="white"/></svg>'
+      : '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42"><path fill="#c62828" stroke="white" stroke-width="2" d="M16 1C7.7 1 1 7.7 1 16c0 11 15 25 15 25s15-14 15-25C31 7.7 24.3 1 16 1z"/><circle cx="16" cy="16" r="6" fill="white"/></svg>';
+    const icon = new H.map.Icon('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg));
+    const marker = new H.map.Marker({lat:coords.lat,lng:coords.lng},{icon});
+    map.addObject(marker);
+    if (type === 'pickup') pickupMarker = marker;
+    else dropoffMarker = marker;
   }
 
   function invalidateRoute(clearResults=true) {
@@ -2079,6 +2073,10 @@
     $(`${type}-suggestions`).innerHTML = '';
     updateInputClearButton(type);
     updateMarker(type,point);
+    if (map && (!pickupCoords || !dropoffCoords)) {
+      map.setCenter(point);
+      map.setZoom(15);
+    }
     clearError();
     if (pickupCoords && dropoffCoords) {
       calculateRoute();
@@ -2109,6 +2107,12 @@
     if (pickupCoords && Number.isFinite(pickupCoords.lat) && Number.isFinite(pickupCoords.lng)) {
       return `${pickupCoords.lat},${pickupCoords.lng}`;
     }
+    if (map) {
+      const center = map.getCenter();
+      if (center && Number.isFinite(center.lat) && Number.isFinite(center.lng)) {
+        return `${center.lat},${center.lng}`;
+      }
+    }
     return '3.1390,101.6869';
   }
 
@@ -2122,13 +2126,53 @@
   }
 
   async function fetchHerePlaces(query, signal) {
-    const coord=coordinateItem(query);
-    if(coord)return [coord];
-    const params=new URLSearchParams({q:query,format:'jsonv2',addressdetails:'1',limit:'8',countrycodes:'my',accept_language:'en'});
-    const response=await fetch(`${OFFLINE_GEOCODER_URL}/search?${params}`,{signal,headers:{'Accept':'application/json'}});
-    if(!response.ok)throw new Error(`Offline place search unavailable (HTTP ${response.status}).`);
-    const data=await response.json();
-    return (Array.isArray(data)?data:(data.items||[])).map(normalizeGeocoderItem).filter(Boolean);
+    const center = getSearchCenter();
+    const baseParams = {
+      q:query,
+      at:center,
+      in:'countryCode:MYS',
+      limit:'10',
+      lang:'en-US',
+      apiKey:HERE_API_KEY
+    };
+
+    const autoRes = await fetch(
+      `https://autosuggest.search.hereapi.com/v1/autosuggest?${new URLSearchParams(baseParams)}`,
+      {signal}
+    );
+    if (autoRes.status === 429) {
+      throw new Error('Location search rate limit reached. Wait a few seconds and retry.');
+    }
+    if (autoRes.status === 401 || autoRes.status === 403) {
+      throw new Error(`HERE API key rejected (HTTP ${autoRes.status}). Check key or referrer restrictions.`);
+    }
+    if (!autoRes.ok) {
+      throw new Error(`Location search failed (HTTP ${autoRes.status}).`);
+    }
+    const autoData = await autoRes.json();
+    let items = (autoData.items || []).filter(item =>
+      item.position &&
+      Number.isFinite(item.position.lat) &&
+      Number.isFinite(item.position.lng) &&
+      (!item.address || !item.address.countryCode || item.address.countryCode === 'MYS')
+    );
+
+    if (!items.length) {
+      const discRes = await fetch(
+        `https://discover.search.hereapi.com/v1/discover?${new URLSearchParams(baseParams)}`,
+        {signal}
+      );
+      if (discRes.ok) {
+        const discData = await discRes.json();
+        items = (discData.items || []).filter(item =>
+          item.position &&
+          Number.isFinite(item.position.lat) &&
+          Number.isFinite(item.position.lng) &&
+          (!item.address || !item.address.countryCode || item.address.countryCode === 'MYS')
+        );
+      }
+    }
+    return items;
   }
 
   function setupAutocomplete(type) {
@@ -2170,13 +2214,18 @@
       }
 
       if (query.length < 2) {
-        renderSuggestionNotice(box,'Type at least 2 characters or enter latitude, longitude…');
+        renderSuggestionNotice(box,'Type at least 2 characters to search Malaysia locations…');
         return;
       }
 
-      renderSuggestionNotice(box,'Searching local Malaysia address database…');
+      renderSuggestionNotice(box,'Searching Malaysia locations…');
 
       state.timer = setTimeout(async () => {
+        if (!isApiKeyConfigured()) {
+          box.style.display = 'none';
+          showError('Please configure your HERE API key in the script.');
+          return;
+        }
         state.controller = new AbortController();
         try {
           const items = await fetchHerePlaces(query, state.controller.signal);
@@ -2184,7 +2233,7 @@
 
           box.innerHTML = '';
           if (!items.length) {
-            renderSuggestionNotice(box,'No matching offline location. Try a nearby town or coordinates.');
+            renderSuggestionNotice(box,'No matching Malaysian locations found.');
             return;
           }
 
@@ -2274,10 +2323,26 @@
      10. NON-BLOCKING GPS & REVERSE GEOCODING
      ========================================================= */
   async function reverseGeocode(lat,lng) {
-    const params=new URLSearchParams({lat:String(lat),lon:String(lng),format:'jsonv2',addressdetails:'1'});
-    const response=await fetch(`${OFFLINE_GEOCODER_URL}/reverse?${params}`);
-    if(!response.ok)return null;
-    return normalizeGeocoderItem(await response.json());
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+    try {
+      const params = new URLSearchParams({
+        at:`${lat},${lng}`,
+        lang:'en-US',
+        apiKey:HERE_API_KEY
+      });
+      const response = await fetch(
+        `https://revgeocode.search.hereapi.com/v1/revgeocode?${params}`,
+        {signal:controller.signal}
+      );
+      if (!response.ok) return null;
+      const data = await response.json();
+      const item = data.items && data.items[0] ? data.items[0] : null;
+      if (!item || !item.address || item.address.countryCode !== 'MYS') return null;
+      return item;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   function getPositionAsync(options) {
@@ -2355,17 +2420,21 @@
     updateInputClearButton('pickup');
     updateMarker('pickup',point);
 
+    if (map) {
+      map.setCenter(point);
+      map.setZoom(15);
+    }
 
     const accuracyNote = Number.isFinite(gpsAccuracy) && gpsAccuracy > 100
       ? ` (low accuracy ±${Math.round(gpsAccuracy)}m — verify pin)`
       : (Number.isFinite(gpsAccuracy) ? ` · ±${Math.round(gpsAccuracy)}m` : '');
-    setRouteStatus(`GPS pickup set${accuracyNote}. Resolving local address…`);
+    setRouteStatus(`GPS pickup set${accuracyNote}. Resolving address…`);
 
     if (pickupCoords && dropoffCoords) {
       calculateRoute();
     }
 
-    {
+    if (isApiKeyConfigured()) {
       reverseGeocode(point.lat, point.lng)
         .then(item => {
           if (requestId !== gpsRequestId || !pickupCoords) return;
@@ -2411,109 +2480,170 @@
   }
 
   function setRoutingMode(mode) {
-    if(!['fast','short','fast-notoll','short-notoll'].includes(mode))return;
-    if(activeRoutingMode===mode)return;
-    activeRoutingMode=mode;
-    const ids={fast:'btn-mode-fast',short:'btn-mode-short','fast-notoll':'btn-mode-fast-notoll','short-notoll':'btn-mode-short-notoll'};
-    Object.entries(ids).forEach(([key,id])=>$(id).classList.toggle('active',key===mode));
-    if(pickupCoords&&dropoffCoords)calculateRoute();
+    if (!['fast','short','notoll'].includes(mode)) return;
+    if (activeRoutingMode === mode) return;
+    activeRoutingMode = mode;
+    $('btn-mode-fast').classList.toggle('active',mode === 'fast');
+    $('btn-mode-short').classList.toggle('active',mode === 'short');
+    $('btn-mode-notoll').classList.toggle('active',mode === 'notoll');
+    if (pickupCoords && dropoffCoords) {
+      calculateRoute();
+    }
   }
 
   /* =========================================================
-     12. OFFLINE ROUTE CALCULATION (LOCAL VALHALLA ENGINE)
+     12. ROUTE CALCULATION (HERE ROUTING API v8)
      ========================================================= */
-  function decodePolyline6(encoded){
-    let index=0,lat=0,lng=0;const points=[],factor=1e6;
-    while(index<encoded.length){
-      let result=0,shift=0,b;
-      do{b=encoded.charCodeAt(index++)-63;result|=(b&0x1f)<<shift;shift+=5;}while(b>=0x20&&index<encoded.length);
-      lat+=((result&1)?~(result>>1):(result>>1));
-      result=0;shift=0;
-      do{b=encoded.charCodeAt(index++)-63;result|=(b&0x1f)<<shift;shift+=5;}while(b>=0x20&&index<encoded.length);
-      lng+=((result&1)?~(result>>1):(result>>1));
-      points.push({lat:lat/factor,lng:lng/factor});
-    }
-    return points;
-  }
+  function calculateRoute() {
+    if (!pickupCoords || !dropoffCoords) return;
 
-  async function requestOfflineRoute(origin,destination,mode,signal){
-    const shortest=mode.startsWith('short'),avoidTolls=mode.endsWith('notoll');
-    const autoOptions={};
-    if(shortest){autoOptions.shortest=true;autoOptions.disable_hierarchy_pruning=true;}
-    if(avoidTolls){
-      // use_tolls is a preference fallback; exclude_tolls is the hard restriction.
-      // Valhalla must be built with service_limits.allow_hard_exclusions=true.
-      autoOptions.use_tolls=0.0;
-      autoOptions.exclude_tolls=true;
+    const directDistance = calculateHaversineDistance(
+      pickupCoords.lat,
+      pickupCoords.lng,
+      dropoffCoords.lat,
+      dropoffCoords.lng
+    );
+    if (directDistance < 0.02) {
+      showError('Pickup and drop-off are almost the same location.');
+      return;
     }
-    const body={
-      locations:[{lat:origin.lat,lon:origin.lng},{lat:destination.lat,lon:destination.lng}],
-      costing:'auto',costing_options:{auto:autoOptions},units:'kilometers',
-      language:'en-US',shape_format:'polyline6',directions_type:'none'
-    };
-    const response=await fetch(OFFLINE_ROUTER_URL,{
-      method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},
-      body:JSON.stringify(body),signal
-    });
-    if(!response.ok){
-      const detail=await response.text().catch(()=> '');
-      throw new Error(`Offline routing engine returned HTTP ${response.status}${detail?`: ${detail.slice(0,180)}`:''}`);
+    if (!router) {
+      showError('HERE routing service is unavailable.');
+      return;
     }
-    const data=await response.json();
-    if(data.error||!data.trip||!Array.isArray(data.trip.legs)||!data.trip.legs.length)
-      throw new Error(data.error||'No route returned by the offline road network.');
-    const summary=data.trip.summary||data.trip.legs[0].summary||{},points=[];
-    data.trip.legs.forEach(leg=>{
-      if(!leg.shape)return;
-      const decoded=decodePolyline6(leg.shape);
-      if(points.length&&decoded.length&&calculateHaversineDistance(points.at(-1).lat,points.at(-1).lng,decoded[0].lat,decoded[0].lng)<.01)decoded.shift();
-      points.push(...decoded);
-    });
-    const distanceKm=Number(summary.length),durationMins=Number(summary.time)/60;
-    if(points.length<2||!(distanceKm>0)||!Number.isFinite(durationMins))
-      throw new Error('Offline route response has invalid distance, ETA or geometry.');
-    return {distanceKm,durationMins,points,hasToll:Boolean(summary.has_toll),raw:data};
-  }
+    if (!isApiKeyConfigured()) {
+      showError('Configure your HERE API key before calculating routes.');
+      return;
+    }
 
-  let activeRouteController=null;
-  async function calculateRoute(){
-    if(!pickupCoords||!dropoffCoords)return;
-    const directDistance=calculateHaversineDistance(pickupCoords.lat,pickupCoords.lng,dropoffCoords.lat,dropoffCoords.lng);
-    if(directDistance<.02){showError('Pickup and drop-off are almost the same location.');return;}
-    const hadPreviousCard=$('result-card').style.display==='block';
+    const hadPreviousCard = $('result-card').style.display === 'block';
     invalidateRoute(!hadPreviousCard);
-    const requestId=routeRequestId,origin={...pickupCoords},destination={...dropoffCoords},mode=activeRoutingMode;
-    if(activeRouteController)activeRouteController.abort();
-    activeRouteController=new AbortController();
-    setLoading(true);clearError();setRouteStatus('Calculating route using the local offline road network…');
-    try{
-      const result=await requestOfflineRoute(origin,destination,mode,activeRouteController.signal);
-      if(requestId!==routeRequestId)return;
-      setLoading(false);
-      // Always price tolls found on the returned route. Never hide charges merely
-      // because the user selected toll avoidance: the local engine may be configured
-      // without Valhalla hard-exclusion support or may have no toll-free alternative.
-      const tollResult=evaluateRouteTolls(result.points,false);
-      const calculation=processCalculations({
-        distance:result.distanceKm,duration:result.durationMins,
-        sectionsCount:result.raw.trip.legs.length,alternativesCount:0,tollResult
-      });
-      latestCalculation=calculation;renderOfflineMap(result.points);recordRecentRoute();updatePinButtonState();
-      const modeLabel={fast:'Normal · toll roads',short:'Shortest · toll roads','fast-notoll':'Normal · toll avoidance','short-notoll':'Shortest · toll avoidance'}[mode];
-      const tollLabel=tollResult.totalTollCents>0?`${moneyFromCents(tollResult.totalTollCents)} toll`:'RM 0.00 detected toll';
-      let routeWarning='';
-      if(mode.endsWith('notoll') && result.hasToll) {
-        routeWarning=' · WARNING: road engine returned a toll segment; avoidance was not achieved';
-      } else if(result.hasToll && tollResult.totalTollCents===0) {
-        routeWarning=' · WARNING: toll road flagged but no plaza tariff matched; toll total may be incomplete';
+    const requestId = routeRequestId;
+    const origin = {...pickupCoords};
+    const destination = {...dropoffCoords};
+    const routingMode = activeRoutingMode;
+
+    setLoading(true);
+    clearError();
+    setRouteStatus('Requesting route & evaluating toll events…');
+
+    routeDebounce = setTimeout(() => {
+      if (requestId !== routeRequestId) return;
+      const params = {
+        routingMode: (routingMode === 'short' || routingMode === 'notoll') ? 'short' : 'fast',
+        transportMode:'car',
+        origin:`${origin.lat},${origin.lng}`,
+        destination:`${destination.lat},${destination.lng}`,
+        departureTime:'any',
+        return:'polyline,summary'
+      };
+      if (routingMode === 'notoll') {
+        params['avoid[features]'] = 'tollRoad';
       }
-      setRouteStatus(`Offline route calculated · ${modeLabel} · ${tollLabel}${routeWarning}`);
-    }catch(error){
-      if(error.name==='AbortError'||requestId!==routeRequestId)return;
-      setLoading(false);console.error('Offline route calculation failed:',error);
-      showError(`${error.message||'Offline route calculation failed.'} Ensure the local Valhalla service and Malaysia road data are running.`,true);
-      setRouteStatus('Offline routing unavailable.');
+
+      router.calculateRoute(
+        params,
+        result => {
+          if (requestId !== routeRequestId) return;
+          setLoading(false);
+          if (!result || !Array.isArray(result.routes) || !result.routes.length) {
+            showError('No route found for the selected locations.',true);
+            return;
+          }
+          try {
+            handleRouteResult(result.routes[0],result.routes.length,requestId);
+          } catch(error) {
+            console.error('Route processing error:',error);
+            showError('Route was returned, but its details could not be processed.',true);
+          }
+        },
+        error => {
+          if (requestId !== routeRequestId) return;
+          setLoading(false);
+          console.error('HERE routing error:',error);
+          const detail = (error && (error.message || error.title)) ? ` (${error.message || error.title})` : '';
+          showError(`Route calculation failed${detail}. Check connection and retry.`,true);
+        }
+      );
+    },180);
+  }
+
+  /* =========================================================
+     13. ROUTE RESULT PROCESSING & TOLL EXTRACTION
+     ========================================================= */
+  function handleRouteResult(route,routesReturnedCount,requestId) {
+    if (requestId !== routeRequestId) return;
+    const sections = Array.isArray(route.sections) ? route.sections : [];
+    if (!sections.length) {
+      throw new Error('Route contains no sections.');
     }
+
+    let distanceMeters = 0;
+    let durationSeconds = 0;
+    const decodedPoints = [];
+
+    clearRouteObjects();
+    const group = new H.map.Group();
+
+    sections.forEach(section => {
+      distanceMeters += Number(section.summary && section.summary.length || 0);
+      durationSeconds += Number(section.summary && section.summary.duration || 0);
+
+      if (!section.polyline) return;
+      const lineString = H.geo.LineString.fromFlexiblePolyline(section.polyline);
+      const count = lineString.getPointCount();
+      for (let i = 0; i < count; i++) {
+        const pt = lineString.extractPoint(i);
+        decodedPoints.push({ lat: pt.lat, lng: pt.lng });
+      }
+      const line = new H.map.Polyline(lineString,{
+        style:{strokeColor: activeRoutingMode === 'notoll' ? '#2e7d32' : '#8e24aa', lineWidth:5}
+      });
+      routePolylines.push(line);
+      group.addObject(line);
+    });
+
+    const distanceKm = distanceMeters / 1000;
+    const durationMins = durationSeconds / 60;
+    if (!(distanceKm > 0) || !Number.isFinite(durationMins) || durationMins < 0) {
+      throw new Error('Invalid route summary.');
+    }
+
+    if (routePolylines.length) {
+      map.addObjects(routePolylines);
+      const bounds = group.getBoundingBox();
+      if (bounds) {
+        map.getViewModel().setLookAtData({bounds,padding:30});
+      }
+    }
+
+    const tollResult = evaluateRouteTolls(decodedPoints);
+
+    const calculation = processCalculations({
+      distance:distanceKm,
+      duration:durationMins,
+      sectionsCount:sections.length,
+      alternativesCount:Math.max(0,routesReturnedCount - 1),
+      tollResult
+    });
+
+    latestCalculation = calculation;
+    recordRecentRoute();
+    updatePinButtonState();
+
+    const modeLabel = activeRoutingMode === 'fast'
+      ? 'Normal / fastest (tolls allowed)'
+      : (activeRoutingMode === 'short' ? 'Shortest (tolls allowed)' : 'Shortest (avoid tolls)');
+    const tollLabel = tollResult.totalTollCents > 0
+      ? `${moneyFromCents(tollResult.totalTollCents)} toll`
+      : 'Toll-free';
+    const confidenceNote = tollResult.estimatedEvents > 0
+      ? ` · ${tollResult.estimatedEvents} provisional toll estimate(s) — verify`
+      : '';
+    const avoidanceNote = activeRoutingMode === 'notoll' && tollResult.totalTollCents > 0
+      ? ' · toll plaza detected despite avoidance preference'
+      : '';
+    setRouteStatus(`Route calculated · ${modeLabel} · ${tollLabel}${confidenceNote}${avoidanceNote}`);
   }
 
   /* =========================================================
@@ -2737,7 +2867,9 @@
   }
 
   function receiptText(data) {
-    const modeLabel = ({fast:'Normal · toll roads',short:'Shortest · toll roads','fast-notoll':'Normal · toll avoidance','short-notoll':'Shortest · toll avoidance'})[data.routingMode] || data.routingMode;
+    const modeLabel = data.routingMode === 'fast'
+      ? 'Normal / fastest (tolls allowed)'
+      : (data.routingMode === 'short' ? 'Shortest (tolls allowed)' : 'Shortest (avoid tolls)');
 
     const tollLines = data.tollEvents.length
       ? data.tollEvents.map(ev => `  #${ev.seq} [${ev.systemType}] ${ev.title} (${ev.operatorName}): ${money(ev.amount)}`)
@@ -2835,9 +2967,41 @@
   }
 
   /* =========================================================
-     18. OFFLINE ROUTE PREVIEW INITIALISATION
+     18. MAP INITIALISATION
      ========================================================= */
-  function initMap(){renderOfflineMap();return true;}
+  function initMap() {
+    try {
+      if (!window.H || !H.service || !H.Map) {
+        showError('HERE Maps scripts did not load. Check internet connection or content blockers.');
+        return false;
+      }
+      if (!isApiKeyConfigured()) {
+        setRouteStatus('Setup required: configure your HERE API key to enable map services.');
+      }
+      platform = new H.service.Platform({apikey:HERE_API_KEY});
+      const layers = platform.createDefaultLayers();
+      map = new H.Map(
+        $('map'),
+        layers.vector.normal.map,
+        {
+          zoom:11,
+          center:{lat:3.1390,lng:101.6869},
+          pixelRatio:window.devicePixelRatio || 1
+        }
+      );
+      window.addEventListener('resize',() => {
+        if (map) map.getViewPort().resize();
+      });
+      new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
+      ui = H.ui.UI.createDefault(map,layers);
+      router = platform.getRoutingService(null,8);
+      return true;
+    } catch(error) {
+      console.error('Map initialisation error:',error);
+      showError('Unable to initialise HERE Maps. Check API key, permissions and internet connection.');
+      return false;
+    }
+  }
 
   /* =========================================================
      19. EVENT BINDING
@@ -2849,8 +3013,7 @@
     $('swap-locations-btn').addEventListener('click',swapLocations);
     $('btn-mode-fast').addEventListener('click',() => setRoutingMode('fast'));
     $('btn-mode-short').addEventListener('click',() => setRoutingMode('short'));
-    $('btn-mode-fast-notoll').addEventListener('click',() => setRoutingMode('fast-notoll'));
-    $('btn-mode-short-notoll').addEventListener('click',() => setRoutingMode('short-notoll'));
+    $('btn-mode-notoll').addEventListener('click',() => setRoutingMode('notoll'));
     $('retry-route-btn').addEventListener('click',calculateRoute);
     $('pin-trip-btn').addEventListener('click',pinCurrentRoute);
 
@@ -2912,7 +3075,9 @@
     renderQuickBar();
     bindEvents();
     initMap();
-    setRouteStatus('Offline mode ready. Local Valhalla routing + local Malaysia geocoder required.');
+    if (!isApiKeyConfigured()) {
+      setRouteStatus('Setup required: replace HERE_API_KEY with your valid key.');
+    }
   }
 
   boot();
