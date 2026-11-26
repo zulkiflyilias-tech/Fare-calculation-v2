@@ -1467,118 +1467,63 @@
     return {applies:false,label:''};
   }
 
-  function pointToSegmentInfo(pLat, pLng, aLat, aLng, bLat, bLng) {
-    const cosLat = Math.cos(((aLat + bLat) * 0.5) * Math.PI / 180);
-    const kx = 111.320 * cosLat;
-    const ky = 110.574;
-
-    const ax = aLng * kx, ay = aLat * ky;
-    const bx = bLng * kx, by = bLat * ky;
-    const px = pLng * kx, py = pLat * ky;
-
-    const dx = bx - ax;
-    const dy = by - ay;
-    const lenSq = dx * dx + dy * dy;
-
-    let t = 0;
-    if (lenSq > 0) {
-      t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
-      t = Math.max(0, Math.min(1, t));
-    }
-
-    const projX = ax + t * dx;
-    const projY = ay + t * dy;
-    const distKm = Math.hypot(px - projX, py - projY);
-
-    return { distKm, t };
-  }
-
   function evaluateRouteTolls(routePoints, avoidTollsSelected) {
-    if (!Array.isArray(routePoints) || routePoints.length < 2) {
-      return { events: [], operatorSubtotals: {}, totalTollCents: 0 };
-    }
-
-    const cumKm = new Float64Array(routePoints.length);
-    for (let i = 1; i < routePoints.length; i++) {
-      cumKm[i] = cumKm[i - 1] + calculateHaversineDistance(
-        routePoints[i - 1].lat, routePoints[i - 1].lng,
-        routePoints[i].lat, routePoints[i].lng
-      );
-    }
-    const totalRouteKm = cumKm[routePoints.length - 1];
-
     const rawHits = [];
+    let cumulativeKm = 0;
 
-    for (let i = 1; i < routePoints.length; i++) {
-      const a = routePoints[i - 1];
-      const b = routePoints[i];
-      const segLenKm = cumKm[i] - cumKm[i - 1];
-
-      const minLat = Math.min(a.lat, b.lat);
-      const maxLat = Math.max(a.lat, b.lat);
-      const minLng = Math.min(a.lng, b.lng);
-      const maxLng = Math.max(a.lng, b.lng);
+    for (let i = 0; i < routePoints.length; i++) {
+      const pt = routePoints[i];
+      if (i > 0) {
+        cumulativeKm += calculateHaversineDistance(
+          routePoints[i - 1].lat, routePoints[i - 1].lng,
+          pt.lat, pt.lng
+        );
+      }
 
       for (const plaza of TOLL_PLAZAS) {
-        const degMargin = (plaza.radiusKm / 110.5) + 0.004;
-        if (
-          plaza.lat < minLat - degMargin || plaza.lat > maxLat + degMargin ||
-          plaza.lng < minLng - degMargin || plaza.lng > maxLng + degMargin
-        ) {
+        // Fast bounding-box pre-filter (~0.01 deg ≈ 1.11 km) before expensive trig math
+        const degMargin = (plaza.radiusKm / 111) + 0.005;
+        if (Math.abs(pt.lat - plaza.lat) > degMargin || Math.abs(pt.lng - plaza.lng) > degMargin) {
           continue;
         }
 
-        const { distKm, t } = pointToSegmentInfo(
-          plaza.lat, plaza.lng,
-          a.lat, a.lng,
-          b.lat, b.lng
-        );
-
-        if (distKm <= plaza.radiusKm) {
-          const hitKm = cumKm[i - 1] + t * segLenKm;
-
-          const backIdx = Math.max(0, i - 3);
-          const fwdIdx = Math.min(routePoints.length - 1, i + 2);
-          const dLng = routePoints[fwdIdx].lng - routePoints[backIdx].lng;
+        const dist = calculateHaversineDistance(pt.lat, pt.lng, plaza.lat, plaza.lng);
+        if (dist <= plaza.radiusKm) {
+          const prevPt = routePoints[Math.max(0, i - 5)];
+          const nextPt = routePoints[Math.min(routePoints.length - 1, i + 5)];
+          const dLng = nextPt.lng - prevPt.lng;
           const bridgeDir = dLng < -0.0005 ? 'MAINLAND_TO_ISLAND' : 'ISLAND_TO_MAINLAND';
 
           const lastHit = rawHits[rawHits.length - 1];
           if (lastHit && lastHit.plaza.id === plaza.id) {
-            if (distKm < lastHit.minDist) {
-              lastHit.minDist = distKm;
-              lastHit.kmAtHit = hitKm;
+            if (dist < lastHit.minDist) {
+              lastHit.minDist = dist;
+              lastHit.kmAtHit = cumulativeKm;
               lastHit.bridgeDir = bridgeDir;
             }
           } else {
-            const duplicateNearby = rawHits.some(
-              h => h.plaza.id === plaza.id && Math.abs(hitKm - h.kmAtHit) < 3.5
+            const alreadyHitRecently = rawHits.some(
+              h => h.plaza.id === plaza.id && Math.abs(cumulativeKm - h.kmAtHit) < 4.0
             );
-            if (!duplicateNearby) {
-              rawHits.push({
-                plaza,
-                minDist: distKm,
-                kmAtHit: hitKm,
-                bridgeDir
-              });
+            if (!alreadyHitRecently) {
+              rawHits.push({ plaza, minDist: dist, kmAtHit: cumulativeKm, bridgeDir });
             }
           }
         }
       }
     }
 
-    rawHits.sort((a, b) => a.kmAtHit - b.kmAtHit);
-
-    const unsortedEvents = [];
+    const events = [];
     const openClosedSessions = new Map();
+    let seq = 1;
 
     for (const hit of rawHits) {
       const p = hit.plaza;
       const opInfo = TOLL_OPERATORS[p.op] || { name: p.op, short: p.op };
 
       if (p.type === 'TOLL_FREE') {
-        unsortedEvents.push({
-          sortKm: hit.kmAtHit,
-          kmLabel: `km ${hit.kmAtHit.toFixed(1)}`,
+        events.push({
+          seq: seq++,
           systemType: 'TOLL_FREE',
           operatorId: p.op,
           operatorName: opInfo.short,
@@ -1609,12 +1554,11 @@
             const segKm = Math.max(1, Math.abs(hit.kmAtHit - entryHit.kmAtHit));
             const rateSen = NETWORK_FALLBACK_SEN_PER_KM[p.net] || 11.5;
             fareCents = Math.round(segKm * rateSen);
-            lookupNote = `Closed distance est. (~${segKm.toFixed(1)} km)`;
+            lookupNote = `Closed distance estimate (~${segKm.toFixed(1)} km)`;
           }
 
-          unsortedEvents.push({
-            sortKm: entryHit.kmAtHit,
-            kmLabel: `km ${entryHit.kmAtHit.toFixed(1)} → ${hit.kmAtHit.toFixed(1)}`,
+          events.push({
+            seq: seq++,
             systemType: 'CLOSED',
             operatorId: p.op,
             operatorName: opInfo.short,
@@ -1630,9 +1574,8 @@
       if (p.type === 'BRIDGE') {
         const isTolledLeg = hit.bridgeDir === p.dir;
         const fareCents = isTolledLeg ? p.rateCents : 0;
-        unsortedEvents.push({
-          sortKm: hit.kmAtHit,
-          kmLabel: `km ${hit.kmAtHit.toFixed(1)}`,
+        events.push({
+          seq: seq++,
           systemType: 'BRIDGE',
           operatorId: p.op,
           operatorName: opInfo.short,
@@ -1645,9 +1588,8 @@
       }
 
       if (p.type === 'OPEN') {
-        unsortedEvents.push({
-          sortKm: hit.kmAtHit,
-          kmLabel: `km ${hit.kmAtHit.toFixed(1)}`,
+        events.push({
+          seq: seq++,
           systemType: 'OPEN',
           operatorId: p.op,
           operatorName: opInfo.short,
@@ -1664,33 +1606,23 @@
       const p = entryHit.plaza;
       const opInfo = TOLL_OPERATORS[p.op] || { name: p.op, short: p.op };
       const distBefore = entryHit.kmAtHit;
-      const distAfter = Math.max(0, totalRouteKm - entryHit.kmAtHit);
-      const isExitOnly = distBefore > distAfter;
+      const distAfter = Math.max(0, cumulativeKm - entryHit.kmAtHit);
       const activeClosedKm = Math.max(distBefore, distAfter);
-
       if (activeClosedKm >= 3.0) {
         const rateSen = NETWORK_FALLBACK_SEN_PER_KM[netId] || 11.5;
         const estCents = Math.round(activeClosedKm * rateSen);
-        unsortedEvents.push({
-          sortKm: isExitOnly ? 0 : entryHit.kmAtHit,
-          kmLabel: `km ${entryHit.kmAtHit.toFixed(1)}`,
+        events.push({
+          seq: seq++,
           systemType: 'CLOSED',
           operatorId: p.op,
           operatorName: opInfo.short,
           routeCode: p.code,
-          title: `${p.name} (${isExitOnly ? 'Exit' : 'Entry'} section)`,
+          title: `${p.name} (${distBefore > distAfter ? 'Exit' : 'Entry'} section)`,
           subtitle: `${opInfo.short} · Partial closed corridor (~${activeClosedKm.toFixed(1)} km)`,
           amountCents: estCents
         });
       }
     }
-
-    unsortedEvents.sort((a, b) => a.sortKm - b.sortKm);
-
-    const events = unsortedEvents.map((ev, index) => ({
-      ...ev,
-      seq: index + 1
-    }));
 
     const operatorSubtotals = {};
     let totalTollCents = 0;
@@ -2422,12 +2354,12 @@
 
       item.innerHTML = `
         <div class="toll-event-top">
-          <span><span class="toll-badge ${badgeClass}">#${ev.seq} · ${badgeText}</span>${ev.title}</span>
+          <span><span class="toll-badge ${badgeClass}">${badgeText}</span>${ev.title}</span>
           <span>${moneyFromCents(ev.amountCents)}</span>
         </div>
         <div class="toll-event-sub">
           <span>${ev.subtitle}</span>
-          <span>${ev.kmLabel || ''}</span>
+          <span>#${ev.seq}</span>
         </div>
       `;
       container.appendChild(item);
@@ -2600,7 +2532,7 @@
       : (data.routingMode === 'short' ? 'Shortest' : 'Avoid Tolls');
 
     const tollLines = data.tollEvents.length
-      ? data.tollEvents.map(ev => `  #${ev.seq} (${ev.kmLabel || ''}) [${ev.systemType}] ${ev.title} — ${ev.operatorName}: ${money(ev.amount)}`)
+      ? data.tollEvents.map(ev => `  #${ev.seq} [${ev.systemType}] ${ev.title} (${ev.operatorName}): ${money(ev.amount)}`)
       : ['  None (RM 0.00)'];
 
     const opLines = Object.entries(data.operatorSubtotals).length
