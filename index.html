@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare and toll estimator">
-<title>Rideshare MY Personal Edition v3.8.2</title>
+<title>Rideshare MY Personal Edition v3.8.3</title>
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 <style>
   :root {
@@ -538,7 +538,7 @@
   <main id="search-panel">
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.8.2</span>
+      <span class="version">PERSONAL EDITION v3.8.3</span>
     </div>
 
     <!-- QUICK PINS & RECENT ROUTES -->
@@ -756,7 +756,7 @@
   /* =========================================================
      1. CONFIGURATION & ZONES
      ========================================================= */
-  const APP_VERSION = '3.8.2';
+  const APP_VERSION = '3.8.3';
   const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
   const DEFAULT_SETTINGS = Object.freeze({
@@ -781,7 +781,7 @@
     'rideshareMY.personal.v3.1.settings',
     'rideshareMY.personal.v3.0.settings'
   ];
-  const ROUTES_STORAGE_KEY = 'rideshareMY.personal.v3.6.routes';
+  const ROUTES_STORAGE_KEY = 'rideshareMY.personal.v3.8.routes';
   const MAX_PINNED_ROUTES = 6;
   const MAX_RECENT_ROUTES = 5;
 
@@ -831,8 +831,8 @@
 
   const TOLL_PLAZAS = [
     // --- PENANG BRIDGES, BORR (E17) & BKE (E15) ---
-    { id:'PLZ_E36_PERAI', code:'E36', name:'Penang Bridge (Perai)', op:'OP_PLUS', type:'BRIDGE', net:null, dir:'MAINLAND_TO_ISLAND', rateCents:574, lat:5.3792, lng:100.3863, radiusKm:0.55 },
-    { id:'PLZ_E28_BDR_CASSIA_BRG', code:'E28', name:'Penang 2nd Bridge (Bandar Cassia)', op:'OP_JKSB', type:'BRIDGE', net:null, dir:'MAINLAND_TO_ISLAND', rateCents:574, lat:5.2427, lng:100.4319, radiusKm:0.55 },
+    { id:'PLZ_E36_PERAI', code:'E36', name:'Penang Bridge (Perai)', op:'OP_PLUS', type:'BRIDGE', net:null, dir:'MAINLAND_TO_ISLAND', rateCents:574, lat:5.3792, lng:100.3863, radiusKm:0.95 },
+    { id:'PLZ_E28_BDR_CASSIA_BRG', code:'E28', name:'Penang 2nd Bridge (Bandar Cassia)', op:'OP_JKSB', type:'BRIDGE', net:null, dir:'MAINLAND_TO_ISLAND', rateCents:574, lat:5.2427, lng:100.4319, radiusKm:0.95 },
     { id:'PLZ_E17_PERAI', code:'E17', name:'BORR Perai', op:'OP_BORR', type:'OPEN', net:null, dir:'ANY', rateCents:150, lat:5.3887, lng:100.3849, radiusKm:0.35 },
     { id:'PLZ_E17_BAGAN_AJAM', code:'E17', name:'BORR Bagan Ajam', op:'OP_BORR', type:'OPEN', net:null, dir:'ANY', rateCents:150, lat:5.4379, lng:100.3821, radiusKm:0.35 },
     { id:'PLZ_E17_SG_NYIOR', code:'E17', name:'BORR Sungai Nyior', op:'OP_BORR', type:'OPEN', net:null, dir:'ANY', rateCents:120, lat:5.4088, lng:100.3736, radiusKm:0.35 },
@@ -1089,8 +1089,70 @@
     ['NET_LEKAS', 'PLZ_E21_KAJANG_SEL', 'PLZ_E21_SEMENYIH', 160],
     ['NET_LEKAS', 'PLZ_E21_KAJANG_SEL', 'PLZ_E21_PAJAM', 380],
     ['NET_LEKAS', 'PLZ_E21_KAJANG_SEL', 'PLZ_E21_MANTIN', 530],
-    ['NET_LEKAS', 'PLZ_E21_KAJANG_SEL', 'PLZ_E21_SETUL', 780]
+    ['NET_LEKAS', 'PLZ_E21_KAJANG_SEL', 'PLZ_E21_SETUL', 780],
+
+    // Additional Setia Alam / Bukit Raja / Shah Alam / Subang / ELITE / NSE pairs
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_SHAH_ALAM', 60],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_SUBANG', 110],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_DAMANSARA', 180],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_KOTA_DAMANSARA', 210],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_RAWANG', 355],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_TG_MALIM', 839],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_TAPAH', 1651],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_IPOH_U', 2390],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_KUALA_KANGSAR', 2570],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E1_TAIPING_U', 2988],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E2_NILAI', 820],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E2_SEREMBAN', 1025],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E2_SENAWANG', 1110],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E2_SPG_AMPAT', 1550],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E2_AYER_KEROH', 1787],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E2_PAGOH', 2394],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E2_YONG_PENG_U', 2870],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E2_MACHAP', 3173],
+    ['NET_PLUS', 'PLZ_E1_SETIA_ALAM', 'PLZ_E2_KULAI', 3682],
+
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E2_NILAI', 875],
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E2_SEREMBAN', 1080],
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E2_SENAWANG', 1165],
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E2_SPG_AMPAT', 1605],
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E2_PAGOH', 2449],
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E2_YONG_PENG_U', 2925],
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E2_MACHAP', 3228],
+    ['NET_PLUS', 'PLZ_E1_BUKIT_RAJA', 'PLZ_E2_KULAI', 3737],
+
+    ['NET_PLUS', 'PLZ_E1_SHAH_ALAM', 'PLZ_E2_SKUDAI', 3695],
+    ['NET_PLUS', 'PLZ_E1_SUBANG', 'PLZ_E2_SKUDAI', 3645],
+    ['NET_PLUS', 'PLZ_E6_USJ', 'PLZ_E2_SKUDAI', 3580],
+    ['NET_PLUS', 'PLZ_E6_PUTRA_HEIGHTS', 'PLZ_E2_SKUDAI', 3510],
+    ['NET_PLUS', 'PLZ_E6_SAUJANA_PUTRA', 'PLZ_E2_SKUDAI', 3435],
+    ['NET_PLUS', 'PLZ_E6_PUTRAJAYA', 'PLZ_E2_SKUDAI', 3370]
   ];
+
+  // Physical highway order for closed-system segment fallback & entry/exit pairing
+  const CLOSED_CORRIDOR_CHAINS = {
+    NET_PLUS: [
+      'PLZ_E1_HUTAN_KAMPUNG','PLZ_E1_ALOR_SETAR_U','PLZ_E1_ALOR_SETAR_S',
+      'PLZ_E1_SG_PETANI_U','PLZ_E1_SG_PETANI_S','PLZ_E1_SG_DUA','PLZ_E1_JURU','PLZ_E1_BDR_CASSIA',
+      'PLZ_E1_TAIPING_U','PLZ_E1_KUALA_KANGSAR','PLZ_E1_IPOH_U','PLZ_E1_IPOH_SEL',
+      'PLZ_E1_TAPAH','PLZ_E1_TG_MALIM','PLZ_E1_RAWANG','PLZ_E1_SG_BULOH','PLZ_E1_JLN_DUTA',
+      'PLZ_E1_KOTA_DAMANSARA','PLZ_E1_DAMANSARA','PLZ_E1_SUBANG','PLZ_E1_SHAH_ALAM',
+      'PLZ_E1_SETIA_ALAM','PLZ_E1_BUKIT_RAJA',
+      'PLZ_E6_USJ','PLZ_E6_PUTRA_HEIGHTS','PLZ_E6_SAUJANA_PUTRA','PLZ_E6_PUTRAJAYA','PLZ_E6_KLIA',
+      'PLZ_E2_SG_BESI','PLZ_E2_KAJANG','PLZ_E2_BANGI','PLZ_E2_NILAI','PLZ_E2_SEREMBAN',
+      'PLZ_E2_SENAWANG','PLZ_E2_SPG_AMPAT','PLZ_E2_AYER_KEROH','PLZ_E2_PAGOH',
+      'PLZ_E2_YONG_PENG_U','PLZ_E2_MACHAP','PLZ_E2_KULAI','PLZ_E2_SKUDAI'
+    ],
+    NET_LPT1: [
+      'PLZ_E8_KARAK','PLZ_E8_TEMERLOH','PLZ_E8_MARAN','PLZ_E8_GAMBANG','PLZ_E8_KUANTAN','PLZ_E8_JABOR'
+    ],
+    NET_LEKAS: [
+      'PLZ_E21_KAJANG_SEL','PLZ_E21_SEMENYIH','PLZ_E21_PAJAM','PLZ_E21_MANTIN','PLZ_E21_SETUL'
+    ],
+    NET_WCE: [
+      'PLZ_E32_BDR_BUKIT_RAJA','PLZ_E32_SAE'
+    ]
+  };
 
   const CLOSED_FARE_MAP = (() => {
     const map = new Map();
@@ -1205,7 +1267,7 @@
 
   function loadSavedRoutes() {
     try {
-      const raw = localStorage.getItem(ROUTES_STORAGE_KEY);
+      const raw = localStorage.getItem(ROUTES_STORAGE_KEY) || localStorage.getItem('rideshareMY.personal.v3.6.routes');
       if (!raw) return {pinned:[],recent:[]};
       const parsed = JSON.parse(raw);
       return {
@@ -1481,18 +1543,18 @@
       }
 
       for (const plaza of TOLL_PLAZAS) {
-        // Fast bounding-box pre-filter (~0.01 deg ≈ 1.11 km) before expensive trig math
-        const degMargin = (plaza.radiusKm / 111) + 0.005;
+        const degMargin = (plaza.radiusKm / 111) + 0.006;
         if (Math.abs(pt.lat - plaza.lat) > degMargin || Math.abs(pt.lng - plaza.lng) > degMargin) {
           continue;
         }
 
         const dist = calculateHaversineDistance(pt.lat, pt.lng, plaza.lat, plaza.lng);
         if (dist <= plaza.radiusKm) {
-          const prevPt = routePoints[Math.max(0, i - 5)];
-          const nextPt = routePoints[Math.min(routePoints.length - 1, i + 5)];
+          // Wider directional window (~25 points) so curved bridge approaches resolve accurately
+          const prevPt = routePoints[Math.max(0, i - 25)];
+          const nextPt = routePoints[Math.min(routePoints.length - 1, i + 25)];
           const dLng = nextPt.lng - prevPt.lng;
-          const bridgeDir = dLng < -0.0005 ? 'MAINLAND_TO_ISLAND' : 'ISLAND_TO_MAINLAND';
+          const bridgeDir = dLng < -0.001 ? 'MAINLAND_TO_ISLAND' : 'ISLAND_TO_MAINLAND';
 
           const lastHit = rawHits[rawHits.length - 1];
           if (lastHit && lastHit.plaza.id === plaza.id) {
@@ -1503,7 +1565,7 @@
             }
           } else {
             const alreadyHitRecently = rawHits.some(
-              h => h.plaza.id === plaza.id && Math.abs(cumulativeKm - h.kmAtHit) < 4.0
+              h => h.plaza.id === plaza.id && Math.abs(cumulativeKm - h.kmAtHit) < 5.0
             );
             if (!alreadyHitRecently) {
               rawHits.push({ plaza, minDist: dist, kmAtHit: cumulativeKm, bridgeDir });
@@ -1513,114 +1575,167 @@
       }
     }
 
-    const events = [];
-    const openClosedSessions = new Map();
-    let seq = 1;
+    // Sort strictly by travel distance along route polyline
+    rawHits.sort((a, b) => a.kmAtHit - b.kmAtHit);
+
+    // Group contiguous closed-system hits per network so intermediate gantries do not fragment entry->exit pairs
+    const closedClustersByNet = new Map();
+    const standaloneHits = [];
 
     for (const hit of rawHits) {
       const p = hit.plaza;
-      const opInfo = TOLL_OPERATORS[p.op] || { name: p.op, short: p.op };
-
-      if (p.type === 'TOLL_FREE') {
-        events.push({
-          seq: seq++,
-          systemType: 'TOLL_FREE',
-          operatorId: p.op,
-          operatorName: opInfo.short,
-          routeCode: p.code,
-          title: p.name,
-          subtitle: 'Toll-free corridor / abolished facility',
-          amountCents: 0
-        });
-        continue;
-      }
-
-      if (avoidTollsSelected) continue;
-
       if (p.type === 'CLOSED' && p.net) {
-        if (!openClosedSessions.has(p.net)) {
-          openClosedSessions.set(p.net, hit);
+        if (!closedClustersByNet.has(p.net)) {
+          closedClustersByNet.set(p.net, [[hit]]);
         } else {
-          const entryHit = openClosedSessions.get(p.net);
-          openClosedSessions.delete(p.net);
-
-          if (entryHit.plaza.id === p.id) continue;
-
-          const matrixKey = `${p.net}|${entryHit.plaza.id}|${p.id}`;
-          let fareCents = CLOSED_FARE_MAP.get(matrixKey);
-          let lookupNote = `Closed matrix (${p.net})`;
-
-          if (fareCents === undefined) {
-            const segKm = Math.max(1, Math.abs(hit.kmAtHit - entryHit.kmAtHit));
-            const rateSen = NETWORK_FALLBACK_SEN_PER_KM[p.net] || 11.5;
-            fareCents = Math.round(segKm * rateSen);
-            lookupNote = `Closed distance estimate (~${segKm.toFixed(1)} km)`;
+          const clusters = closedClustersByNet.get(p.net);
+          const currentCluster = clusters[clusters.length - 1];
+          const prevHit = currentCluster[currentCluster.length - 1];
+          // If gap between consecutive closed gantries on same network is > 380 km or separated by an open mainline break, start new session
+          const gapKm = hit.kmAtHit - prevHit.kmAtHit;
+          if (gapKm > 380) {
+            clusters.push([hit]);
+          } else {
+            currentCluster.push(hit);
           }
+        }
+      } else {
+        standaloneHits.push(hit);
+      }
+    }
 
+    const timelineItems = [];
+
+    for (const hit of standaloneHits) {
+      timelineItems.push({ kind: 'SINGLE', kmAtHit: hit.kmAtHit, hit });
+    }
+
+    for (const [netId, clusters] of closedClustersByNet.entries()) {
+      for (const cluster of clusters) {
+        timelineItems.push({
+          kind: 'CLOSED_CLUSTER',
+          netId,
+          kmAtHit: cluster[0].kmAtHit,
+          hits: cluster
+        });
+      }
+    }
+
+    timelineItems.sort((a, b) => a.kmAtHit - b.kmAtHit);
+
+    const events = [];
+    let seq = 1;
+
+    for (const item of timelineItems) {
+      if (item.kind === 'SINGLE') {
+        const hit = item.hit;
+        const p = hit.plaza;
+        const opInfo = TOLL_OPERATORS[p.op] || { name: p.op, short: p.op };
+
+        if (p.type === 'TOLL_FREE') {
           events.push({
             seq: seq++,
-            systemType: 'CLOSED',
+            systemType: 'TOLL_FREE',
             operatorId: p.op,
             operatorName: opInfo.short,
             routeCode: p.code,
-            title: `${entryHit.plaza.name} → ${p.name}`,
-            subtitle: `${opInfo.short} · ${lookupNote}`,
+            title: p.name,
+            subtitle: 'Toll-free corridor / abolished facility',
+            amountCents: 0
+          });
+          continue;
+        }
+
+        if (avoidTollsSelected) continue;
+
+        if (p.type === 'BRIDGE') {
+          const isTolledLeg = hit.bridgeDir === p.dir;
+          const fareCents = isTolledLeg ? p.rateCents : 0;
+          events.push({
+            seq: seq++,
+            systemType: 'BRIDGE',
+            operatorId: p.op,
+            operatorName: opInfo.short,
+            routeCode: p.code,
+            title: `${p.name} (${hit.bridgeDir === 'MAINLAND_TO_ISLAND' ? 'Mainland → Island' : 'Island → Mainland'})`,
+            subtitle: `${opInfo.short} · ${isTolledLeg ? 'Unidirectional bridge charge' : 'Free return direction'}`,
             amountCents: fareCents
+          });
+          continue;
+        }
+
+        if (p.type === 'OPEN') {
+          events.push({
+            seq: seq++,
+            systemType: 'OPEN',
+            operatorId: p.op,
+            operatorName: opInfo.short,
+            routeCode: p.code,
+            title: p.name,
+            subtitle: `${opInfo.short} · Open plaza (${p.code})`,
+            amountCents: p.rateCents
           });
         }
         continue;
       }
 
-      if (p.type === 'BRIDGE') {
-        const isTolledLeg = hit.bridgeDir === p.dir;
-        const fareCents = isTolledLeg ? p.rateCents : 0;
-        events.push({
-          seq: seq++,
-          systemType: 'BRIDGE',
-          operatorId: p.op,
-          operatorName: opInfo.short,
-          routeCode: p.code,
-          title: `${p.name} (${hit.bridgeDir === 'MAINLAND_TO_ISLAND' ? 'Mainland → Island' : 'Island → Mainland'})`,
-          subtitle: `${opInfo.short} · ${isTolledLeg ? 'Unidirectional bridge charge' : 'Free return direction'}`,
-          amountCents: fareCents
-        });
-        continue;
-      }
+      // CLOSED_CLUSTER: pair true first entry plaza with true final exit plaza
+      if (avoidTollsSelected) continue;
+      const cluster = item.hits;
+      const netId = item.netId;
+      const entryHit = cluster[0];
+      const exitHit = cluster[cluster.length - 1];
+      const pEntry = entryHit.plaza;
+      const pExit = exitHit.plaza;
+      const opInfo = TOLL_OPERATORS[pEntry.op] || { name: pEntry.op, short: pEntry.op };
 
-      if (p.type === 'OPEN') {
-        events.push({
-          seq: seq++,
-          systemType: 'OPEN',
-          operatorId: p.op,
-          operatorName: opInfo.short,
-          routeCode: p.code,
-          title: p.name,
-          subtitle: `${opInfo.short} · Open plaza (${p.code})`,
-          amountCents: p.rateCents
-        });
-      }
-    }
+      if (cluster.length >= 2 && pEntry.id !== pExit.id) {
+        const matrixKey = `${netId}|${pEntry.id}|${pExit.id}`;
+        let fareCents = CLOSED_FARE_MAP.get(matrixKey);
+        let lookupNote = `Closed matrix (${netId})`;
 
-    for (const [netId, entryHit] of openClosedSessions.entries()) {
-      if (avoidTollsSelected) break;
-      const p = entryHit.plaza;
-      const opInfo = TOLL_OPERATORS[p.op] || { name: p.op, short: p.op };
-      const distBefore = entryHit.kmAtHit;
-      const distAfter = Math.max(0, cumulativeKm - entryHit.kmAtHit);
-      const activeClosedKm = Math.max(distBefore, distAfter);
-      if (activeClosedKm >= 3.0) {
-        const rateSen = NETWORK_FALLBACK_SEN_PER_KM[netId] || 11.5;
-        const estCents = Math.round(activeClosedKm * rateSen);
+        if (fareCents === undefined) {
+          const segKm = Math.max(1, Math.abs(exitHit.kmAtHit - entryHit.kmAtHit));
+          const rateSen = NETWORK_FALLBACK_SEN_PER_KM[netId] || 11.5;
+          fareCents = Math.round(segKm * rateSen);
+          lookupNote = `Closed distance estimate (~${segKm.toFixed(1)} km)`;
+        }
+
+        const viaCount = Math.max(0, cluster.length - 2);
+        const viaNote = viaCount > 0 ? ` · via ${viaCount} interchange${viaCount === 1 ? '' : 's'}` : '';
+
         events.push({
           seq: seq++,
           systemType: 'CLOSED',
-          operatorId: p.op,
+          operatorId: pEntry.op,
           operatorName: opInfo.short,
-          routeCode: p.code,
-          title: `${p.name} (${distBefore > distAfter ? 'Exit' : 'Entry'} section)`,
-          subtitle: `${opInfo.short} · Partial closed corridor (~${activeClosedKm.toFixed(1)} km)`,
-          amountCents: estCents
+          routeCode: pEntry.code === pExit.code ? pEntry.code : `${pEntry.code}/${pExit.code}`,
+          title: `${pEntry.name} → ${pExit.name}`,
+          subtitle: `${opInfo.short} · ${lookupNote}${viaNote}`,
+          amountCents: fareCents
         });
+      } else {
+        // Single-gantry closed hit (e.g., partial closed ramp near trip boundary): cap fallback to max 35 km so unclosed junctions never fabricate 200+ km charges
+        const distBefore = entryHit.kmAtHit;
+        const distAfter = Math.max(0, cumulativeKm - entryHit.kmAtHit);
+        const rawSpanKm = Math.min(distBefore, distAfter) >= 2.0
+          ? Math.min(distBefore, distAfter)
+          : Math.max(distBefore, distAfter);
+        const boundedKm = Math.min(35, rawSpanKm);
+        if (boundedKm >= 2.0) {
+          const rateSen = NETWORK_FALLBACK_SEN_PER_KM[netId] || 11.5;
+          const estCents = Math.round(boundedKm * rateSen);
+          events.push({
+            seq: seq++,
+            systemType: 'CLOSED',
+            operatorId: pEntry.op,
+            operatorName: opInfo.short,
+            routeCode: pEntry.code,
+            title: `${pEntry.name} (Single-gantry closed ramp)`,
+            subtitle: `${opInfo.short} · Bounded closed ramp estimate (~${boundedKm.toFixed(1)} km)`,
+            amountCents: estCents
+          });
+        }
       }
     }
 
@@ -2352,16 +2467,30 @@
         ? 'CLOSED MATRIX'
         : (ev.systemType === 'BRIDGE' ? 'BRIDGE' : (ev.systemType === 'TOLL_FREE' ? 'TOLL-FREE' : 'OPEN'));
 
-      item.innerHTML = `
-        <div class="toll-event-top">
-          <span><span class="toll-badge ${badgeClass}">${badgeText}</span>${ev.title}</span>
-          <span>${moneyFromCents(ev.amountCents)}</span>
-        </div>
-        <div class="toll-event-sub">
-          <span>${ev.subtitle}</span>
-          <span>#${ev.seq}</span>
-        </div>
-      `;
+      const topRow = document.createElement('div');
+      topRow.className = 'toll-event-top';
+      const titleWrap = document.createElement('span');
+      const badge = document.createElement('span');
+      badge.className = `toll-badge ${badgeClass}`;
+      badge.textContent = badgeText;
+      titleWrap.appendChild(badge);
+      titleWrap.appendChild(document.createTextNode(ev.title));
+      const amountSpan = document.createElement('span');
+      amountSpan.textContent = moneyFromCents(ev.amountCents);
+      topRow.appendChild(titleWrap);
+      topRow.appendChild(amountSpan);
+
+      const subRow = document.createElement('div');
+      subRow.className = 'toll-event-sub';
+      const subLeft = document.createElement('span');
+      subLeft.textContent = ev.subtitle;
+      const subRight = document.createElement('span');
+      subRight.textContent = `#${ev.seq}`;
+      subRow.appendChild(subLeft);
+      subRow.appendChild(subRight);
+
+      item.appendChild(topRow);
+      item.appendChild(subRow);
       container.appendChild(item);
     });
 
