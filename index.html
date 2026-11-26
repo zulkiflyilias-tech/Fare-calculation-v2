@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#8e24aa">
 <meta name="description" content="Private Malaysian transport fare and toll estimator">
-<title>Rideshare MY Personal Edition v3.8.4</title>
+<title>Rideshare MY Personal Edition v3.8.5</title>
 <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
 <style>
   :root {
@@ -538,7 +538,7 @@
   <main id="search-panel">
     <div class="header-row">
       <h2>Fare Estimator</h2>
-      <span class="version">PERSONAL EDITION v3.8.4</span>
+      <span class="version">PERSONAL EDITION v3.8.5</span>
     </div>
 
     <!-- QUICK PINS & RECENT ROUTES -->
@@ -756,7 +756,7 @@
   /* =========================================================
      1. CONFIGURATION & ZONES
      ========================================================= */
-  const APP_VERSION = '3.8.4';
+  const APP_VERSION = '3.8.5';
   const HERE_API_KEY = 'PsS2JuT4JvaMqKzOkSgQcclwn0pBP9jVcNKSC7JHmZk';
 
   const DEFAULT_SETTINGS = Object.freeze({
@@ -774,8 +774,9 @@
     roundingUnit:1
   });
 
-  const SETTINGS_KEY = 'rideshareMY.personal.v3.8.settings';
+  const SETTINGS_KEY = 'rideshareMY.personal.v3.8.5.settings';
   const LEGACY_SETTINGS_KEYS = [
+    'rideshareMY.personal.v3.8.settings',
     'rideshareMY.personal.v3.6.settings',
     'rideshareMY.personal.v3.5.settings',
     'rideshareMY.personal.v3.1.settings',
@@ -831,11 +832,11 @@
 
   const TOLL_PLAZAS = [
     // --- PENANG BRIDGES, BORR (E17) & BKE (E15) ---
-    { id:'PLZ_E36_PERAI', code:'E36', name:'Penang Bridge (Perai)', op:'OP_PLUS', type:'BRIDGE', net:null, dir:'MAINLAND_TO_ISLAND', rateCents:574, lat:5.3765, lng:100.3955, radiusKm:0.95 },
+    { id:'PLZ_E36_PERAI', code:'E36', name:'Penang Bridge (Perai)', op:'OP_PLUS', type:'BRIDGE', net:null, dir:'MAINLAND_TO_ISLAND', rateCents:700, lat:5.3765, lng:100.3955, radiusKm:0.95 },
     { id:'PLZ_E28_BDR_CASSIA_BRG', code:'E28', name:'Penang 2nd Bridge (Bandar Cassia)', op:'OP_JKSB', type:'BRIDGE', net:null, dir:'MAINLAND_TO_ISLAND', rateCents:574, lat:5.2427, lng:100.4319, radiusKm:0.95 },
-    { id:'PLZ_E17_PERAI', code:'E17', name:'BORR Perai', op:'OP_BORR', type:'OPEN', net:null, dir:'ANY', rateCents:150, lat:5.3887, lng:100.3849, radiusKm:0.30 },
-    { id:'PLZ_E17_BAGAN_AJAM', code:'E17', name:'BORR Bagan Ajam', op:'OP_BORR', type:'OPEN', net:null, dir:'ANY', rateCents:150, lat:5.4379, lng:100.3821, radiusKm:0.30 },
-    { id:'PLZ_E17_SG_NYIOR', code:'E17', name:'BORR Sungai Nyior', op:'OP_BORR', type:'OPEN', net:null, dir:'ANY', rateCents:120, lat:5.4088, lng:100.3736, radiusKm:0.30 },
+    { id:'PLZ_E17_PERAI', code:'E17', name:'BORR Perai', op:'OP_BORR', type:'OPEN', net:null, dir:'ANY', rateCents:150, lat:5.3887, lng:100.3849, radiusKm:0.35 },
+    { id:'PLZ_E17_BAGAN_AJAM', code:'E17', name:'BORR Bagan Ajam', op:'OP_BORR', type:'OPEN', net:null, dir:'ANY', rateCents:150, lat:5.4379, lng:100.3821, radiusKm:0.35 },
+    { id:'PLZ_E17_SG_NYIOR', code:'E17', name:'BORR Sungai Nyior', op:'OP_BORR', type:'OPEN', net:null, dir:'ANY', rateCents:120, lat:5.4088, lng:100.3736, radiusKm:0.35 },
     { id:'PLZ_E15_KUBANG_SEMANG', code:'E15', name:'BKE Kubang Semang', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:131, lat:5.4055, lng:100.4648, radiusKm:0.35 },
     { id:'PLZ_E15_LUNAS', code:'E15', name:'BKE Lunas', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:131, lat:5.4326, lng:100.5349, radiusKm:0.35 },
 
@@ -897,70 +898,89 @@
     { id:'PLZ_E29_LUKUT', code:'E29', name:'Lukut (SPDH)', op:'OP_PLUS', type:'OPEN', net:null, dir:'ANY', rateCents:65, lat:2.5648, lng:101.8245, radiusKm:0.35 },
 
     // --- LDP (E11) ---
-    { id:'PLZ_E11_PENCHALA', code:'E11', name:'Penchala (LDP)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:210, lat:3.1627, lng:101.6174, radiusKm:0.30 },
-    { id:'PLZ_E11_PJS', code:'E11', name:'Petaling Jaya Selatan (LDP)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:210, lat:3.0811, lng:101.6134, radiusKm:0.30 },
-    { id:'PLZ_E11_PUCHONG_BRT', code:'E11', name:'Puchong Barat (LDP)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:210, lat:3.0472, lng:101.6080, radiusKm:0.30 },
-    { id:'PLZ_E11_PUCHONG_SEL', code:'E11', name:'Puchong Selatan (LDP)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:210, lat:2.9963, lng:101.6373, radiusKm:0.30 },
+    { id:'PLZ_E11_PENCHALA', code:'E11', name:'Penchala (LDP)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:210, lat:3.1627, lng:101.6174, radiusKm:0.35 },
+    { id:'PLZ_E11_PJS', code:'E11', name:'Petaling Jaya Selatan (LDP)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:210, lat:3.0811, lng:101.6134, radiusKm:0.35 },
+    { id:'PLZ_E11_PUCHONG_BRT', code:'E11', name:'Puchong Barat (LDP)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:210, lat:3.0472, lng:101.6080, radiusKm:0.35 },
+    { id:'PLZ_E11_PUCHONG_SEL', code:'E11', name:'Puchong Selatan (LDP)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:210, lat:2.9963, lng:101.6373, radiusKm:0.35 },
 
     // --- KESAS (E5) ---
     { id:'PLZ_E5_KEMUNING', code:'E5', name:'Kemuning (KESAS)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.0124, lng:101.5311, radiusKm:0.35 },
     { id:'PLZ_E5_SUNWAY', code:'E5', name:'Sunway (KESAS)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.0581, lng:101.6038, radiusKm:0.35 },
-    { id:'PLZ_E5_AWAN_BESAR_W', code:'E5', name:'Awan Besar Barat (KESAS)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.0635, lng:101.6632, radiusKm:0.30 },
-    { id:'PLZ_E5_AWAN_BESAR_E', code:'E5', name:'Awan Besar Timur (KESAS)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.0639, lng:101.6741, radiusKm:0.30 },
+    { id:'PLZ_E5_AWAN_BESAR_W', code:'E5', name:'Awan Besar Barat (KESAS)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.0635, lng:101.6632, radiusKm:0.35 },
+    { id:'PLZ_E5_AWAN_BESAR_E', code:'E5', name:'Awan Besar Timur (KESAS)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.0639, lng:101.6741, radiusKm:0.35 },
 
     // --- SPRINT (E23) & SMART TUNNEL (E38) ---
-    { id:'PLZ_E23_BUKIT_KIARA', code:'E23', name:'Bukit Kiara (SPRINT)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:300, lat:3.1491, lng:101.6438, radiusKm:0.30 },
-    { id:'PLZ_E23_DAMANSARA', code:'E23', name:'Damansara (SPRINT)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.1321, lng:101.6244, radiusKm:0.30 },
-    { id:'PLZ_E23_PANTAI', code:'E23', name:'Pantai (SPRINT)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1221, lng:101.6621, radiusKm:0.30 },
+    { id:'PLZ_E23_BUKIT_KIARA', code:'E23', name:'Bukit Kiara (SPRINT)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:300, lat:3.1491, lng:101.6438, radiusKm:0.35 },
+    { id:'PLZ_E23_DAMANSARA', code:'E23', name:'Damansara (SPRINT)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.1321, lng:101.6244, radiusKm:0.35 },
+    { id:'PLZ_E23_PANTAI', code:'E23', name:'Pantai (SPRINT)', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1221, lng:101.6621, radiusKm:0.35 },
     { id:'PLZ_E38_SMART', code:'E38', name:'SMART Tunnel', op:'OP_ALR', type:'OPEN', net:null, dir:'ANY', rateCents:300, lat:3.1282, lng:101.7142, radiusKm:0.35 },
 
     // --- NPE (E10) & BESRAYA (E9) ---
-    { id:'PLZ_E10_PANTAI_DALAM', code:'E10', name:'Pantai Dalam (NPE)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1021, lng:101.6661, radiusKm:0.30 },
-    { id:'PLZ_E10_PJS2', code:'E10', name:'PJS 2 (NPE)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:100, lat:3.0809, lng:101.6442, radiusKm:0.28 },
-    { id:'PLZ_E10_PJS5', code:'E10', name:'PJS 5 (NPE)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.0764, lng:101.6224, radiusKm:0.30 },
-    { id:'PLZ_E9_MINES_U', code:'E9', name:'Mines Utara (BESRAYA)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:185, lat:3.0458, lng:101.7121, radiusKm:0.30 },
-    { id:'PLZ_E9_MINES_S', code:'E9', name:'Mines Selatan (BESRAYA)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:185, lat:3.0211, lng:101.7161, radiusKm:0.30 },
-    { id:'PLZ_E9_LOKE_YEW', code:'E9', name:'Loke Yew (BESRAYA)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:185, lat:3.1261, lng:101.7174, radiusKm:0.30 },
+    { id:'PLZ_E10_PANTAI_DALAM', code:'E10', name:'Pantai Dalam (NPE)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1021, lng:101.6661, radiusKm:0.35 },
+    { id:'PLZ_E10_PJS2', code:'E10', name:'PJS 2 (NPE)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:100, lat:3.0809, lng:101.6442, radiusKm:0.35 },
+    { id:'PLZ_E10_PJS5', code:'E10', name:'PJS 5 (NPE)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.0764, lng:101.6224, radiusKm:0.35 },
+    { id:'PLZ_E9_MINES_U', code:'E9', name:'Mines Utara (BESRAYA)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:185, lat:3.0458, lng:101.7121, radiusKm:0.35 },
+    { id:'PLZ_E9_MINES_S', code:'E9', name:'Mines Selatan (BESRAYA)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:185, lat:3.0211, lng:101.7161, radiusKm:0.35 },
+    { id:'PLZ_E9_LOKE_YEW', code:'E9', name:'Loke Yew (BESRAYA)', op:'OP_IJM', type:'OPEN', net:null, dir:'ANY', rateCents:185, lat:3.1261, lng:101.7174, radiusKm:0.35 },
 
     // --- MEX (E20) ---
-    { id:'PLZ_E20_SALAK_SEL', code:'E20', name:'Salak Selatan (MEX)', op:'OP_MEX', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.0951, lng:101.6981, radiusKm:0.30 },
-    { id:'PLZ_E20_SERI_KEMBANGAN', code:'E20', name:'Seri Kembangan (MEX)', op:'OP_MEX', type:'OPEN', net:null, dir:'ANY', rateCents:220, lat:3.0121, lng:101.6781, radiusKm:0.30 },
+    { id:'PLZ_E20_SALAK_SEL', code:'E20', name:'Salak Selatan (MEX)', op:'OP_MEX', type:'OPEN', net:null, dir:'ANY', rateCents:200, lat:3.0951, lng:101.6981, radiusKm:0.35 },
+    { id:'PLZ_E20_SERI_KEMBANGAN', code:'E20', name:'Seri Kembangan (MEX)', op:'OP_MEX', type:'OPEN', net:null, dir:'ANY', rateCents:220, lat:3.0121, lng:101.6781, radiusKm:0.35 },
     { id:'PLZ_E20_PUTRAJAYA', code:'E20', name:'Putrajaya Utama (MEX)', op:'OP_MEX', type:'OPEN', net:null, dir:'ANY', rateCents:350, lat:2.9481, lng:101.6738, radiusKm:0.40 },
 
     // --- PROLINTAS: GCE (E35), DASH (E31), LKSA (E13), AKLEH (E12), SILK (E18), SUKE (E19) ---
-    { id:'PLZ_E35_BKT_JELUTONG', code:'E35', name:'Bukit Jelutong (GCE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:175, lat:3.1051, lng:101.5308, radiusKm:0.30 },
-    { id:'PLZ_E35_ELMINA', code:'E35', name:'Elmina (GCE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:175, lat:3.1751, lng:101.5154, radiusKm:0.30 },
-    { id:'PLZ_E35_LAGONG', code:'E35', name:'Lagong (GCE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:175, lat:3.2508, lng:101.5464, radiusKm:0.30 },
-    { id:'PLZ_E31_KOTA_DAMANSARA', code:'E31', name:'Kota Damansara (DASH)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1624, lng:101.5881, radiusKm:0.30 },
-    { id:'PLZ_E31_RRIM', code:'E31', name:'Kwasa Damansara / RRIM (DASH)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1741, lng:101.5538, radiusKm:0.30 },
-    { id:'PLZ_E31_DENAI_ALAM', code:'E31', name:'Denai Alam (DASH)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1614, lng:101.5141, radiusKm:0.30 },
-    { id:'PLZ_E13_ALAM_IMPIAN', code:'E13', name:'Alam Impian (LKSA)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:83, lat:3.0441, lng:101.5121, radiusKm:0.30 },
-    { id:'PLZ_E13_SERI_MUDA', code:'E13', name:'Seri Muda (LKSA)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:156, lat:3.0251, lng:101.5311, radiusKm:0.30 },
-    { id:'PLZ_E12_DATUK_KERAMAT', code:'E12', name:'Datuk Keramat (AKLEH)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:213, lat:3.1641, lng:101.7341, radiusKm:0.30 },
-    { id:'PLZ_E18_SG_BALAK', code:'E18', name:'Sungai Balak (SILK)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:166, lat:3.0141, lng:101.7681, radiusKm:0.30 },
-    { id:'PLZ_E18_SG_RAMAL', code:'E18', name:'Sungai Ramal (SILK)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:166, lat:2.9861, lng:101.7564, radiusKm:0.30 },
-    { id:'PLZ_E18_BKT_KAJANG', code:'E18', name:'Bukit Kajang (SILK)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:166, lat:2.9921, lng:101.8021, radiusKm:0.30 },
-    { id:'PLZ_E18_SG_LONG', code:'E18', name:'Sungai Long (SILK)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:166, lat:3.0351, lng:101.7891, radiusKm:0.30 },
-    { id:'PLZ_E19_ALAM_DAMAI', code:'E19', name:'Alam Damai (SUKE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.0741, lng:101.7441, radiusKm:0.30 },
-    { id:'PLZ_E19_BKT_TERATAI', code:'E19', name:'Bukit Teratai (SUKE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1121, lng:101.7681, radiusKm:0.30 },
-    { id:'PLZ_E19_AMPANG', code:'E19', name:'Ampang (SUKE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1481, lng:101.7661, radiusKm:0.30 },
+    { id:'PLZ_E35_BKT_JELUTONG', code:'E35', name:'Bukit Jelutong (GCE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:175, lat:3.1051, lng:101.5308, radiusKm:0.35 },
+    { id:'PLZ_E35_ELMINA', code:'E35', name:'Elmina (GCE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:175, lat:3.1751, lng:101.5154, radiusKm:0.35 },
+    { id:'PLZ_E35_LAGONG', code:'E35', name:'Lagong (GCE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:175, lat:3.2508, lng:101.5464, radiusKm:0.35 },
+    { id:'PLZ_E31_KOTA_DAMANSARA', code:'E31', name:'Kota Damansara (DASH)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1624, lng:101.5881, radiusKm:0.35 },
+    { id:'PLZ_E31_RRIM', code:'E31', name:'Kwasa Damansara / RRIM (DASH)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1741, lng:101.5538, radiusKm:0.35 },
+    { id:'PLZ_E31_DENAI_ALAM', code:'E31', name:'Denai Alam (DASH)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1614, lng:101.5141, radiusKm:0.35 },
+    { id:'PLZ_E13_ALAM_IMPIAN', code:'E13', name:'Alam Impian (LKSA)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:83, lat:3.0441, lng:101.5121, radiusKm:0.35 },
+    { id:'PLZ_E13_SERI_MUDA', code:'E13', name:'Seri Muda (LKSA)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:156, lat:3.0251, lng:101.5311, radiusKm:0.35 },
+    { id:'PLZ_E12_DATUK_KERAMAT', code:'E12', name:'Datuk Keramat (AKLEH)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:213, lat:3.1641, lng:101.7341, radiusKm:0.35 },
+    { id:'PLZ_E18_SG_BALAK', code:'E18', name:'Sungai Balak (SILK)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:166, lat:3.0141, lng:101.7681, radiusKm:0.35 },
+    { id:'PLZ_E18_SG_RAMAL', code:'E18', name:'Sungai Ramal (SILK)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:166, lat:2.9861, lng:101.7564, radiusKm:0.35 },
+    { id:'PLZ_E18_BKT_KAJANG', code:'E18', name:'Bukit Kajang (SILK)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:166, lat:2.9921, lng:101.8021, radiusKm:0.35 },
+    { id:'PLZ_E18_SG_LONG', code:'E18', name:'Sungai Long (SILK)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:166, lat:3.0351, lng:101.7891, radiusKm:0.35 },
+    { id:'PLZ_E19_ALAM_DAMAI', code:'E19', name:'Alam Damai (SUKE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.0741, lng:101.7441, radiusKm:0.35 },
+    { id:'PLZ_E19_BKT_TERATAI', code:'E19', name:'Bukit Teratai (SUKE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1121, lng:101.7681, radiusKm:0.35 },
+    { id:'PLZ_E19_AMPANG', code:'E19', name:'Ampang (SUKE)', op:'OP_PROLINTAS', type:'OPEN', net:null, dir:'ANY', rateCents:230, lat:3.1481, lng:101.7661, radiusKm:0.35 },
 
     // --- DUKE / DUKE 2 / SPE (E33 / E39) ---
-    { id:'PLZ_E33_BATU', code:'E33', name:'Batu (DUKE)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.2089, lng:101.6822, radiusKm:0.30 },
-    { id:'PLZ_E33_SENTUL_PASAR', code:'E33', name:'Sentul Pasar (DUKE East)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1912, lng:101.7018, radiusKm:0.28 },
-    { id:'PLZ_E33_AYER_PANAS', code:'E33', name:'Ayer Panas (DUKE)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1865, lng:101.7225, radiusKm:0.30 },
-    { id:'PLZ_E33_SEGAMBUT', code:'E33', name:'Segambut (DUKE 2)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1919, lng:101.6689, radiusKm:0.30 },
-    { id:'PLZ_E39_SETIAWANGSA', code:'E39', name:'Setiawangsa (SPE / DUKE 3)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:350, lat:3.1765, lng:101.7415, radiusKm:0.30 },
-    { id:'PLZ_E39_CHAN_SOW_LIN', code:'E39', name:'Chan Sow Lin (SPE)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:350, lat:3.1285, lng:101.7165, radiusKm:0.30 },
+    { id:'PLZ_E33_BATU', code:'E33', name:'Batu (DUKE)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.2089, lng:101.6822, radiusKm:0.35 },
+    { id:'PLZ_E33_SENTUL_PASAR', code:'E33', name:'Sentul Pasar (DUKE East)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1912, lng:101.7018, radiusKm:0.35 },
+    { id:'PLZ_E33_AYER_PANAS', code:'E33', name:'Ayer Panas (DUKE)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1865, lng:101.7225, radiusKm:0.35 },
+    { id:'PLZ_E33_SEGAMBUT', code:'E33', name:'Segambut (DUKE 2)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.1919, lng:101.6689, radiusKm:0.35 },
+    { id:'PLZ_E39_SETIAWANGSA', code:'E39', name:'Setiawangsa (SPE / DUKE 3)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:350, lat:3.1765, lng:101.7415, radiusKm:0.35 },
+    { id:'PLZ_E39_CHAN_SOW_LIN', code:'E39', name:'Chan Sow Lin (SPE)', op:'OP_EKOVEST', type:'OPEN', net:null, dir:'ANY', rateCents:350, lat:3.1285, lng:101.7165, radiusKm:0.35 },
 
-    // --- WCE (E32) ---
-    { id:'PLZ_E32_BDR_BUKIT_RAJA', code:'E32', name:'Bandar Bukit Raja (WCE)', op:'OP_WCE', type:'CLOSED', net:'NET_WCE', dir:'ANY', rateCents:0, lat:3.0912, lng:101.4418, radiusKm:0.35 },
-    { id:'PLZ_E32_SAE', code:'E32', name:'SAE / Johan Setia (WCE)', op:'OP_WCE', type:'CLOSED', net:'NET_WCE', dir:'ANY', rateCents:0, lat:2.9896, lng:101.4712, radiusKm:0.35 },
+    // --- EKVE (E27 CLOSED) ---
+    { id:'PLZ_E27_SG_LONG', code:'E27', name:'Sungai Long (EKVE)', op:'OP_EKVE', type:'CLOSED', net:'NET_EKVE', dir:'ANY', rateCents:0, lat:3.0468, lng:101.8125, radiusKm:0.40 },
+    { id:'PLZ_E27_MAHKOTA_CHERAS', code:'E27', name:'Bandar Mahkota Cheras (EKVE)', op:'OP_EKVE', type:'CLOSED', net:'NET_EKVE', dir:'ANY', rateCents:0, lat:3.0635, lng:101.7975, radiusKm:0.40 },
+    { id:'PLZ_E27_HULU_LANGAT', code:'E27', name:'Hulu Langat (EKVE)', op:'OP_EKVE', type:'CLOSED', net:'NET_EKVE', dir:'ANY', rateCents:0, lat:3.1125, lng:101.8145, radiusKm:0.40 },
+    { id:'PLZ_E27_AMPANG', code:'E27', name:'Ampang (EKVE)', op:'OP_EKVE', type:'CLOSED', net:'NET_EKVE', dir:'ANY', rateCents:0, lat:3.1495, lng:101.7785, radiusKm:0.40 },
+
+    // --- WCE (E32 CLOSED — SELANGOR & PERAK SECTIONS) ---
+    { id:'PLZ_E32_BANTING', code:'E32', name:'Banting (WCE)', op:'OP_WCE', type:'CLOSED', net:'NET_WCE', dir:'ANY', rateCents:0, lat:2.8285, lng:101.5185, radiusKm:0.40 },
+    { id:'PLZ_E32_SKVE', code:'E32', name:'SKVE Interchange (WCE)', op:'OP_WCE', type:'CLOSED', net:'NET_WCE', dir:'ANY', rateCents:0, lat:2.9125, lng:101.4915, radiusKm:0.40 },
+    { id:'PLZ_E32_SAE', code:'E32', name:'SAE / Johan Setia (WCE)', op:'OP_WCE', type:'CLOSED', net:'NET_WCE', dir:'ANY', rateCents:0, lat:2.9896, lng:101.4712, radiusKm:0.40 },
+    { id:'PLZ_E32_BDR_BUKIT_RAJA_S', code:'E32', name:'Bandar Bukit Raja Selatan (WCE)', op:'OP_WCE', type:'CLOSED', net:'NET_WCE', dir:'ANY', rateCents:0, lat:3.0912, lng:101.4418, radiusKm:0.40 },
+    { id:'PLZ_E32_BDR_BUKIT_RAJA_U', code:'E32', name:'Bandar Bukit Raja Utara (WCE)', op:'OP_WCE', type:'CLOSED', net:'NET_WCE', dir:'ANY', rateCents:0, lat:3.1185, lng:101.4345, radiusKm:0.40 },
+    { id:'PLZ_E32_ASSAM_JAWA', code:'E32', name:'Assam Jawa (WCE)', op:'OP_WCE', type:'CLOSED', net:'NET_WCE', dir:'ANY', rateCents:0, lat:3.3145, lng:101.3685, radiusKm:0.40 },
+    { id:'PLZ_E32_HUTAN_MELINTANG', code:'E32', name:'Hutan Melintang (WCE)', op:'OP_WCE', type:'CLOSED', net:'NET_WCE', dir:'ANY', rateCents:0, lat:3.8745, lng:100.9345, radiusKm:0.40 },
+    { id:'PLZ_E32_TELUK_INTAN', code:'E32', name:'Teluk Intan (WCE)', op:'OP_WCE', type:'CLOSED', net:'NET_WCE', dir:'ANY', rateCents:0, lat:3.9985, lng:101.0345, radiusKm:0.40 },
+    { id:'PLZ_E32_LEKIR', code:'E32', name:'Lekir (WCE)', op:'OP_WCE', type:'CLOSED', net:'NET_WCE', dir:'ANY', rateCents:0, lat:4.1485, lng:100.7285, radiusKm:0.40 },
+    { id:'PLZ_E32_SITIAWAN', code:'E32', name:'Sitiawan (WCE)', op:'OP_WCE', type:'CLOSED', net:'NET_WCE', dir:'ANY', rateCents:0, lat:4.2185, lng:100.7045, radiusKm:0.40 },
+    { id:'PLZ_E32_SITIAWAN_U', code:'E32', name:'Sitiawan Utara (WCE)', op:'OP_WCE', type:'CLOSED', net:'NET_WCE', dir:'ANY', rateCents:0, lat:4.2645, lng:100.6985, radiusKm:0.40 },
+    { id:'PLZ_E32_CHANGKAT_CERMIN', code:'E32', name:'Changkat Cermin (WCE)', op:'OP_WCE', type:'CLOSED', net:'NET_WCE', dir:'ANY', rateCents:0, lat:4.3685, lng:100.8185, radiusKm:0.40 },
+    { id:'PLZ_E32_BERUAS', code:'E32', name:'Beruas (WCE)', op:'OP_WCE', type:'CLOSED', net:'NET_WCE', dir:'ANY', rateCents:0, lat:4.4985, lng:100.7845, radiusKm:0.40 },
+    { id:'PLZ_E32_TRONG', code:'E32', name:'Trong (WCE)', op:'OP_WCE', type:'CLOSED', net:'NET_WCE', dir:'ANY', rateCents:0, lat:4.7045, lng:100.7245, radiusKm:0.40 },
+    { id:'PLZ_E32_TAIPING_SEL', code:'E32', name:'Taiping Selatan (WCE)', op:'OP_WCE', type:'CLOSED', net:'NET_WCE', dir:'ANY', rateCents:0, lat:4.8185, lng:100.7145, radiusKm:0.40 },
 
     // --- GRAND SAGA (E7), GRAND SEPADU (E30), LATAR (E25), SKVE (E26) ---
-    { id:'PLZ_E7_BATU9', code:'E7', name:'Batu 9 Cheras (Grand Saga)', op:'OP_GRAND_SAGA', type:'OPEN', net:null, dir:'ANY', rateCents:130, lat:3.0715, lng:101.7645, radiusKm:0.30 },
-    { id:'PLZ_E7_BATU11', code:'E7', name:'Batu 11 Cheras (Grand Saga)', op:'OP_GRAND_SAGA', type:'OPEN', net:null, dir:'ANY', rateCents:130, lat:3.0465, lng:101.7735, radiusKm:0.30 },
-    { id:'PLZ_E30_BUKIT_RAJA', code:'E30', name:'Bukit Raja (NNKSB)', op:'OP_GRAND_SEPADU', type:'OPEN', net:null, dir:'ANY', rateCents:60, lat:3.0688, lng:101.4540, radiusKm:0.30 },
+    { id:'PLZ_E7_BATU9', code:'E7', name:'Batu 9 Cheras (Grand Saga)', op:'OP_GRAND_SAGA', type:'OPEN', net:null, dir:'ANY', rateCents:130, lat:3.0715, lng:101.7645, radiusKm:0.35 },
+    { id:'PLZ_E7_BATU11', code:'E7', name:'Batu 11 Cheras (Grand Saga)', op:'OP_GRAND_SAGA', type:'OPEN', net:null, dir:'ANY', rateCents:130, lat:3.0465, lng:101.7735, radiusKm:0.35 },
+    { id:'PLZ_E30_BUKIT_RAJA', code:'E30', name:'Bukit Raja (NNKSB)', op:'OP_GRAND_SEPADU', type:'OPEN', net:null, dir:'ANY', rateCents:60, lat:3.0688, lng:101.4540, radiusKm:0.35 },
     { id:'PLZ_E30_KAPAR', code:'E30', name:'Kapar (NNKSB)', op:'OP_GRAND_SEPADU', type:'OPEN', net:null, dir:'ANY', rateCents:270, lat:3.0745, lng:101.4145, radiusKm:0.35 },
     { id:'PLZ_E25_IJOK', code:'E25', name:'Ijok (LATAR)', op:'OP_LATAR', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.3145, lng:101.4165, radiusKm:0.35 },
     { id:'PLZ_E25_KUANG', code:'E25', name:'Kuang (LATAR)', op:'OP_LATAR', type:'OPEN', net:null, dir:'ANY', rateCents:250, lat:3.2694, lng:101.5458, radiusKm:0.35 },
@@ -996,9 +1016,9 @@
     { id:'PLZ_E22_PENAWAR', code:'E22', name:'Penawar / Desaru (SDE)', op:'OP_SDE', type:'OPEN', net:null, dir:'ANY', rateCents:640, lat:1.5545, lng:104.2145, radiusKm:0.45 },
 
     // --- SABAH & SARAWAK TOLL-FREE CORRIDORS ---
-    { id:'PLZ_AH150_KUCHING', code:'AH150', name:'Pan Borneo Highway (Sarawak — Toll-Free)', op:'OP_JKR_BORNEO', type:'TOLL_FREE', net:null, dir:'ANY', rateCents:0, lat:1.5185, lng:110.3345, radiusKm:4.0 },
+    { id:'PLZ_AH150_KUCHING', code:'AH150', name:'Pan Borneo Highway (Sarawak — Toll-Free)', op:'OP_JKR_BORNEO', type:'TOLL_FREE', net:null, dir:'ANY', rateCents:0, lat:1.5185, lng:110.3345, radiusKm:0.80 },
     { id:'PLZ_E24_TUN_SALAHUDDIN', code:'E24', name:'Tun Salahuddin Bridge (Abolished 2016)', op:'OP_JKR_BORNEO', type:'TOLL_FREE', net:null, dir:'ANY', rateCents:0, lat:1.5645, lng:110.3845, radiusKm:1.0 },
-    { id:'PLZ_AH150_KK', code:'AH150', name:'Pan Borneo Highway (Sabah — Toll-Free)', op:'OP_JKR_BORNEO', type:'TOLL_FREE', net:null, dir:'ANY', rateCents:0, lat:5.9445, lng:116.0845, radiusKm:4.0 }
+    { id:'PLZ_AH150_KK', code:'AH150', name:'Pan Borneo Highway (Sabah — Toll-Free)', op:'OP_JKR_BORNEO', type:'TOLL_FREE', net:null, dir:'ANY', rateCents:0, lat:5.9445, lng:116.0845, radiusKm:0.80 }
   ];
 
   const PLAZA_BY_ID = (() => {
@@ -1165,7 +1185,55 @@
     ['NET_LPT1', 'PLZ_E8_MARAN', 'PLZ_E8_JABOR', 930],
     ['NET_LPT1', 'PLZ_E8_GAMBANG', 'PLZ_E8_KUANTAN', 270],
     ['NET_LPT1', 'PLZ_E8_GAMBANG', 'PLZ_E8_JABOR', 410],
-    ['NET_LPT1', 'PLZ_E8_KUANTAN', 'PLZ_E8_JABOR', 140]
+    ['NET_LPT1', 'PLZ_E8_KUANTAN', 'PLZ_E8_JABOR', 140],
+
+    // EKVE Section 1 (Class 1 gazetted rates)
+    ['NET_EKVE', 'PLZ_E27_SG_LONG', 'PLZ_E27_MAHKOTA_CHERAS', 268],
+    ['NET_EKVE', 'PLZ_E27_SG_LONG', 'PLZ_E27_HULU_LANGAT', 345],
+    ['NET_EKVE', 'PLZ_E27_SG_LONG', 'PLZ_E27_AMPANG', 608],
+    ['NET_EKVE', 'PLZ_E27_MAHKOTA_CHERAS', 'PLZ_E27_HULU_LANGAT', 202],
+    ['NET_EKVE', 'PLZ_E27_MAHKOTA_CHERAS', 'PLZ_E27_AMPANG', 465],
+    ['NET_EKVE', 'PLZ_E27_HULU_LANGAT', 'PLZ_E27_AMPANG', 367],
+
+    // WCE Selangor & Perak (Class 1 gazetted rates)
+    ['NET_WCE', 'PLZ_E32_BDR_BUKIT_RAJA_S', 'PLZ_E32_BDR_BUKIT_RAJA_U', 150],
+    ['NET_WCE', 'PLZ_E32_BDR_BUKIT_RAJA_S', 'PLZ_E32_ASSAM_JAWA', 505],
+    ['NET_WCE', 'PLZ_E32_BDR_BUKIT_RAJA_U', 'PLZ_E32_ASSAM_JAWA', 412],
+    ['NET_WCE', 'PLZ_E32_HUTAN_MELINTANG', 'PLZ_E32_TELUK_INTAN', 290],
+    ['NET_WCE', 'PLZ_E32_LEKIR', 'PLZ_E32_SITIAWAN_U', 280],
+    ['NET_WCE', 'PLZ_E32_LEKIR', 'PLZ_E32_CHANGKAT_CERMIN', 470],
+    ['NET_WCE', 'PLZ_E32_LEKIR', 'PLZ_E32_BERUAS', 790],
+    ['NET_WCE', 'PLZ_E32_LEKIR', 'PLZ_E32_TRONG', 1253],
+    ['NET_WCE', 'PLZ_E32_SITIAWAN', 'PLZ_E32_SITIAWAN_U', 220],
+    ['NET_WCE', 'PLZ_E32_SITIAWAN', 'PLZ_E32_CHANGKAT_CERMIN', 420],
+    ['NET_WCE', 'PLZ_E32_SITIAWAN', 'PLZ_E32_BERUAS', 730],
+    ['NET_WCE', 'PLZ_E32_SITIAWAN', 'PLZ_E32_TRONG', 1155],
+    ['NET_WCE', 'PLZ_E32_SITIAWAN', 'PLZ_E32_TAIPING_SEL', 1295],
+    ['NET_WCE', 'PLZ_E32_SITIAWAN_U', 'PLZ_E32_CHANGKAT_CERMIN', 270],
+    ['NET_WCE', 'PLZ_E32_SITIAWAN_U', 'PLZ_E32_BERUAS', 580],
+    ['NET_WCE', 'PLZ_E32_SITIAWAN_U', 'PLZ_E32_TRONG', 1004],
+    ['NET_WCE', 'PLZ_E32_SITIAWAN_U', 'PLZ_E32_TAIPING_SEL', 1144],
+    ['NET_WCE', 'PLZ_E32_CHANGKAT_CERMIN', 'PLZ_E32_BERUAS', 360],
+    ['NET_WCE', 'PLZ_E32_CHANGKAT_CERMIN', 'PLZ_E32_TRONG', 787],
+    ['NET_WCE', 'PLZ_E32_CHANGKAT_CERMIN', 'PLZ_E32_TAIPING_SEL', 930],
+    ['NET_WCE', 'PLZ_E32_BERUAS', 'PLZ_E32_TRONG', 427],
+    ['NET_WCE', 'PLZ_E32_BERUAS', 'PLZ_E32_TAIPING_SEL', 606],
+
+    // Additional PLUS / ELITE / NSE cross-pairs
+    ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E6_KLIA', 745],
+    ['NET_PLUS', 'PLZ_E1_SG_BULOH', 'PLZ_E6_KLIA', 685],
+    ['NET_PLUS', 'PLZ_E1_DAMANSARA', 'PLZ_E6_KLIA', 580],
+    ['NET_PLUS', 'PLZ_E1_KOTA_DAMANSARA', 'PLZ_E6_KLIA', 610],
+    ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E2_SEREMBAN', 980],
+    ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E2_AYER_KEROH', 1742],
+    ['NET_PLUS', 'PLZ_E1_JLN_DUTA', 'PLZ_E2_SKUDAI', 3776],
+    ['NET_PLUS', 'PLZ_E1_SUBANG', 'PLZ_E2_SEREMBAN', 945],
+    ['NET_PLUS', 'PLZ_E1_SUBANG', 'PLZ_E2_AYER_KEROH', 1707],
+    ['NET_PLUS', 'PLZ_E1_SHAH_ALAM', 'PLZ_E2_SEREMBAN', 995],
+    ['NET_PLUS', 'PLZ_E1_SHAH_ALAM', 'PLZ_E2_AYER_KEROH', 1757],
+    ['NET_PLUS', 'PLZ_E2_KAJANG', 'PLZ_E2_SEREMBAN', 360],
+    ['NET_PLUS', 'PLZ_E2_KAJANG', 'PLZ_E2_AYER_KEROH', 1122],
+    ['NET_PLUS', 'PLZ_E2_KAJANG', 'PLZ_E2_SKUDAI', 3156]
   ];
 
   // Physical highway order for closed-system corridor snapping & entry/exit pairing
@@ -1188,8 +1256,15 @@
     NET_LEKAS: [
       'PLZ_E21_KAJANG_SEL','PLZ_E21_SEMENYIH','PLZ_E21_PAJAM','PLZ_E21_MANTIN','PLZ_E21_SETUL'
     ],
+    NET_EKVE: [
+      'PLZ_E27_SG_LONG','PLZ_E27_MAHKOTA_CHERAS','PLZ_E27_HULU_LANGAT','PLZ_E27_AMPANG'
+    ],
     NET_WCE: [
-      'PLZ_E32_BDR_BUKIT_RAJA','PLZ_E32_SAE'
+      'PLZ_E32_BANTING','PLZ_E32_SKVE','PLZ_E32_SAE',
+      'PLZ_E32_BDR_BUKIT_RAJA_S','PLZ_E32_BDR_BUKIT_RAJA_U','PLZ_E32_ASSAM_JAWA',
+      'PLZ_E32_HUTAN_MELINTANG','PLZ_E32_TELUK_INTAN',
+      'PLZ_E32_LEKIR','PLZ_E32_SITIAWAN','PLZ_E32_SITIAWAN_U',
+      'PLZ_E32_CHANGKAT_CERMIN','PLZ_E32_BERUAS','PLZ_E32_TRONG','PLZ_E32_TAIPING_SEL'
     ]
   };
 
@@ -1214,7 +1289,8 @@
     NET_PLUS: 11.2,
     NET_LPT1: 13.1,
     NET_LEKAS: 14.5,
-    NET_WCE: 13.5
+    NET_EKVE: 16.0,
+    NET_WCE: 14.2
   };
 
   /* =========================================================
@@ -1576,7 +1652,7 @@
     return {applies:false,label:''};
   }
 
-  function densifyRoutePoints(points, maxStepKm = 0.12) {
+  function densifyRoutePoints(points, maxStepKm = 0.30) {
     if (!Array.isArray(points) || points.length < 2) return points || [];
     const dense = [points[0]];
     for (let i = 1; i < points.length; i++) {
@@ -1607,12 +1683,21 @@
     return routePoints[routePoints.length - 1];
   }
 
+  function calculateBearingDeg(a, b) {
+    const lat1 = a.lat * Math.PI / 180;
+    const lat2 = b.lat * Math.PI / 180;
+    const dLon = (b.lng - a.lng) * Math.PI / 180;
+    const y = Math.sin(dLon) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  }
+
   function determineBridgeDirection(routePoints, cumDistances, hitKm) {
-    // Physical ~1.5 km window instead of index count so polyline density never skews direction
-    const beforePt = findPointAtDistance(routePoints, cumDistances, hitKm - 1.5);
-    const afterPt = findPointAtDistance(routePoints, cumDistances, hitKm + 1.5);
-    const dLng = afterPt.lng - beforePt.lng;
-    return dLng < -0.002 ? 'MAINLAND_TO_ISLAND' : 'ISLAND_TO_MAINLAND';
+    // Use ~2.5 km span across bridge water alignment; Penang bridges run ~240°-295° west-southwest onto island
+    const beforePt = findPointAtDistance(routePoints, cumDistances, hitKm - 1.2);
+    const afterPt = findPointAtDistance(routePoints, cumDistances, hitKm + 1.8);
+    const bearing = calculateBearingDeg(beforePt, afterPt);
+    return (bearing >= 200 && bearing <= 330) ? 'MAINLAND_TO_ISLAND' : 'ISLAND_TO_MAINLAND';
   }
 
   function snapHitToCorridorChain(hit) {
@@ -1635,7 +1720,7 @@
   }
 
   function evaluateRouteTolls(rawRoutePoints, avoidTollsSelected) {
-    const routePoints = densifyRoutePoints(rawRoutePoints, 0.12);
+    const routePoints = densifyRoutePoints(rawRoutePoints, 0.30);
     const cumDistances = [0];
     for (let i = 1; i < routePoints.length; i++) {
       cumDistances.push(
@@ -1805,14 +1890,7 @@
       const cluster = item.hits;
       const netId = item.netId;
 
-      const sortedCluster = [...cluster].sort((a, b) => {
-        const idxA = CORRIDOR_INDEX_MAP.get(`${netId}|${a.plaza.id}`);
-        const idxB = CORRIDOR_INDEX_MAP.get(`${netId}|${b.plaza.id}`);
-        if (idxA !== undefined && idxB !== undefined && idxA !== idxB) {
-          return a.kmAtHit <= b.kmAtHit ? a.kmAtHit - b.kmAtHit : b.kmAtHit - a.kmAtHit;
-        }
-        return a.kmAtHit - b.kmAtHit;
-      });
+      const sortedCluster = [...cluster].sort((a, b) => a.kmAtHit - b.kmAtHit);
 
       const entryHit = sortedCluster[0];
       const exitHit = sortedCluster[sortedCluster.length - 1];
@@ -2450,7 +2528,7 @@
         origin:`${origin.lat},${origin.lng}`,
         destination:`${destination.lat},${destination.lng}`,
         departureTime:'any',
-        return:'polyline,summary,actions'
+        return:'polyline,summary'
       };
       if (routingMode === 'notoll') {
         params['avoid[features]'] = 'tollRoad';
